@@ -425,6 +425,30 @@ fun RegisterScreen(
     }
 }
 
+data class ScheduledMeal(
+    val id: Int,
+    val foodItem: FoodItem,
+    val quantity: Int,
+    val targetTime: String,
+    val dateLabel: String,
+    val specs: String,
+    val isPaid: Boolean,
+    val barcodeSeed: String
+)
+
+fun getNutritionalProfile(food: FoodItem): Triple<Float, Float, Float> {
+    val nameLower = food.name.lowercase()
+    return when {
+        nameLower.contains("rice") || nameLower.contains("jollof") || nameLower.contains("waakye") -> Triple(18f, 112f, 12f)
+        nameLower.contains("fufu") || nameLower.contains("soup") || nameLower.contains("banku") -> Triple(22f, 125f, 14f)
+        nameLower.contains("egg") || nameLower.contains("oat") || nameLower.contains("breakfast") || nameLower.contains("bread") -> Triple(14f, 45f, 10f)
+        nameLower.contains("chicken") || nameLower.contains("meat") || nameLower.contains("fish") -> Triple(32f, 15f, 11f)
+        food.category == "Drinks" -> Triple(0f, 38f, 0f)
+        food.category == "Snacks" -> Triple(8f, 50f, 15f)
+        else -> Triple(12f, 75f, 10f)
+    }
+}
+
 // ==========================================
 // 3. STUDENT FOOD ORDERING & RATING PORTAL
 // ==========================================
@@ -445,11 +469,51 @@ fun StudentDashboardScreen(
     val vendorAnnouncement by viewModel.vendorAnnouncement.collectAsStateWithLifecycle()
     val isAdminActing by viewModel.isAdminActing.collectAsStateWithLifecycle()
 
-    var activeTab by remember { mutableIntStateOf(0) } // 0: Browse Food, 1: Track Orders, 2: Smart Wallet & ID
+    val acknowledgedOrders = remember { mutableStateListOf<Int>() }
+
+    var activeTab by remember { mutableIntStateOf(0) } // 0: Browse Food, 1: Orders Hub, 2: Nutrition, 3: Prep Reserves, 4: Smart Wallet & ID
     var selectedFoodForOrder by remember { mutableStateOf<FoodItem?>(null) }
     var orderQuantity by remember { mutableIntStateOf(1) }
     var payViaWallet by remember { mutableStateOf(false) }
     var orderPlacementError by remember { mutableStateOf<String?>(null) }
+
+    // Advanced features state managers
+    val scheduledReservations = remember { mutableStateListOf<ScheduledMeal>() }
+    var dailyCalorieTarget by remember { mutableFloatStateOf(2000f) }
+    var selectedGoalFilter by remember { mutableStateOf("All Goals") }
+    val loggedNutritionMeals = remember { mutableStateListOf<Pair<FoodItem, Long>>() }
+    var successNutritionMessage by remember { mutableStateOf<String?>(null) }
+
+    LaunchedEffect(allFoodItems) {
+        if (loggedNutritionMeals.isEmpty() && allFoodItems.isNotEmpty()) {
+            val jollof = allFoodItems.firstOrNull { it.name.lowercase().contains("jollof") || it.name.lowercase().contains("rice") }
+                ?: allFoodItems.firstOrNull()
+            jollof?.let {
+                loggedNutritionMeals.add(it to System.currentTimeMillis() - 4 * 3600000)
+            }
+            val drink = allFoodItems.firstOrNull { it.category == "Drinks" }
+            drink?.let {
+                loggedNutritionMeals.add(it to System.currentTimeMillis() - 2 * 3600000)
+            }
+        }
+        if (scheduledReservations.isEmpty() && allFoodItems.isNotEmpty()) {
+            val localDish = allFoodItems.firstOrNull { it.category == "Local Dish" } ?: allFoodItems.firstOrNull()
+            localDish?.let {
+                scheduledReservations.add(
+                    ScheduledMeal(
+                        id = 1,
+                        foodItem = it,
+                        quantity = 1,
+                        targetTime = "12:45 PM",
+                        dateLabel = "Today",
+                        specs = "Extra hot chili spice, bio degradable box.",
+                        isPaid = true,
+                        barcodeSeed = "REC-ATU-7731"
+                    )
+                )
+            }
+        }
+    }
 
     var feedbackTargetOrder by remember { mutableStateOf<Order?>(null) }
     var foodQualityRating by remember { mutableIntStateOf(5) }
@@ -518,19 +582,31 @@ fun StudentDashboardScreen(
                     selected = activeTab == 0,
                     onClick = { activeTab = 0 },
                     icon = { Icon(Icons.Default.Restaurant, contentDescription = null) },
-                    label = { Text("Browse Foods") }
+                    label = { Text("Browse", fontSize = 10.sp) }
                 )
                 NavigationBarItem(
                     selected = activeTab == 1,
                     onClick = { activeTab = 1 },
-                    icon = { Icon(Icons.Default.ShoppingCart, contentDescription = null) },
-                    label = { Text("My Orders & Reviews") }
+                    icon = { Icon(Icons.Default.Timer, contentDescription = "Active Track") },
+                    label = { Text("Orders Hub", fontSize = 10.sp) }
                 )
                 NavigationBarItem(
                     selected = activeTab == 2,
                     onClick = { activeTab = 2 },
+                    icon = { Icon(Icons.Default.Favorite, contentDescription = "Calorie & Nutrition") },
+                    label = { Text("Nutrition", fontSize = 10.sp) }
+                )
+                NavigationBarItem(
+                    selected = activeTab == 3,
+                    onClick = { activeTab = 3 },
+                    icon = { Icon(Icons.Default.DateRange, contentDescription = "Reserve Meal") },
+                    label = { Text("Reserve", fontSize = 10.sp) }
+                )
+                NavigationBarItem(
+                    selected = activeTab == 4,
+                    onClick = { activeTab = 4 },
                     icon = { Icon(Icons.Default.Person, contentDescription = null) },
-                    label = { Text("Smart Wallet & ID") }
+                    label = { Text("Wallet & ID", fontSize = 10.sp) }
                 )
             }
         }
@@ -611,6 +687,79 @@ fun StudentDashboardScreen(
                                             fontWeight = FontWeight.Medium,
                                             color = MaterialTheme.colorScheme.onSecondaryContainer
                                         )
+                                    }
+                                }
+                            }
+                        }
+
+                        // Real-time preparation hours/minutes alerts from vendor
+                        val preparingOrders = studentOrders.filter { it.status == "PREPARING" }
+                        if (preparingOrders.isNotEmpty()) {
+                            item {
+                                Card(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    colors = CardDefaults.cardColors(
+                                        containerColor = MaterialTheme.colorScheme.tertiaryContainer.copy(alpha = 0.95f)
+                                    ),
+                                    border = androidx.compose.foundation.BorderStroke(1.5.dp, MaterialTheme.colorScheme.tertiary),
+                                    shape = RoundedCornerShape(12.dp)
+                                ) {
+                                    Column(modifier = Modifier.padding(14.dp)) {
+                                        Row(
+                                            verticalAlignment = Alignment.CenterVertically,
+                                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                        ) {
+                                            Icon(
+                                                imageVector = Icons.Default.Timer,
+                                                contentDescription = "Active Prep Alerts",
+                                                tint = MaterialTheme.colorScheme.tertiary,
+                                                modifier = Modifier.size(20.dp)
+                                            )
+                                            Text(
+                                                "LIVE KITCHEN PREPARATION ALERTS",
+                                                fontWeight = FontWeight.ExtraBold,
+                                                fontSize = 10.sp,
+                                                letterSpacing = 0.8.sp,
+                                                color = MaterialTheme.colorScheme.onTertiaryContainer
+                                            )
+                                        }
+                                        Spacer(modifier = Modifier.height(10.dp))
+                                        preparingOrders.forEach { order ->
+                                            Row(
+                                                modifier = Modifier
+                                                    .fillMaxWidth()
+                                                    .padding(vertical = 4.dp),
+                                                horizontalArrangement = Arrangement.SpaceBetween,
+                                                verticalAlignment = Alignment.CenterVertically
+                                            ) {
+                                                Column(modifier = Modifier.weight(1f)) {
+                                                    Text(
+                                                        text = order.foodName,
+                                                        fontWeight = FontWeight.Bold,
+                                                        fontSize = 13.sp,
+                                                        color = MaterialTheme.colorScheme.onTertiaryContainer
+                                                    )
+                                                    Text(
+                                                        text = "Order #${order.id} • Qty: ${order.quantity}",
+                                                        fontSize = 10.sp,
+                                                        color = MaterialTheme.colorScheme.onTertiaryContainer.copy(alpha = 0.7f)
+                                                    )
+                                                }
+                                                Box(
+                                                    modifier = Modifier
+                                                        .clip(RoundedCornerShape(8.dp))
+                                                        .background(MaterialTheme.colorScheme.tertiary)
+                                                        .padding(horizontal = 10.dp, vertical = 6.dp)
+                                                ) {
+                                                    Text(
+                                                        text = order.estimatedPickupTime,
+                                                        fontWeight = FontWeight.Bold,
+                                                        fontSize = 11.sp,
+                                                        color = MaterialTheme.colorScheme.onTertiary
+                                                    )
+                                                }
+                                            }
+                                        }
                                     }
                                 }
                             }
@@ -778,111 +927,988 @@ fun StudentDashboardScreen(
                     }
                 }
                 1 -> {
-                    // Track student orders & reviews
-                    LazyColumn(
+                    // Merged tracking and history hub
+                    var ordersSubTab by remember { mutableIntStateOf(0) } // 0: Live Tracker, 1: Dining History
+                    
+                    Column(modifier = Modifier.fillMaxSize()) {
+                        TabRow(selectedTabIndex = ordersSubTab) {
+                            Tab(
+                                selected = ordersSubTab == 0,
+                                onClick = { ordersSubTab = 0 },
+                                text = { Text("Live Tracker", fontWeight = FontWeight.Bold, fontSize = 12.sp) },
+                                icon = { Icon(Icons.Default.Timer, contentDescription = null, modifier = Modifier.size(18.dp)) }
+                            )
+                            Tab(
+                                selected = ordersSubTab == 1,
+                                onClick = { ordersSubTab = 1 },
+                                text = { Text("Historical Dishes", fontWeight = FontWeight.Bold, fontSize = 12.sp) },
+                                icon = { Icon(Icons.Default.History, contentDescription = null, modifier = Modifier.size(18.dp)) }
+                            )
+                        }
+                        
+                        if (ordersSubTab == 0) {
+                            val activeOrders = studentOrders.filter { it.status == "PENDING" || it.status == "PREPARING" || it.status == "READY" }
+                            
+                            LazyColumn(
                         modifier = Modifier.fillMaxSize(),
                         contentPadding = PaddingValues(16.dp),
-                        verticalArrangement = Arrangement.spacedBy(12.dp)
+                        verticalArrangement = Arrangement.spacedBy(16.dp)
                     ) {
                         item {
-                            Text(
-                                text = "Your Secure Order Registry",
-                                style = MaterialTheme.typography.titleMedium,
-                                fontWeight = FontWeight.Bold,
-                                color = MaterialTheme.colorScheme.primary
-                            )
+                            Column {
+                                Text(
+                                    text = "Real-Time Meal Tracker",
+                                    style = MaterialTheme.typography.titleMedium,
+                                    fontWeight = FontWeight.Bold,
+                                    color = MaterialTheme.colorScheme.primary
+                                )
+                                Text(
+                                    text = "Monitor live preparation speed under Accra Technical culinary protocols.",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
                         }
 
-                        item {
-                            StudentTrendsLineChart(
-                                orders = studentOrders,
-                                modifier = Modifier.fillMaxWidth()
-                            )
-                        }
-
-                        if (studentOrders.isEmpty()) {
+                        if (activeOrders.isEmpty()) {
                             item {
-                                Box(
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .height(200.dp),
-                                    contentAlignment = Alignment.Center
+                                Card(
+                                    modifier = Modifier.fillMaxWidth().padding(top = 16.dp),
+                                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f)),
+                                    shape = RoundedCornerShape(16.dp)
                                 ) {
-                                    Text("No orders placed yet. Select Browse to fill a plate!")
+                                    Column(
+                                        modifier = Modifier.padding(24.dp).fillMaxWidth(),
+                                        horizontalAlignment = Alignment.CenterHorizontally,
+                                        verticalArrangement = Arrangement.Center
+                                    ) {
+                                        Box(
+                                            modifier = Modifier
+                                                .size(60.dp)
+                                                .clip(CircleShape)
+                                                .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.1f)),
+                                            contentAlignment = Alignment.Center
+                                        ) {
+                                            Icon(
+                                                Icons.Default.Timer,
+                                                contentDescription = null,
+                                                tint = MaterialTheme.colorScheme.primary,
+                                                modifier = Modifier.size(32.dp)
+                                            )
+                                        }
+                                        Spacer(modifier = Modifier.height(16.dp))
+                                        Text(
+                                            "No active order pipeline detected",
+                                            fontWeight = FontWeight.Bold,
+                                            style = MaterialTheme.typography.titleSmall
+                                        )
+                                        Text(
+                                            "Satisfy your cravings with nutritious dishes. Go to the Browse tab and request a dining ticket!",
+                                            fontSize = 11.sp,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                            textAlign = TextAlign.Center,
+                                            modifier = Modifier.padding(top = 4.dp, bottom = 4.dp)
+                                        )
+                                    }
                                 }
                             }
                         } else {
-                            items(studentOrders) { order ->
-                                val isReviewed = allFeedback.any { it.orderId == order.id }
-
+                            items(activeOrders) { order ->
+                                val vendor = allVendors.find { it.id == order.vendorId }
                                 Card(
                                     modifier = Modifier.fillMaxWidth(),
                                     colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                                    shape = RoundedCornerShape(16.dp)
+                                ) {
+                                    Column(modifier = Modifier.padding(16.dp)) {
+                                        // Header
+                                        Row(
+                                            modifier = Modifier.fillMaxWidth(),
+                                            horizontalArrangement = Arrangement.SpaceBetween,
+                                            verticalAlignment = Alignment.Top
+                                        ) {
+                                            Column(modifier = Modifier.weight(1f)) {
+                                                Text(
+                                                    text = "TICKET ORDER #${order.id}",
+                                                    fontWeight = FontWeight.Bold,
+                                                    fontSize = 11.sp,
+                                                    color = MaterialTheme.colorScheme.primary
+                                                )
+                                                Text(
+                                                    text = order.foodName,
+                                                    fontWeight = FontWeight.Bold,
+                                                    style = MaterialTheme.typography.titleMedium
+                                                )
+                                                Text(
+                                                    text = "Seller: ${vendor?.fullName ?: "Cafeteria Vendor"} (${vendor?.info ?: "Culinary booth"})",
+                                                    fontSize = 11.sp,
+                                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                                )
+                                            }
+
+                                            // Status tag
+                                            val badgeColor = when (order.status) {
+                                                "PENDING" -> Color(0xFFF9A825) // Amber
+                                                "PREPARING" -> Color(0xFF1976D2) // Blue
+                                                "READY" -> Color(0xFF2E7D32) // Green
+                                                else -> MaterialTheme.colorScheme.primary
+                                            }
+                                            Box(
+                                                modifier = Modifier
+                                                    .clip(RoundedCornerShape(8.dp))
+                                                    .background(badgeColor)
+                                                    .padding(horizontal = 10.dp, vertical = 5.dp)
+                                            ) {
+                                                Text(
+                                                    text = when (order.status) {
+                                                        "PENDING" -> "Order Received"
+                                                        "PREPARING" -> "Preparing"
+                                                        "READY" -> "Ready for Pickup"
+                                                        else -> order.status
+                                                    },
+                                                    color = Color.White,
+                                                    fontWeight = FontWeight.Bold,
+                                                    fontSize = 10.sp
+                                                )
+                                            }
+                                        }
+
+                                        Spacer(modifier = Modifier.height(12.dp))
+                                        HorizontalDivider(color = MaterialTheme.colorScheme.surfaceVariant)
+                                        Spacer(modifier = Modifier.height(12.dp))
+
+                                        // Stepper progress timeline helper
+                                        val steps = listOf("Received", "Preparing", "Ready")
+                                        val activeStep = when (order.status) {
+                                            "PENDING" -> 0
+                                            "PREPARING" -> 1
+                                            "READY" -> 2
+                                            else -> 0
+                                        }
+
+                                        Row(
+                                            modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp),
+                                            verticalAlignment = Alignment.CenterVertically,
+                                            horizontalArrangement = Arrangement.SpaceBetween
+                                        ) {
+                                            steps.forEachIndexed { index, stepTitle ->
+                                                val isCompleted = index < activeStep
+                                                val isCurrent = index == activeStep
+
+                                                Column(
+                                                    horizontalAlignment = Alignment.CenterHorizontally,
+                                                    modifier = Modifier.weight(1f)
+                                                ) {
+                                                    Box(
+                                                        modifier = Modifier
+                                                            .size(24.dp)
+                                                            .clip(CircleShape)
+                                                            .background(
+                                                                if (isCurrent) MaterialTheme.colorScheme.primary
+                                                                else if (isCompleted) MaterialTheme.colorScheme.primaryContainer
+                                                                else MaterialTheme.colorScheme.surfaceVariant
+                                                            ),
+                                                        contentAlignment = Alignment.Center
+                                                    ) {
+                                                        if (isCompleted) {
+                                                            Icon(
+                                                                Icons.Default.Check,
+                                                                contentDescription = null,
+                                                                tint = MaterialTheme.colorScheme.onPrimaryContainer,
+                                                                modifier = Modifier.size(14.dp)
+                                                            )
+                                                        } else if (isCurrent) {
+                                                            Box(
+                                                                modifier = Modifier
+                                                                    .size(8.dp)
+                                                                    .clip(CircleShape)
+                                                                    .background(MaterialTheme.colorScheme.onPrimary)
+                                                            )
+                                                        } else {
+                                                            Text(
+                                                                text = (index + 1).toString(),
+                                                                fontSize = 10.sp,
+                                                                fontWeight = FontWeight.Bold,
+                                                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                                                            )
+                                                        }
+                                                    }
+                                                    Spacer(modifier = Modifier.height(4.dp))
+                                                    Text(
+                                                        text = stepTitle,
+                                                        fontSize = 9.sp,
+                                                        fontWeight = if (isCurrent) FontWeight.Bold else FontWeight.Normal,
+                                                        color = if (isCurrent) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
+                                                    )
+                                                }
+
+                                                if (index < steps.size - 1) {
+                                                    Box(
+                                                        modifier = Modifier
+                                                            .height(3.dp)
+                                                            .weight(0.4f)
+                                                            .background(
+                                                                if (index < activeStep) MaterialTheme.colorScheme.primary
+                                                                else MaterialTheme.colorScheme.surfaceVariant
+                                                            )
+                                                    )
+                                                }
+                                            }
+                                        }
+
+                                        Spacer(modifier = Modifier.height(12.dp))
+
+                                        // Estimated pickup banner
+                                        Box(
+                                            modifier = Modifier
+                                                .fillMaxWidth()
+                                                .clip(RoundedCornerShape(8.dp))
+                                                .background(MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.4f))
+                                                .padding(12.dp)
+                                        ) {
+                                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                                Icon(
+                                                    imageVector = Icons.Default.Timer,
+                                                    contentDescription = null,
+                                                    tint = MaterialTheme.colorScheme.onSecondaryContainer,
+                                                    modifier = Modifier.size(20.dp)
+                                                )
+                                                Spacer(modifier = Modifier.width(10.dp))
+                                                Column {
+                                                    if (order.status == "PENDING") {
+                                                        Text(
+                                                            text = "ESTIMATED PICKUP TIME",
+                                                            fontSize = 10.sp,
+                                                            fontWeight = FontWeight.Bold,
+                                                            color = MaterialTheme.colorScheme.onSecondaryContainer.copy(alpha = 0.8f)
+                                                        )
+                                                        Text(
+                                                            text = "Awaiting acceptance from vendor...",
+                                                            fontWeight = FontWeight.ExtraBold,
+                                                            fontSize = 12.sp,
+                                                            color = MaterialTheme.colorScheme.onSecondaryContainer
+                                                        )
+                                                    } else if (order.status == "PREPARING") {
+                                                        Text(
+                                                            text = "ESTIMATED PICKUP TIME",
+                                                            fontSize = 10.sp,
+                                                            fontWeight = FontWeight.Bold,
+                                                            color = MaterialTheme.colorScheme.onSecondaryContainer.copy(alpha = 0.8f)
+                                                        )
+                                                        Text(
+                                                            text = order.estimatedPickupTime,
+                                                            fontWeight = FontWeight.ExtraBold,
+                                                            fontSize = 13.sp,
+                                                            color = MaterialTheme.colorScheme.onSecondaryContainer
+                                                        )
+                                                    } else if (order.status == "READY") {
+                                                        Text(
+                                                            text = "HOT & READY FOR RETRIEVAL",
+                                                            fontSize = 10.sp,
+                                                            fontWeight = FontWeight.Bold,
+                                                            color = Color(0xFF2E7D32)
+                                                        )
+                                                        Text(
+                                                            text = "Bring token to physical stand immediately!",
+                                                            fontWeight = FontWeight.ExtraBold,
+                                                            fontSize = 12.sp,
+                                                            color = Color(0xFF2E7D32)
+                                                        )
+                                                    }
+                                                }
+                                            }
+                                        }
+
+                                        // Handshake Token (PIN)
+                                        Spacer(modifier = Modifier.height(10.dp))
+                                        Row(
+                                            modifier = Modifier
+                                                .fillMaxWidth()
+                                                .clip(RoundedCornerShape(8.dp))
+                                                .background(MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.35f))
+                                                .padding(12.dp),
+                                            verticalAlignment = Alignment.CenterVertically
+                                        ) {
+                                            Icon(
+                                                Icons.Default.Lock,
+                                                contentDescription = null,
+                                                tint = MaterialTheme.colorScheme.error,
+                                                modifier = Modifier.size(18.dp)
+                                            )
+                                            Spacer(modifier = Modifier.width(10.dp))
+                                            Column {
+                                                Text(
+                                                    text = "SECURE PICKUP TOKEN PIN: [ ${order.pickupPin} ]",
+                                                    fontWeight = FontWeight.Bold,
+                                                    fontSize = 12.sp,
+                                                    color = MaterialTheme.colorScheme.onErrorContainer
+                                                )
+                                                Text(
+                                                    "Quote this secret verification code to the server booth.",
+                                                    fontSize = 9.sp,
+                                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                                )
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    } else {
+                            val completedOrCanceledOrders = studentOrders.filter { it.status == "COMPLETED" || it.status == "DECLINED" }
+                            val totalSpend = completedOrCanceledOrders.filter { it.status == "COMPLETED" }.sumOf { it.totalPrice }
+                            val orderCount = completedOrCanceledOrders.filter { it.status == "COMPLETED" }.size
+                            
+                            LazyColumn(
+                                modifier = Modifier.fillMaxSize(),
+                                contentPadding = PaddingValues(16.dp),
+                                verticalArrangement = Arrangement.spacedBy(16.dp)
+                            ) {
+                                item {
+                                    Column {
+                                        Text(
+                                            text = "Student Meal Dashboard",
+                                            style = MaterialTheme.typography.titleMedium,
+                                            fontWeight = FontWeight.Bold,
+                                            color = MaterialTheme.colorScheme.primary
+                                        )
+                                        Text(
+                                            text = "Examine your cumulative dining footprints and vendor performance archives.",
+                                            style = MaterialTheme.typography.bodySmall,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                                        )
+                                    }
+                                }
+
+                                // Historical summary cards stats
+                                item {
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        horizontalArrangement = Arrangement.spacedBy(12.dp)
+                                    ) {
+                                        Card(
+                                            modifier = Modifier.weight(1f),
+                                            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer),
+                                            shape = RoundedCornerShape(12.dp)
+                                        ) {
+                                            Column(modifier = Modifier.padding(14.dp)) {
+                                                Text("Total Invested", fontSize = 10.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
+                                                Text(
+                                                    "GH₵ ${"%.2f".format(totalSpend)}",
+                                                    style = MaterialTheme.typography.titleMedium,
+                                                    fontWeight = FontWeight.ExtraBold,
+                                                    color = MaterialTheme.colorScheme.onPrimaryContainer
+                                                )
+                                                Text("Virtual Smart Funds", fontSize = 8.sp, color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.7f))
+                                            }
+                                        }
+
+                                        Card(
+                                            modifier = Modifier.weight(1f),
+                                            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.secondaryContainer),
+                                            shape = RoundedCornerShape(12.dp)
+                                        ) {
+                                            Column(modifier = Modifier.padding(14.dp)) {
+                                                Text("Plates Claimed", fontSize = 10.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.secondary)
+                                                Text(
+                                                    "$orderCount Dishes",
+                                                    style = MaterialTheme.typography.titleMedium,
+                                                    fontWeight = FontWeight.ExtraBold,
+                                                    color = MaterialTheme.colorScheme.onSecondaryContainer
+                                                )
+                                                Text("Full Meal Deliveries", fontSize = 8.sp, color = MaterialTheme.colorScheme.onSecondaryContainer.copy(alpha = 0.7f))
+                                            }
+                                        }
+                                    }
+                                }
+
+                                item {
+                                    StudentTrendsLineChart(
+                                        orders = completedOrCanceledOrders.filter { it.status == "COMPLETED" },
+                                        modifier = Modifier.fillMaxWidth()
+                                    )
+                                }
+
+                                item {
+                                    Text("Official Receipt Journal", fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleSmall, color = MaterialTheme.colorScheme.primary)
+                                }
+
+                                if (completedOrCanceledOrders.isEmpty()) {
+                                    item {
+                                        Text("No dining history found yet.", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                    }
+                                } else {
+                                    items(completedOrCanceledOrders) { order ->
+                                        val orderFeedback = allFeedback.find { it.orderId == order.id }
+                                        Card(
+                                            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f)),
+                                            modifier = Modifier.fillMaxWidth(),
+                                            shape = RoundedCornerShape(12.dp)
+                                        ) {
+                                            Column(modifier = Modifier.padding(14.dp)) {
+                                                Row(
+                                                    modifier = Modifier.fillMaxWidth(),
+                                                    horizontalArrangement = Arrangement.SpaceBetween
+                                                ) {
+                                                    Column {
+                                                        Text(order.foodName, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleSmall)
+                                                        Text("Total paid: GH₵ ${"%.2f".format(order.totalPrice)}", fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                                    }
+                                                    Box(
+                                                        modifier = Modifier
+                                                            .clip(RoundedCornerShape(6.dp))
+                                                            .background(if (order.status == "COMPLETED") MaterialTheme.colorScheme.secondaryContainer else MaterialTheme.colorScheme.errorContainer)
+                                                            .padding(horizontal = 8.dp, vertical = 4.dp)
+                                                    ) {
+                                                        Text(
+                                                            text = order.status,
+                                                            fontSize = 9.sp,
+                                                            fontWeight = FontWeight.Bold,
+                                                            color = if (order.status == "COMPLETED") MaterialTheme.colorScheme.onSecondaryContainer else MaterialTheme.colorScheme.onErrorContainer
+                                                        )
+                                                    }
+                                                }
+
+                                                Spacer(modifier = Modifier.height(10.dp))
+
+                                                if (order.status == "COMPLETED" && orderFeedback == null) {
+                                                    Button(
+                                                        onClick = { feedbackTargetOrder = order },
+                                                        colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary),
+                                                        shape = RoundedCornerShape(6.dp),
+                                                        modifier = Modifier.align(Alignment.End)
+                                                    ) {
+                                                        Icon(Icons.Default.Star, contentDescription = null, modifier = Modifier.size(12.dp))
+                                                        Spacer(modifier = Modifier.width(6.dp))
+                                                        Text("File Safety & Quality Review", fontSize = 10.sp)
+                                                    }
+                                                } else if (orderFeedback != null) {
+                                                    Box(
+                                                        modifier = Modifier
+                                                            .fillMaxWidth()
+                                                            .clip(RoundedCornerShape(8.dp))
+                                                            .background(MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.5f))
+                                                            .padding(8.dp),
+                                                        contentAlignment = Alignment.Center
+                                                    ) {
+                                                        Row(verticalAlignment = Alignment.CenterVertically) {
+                                                            Icon(Icons.Default.CheckCircle, contentDescription = null, tint = MaterialTheme.colorScheme.secondary, modifier = Modifier.size(16.dp))
+                                                            Spacer(modifier = Modifier.width(6.dp))
+                                                            Text("Feedback logged. Compliance Audit Trace records saved.", fontSize = 10.sp, color = MaterialTheme.colorScheme.onSecondaryContainer, fontWeight = FontWeight.Bold)
+                                                        }
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+                2 -> {
+                    // ATU CALORIE & HEALTH PLANNING CENTER (ADVANCED PAGE)
+                    val calorieLoggedSum = loggedNutritionMeals.sumOf { food ->
+                        val macro = getNutritionalProfile(food.first)
+                        val kcal = macro.first * 4f + macro.second * 4f + macro.third * 9f
+                        kcal.toDouble()
+                    }.toFloat()
+
+                    val proteinLogged = loggedNutritionMeals.sumOf { getNutritionalProfile(it.first).first.toDouble() }.toFloat()
+                    val carbsLogged = loggedNutritionMeals.sumOf { getNutritionalProfile(it.first).second.toDouble() }.toFloat()
+                    val fatLogged = loggedNutritionMeals.sumOf { getNutritionalProfile(it.first).third.toDouble() }.toFloat()
+
+                    LazyColumn(
+                        modifier = Modifier.fillMaxSize(),
+                        contentPadding = PaddingValues(16.dp),
+                        verticalArrangement = Arrangement.spacedBy(16.dp)
+                    ) {
+                        item {
+                            Column {
+                                Text(
+                                    text = "ATU Campus Health & Nutrition Portal",
+                                    style = MaterialTheme.typography.titleMedium,
+                                    fontWeight = FontWeight.Bold,
+                                    color = MaterialTheme.colorScheme.primary
+                                )
+                                Text(
+                                    text = "Align your physical wellness goals with your cafeteria dining habits dynamically.",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                        }
+
+                        // Success notification banner if any
+                        successNutritionMessage?.let { msg ->
+                            item {
+                                Card(
+                                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer),
+                                    modifier = Modifier.fillMaxWidth()
+                                ) {
+                                    Row(
+                                        modifier = Modifier.padding(12.dp),
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        Icon(Icons.Default.Check, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
+                                        Spacer(modifier = Modifier.width(10.dp))
+                                        Text(msg, fontSize = 11.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onPrimaryContainer)
+                                    }
+                                }
+                            }
+                        }
+
+                        // Circular rings and calorie indicators
+                        item {
+                            Card(
+                                modifier = Modifier.fillMaxWidth(),
+                                shape = RoundedCornerShape(16.dp),
+                                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))
+                            ) {
+                                Row(
+                                    modifier = Modifier.padding(16.dp),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(16.dp)
+                                ) {
+                                    // Circular dial
+                                    Box(
+                                        contentAlignment = Alignment.Center,
+                                        modifier = Modifier.size(110.dp)
+                                    ) {
+                                        CircularProgressIndicator(
+                                            progress = { (calorieLoggedSum / dailyCalorieTarget).coerceIn(0f, 1f) },
+                                            modifier = Modifier.size(110.dp),
+                                            color = MaterialTheme.colorScheme.primary,
+                                            strokeWidth = 10.dp,
+                                            trackColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.6f)
+                                        )
+                                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                            Text(
+                                                text = "${calorieLoggedSum.toInt()}",
+                                                fontWeight = FontWeight.ExtraBold,
+                                                fontSize = 20.sp,
+                                                color = MaterialTheme.colorScheme.primary
+                                            )
+                                            Text(
+                                                text = "/ ${dailyCalorieTarget.toInt()} kcal",
+                                                fontSize = 9.sp,
+                                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                                            )
+                                        }
+                                    }
+
+                                    // Controls & Goal setting
+                                    Column(modifier = Modifier.weight(1f)) {
+                                        Text(
+                                            text = "Daily Calorie Budget",
+                                            fontWeight = FontWeight.Bold,
+                                            fontSize = 12.sp,
+                                            color = MaterialTheme.colorScheme.primary
+                                        )
+                                        Text(
+                                            text = "Maintain active study/sports metabolism levels.",
+                                            fontSize = 10.sp,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                                        )
+
+                                        Spacer(modifier = Modifier.height(8.dp))
+
+                                        Slider(
+                                            value = dailyCalorieTarget,
+                                            onValueChange = { dailyCalorieTarget = it.toInt().toFloat() },
+                                            valueRange = 1500f..3500f,
+                                            steps = 19
+                                        )
+
+                                        Text(
+                                            text = "Adjusted Target: ${dailyCalorieTarget.toInt()} kcal",
+                                            fontSize = 11.sp,
+                                            fontWeight = FontWeight.SemiBold
+                                        )
+                                    }
+                                }
+                            }
+                        }
+
+                        // Macro Breakdown linear bars
+                        item {
+                            Card(
+                                modifier = Modifier.fillMaxWidth(),
+                                shape = RoundedCornerShape(12.dp)
+                            ) {
+                                Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                                    Text("Macro-Nutrient Performance Trackers", fontWeight = FontWeight.Bold, fontSize = 12.sp, color = MaterialTheme.colorScheme.primary)
+                                    
+                                    // Protein tracker
+                                    Column {
+                                        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                                            Text("🍗 Protein Intake", fontSize = 11.sp, fontWeight = FontWeight.SemiBold)
+                                            Text("${proteinLogged.toInt()}g / 130g target", fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                        }
+                                        Spacer(modifier = Modifier.height(4.dp))
+                                        LinearProgressIndicator(
+                                            progress = { (proteinLogged / 130f).coerceIn(0f, 1f) },
+                                            modifier = Modifier.fillMaxWidth(),
+                                            color = Color(0xFF4CAF50),
+                                            trackColor = MaterialTheme.colorScheme.surfaceVariant
+                                        )
+                                    }
+
+                                    // Carbs tracker
+                                    Column {
+                                        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                                            Text("🌾 Carb Fuel", fontSize = 11.sp, fontWeight = FontWeight.SemiBold)
+                                            Text("${carbsLogged.toInt()}g / 280g limit", fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                        }
+                                        Spacer(modifier = Modifier.height(4.dp))
+                                        LinearProgressIndicator(
+                                            progress = { (carbsLogged / 280f).coerceIn(0f, 1f) },
+                                            modifier = Modifier.fillMaxWidth(),
+                                            color = Color(0xFFFF9800),
+                                            trackColor = MaterialTheme.colorScheme.surfaceVariant
+                                        )
+                                    }
+
+                                    // Fat tracker
+                                    Column {
+                                        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                                            Text("🥑 Core Fats", fontSize = 11.sp, fontWeight = FontWeight.SemiBold)
+                                            Text("${fatLogged.toInt()}g / 80g limit", fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                        }
+                                        Spacer(modifier = Modifier.height(4.dp))
+                                        LinearProgressIndicator(
+                                            progress = { (fatLogged / 80f).coerceIn(0f, 1f) },
+                                            modifier = Modifier.fillMaxWidth(),
+                                            color = Color(0xFFE91E63),
+                                            trackColor = MaterialTheme.colorScheme.surfaceVariant
+                                        )
+                                    }
+                                }
+                            }
+                        }
+
+                        // Logging logs & suggestions header
+                        item {
+                            Text(
+                                text = "ATU Smart Nutri-Scan meal suggestor",
+                                fontWeight = FontWeight.Bold,
+                                style = MaterialTheme.typography.titleSmall
+                            )
+                        }
+
+                        item {
+                            // Filter goals
+                            val goals = listOf("All Goals", "High Protein gains", "Low Calorie snack", "Budget Healthy")
+                            LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                items(goals) { goal ->
+                                    FilterChip(
+                                        selected = selectedGoalFilter == goal,
+                                        onClick = { selectedGoalFilter = goal },
+                                        label = { Text(goal, fontSize = 10.sp) }
+                                    )
+                                }
+                            }
+                        }
+
+                        // Filtered suggestions
+                        val filteredSuggestList = allFoodItems.filter { food ->
+                            when (selectedGoalFilter) {
+                                "High Protein gains" -> {
+                                    val triple = getNutritionalProfile(food)
+                                    triple.first >= 15f
+                                }
+                                "Low Calorie snack" -> {
+                                    val triple = getNutritionalProfile(food)
+                                    val kc = triple.first * 4 + triple.second * 4 + triple.third * 9
+                                    kc < 450f
+                                }
+                                "Budget Healthy" -> {
+                                    food.price < 35.0
+                                }
+                                else -> true
+                            }
+                        }
+
+                        if (filteredSuggestList.isEmpty()) {
+                            item {
+                                Text("No matching dietary items found inside active campus stands.", fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            }
+                        } else {
+                            items(filteredSuggestList) { food ->
+                                val triple = getNutritionalProfile(food)
+                                val kcalValue = triple.first * 4f + triple.second * 4f + triple.third * 9f
+                                Card(
+                                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                                    border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.primaryContainer),
+                                    shape = RoundedCornerShape(12.dp),
+                                    modifier = Modifier.fillMaxWidth()
+                                ) {
+                                    Row(
+                                        modifier = Modifier.padding(12.dp),
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        Column(modifier = Modifier.weight(1f)) {
+                                            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                                                Text(
+                                                    text = food.name,
+                                                    fontWeight = FontWeight.Bold,
+                                                    fontSize = 14.sp
+                                                )
+                                                Box(
+                                                    modifier = Modifier
+                                                        .clip(RoundedCornerShape(4.dp))
+                                                        .background(MaterialTheme.colorScheme.primaryContainer)
+                                                        .padding(horizontal = 6.dp, vertical = 2.dp)
+                                                ) {
+                                                    Text(
+                                                        text = "${kcalValue.toInt()} kcal",
+                                                        fontSize = 9.sp,
+                                                        fontWeight = FontWeight.Bold,
+                                                        color = MaterialTheme.colorScheme.onPrimaryContainer
+                                                    )
+                                                }
+                                            }
+                                            Text(
+                                                text = "Protein: ${triple.first.toInt()}g • Carbs: ${triple.second.toInt()}g • Fat: ${triple.third.toInt()}g",
+                                                fontSize = 11.sp,
+                                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                                            )
+                                            Text(
+                                                text = "GH₵ ${"%.2f".format(food.price)} • ${food.category}",
+                                                fontSize = 10.sp,
+                                                color = MaterialTheme.colorScheme.primary,
+                                                fontWeight = FontWeight.Bold
+                                            )
+                                        }
+
+                                        Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                                            Button(
+                                                onClick = {
+                                                    loggedNutritionMeals.add(food to System.currentTimeMillis())
+                                                    successNutritionMessage = "Healthy choice logged! Added ${kcalValue.toInt()} kcal to your board."
+                                                },
+                                                contentPadding = PaddingValues(horizontal = 8.dp),
+                                                colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.secondary),
+                                                modifier = Modifier.defaultMinSize(minWidth = 1.dp, minHeight = 1.dp)
+                                            ) {
+                                                Text("Log Food", fontSize = 10.sp)
+                                            }
+
+                                            OutlinedButton(
+                                                onClick = {
+                                                    selectedFoodForOrder = food
+                                                },
+                                                contentPadding = PaddingValues(horizontal = 8.dp),
+                                                modifier = Modifier.defaultMinSize(minWidth = 1.dp, minHeight = 1.dp)
+                                            ) {
+                                                Text("Order Now", fontSize = 10.sp)
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+
+                        // Log history footer
+                        item {
+                            Text("Today's Nutritional Logs", fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleSmall)
+                        }
+
+                        if (loggedNutritionMeals.isEmpty()) {
+                            item {
+                                Text("No foods logged in active health system today.", fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            }
+                        } else {
+                            items(loggedNutritionMeals) { pair ->
+                                val fl = pair.first
+                                val triple = getNutritionalProfile(fl)
+                                val kcalValue = triple.first * 4f + triple.second * 4f + triple.third * 9f
+                                Card(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f))
+                                ) {
+                                    Row(
+                                        modifier = Modifier.padding(10.dp),
+                                        horizontalArrangement = Arrangement.SpaceBetween,
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        Column {
+                                            Text(fl.name, fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                                            Text("Macros: P:${triple.first.toInt()}g C:${triple.second.toInt()}g F:${triple.third.toInt()}g", fontSize = 10.sp)
+                                        }
+                                        Box(
+                                            modifier = Modifier
+                                                .clip(RoundedCornerShape(6.dp))
+                                                .background(MaterialTheme.colorScheme.primaryContainer)
+                                                .padding(horizontal = 8.dp, vertical = 4.dp)
+                                        ) {
+                                            Text(
+                                                text = "+${kcalValue.toInt()} kcal",
+                                                fontWeight = FontWeight.Bold,
+                                                fontSize = 11.sp,
+                                                color = MaterialTheme.colorScheme.onPrimaryContainer
+                                            )
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    val completedOrCanceledOrders = studentOrders.filter { it.status == "COMPLETED" || it.status == "DECLINED" }
+                    val totalSpend = completedOrCanceledOrders.filter { it.status == "COMPLETED" }.sumOf { it.totalPrice }
+                    val orderCount = completedOrCanceledOrders.filter { it.status == "COMPLETED" }.size
+
+                    if (false) {
+                        LazyColumn(
+                        modifier = Modifier.fillMaxSize(),
+                        contentPadding = PaddingValues(16.dp),
+                        verticalArrangement = Arrangement.spacedBy(16.dp)
+                    ) {
+                        item {
+                            Column {
+                                Text(
+                                    text = "Student Meal Dashboard",
+                                    style = MaterialTheme.typography.titleMedium,
+                                    fontWeight = FontWeight.Bold,
+                                    color = MaterialTheme.colorScheme.primary
+                                )
+                                Text(
+                                    text = "Examine your cumulative dining footprints and vendor performance archives.",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                        }
+
+                        // Historical summary cards stats
+                        item {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(12.dp)
+                            ) {
+                                Card(
+                                    modifier = Modifier.weight(1f),
+                                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer),
+                                    shape = RoundedCornerShape(12.dp)
+                                ) {
+                                    Column(modifier = Modifier.padding(14.dp)) {
+                                        Text("Total Invested", fontSize = 10.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
+                                        Text(
+                                            "GH₵ ${"%.2f".format(totalSpend)}",
+                                            style = MaterialTheme.typography.titleMedium,
+                                            fontWeight = FontWeight.ExtraBold,
+                                            color = MaterialTheme.colorScheme.onPrimaryContainer
+                                        )
+                                        Text("Virtual Smart Funds", fontSize = 8.sp, color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.7f))
+                                    }
+                                }
+
+                                Card(
+                                    modifier = Modifier.weight(1f),
+                                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.secondaryContainer),
+                                    shape = RoundedCornerShape(12.dp)
+                                ) {
+                                    Column(modifier = Modifier.padding(14.dp)) {
+                                        Text("Plates Claimed", fontSize = 10.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.secondary)
+                                        Text(
+                                            "$orderCount Dishes",
+                                            style = MaterialTheme.typography.titleMedium,
+                                            fontWeight = FontWeight.ExtraBold,
+                                            color = MaterialTheme.colorScheme.onSecondaryContainer
+                                        )
+                                        Text("Successful transfers", fontSize = 8.sp, color = MaterialTheme.colorScheme.onSecondaryContainer.copy(alpha = 0.7f))
+                                    }
+                                }
+                            }
+                        }
+
+                        // Spend trend line chart
+                        item {
+                            Card(
+                                modifier = Modifier.fillMaxWidth(),
+                                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                                shape = RoundedCornerShape(16.dp),
+                                elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+                            ) {
+                                Column(modifier = Modifier.padding(16.dp)) {
+                                    Text(
+                                        "Campus Dining Intensity Trend",
+                                        fontWeight = FontWeight.Bold,
+                                        style = MaterialTheme.typography.titleSmall,
+                                        color = MaterialTheme.colorScheme.primary
+                                    )
+                                    Spacer(modifier = Modifier.height(10.dp))
+                                    StudentTrendsLineChart(
+                                        orders = studentOrders,
+                                        modifier = Modifier.fillMaxWidth()
+                                    )
+                                }
+                            }
+                        }
+
+                        item {
+                            Text(
+                                text = "Landed Invoices & Outbox Archives",
+                                style = MaterialTheme.typography.titleSmall,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+
+                        if (completedOrCanceledOrders.isEmpty()) {
+                            item {
+                                Box(
+                                    modifier = Modifier.fillMaxWidth().height(120.dp),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Text("No historical dining records archived yet.", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                }
+                            }
+                        } else {
+                            items(completedOrCanceledOrders) { order ->
+                                val isReviewed = allFeedback.any { it.orderId == order.id }
+                                val vendor = allVendors.find { it.id == order.vendorId }
+
+                                Card(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f)),
                                     shape = RoundedCornerShape(12.dp)
                                 ) {
                                     Column(modifier = Modifier.padding(16.dp)) {
                                         Row(
                                             modifier = Modifier.fillMaxWidth(),
-                                            horizontalArrangement = Arrangement.SpaceBetween
+                                            horizontalArrangement = Arrangement.SpaceBetween,
+                                            verticalAlignment = Alignment.CenterVertically
                                         ) {
                                             Column {
-                                                Text("Order #${order.id}", fontWeight = FontWeight.Bold, fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                                                Text(order.foodName, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleMedium)
-                                                Text("QTY: ${order.quantity} • Total: GH₵ ${"%.2f".format(order.totalPrice)}", style = MaterialTheme.typography.bodySmall)
+                                                Text("Receipt #${order.id}", fontWeight = FontWeight.Bold, fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                                Text(order.foodName, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.bodyLarge)
+                                                Text(
+                                                    "QTY: ${order.quantity} • Paid: GH₵ ${"%.2f".format(order.totalPrice)}",
+                                                    style = MaterialTheme.typography.bodySmall
+                                                )
+                                                Text(
+                                                    "Stand: ${vendor?.fullName ?: "Cafeteria Vendor"}",
+                                                    fontSize = 11.sp,
+                                                    color = MaterialTheme.colorScheme.primary
+                                                )
                                             }
 
                                             // Status Badge
-                                            val badgeColor = when (order.status) {
-                                                "PENDING" -> Color(0xFFF9A825)
-                                                "PREPARING" -> Color(0xFF1976D2)
-                                                "READY" -> Color(0xFF2E7D32)
-                                                "COMPLETED" -> Color(0xFF555555)
-                                                else -> Color(0xFFC62828)
-                                            }
+                                            val badgeColor = if (order.status == "COMPLETED") Color(0xFF2E7D32) else Color(0xFFC62828)
                                             Box(
                                                 modifier = Modifier
                                                     .clip(RoundedCornerShape(4.dp))
                                                     .background(badgeColor)
                                                     .padding(horizontal = 8.dp, vertical = 4.dp)
                                             ) {
-                                                Text(order.status, color = Color.White, fontWeight = FontWeight.Bold, fontSize = 10.sp)
+                                                Text(order.status, color = Color.White, fontWeight = FontWeight.Bold, fontSize = 9.sp)
                                             }
                                         }
 
-                                        Spacer(modifier = Modifier.height(12.dp))
-
-                                        // SECURITY KEY HANDSHAKE
-                                        if (order.status != "COMPLETED" && order.status != "DECLINED") {
-                                            Row(
-                                                modifier = Modifier
-                                                    .fillMaxWidth()
-                                                    .clip(RoundedCornerShape(8.dp))
-                                                    .background(MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.5f))
-                                                    .padding(12.dp),
-                                                verticalAlignment = Alignment.CenterVertically
-                                            ) {
-                                                Icon(
-                                                    Icons.Default.Lock,
-                                                    contentDescription = null,
-                                                    tint = MaterialTheme.colorScheme.error,
-                                                    modifier = Modifier.size(24.dp)
-                                                )
-                                                Spacer(modifier = Modifier.width(12.dp))
-                                                Column {
-                                                    Text(
-                                                        text = "SECURE PICKUP TOKEN: [ ${order.pickupPin} ]",
-                                                        fontWeight = FontWeight.Bold,
-                                                        fontSize = 13.sp,
-                                                        color = MaterialTheme.colorScheme.onErrorContainer
-                                                    )
-                                                    Text(
-                                                        "Declare this 4-digit token to the seller booth to claim food custody.",
-                                                        fontSize = 9.sp,
-                                                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                                                    )
-                                                }
-                                            }
-                                        } else if (order.status == "COMPLETED") {
+                                        if (order.status == "COMPLETED") {
+                                            Spacer(modifier = Modifier.height(12.dp))
                                             if (!isReviewed) {
                                                 Button(
                                                     onClick = {
@@ -906,14 +1932,14 @@ fun StudentDashboardScreen(
                                                     modifier = Modifier
                                                         .fillMaxWidth()
                                                         .clip(RoundedCornerShape(8.dp))
-                                                        .background(MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.4f))
+                                                        .background(MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.5f))
                                                         .padding(8.dp),
                                                     contentAlignment = Alignment.Center
                                                 ) {
                                                     Row(verticalAlignment = Alignment.CenterVertically) {
-                                                        Icon(Icons.Default.Check, contentDescription = null, tint = MaterialTheme.colorScheme.secondary, modifier = Modifier.size(16.dp))
+                                                        Icon(Icons.Default.CheckCircle, contentDescription = null, tint = MaterialTheme.colorScheme.secondary, modifier = Modifier.size(16.dp))
                                                         Spacer(modifier = Modifier.width(6.dp))
-                                                        Text("Feedback logged. Compliance Audit Trace records saved.", fontSize = 11.sp, color = MaterialTheme.colorScheme.onSecondaryContainer, fontWeight = FontWeight.Bold)
+                                                        Text("Feedback logged. Compliance Audit Trace records saved.", fontSize = 10.sp, color = MaterialTheme.colorScheme.onSecondaryContainer, fontWeight = FontWeight.Bold)
                                                     }
                                                 }
                                             }
@@ -924,7 +1950,369 @@ fun StudentDashboardScreen(
                         }
                     }
                 }
-                2 -> {
+                3 -> {
+                    // CAMPUS PRE-ORDER RESERVATION SCHEDULER (ADVANCED PAGE)
+                    var reserveFoodSelection by remember { mutableStateOf<FoodItem?>(allFoodItems.firstOrNull()) }
+                    var reserveQuantity by remember { mutableIntStateOf(1) }
+                    var reserveTimeSlot by remember { mutableStateOf("Mid-day Class break: 11:45 AM") }
+                    var reserveSpecs by remember { mutableStateOf("") }
+                    var reservePayWithWallet by remember { mutableStateOf(true) }
+                    var reserveMessage by remember { mutableStateOf<String?>(null) }
+                    var reserveErrorMsg by remember { mutableStateOf<String?>(null) }
+
+                    LazyColumn(
+                        modifier = Modifier.fillMaxSize(),
+                        contentPadding = PaddingValues(16.dp),
+                        verticalArrangement = Arrangement.spacedBy(16.dp)
+                    ) {
+                        item {
+                            Column {
+                                Text(
+                                    text = "ATU Line-Bypass Scheduling Engine",
+                                    style = MaterialTheme.typography.titleMedium,
+                                    fontWeight = FontWeight.Bold,
+                                    color = MaterialTheme.colorScheme.primary
+                                )
+                                Text(
+                                    text = "Schedule meal preparation up to 48 hours early. Arrive and flash your verification barcode to grab your hot plate.",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                        }
+
+                        // Notifications feedback
+                        reserveMessage?.let { msg ->
+                            item {
+                                Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer)) {
+                                    Row(modifier = Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
+                                        Icon(Icons.Default.CheckCircle, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
+                                        Spacer(modifier = Modifier.width(10.dp))
+                                        Text(msg, fontSize = 11.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onPrimaryContainer)
+                                    }
+                                }
+                            }
+                        }
+
+                        reserveErrorMsg?.let { msg ->
+                            item {
+                                Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.errorContainer)) {
+                                    Row(modifier = Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
+                                        Icon(Icons.Default.Warning, contentDescription = null, tint = MaterialTheme.colorScheme.error)
+                                        Spacer(modifier = Modifier.width(10.dp))
+                                        Text(msg, fontSize = 11.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onErrorContainer)
+                                    }
+                                }
+                            }
+                        }
+
+                        // Scheduler setup Card form
+                        item {
+                            Card(
+                                modifier = Modifier.fillMaxWidth(),
+                                shape = RoundedCornerShape(16.dp)
+                            ) {
+                                Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
+                                    Text(
+                                        text = "Setup Future Meal Reservation",
+                                        fontWeight = FontWeight.ExtraBold,
+                                        fontSize = 14.sp,
+                                        color = MaterialTheme.colorScheme.primary
+                                    )
+
+                                    // Pick food item
+                                    Text("1. SELECT DISH SPECIFICATION:", fontWeight = FontWeight.Bold, fontSize = 9.sp)
+                                    if (allFoodItems.isEmpty()) {
+                                        Text("No campus food menu items seeded yet.", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                    } else {
+                                        var showDropMenu by remember { mutableStateOf(false) }
+                                        Box(modifier = Modifier.fillMaxWidth()) {
+                                            OutlinedButton(
+                                                onClick = { showDropMenu = true },
+                                                modifier = Modifier.fillMaxWidth(),
+                                                shape = RoundedCornerShape(8.dp)
+                                            ) {
+                                                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+                                                    Text(reserveFoodSelection?.name ?: "Select Food item...", fontWeight = FontWeight.Bold)
+                                                    Icon(Icons.Default.ArrowDropDown, contentDescription = null)
+                                                }
+                                            }
+                                            DropdownMenu(
+                                                expanded = showDropMenu,
+                                                onDismissRequest = { showDropMenu = false }
+                                            ) {
+                                                allFoodItems.forEach { item ->
+                                                    DropdownMenuItem(
+                                                        text = { Text("${item.name} • GH₵ ${"%.2f".format(item.price)}") },
+                                                        onClick = {
+                                                            reserveFoodSelection = item
+                                                            showDropMenu = false
+                                                        }
+                                                    )
+                                                }
+                                            }
+                                        }
+                                    }
+
+                                    // Picking time-slot
+                                    Text("2. DEFINE PICKS TARGET SLOT WINDOW:", fontWeight = FontWeight.Bold, fontSize = 9.sp)
+                                    val slots = listOf(
+                                        "Breakfast slot: 8:30 AM",
+                                        "Mid-day Class break: 11:45 AM",
+                                        "Afternoon recess: 2:30 PM",
+                                        "Evening prep sessions: 5:45 PM",
+                                        "Late night snack: 8:15 PM"
+                                    )
+                                    var showSlotsDropMenu by remember { mutableStateOf(false) }
+                                    Box(modifier = Modifier.fillMaxWidth()) {
+                                        OutlinedButton(
+                                            onClick = { showSlotsDropMenu = true },
+                                            modifier = Modifier.fillMaxWidth(),
+                                            shape = RoundedCornerShape(8.dp)
+                                        ) {
+                                            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+                                                Text(reserveTimeSlot, fontWeight = FontWeight.Bold)
+                                                Icon(Icons.Default.ArrowDropDown, contentDescription = null)
+                                            }
+                                        }
+                                        DropdownMenu(
+                                            expanded = showSlotsDropMenu,
+                                            onDismissRequest = { showSlotsDropMenu = false }
+                                        ) {
+                                            slots.forEach { slot ->
+                                                DropdownMenuItem(
+                                                    text = { Text(slot) },
+                                                    onClick = {
+                                                        reserveTimeSlot = slot
+                                                        showSlotsDropMenu = false
+                                                    }
+                                                )
+                                            }
+                                        }
+                                    }
+
+                                    // Pick Quantity
+                                    Text("3. CULINARY QUANTITY:", fontWeight = FontWeight.Bold, fontSize = 9.sp)
+                                    Row(
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        modifier = Modifier.fillMaxWidth()
+                                    ) {
+                                        TextButton(onClick = { if (reserveQuantity > 1) reserveQuantity-- }) {
+                                            Text("-", fontSize = 24.sp, fontWeight = FontWeight.Bold)
+                                        }
+                                        Text("$reserveQuantity", fontWeight = FontWeight.Bold, fontSize = 20.sp, modifier = Modifier.padding(horizontal = 14.dp))
+                                        TextButton(onClick = { if (reserveQuantity < 5) reserveQuantity++ }) {
+                                            Text("+", fontSize = 20.sp, fontWeight = FontWeight.Bold)
+                                        }
+                                    }
+
+                                    // Custom specs
+                                    Text("4. SPECIAL INSTRUCTIONS / INTENT:", fontWeight = FontWeight.Bold, fontSize = 9.sp)
+                                    OutlinedTextField(
+                                        value = reserveSpecs,
+                                        onValueChange = { reserveSpecs = it },
+                                        placeholder = { Text("e.g. Extra spicy, eco-packing, serving temperature", fontSize = 11.sp) },
+                                        modifier = Modifier.fillMaxWidth(),
+                                        singleLine = true,
+                                        shape = RoundedCornerShape(8.dp)
+                                    )
+
+                                    // Payment toggle option
+                                    val currentCost = (reserveFoodSelection?.price ?: 0.0) * reserveQuantity
+                                    Row(verticalAlignment = Alignment.CenterVertically) {
+                                        Checkbox(checked = reservePayWithWallet, onCheckedChange = { reservePayWithWallet = it })
+                                        Spacer(modifier = Modifier.width(6.dp))
+                                        Column {
+                                            Text("Settle Pay securely via Virtual Student Wallet", fontSize = 11.sp, fontWeight = FontWeight.SemiBold)
+                                            Text("Price: GH₵ ${"%.2f".format(currentCost)} • Smart Wallet Balance: GH₵ ${"%.2f".format(studentWalletBalance)}", fontSize = 10.sp, color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold)
+                                        }
+                                    }
+
+                                    // Large Action lock reservation button
+                                    Button(
+                                        onClick = {
+                                            reserveMessage = null
+                                            reserveErrorMsg = null
+                                            val foodSelectedVal = reserveFoodSelection
+                                            if (foodSelectedVal == null) {
+                                                reserveErrorMsg = "Please pick a valid campus food item."
+                                            } else {
+                                                val cost = foodSelectedVal.price * reserveQuantity
+                                                if (reservePayWithWallet) {
+                                                    if (studentWalletBalance >= cost) {
+                                                        // Deduct using viewModel
+                                                        viewModel.rechargeWallet(-cost)
+                                                        scheduledReservations.add(
+                                                            ScheduledMeal(
+                                                                id = (1000..9999).random(),
+                                                                foodItem = foodSelectedVal,
+                                                                quantity = reserveQuantity,
+                                                                targetTime = reserveTimeSlot.substringAfter(": "),
+                                                                dateLabel = "Today",
+                                                                specs = reserveSpecs.ifBlank { "No special dietary options defined." },
+                                                                isPaid = true,
+                                                                barcodeSeed = "REC-ATU-${(1000..9999).random()}"
+                                                            )
+                                                        )
+                                                        reserveMessage = "Campus Pre-Order Booking Lock Saved! Wallet debited."
+                                                        reserveSpecs = ""
+                                                        reserveQuantity = 1
+                                                    } else {
+                                                        reserveErrorMsg = "Your available ATU Virtual Balance is insufficient. Please reload first!"
+                                                    }
+                                                } else {
+                                                    // POD
+                                                    scheduledReservations.add(
+                                                        ScheduledMeal(
+                                                            id = (1000..9999).random(),
+                                                            foodItem = foodSelectedVal,
+                                                            quantity = reserveQuantity,
+                                                            targetTime = reserveTimeSlot.substringAfter(": "),
+                                                            dateLabel = "Today",
+                                                            specs = reserveSpecs.ifBlank { "No special dietary options defined." },
+                                                            isPaid = false,
+                                                            barcodeSeed = "REC-ATU-${(1000..9999).random()}"
+                                                        )
+                                                    )
+                                                    reserveMessage = "Campus pre-order scheduled securely (Pay-on-delivery)!"
+                                                    reserveSpecs = ""
+                                                    reserveQuantity = 1
+                                                }
+                                            }
+                                        },
+                                        modifier = Modifier.fillMaxWidth(),
+                                        shape = RoundedCornerShape(8.dp)
+                                    ) {
+                                        Text("Book Future Meal Pre-Order", fontWeight = FontWeight.Bold)
+                                    }
+                                }
+                            }
+                        }
+
+                        // List of scheduled bookings
+                        item {
+                            Text("My Scheduled College Bookings", fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleMedium)
+                        }
+
+                        if (scheduledReservations.isEmpty()) {
+                            item {
+                                Text("No campus meal reservations recorded currently.", fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            }
+                        } else {
+                            items(scheduledReservations) { booking ->
+                                Card(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
+                                ) {
+                                    Column(modifier = Modifier.padding(16.dp)) {
+                                        Row(
+                                            modifier = Modifier.fillMaxWidth(),
+                                            horizontalArrangement = Arrangement.SpaceBetween,
+                                            verticalAlignment = Alignment.CenterVertically
+                                        ) {
+                                            Column {
+                                                Text(booking.foodItem.name, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleMedium)
+                                                Text("Qty: ${booking.quantity} • Paid Price: GH₵ ${"%.2f".format(booking.foodItem.price * booking.quantity)}", fontSize = 11.sp)
+                                            }
+                                            Box(
+                                                modifier = Modifier
+                                                    .clip(RoundedCornerShape(6.dp))
+                                                    .background(if (booking.isPaid) Color(0xFF4CAF50) else Color(0xFFFF9800))
+                                                    .padding(horizontal = 8.dp, vertical = 4.dp)
+                                            ) {
+                                                Text(
+                                                    text = if (booking.isPaid) "PRE-PAID" else "PAY-ON-DELIVERY",
+                                                    fontWeight = FontWeight.Bold,
+                                                    fontSize = 9.sp,
+                                                    color = Color.White
+                                                )
+                                            }
+                                        }
+
+                                        Spacer(modifier = Modifier.height(10.dp))
+
+                                        Text(
+                                            text = "⏰ Pick target: ${booking.dateLabel} at [ ${booking.targetTime} ]",
+                                            fontWeight = FontWeight.Bold,
+                                            color = MaterialTheme.colorScheme.primary,
+                                            fontSize = 11.sp
+                                        )
+                                        Text(
+                                            text = "Instructions: ${booking.specs}",
+                                            fontSize = 10.sp,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                                        )
+
+                                        Spacer(modifier = Modifier.height(14.dp))
+
+                                        // QR / Barcode aesthetic Canvas Representation
+                                        Row(
+                                            modifier = Modifier
+                                                .fillMaxWidth()
+                                                .clip(RoundedCornerShape(8.dp))
+                                                .background(MaterialTheme.colorScheme.surfaceVariant)
+                                                .padding(12.dp),
+                                            verticalAlignment = Alignment.CenterVertically,
+                                            horizontalArrangement = Arrangement.spacedBy(12.dp)
+                                        ) {
+                                            // Canvas Barcode
+                                            androidx.compose.foundation.Canvas(
+                                                modifier = Modifier
+                                                    .size(width = 110.dp, height = 30.dp)
+                                                    .background(Color.White)
+                                            ) {
+                                                val spaceWidth = size.width / 18f
+                                                for (i in 0 until 18) {
+                                                    if (i % 2 == 0) {
+                                                        drawRect(
+                                                            color = Color.Black,
+                                                            topLeft = androidx.compose.ui.geometry.Offset(i * spaceWidth, 0f),
+                                                            size = androidx.compose.ui.geometry.Size(
+                                                                width = if (i % 3 == 0) spaceWidth * 1.5f else spaceWidth * 0.7f,
+                                                                height = size.height
+                                                            )
+                                                        )
+                                                    }
+                                                }
+                                            }
+
+                                            Column(modifier = Modifier.weight(1f)) {
+                                                Text(
+                                                    text = booking.barcodeSeed,
+                                                    fontWeight = FontWeight.Bold,
+                                                    fontSize = 12.sp,
+                                                    fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace
+                                                )
+                                                Text(
+                                                    text = "Flash at vendor scanner for express bypass validation.",
+                                                    fontSize = 8.sp,
+                                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                                )
+                                            }
+                                        }
+
+                                        Spacer(modifier = Modifier.height(12.dp))
+
+                                        // Cancel reservation
+                                        TextButton(
+                                            onClick = {
+                                                scheduledReservations.remove(booking)
+                                                if (booking.isPaid) {
+                                                    viewModel.rechargeWallet(booking.foodItem.price * booking.quantity)
+                                                }
+                                            },
+                                            colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error),
+                                            modifier = Modifier.align(Alignment.End)
+                                        ) {
+                                            Text("Cancel Book & Refund", fontSize = 10.sp, fontWeight = FontWeight.Bold)
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+                4 -> {
                     // Smart Wallet & ID Tab
                     var showTopUpDialog by remember { mutableStateOf(false) }
                     var topUpAmount by remember { mutableStateOf("") }
@@ -1536,6 +2924,92 @@ fun StudentDashboardScreen(
                     }
                 }
             }
+
+            // POPUP REAL-TIME KITCHEN ALERTS (FROM VENDOR ESTIMATED TIME UPDATE)
+            val activePreparingOrderWithNoAck = studentOrders.firstOrNull { it.status == "PREPARING" && it.id !in acknowledgedOrders }
+            activePreparingOrderWithNoAck?.let { order ->
+                AlertDialog(
+                    onDismissRequest = { /* No-op to force acknowledgement */ },
+                    title = {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Timer,
+                                contentDescription = "Prep Speed Alert",
+                                tint = MaterialTheme.colorScheme.tertiary
+                            )
+                            Text(
+                                text = "Cooking Prep Alert",
+                                fontWeight = FontWeight.Bold,
+                                style = MaterialTheme.typography.titleMedium
+                            )
+                        }
+                    },
+                    text = {
+                        Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                            Text(
+                                text = "Your requested food is being prepared by the kitchen stand!",
+                                style = MaterialTheme.typography.bodyMedium
+                            )
+                            Card(
+                                modifier = Modifier.fillMaxWidth(),
+                                colors = CardDefaults.cardColors(
+                                    containerColor = MaterialTheme.colorScheme.tertiaryContainer
+                                )
+                            ) {
+                                Column(modifier = Modifier.padding(14.dp)) {
+                                    Text(
+                                        text = "ORDERED FOOD:",
+                                        fontSize = 9.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        color = MaterialTheme.colorScheme.tertiary
+                                    )
+                                    Text(
+                                        text = "${order.foodName} x ${order.quantity}",
+                                        fontWeight = FontWeight.Bold,
+                                        style = MaterialTheme.typography.titleSmall,
+                                        color = MaterialTheme.colorScheme.onTertiaryContainer
+                                    )
+                                    Spacer(modifier = Modifier.height(10.dp))
+                                    Text(
+                                        text = "VENDOR ESTIMATED WAIT TIME:",
+                                        fontSize = 9.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        color = MaterialTheme.colorScheme.tertiary
+                                    )
+                                    Text(
+                                        text = order.estimatedPickupTime,
+                                        fontWeight = FontWeight.ExtraBold,
+                                        fontSize = 18.sp,
+                                        color = MaterialTheme.colorScheme.onTertiaryContainer
+                                    )
+                                    Spacer(modifier = Modifier.height(4.dp))
+                                    Text(
+                                        text = "It will take about '${order.estimatedPickupTime}' to finish preparing your meal.",
+                                        fontSize = 11.sp,
+                                        color = MaterialTheme.colorScheme.onTertiaryContainer.copy(alpha = 0.8f)
+                                    )
+                                }
+                            }
+                            Text(
+                                text = "We'll notify you with a READY status update when it's hot and complete!",
+                                fontSize = 11.sp,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                    },
+                    confirmButton = {
+                        Button(
+                            onClick = { acknowledgedOrders.add(order.id) },
+                            colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.tertiary)
+                        ) {
+                            Text("Acknowledge Wait Time", color = MaterialTheme.colorScheme.onTertiary)
+                        }
+                    }
+                )
+            }
         }
     }
 }
@@ -1566,6 +3040,10 @@ fun VendorDashboardScreen(
     var verifyTargetOrder by remember { mutableStateOf<Order?>(null) }
     var enteredTicketPin by remember { mutableStateOf("") }
     var pinVerificationError by remember { mutableStateOf<String?>(null) }
+
+    // Estimation dialogues
+    var showEstTimeDialogForOrder by remember { mutableStateOf<Order?>(null) }
+    var estimatedMinutesSelected by remember { mutableStateOf("15 mins") }
 
     // Add Food States
     var newFoodName by remember { mutableStateOf("") }
@@ -1733,7 +3211,10 @@ fun VendorDashboardScreen(
                                         ) {
                                             if (order.status == "PENDING") {
                                                 Button(
-                                                    onClick = { viewModel.updateOrderStatus(order.id, "PREPARING") },
+                                                    onClick = {
+                                                        showEstTimeDialogForOrder = order
+                                                        estimatedMinutesSelected = "15 mins"
+                                                    },
                                                     modifier = Modifier.weight(1f)
                                                 ) {
                                                     Text("Accept Prep", fontSize = 11.sp)
@@ -2265,6 +3746,77 @@ fun VendorDashboardScreen(
                                     }
                                 ) {
                                     Text("Unlock & Validate")
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            // EXTENDED PICKUP ESTIMATED DURATION DIALOG
+            showEstTimeDialogForOrder?.let { order ->
+                Dialog(onDismissRequest = { showEstTimeDialogForOrder = null }) {
+                    Card(
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(16.dp)
+                    ) {
+                        Column(
+                            modifier = Modifier.padding(24.dp),
+                            verticalArrangement = Arrangement.spacedBy(16.dp)
+                        ) {
+                            Text(
+                                "Configure Preparation Speed",
+                                fontWeight = FontWeight.Bold,
+                                style = MaterialTheme.typography.titleMedium,
+                                color = MaterialTheme.colorScheme.primary
+                            )
+                            Text(
+                                "Determine estimated duration for '${order.foodName}' queue.",
+                                fontSize = 12.sp,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+
+                            // Preloaded selector chips
+                            Text("Fast Selection Tracks:", fontWeight = FontWeight.Bold, fontSize = 11.sp)
+                            val presetTimes = listOf("5 mins", "10 mins", "15 mins", "20 mins", "30 mins")
+                            LazyRow(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                items(presetTimes) { timeChip ->
+                                    val isSelected = estimatedMinutesSelected == timeChip
+                                    FilterChip(
+                                        selected = isSelected,
+                                        onClick = { estimatedMinutesSelected = timeChip },
+                                        label = { Text(timeChip) }
+                                    )
+                                }
+                            }
+
+                            // Custom Input field
+                            OutlinedTextField(
+                                value = estimatedMinutesSelected,
+                                onValueChange = { estimatedMinutesSelected = it },
+                                label = { Text("Or specify custom duration") },
+                                modifier = Modifier.fillMaxWidth(),
+                                singleLine = true
+                            )
+
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.End
+                            ) {
+                                TextButton(onClick = { showEstTimeDialogForOrder = null }) {
+                                    Text("Dismiss")
+                                }
+                                Spacer(modifier = Modifier.width(12.dp))
+                                Button(
+                                    onClick = {
+                                        viewModel.updateOrderStatus(order.id, "PREPARING", estimatedMinutesSelected)
+                                        showEstTimeDialogForOrder = null
+                                    }
+                                ) {
+                                    Text("Accept & Post Estimated Time")
                                 }
                             }
                         }
