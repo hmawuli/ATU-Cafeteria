@@ -561,3 +561,244 @@ fun StudentTrendsLineChart(
         }
     }
 }
+
+// ==========================================
+// 4. VENDOR PERFORMANCE TRENDS LINE CHART
+// ==========================================
+
+@Composable
+fun VendorPerformanceTrendChart(
+    performanceData: List<com.example.data.LaravelDailyPerformance>,
+    modifier: Modifier = Modifier
+) {
+    val primaryColor = MaterialTheme.colorScheme.primary
+    val secondaryColor = MaterialTheme.colorScheme.secondary
+    val gridColor = MaterialTheme.colorScheme.outlineVariant
+    val labelColor = MaterialTheme.colorScheme.onSurface
+    val surfaceColor = MaterialTheme.colorScheme.surface
+
+    // Sort ascending chronologically by date
+    val chronologicalData = remember(performanceData) {
+        performanceData.sortedBy { it.order_date }
+    }
+
+    val maxRevenue = remember(chronologicalData) {
+        chronologicalData.maxOfOrNull { it.daily_revenue }?.toFloat()?.coerceAtLeast(10f) ?: 10f
+    }
+
+    Column(
+        modifier = modifier
+            .fillMaxWidth()
+            .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f), RoundedCornerShape(12.dp))
+            .padding(16.dp)
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text(
+                text = "Chronological Revenue (Laravel Backend)",
+                style = MaterialTheme.typography.titleSmall,
+                fontWeight = FontWeight.Bold,
+                color = labelColor
+            )
+
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(4.dp)
+            ) {
+                Box(
+                    modifier = Modifier
+                        .size(8.dp)
+                        .background(primaryColor, androidx.compose.foundation.shape.CircleShape)
+                )
+                Text("Daily Trend Rate", fontSize = 9.sp, color = labelColor.copy(alpha = 0.7f))
+            }
+        }
+
+        Spacer(modifier = Modifier.height(16.dp))
+
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(160.dp)
+        ) {
+            if (chronologicalData.isEmpty()) {
+                Box(
+                    modifier = Modifier.fillMaxSize(),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        text = "No daily performance data loaded from controller.",
+                        fontSize = 11.sp,
+                        color = labelColor.copy(alpha = 0.5f)
+                    )
+                }
+            } else {
+                Canvas(modifier = Modifier.fillMaxSize()) {
+                    val paddingLeft = 45.dp.toPx()
+                    val paddingBottom = 20.dp.toPx()
+                    val chartWidth = size.width - paddingLeft
+                    val chartHeight = size.height - paddingBottom
+
+                    // Grids
+                    val gridLinesCount = 3
+                    for (i in 0..gridLinesCount) {
+                        val y = chartHeight * (i / gridLinesCount.toFloat())
+                        drawLine(
+                            color = gridColor.copy(alpha = 0.3f),
+                            start = Offset(paddingLeft, y),
+                            end = Offset(size.width, y),
+                            strokeWidth = 0.8.dp.toPx()
+                        )
+                    }
+
+                    // Coordinate Frame Axes
+                    drawLine(
+                        color = gridColor,
+                        start = Offset(paddingLeft, 0f),
+                        end = Offset(paddingLeft, chartHeight),
+                        strokeWidth = 1.dp.toPx()
+                    )
+                    drawLine(
+                        color = gridColor,
+                        start = Offset(paddingLeft, chartHeight),
+                        end = Offset(size.width, chartHeight),
+                        strokeWidth = 1.dp.toPx()
+                    )
+
+                    val numPoints = chronologicalData.size
+                    val segmentWidth = if (numPoints > 1) chartWidth / (numPoints - 1) else chartWidth
+
+                    val linePath = Path()
+                    val fillPath = Path()
+
+                    chronologicalData.forEachIndexed { idx, pt ->
+                        val value = pt.daily_revenue.toFloat()
+                        val cx = paddingLeft + (idx * segmentWidth)
+                        val cy = chartHeight - (value / maxRevenue) * chartHeight
+
+                        if (idx == 0) {
+                            linePath.moveTo(cx, cy)
+                            fillPath.moveTo(cx, chartHeight)
+                            fillPath.lineTo(cx, cy)
+                        } else {
+                            val prevPt = chronologicalData[idx - 1]
+                            val prevX = paddingLeft + ((idx - 1) * segmentWidth)
+                            val prevY = chartHeight - (prevPt.daily_revenue.toFloat() / maxRevenue) * chartHeight
+                            
+                            // Cubic Bezier spline interpolation representing modern Recharts line
+                            linePath.cubicTo(
+                                (prevX + cx) / 2f, prevY,
+                                (prevX + cx) / 2f, cy,
+                                cx, cy
+                            )
+                            fillPath.cubicTo(
+                                (prevX + cx) / 2f, prevY,
+                                (prevX + cx) / 2f, cy,
+                                cx, cy
+                            )
+                        }
+
+                        if (idx == numPoints - 1) {
+                            fillPath.lineTo(cx, chartHeight)
+                            fillPath.lineTo(paddingLeft, chartHeight)
+                            fillPath.close()
+                        }
+                    }
+
+                    // Render Recharts-style Transparent Underlay Gradient Fill
+                    drawPath(
+                        path = fillPath,
+                        brush = androidx.compose.ui.graphics.Brush.verticalGradient(
+                            colors = listOf(
+                                primaryColor.copy(alpha = 0.3f),
+                                Color.Transparent
+                            )
+                        )
+                    )
+
+                    // Render Sleek Line Stroke
+                    drawPath(
+                        path = linePath,
+                        color = primaryColor,
+                        style = Stroke(
+                            width = 3.dp.toPx(),
+                            cap = StrokeCap.Round
+                        )
+                    )
+
+                    // Overlay point circular anchors
+                    chronologicalData.forEachIndexed { idx, pt ->
+                        val value = pt.daily_revenue.toFloat()
+                        val cx = paddingLeft + (idx * segmentWidth)
+                        val cy = chartHeight - (value / maxRevenue) * chartHeight
+
+                        drawCircle(
+                            color = secondaryColor,
+                            radius = 4.5.dp.toPx(),
+                            center = Offset(cx, cy)
+                        )
+                        drawCircle(
+                            color = surfaceColor,
+                            radius = 2.dp.toPx(),
+                            center = Offset(cx, cy)
+                        )
+                    }
+                }
+
+                // Labels overlay
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(start = 45.dp)
+                        .align(Alignment.BottomStart)
+                        .height(18.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    val formatLabel = { fullDate: String ->
+                        try {
+                            if (fullDate.contains("-") && fullDate.length >= 10) {
+                                fullDate.substring(5) // Extract MM-DD for clean aesthetics
+                            } else fullDate
+                        } catch (e: Exception) {
+                            fullDate
+                        }
+                    }
+
+                    Text(text = formatLabel(chronologicalData[0].order_date), fontSize = 8.sp, color = labelColor.copy(alpha = 0.6f))
+                    if (chronologicalData.size > 2) {
+                        Text(text = formatLabel(chronologicalData[chronologicalData.size / 2].order_date), fontSize = 8.sp, color = labelColor.copy(alpha = 0.6f))
+                    }
+                    if (chronologicalData.size > 1) {
+                        Text(text = formatLabel(chronologicalData[chronologicalData.size - 1].order_date), fontSize = 8.sp, color = labelColor.copy(alpha = 0.6f))
+                    }
+                }
+
+                // Max value callout GH₵
+                Text(
+                    text = "GH₵ ${"%.1f".format(maxRevenue)}",
+                    fontSize = 8.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = labelColor.copy(alpha = 0.8f),
+                    modifier = Modifier
+                        .align(Alignment.TopStart)
+                        .padding(start = 2.dp)
+                )
+
+                // Zero baseline indicator
+                Text(
+                    text = "0",
+                    fontSize = 8.sp,
+                    color = labelColor.copy(alpha = 0.5f),
+                    modifier = Modifier
+                        .align(Alignment.BottomStart)
+                        .padding(start = 2.dp, bottom = 20.dp)
+                )
+            }
+        }
+    }
+}
+

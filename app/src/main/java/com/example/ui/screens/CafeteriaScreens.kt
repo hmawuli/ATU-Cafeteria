@@ -3,7 +3,10 @@ package com.example.ui.screens
 import androidx.compose.animation.*
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.ui.platform.testTag
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
@@ -35,6 +38,7 @@ import com.example.data.*
 import com.example.ui.components.DailyRevenueBarChart
 import com.example.ui.components.RadarFeedbackChart
 import com.example.ui.components.StudentTrendsLineChart
+import com.example.ui.components.VendorPerformanceTrendChart
 import com.example.ui.viewmodel.CafeteriaViewModel
 
 // ==========================================
@@ -217,6 +221,133 @@ fun LoginScreen(
                     Text("• Student Portal: user 'student' / PIN '1234'", fontSize = 11.sp, color = MaterialTheme.colorScheme.onPrimaryContainer)
                     Text("• Vendor (Mary Joint): user 'maryjoint' / PIN '1111'", fontSize = 11.sp, color = MaterialTheme.colorScheme.onPrimaryContainer)
                     Text("• Admin Compliance Panel: user 'admin' / PIN 'admin123'", fontSize = 11.sp, color = MaterialTheme.colorScheme.onPrimaryContainer)
+                }
+            }
+
+            Spacer(modifier = Modifier.height(16.dp))
+
+            // Laravel Backend Configuration Tool (Expandable Card)
+            var showLaravelConfig by remember { mutableStateOf(false) }
+            val context = androidx.compose.ui.platform.LocalContext.current
+
+            Card(
+                colors = CardDefaults.cardColors(
+                    containerColor = if (LaravelClientManager.isLaravelEnabled) 
+                        MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.4f) 
+                    else 
+                        MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
+                ),
+                shape = RoundedCornerShape(12.dp),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .animateContentSize()
+            ) {
+                Column(modifier = Modifier.padding(16.dp)) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable { showLaravelConfig = !showLaravelConfig },
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Icon(
+                                imageVector = if (LaravelClientManager.isLaravelEnabled) Icons.Default.CloudQueue else Icons.Default.CloudOff,
+                                contentDescription = null,
+                                tint = if (LaravelClientManager.isLaravelEnabled) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.size(20.dp)
+                            )
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text(
+                                text = if (LaravelClientManager.isLaravelEnabled) "Laravel Live Sync: ON" else "Laravel Offline Mode: ON",
+                                fontWeight = FontWeight.Bold,
+                                style = MaterialTheme.typography.bodyMedium
+                            )
+                        }
+                        Icon(
+                            imageVector = if (showLaravelConfig) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
+                            contentDescription = null,
+                            modifier = Modifier.size(20.dp)
+                        )
+                    }
+
+                    if (showLaravelConfig) {
+                        Spacer(modifier = Modifier.height(16.dp))
+                        
+                        var isEnabledState by remember { mutableStateOf(LaravelClientManager.isLaravelEnabled) }
+                        var urlInput by remember { mutableStateOf(LaravelClientManager.baseUrl) }
+                        var syncStatus by remember { mutableStateOf<String?>(null) }
+
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Column {
+                                Text("Connect to Laravel REST API", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
+                                Text("Routes read/saves to remote database", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            }
+                            Switch(
+                                checked = isEnabledState,
+                                onCheckedChange = { isEnabledState = it }
+                            )
+                        }
+
+                        if (isEnabledState) {
+                             Spacer(modifier = Modifier.height(12.dp))
+                             OutlinedTextField(
+                                 value = urlInput,
+                                 onValueChange = { urlInput = it },
+                                 label = { Text("Laravel Base API URL") },
+                                 leadingIcon = { Icon(Icons.Default.Link, contentDescription = null) },
+                                 placeholder = { Text("e.g. http://10.0.2.2:8000") },
+                                 modifier = Modifier.fillMaxWidth(),
+                                 singleLine = true
+                             )
+                        }
+
+                        syncStatus?.let {
+                            Spacer(modifier = Modifier.height(12.dp))
+                            Text(
+                                text = it,
+                                color = if (it.contains("Success")) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.error,
+                                style = MaterialTheme.typography.bodySmall,
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
+
+                        Spacer(modifier = Modifier.height(16.dp))
+
+                        Button(
+                            onClick = {
+                                LaravelClientManager.isLaravelEnabled = isEnabledState
+                                if (isEnabledState) {
+                                    val formattedUrl = if (urlInput.trim().endsWith("/")) urlInput.trim() else "${urlInput.trim()}/"
+                                    LaravelClientManager.baseUrl = formattedUrl
+                                    syncStatus = "Attempting to handshake & sync database..."
+                                    viewModel.syncAllFromLaravel { success ->
+                                        if (success) {
+                                             syncStatus = "🚀 Handshake Success! All ATU tables fetched."
+                                             android.widget.Toast.makeText(context, "Laravel Connection Applied!", android.widget.Toast.LENGTH_SHORT).show()
+                                        } else {
+                                             syncStatus = "❌ Sync Failed! Please verify server is hosted on '$formattedUrl' and connection is reachable."
+                                        }
+                                    }
+                                } else {
+                                    syncStatus = "Toggled Offline Local Room mode."
+                                    android.widget.Toast.makeText(context, "Switched to standard Offline sandbox database.", android.widget.Toast.LENGTH_SHORT).show()
+                                }
+                            },
+                            modifier = Modifier.fillMaxWidth(),
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = if (isEnabledState) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.secondary
+                            )
+                        ) {
+                            Icon(Icons.Default.Settings, contentDescription = null, modifier = Modifier.size(16.dp))
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text("Apply Settings")
+                        }
+                    }
                 }
             }
         }
@@ -466,6 +597,7 @@ fun StudentDashboardScreen(
     val allVendors by viewModel.allVendors.collectAsStateWithLifecycle()
     val allFeedback by viewModel.allFeedback.collectAsStateWithLifecycle()
     val studentWalletBalance by viewModel.studentWalletBalance.collectAsStateWithLifecycle()
+    val userWalletTransactions by viewModel.userWalletTransactions.collectAsStateWithLifecycle()
     val vendorAnnouncement by viewModel.vendorAnnouncement.collectAsStateWithLifecycle()
     val isAdminActing by viewModel.isAdminActing.collectAsStateWithLifecycle()
 
@@ -2334,6 +2466,74 @@ fun StudentDashboardScreen(
                             }
                         }
 
+                        // 2.2 Wallet Transaction History Card
+                        item {
+                            Card(
+                                modifier = Modifier.fillMaxWidth().testTag("wallet_transactions_card"),
+                                shape = RoundedCornerShape(12.dp),
+                                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
+                            ) {
+                                Column(modifier = Modifier.padding(16.dp)) {
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        horizontalArrangement = Arrangement.SpaceBetween,
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        Text(
+                                            "Wallet Transaction History",
+                                            fontWeight = FontWeight.Bold,
+                                            style = MaterialTheme.typography.titleMedium,
+                                            color = MaterialTheme.colorScheme.primary
+                                        )
+                                        Icon(
+                                            Icons.Default.List,
+                                            contentDescription = null,
+                                            tint = MaterialTheme.colorScheme.primary,
+                                            modifier = Modifier.size(18.dp)
+                                        )
+                                    }
+                                    Spacer(modifier = Modifier.height(12.dp))
+
+                                    if (userWalletTransactions.isEmpty()) {
+                                        Box(
+                                            modifier = Modifier.fillMaxWidth().padding(vertical = 24.dp),
+                                            contentAlignment = Alignment.Center
+                                        ) {
+                                            Text(
+                                                "No wallet transaction logs recorded yet.",
+                                                fontSize = 11.sp,
+                                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                                            )
+                                        }
+                                    } else {
+                                        userWalletTransactions.forEach { tx ->
+                                            val isPositive = tx.amount >= 0
+                                            val color = if (isPositive) androidx.compose.ui.graphics.Color(0xFF2E7D32) else androidx.compose.ui.graphics.Color(0xFFC62828)
+                                            val prefix = if (isPositive) "+" else ""
+                                            Row(
+                                                modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp),
+                                                horizontalArrangement = Arrangement.SpaceBetween,
+                                                verticalAlignment = Alignment.CenterVertically
+                                            ) {
+                                                Column(modifier = Modifier.weight(1f)) {
+                                                    Text(tx.details, fontSize = 11.sp, fontWeight = FontWeight.SemiBold, maxLines = 1)
+                                                    Text("Ref: ${tx.reference} • ${java.text.SimpleDateFormat("dd MMM, hh:mm a", java.util.Locale.US).format(java.util.Date(tx.timestamp))}", fontSize = 9.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                                }
+                                                Text(
+                                                    "${prefix}GH₵ ${"%.2f".format(tx.amount)}",
+                                                    fontWeight = FontWeight.Bold,
+                                                    fontSize = 11.sp,
+                                                    color = color
+                                                )
+                                            }
+                                            HorizontalDivider(modifier = Modifier.padding(vertical = 4.dp), color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
+                                        }
+                                    }
+                                }
+                            }
+                        }
+
                         // 3. Security logs / helpdesk inquiry ticket
                         item {
                             Card(
@@ -2838,6 +3038,14 @@ fun VendorDashboardScreen(
     val vendorAnnouncement by viewModel.vendorAnnouncement.collectAsStateWithLifecycle()
     val isStoreClosed by viewModel.isStoreClosed.collectAsStateWithLifecycle()
     val isAdminActing by viewModel.isAdminActing.collectAsStateWithLifecycle()
+    val activeAlerts by viewModel.newOrderAlerts.collectAsStateWithLifecycle()
+    val sentimentAnalysisText by viewModel.vendorSentimentAnalysis.collectAsStateWithLifecycle()
+    val isAnalyzingSentiment by viewModel.isAnalyzingSentiment.collectAsStateWithLifecycle()
+    val autoRepliesText by viewModel.vendorAutoReplies.collectAsStateWithLifecycle()
+    val isGeneratingAutoReplies by viewModel.isGeneratingAutoReplies.collectAsStateWithLifecycle()
+    val pricingSuggestionsText by viewModel.vendorPricingSuggestions.collectAsStateWithLifecycle()
+    val isGeneratingPricingSuggestions by viewModel.isGeneratingPricingSuggestions.collectAsStateWithLifecycle()
+    val performanceData by viewModel.vendorPerformanceList.collectAsStateWithLifecycle()
 
     var activeTab by remember { mutableIntStateOf(0) } // 0: Orders, 1: Menu List, 2: Ratings/Analytics, 3: Settings & Hub
     var isAddingFood by remember { mutableStateOf(false) }
@@ -2856,6 +3064,8 @@ fun VendorDashboardScreen(
     var newFoodPrice by remember { mutableStateOf("") }
     var newFoodCategory by remember { mutableStateOf("Local Dish") }
     var newFoodDescription by remember { mutableStateOf("") }
+    var newFoodInitialStock by remember { mutableStateOf("100") }
+    var newFoodSafetyThreshold by remember { mutableStateOf("15") }
 
     Scaffold(
         topBar = {
@@ -2933,17 +3143,165 @@ fun VendorDashboardScreen(
                     icon = { Icon(Icons.Default.Settings, contentDescription = null) },
                     label = { Text("Settings & Hub") }
                 )
+                NavigationBarItem(
+                    selected = activeTab == 4,
+                    onClick = { activeTab = 4 },
+                    icon = { Icon(Icons.Default.AccountBalanceWallet, contentDescription = null) },
+                    label = { Text("Finance Hub") }
+                )
             }
         }
     ) { innerPadding ->
-        Box(
+        Column(
             modifier = modifier
                 .fillMaxSize()
                 .padding(innerPadding)
                 .background(MaterialTheme.colorScheme.background)
         ) {
-            AnimatedContent(
-                targetState = activeTab,
+            // SYSTEM AUTOMATED LOW-STOCK WARNING AREA
+            val lowStockItems = remember(vendorFoods) { vendorFoods.filter { it.currentStock <= it.lowStockThreshold } }
+            if (lowStockItems.isNotEmpty()) {
+                Card(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp, vertical = 8.dp)
+                        .testTag("global_low_stock_banner"),
+                    colors = CardDefaults.cardColors(
+                        containerColor = MaterialTheme.colorScheme.errorContainer
+                    ),
+                    shape = RoundedCornerShape(12.dp)
+                ) {
+                    Column(modifier = Modifier.padding(12.dp)) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            Text("🚨", fontSize = 20.sp)
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(
+                                    "Low Stock Alerts & Depletion Projections",
+                                    style = MaterialTheme.typography.titleSmall,
+                                    fontWeight = FontWeight.Bold,
+                                    color = MaterialTheme.colorScheme.onErrorContainer
+                                )
+                                Text(
+                                    "${lowStockItems.size} items are below or near exhaustion thresholds",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    fontSize = 11.sp,
+                                    color = MaterialTheme.colorScheme.onErrorContainer.copy(alpha = 0.8f)
+                                )
+                            }
+                        }
+                        
+                        Spacer(modifier = Modifier.height(8.dp))
+                        
+                        lowStockItems.forEach { item ->
+                            val predictedTime = viewModel.predictStockExhaustion(item, incomingOrders)
+                            val progressFraction = if (item.initialStock > 0) {
+                                (item.currentStock.toFloat() / item.initialStock.toFloat()).coerceIn(0f, 1f)
+                            } else {
+                                0f
+                            }
+                            
+                            Card(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(vertical = 4.dp),
+                                colors = CardDefaults.cardColors(
+                                    containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.85f)
+                                ),
+                                shape = RoundedCornerShape(8.dp)
+                            ) {
+                                Column(modifier = Modifier.padding(8.dp)) {
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        horizontalArrangement = Arrangement.SpaceBetween,
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        Column {
+                                            Text(
+                                                item.name,
+                                                fontWeight = FontWeight.Bold,
+                                                fontSize = 12.sp,
+                                                color = MaterialTheme.colorScheme.onSurface
+                                            )
+                                            Row(
+                                                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                                                verticalAlignment = Alignment.CenterVertically
+                                            ) {
+                                                Text(
+                                                    "Current: ${item.currentStock}/${item.initialStock}",
+                                                    fontSize = 10.sp,
+                                                    fontWeight = FontWeight.Bold,
+                                                    color = if (item.currentStock == 0) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant
+                                                )
+                                                Text(
+                                                    "| Threshold: ${item.lowStockThreshold}",
+                                                    fontSize = 10.sp,
+                                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                                )
+                                            }
+                                        }
+                                        
+                                        // Quick restock button
+                                        Button(
+                                            onClick = { viewModel.replenishFoodItemStock(item, 50) },
+                                            colors = ButtonDefaults.buttonColors(
+                                                containerColor = MaterialTheme.colorScheme.primary,
+                                                contentColor = MaterialTheme.colorScheme.onPrimary
+                                            ),
+                                            contentPadding = PaddingValues(horizontal = 8.dp),
+                                            shape = RoundedCornerShape(6.dp),
+                                            modifier = Modifier.height(26.dp)
+                                        ) {
+                                            Text("+50 Plates", fontSize = 10.sp, fontWeight = FontWeight.Bold)
+                                        }
+                                    }
+                                    
+                                    Spacer(modifier = Modifier.height(6.dp))
+                                    
+                                    LinearProgressIndicator(
+                                        progress = { progressFraction },
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .height(4.dp),
+                                        color = if (progressFraction <= 0.15f) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary,
+                                        trackColor = MaterialTheme.colorScheme.outlineVariant
+                                    )
+                                    
+                                    Spacer(modifier = Modifier.height(4.dp))
+                                    
+                                    Row(
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.spacedBy(4.dp)
+                                    ) {
+                                        Icon(
+                                            imageVector = Icons.Default.Timer,
+                                            contentDescription = "Depletion Estimation",
+                                            tint = if (item.currentStock <= 0) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary,
+                                            modifier = Modifier.size(12.dp)
+                                        )
+                                        Text(
+                                            text = "Exhaustion forecast: $predictedTime",
+                                            fontSize = 10.sp,
+                                            fontWeight = FontWeight.Medium,
+                                            color = if (item.currentStock <= 0) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant
+                                        )
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            Box(
+                modifier = Modifier
+                    .weight(1f)
+                    .fillMaxWidth()
+            ) {
+                AnimatedContent(
+                    targetState = activeTab,
                 transitionSpec = {
                     fadeIn(animationSpec = tween(225)) togetherWith fadeOut(animationSpec = tween(225))
                 },
@@ -3148,6 +3506,136 @@ fun VendorDashboardScreen(
                                                     onCheckedChange = { viewModel.updateFoodAvailability(food, it) }
                                                 )
                                             }
+
+                                            Spacer(modifier = Modifier.height(8.dp))
+                                            androidx.compose.material3.HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
+                                            Spacer(modifier = Modifier.height(8.dp))
+
+                                            var isEditingStockSettings by remember { mutableStateOf(false) }
+
+                                            Row(
+                                                modifier = Modifier.fillMaxWidth(),
+                                                horizontalArrangement = Arrangement.SpaceBetween,
+                                                verticalAlignment = Alignment.CenterVertically
+                                            ) {
+                                                Column(modifier = Modifier.weight(1f)) {
+                                                    Row(
+                                                        verticalAlignment = Alignment.CenterVertically,
+                                                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                                                    ) {
+                                                        Text(
+                                                            "Stock: ${food.currentStock}/${food.initialStock}",
+                                                            style = MaterialTheme.typography.bodySmall,
+                                                            fontWeight = FontWeight.Bold,
+                                                            color = if (food.currentStock <= food.lowStockThreshold) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurface
+                                                        )
+                                                        Text(
+                                                            "(Safety Limit: ${food.lowStockThreshold})",
+                                                            fontSize = 10.sp,
+                                                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                                                        )
+                                                    }
+                                                    
+                                                    val depletionTime = viewModel.predictStockExhaustion(food, incomingOrders)
+                                                    Row(
+                                                        verticalAlignment = Alignment.CenterVertically,
+                                                        horizontalArrangement = Arrangement.spacedBy(4.dp)
+                                                    ) {
+                                                        Icon(
+                                                            imageVector = Icons.Default.Timer,
+                                                            contentDescription = null,
+                                                            tint = if (food.currentStock <= food.lowStockThreshold) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant,
+                                                            modifier = Modifier.size(11.dp)
+                                                        )
+                                                        Text(
+                                                            "Forecast: $depletionTime",
+                                                            fontSize = 10.sp,
+                                                            color = if (food.currentStock <= food.lowStockThreshold) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant
+                                                        )
+                                                    }
+                                                }
+
+                                                Row(
+                                                    verticalAlignment = Alignment.CenterVertically,
+                                                    horizontalArrangement = Arrangement.spacedBy(4.dp)
+                                                ) {
+                                                    Button(
+                                                        onClick = { viewModel.replenishFoodItemStock(food, 10) },
+                                                        colors = ButtonDefaults.buttonColors(
+                                                            containerColor = MaterialTheme.colorScheme.secondaryContainer,
+                                                            contentColor = MaterialTheme.colorScheme.onSecondaryContainer
+                                                        ),
+                                                        contentPadding = PaddingValues(horizontal = 8.dp),
+                                                        shape = RoundedCornerShape(6.dp),
+                                                        modifier = Modifier.height(26.dp)
+                                                    ) {
+                                                        Text("+10 Plates", fontSize = 10.sp, fontWeight = FontWeight.Bold)
+                                                    }
+
+                                                    IconButton(
+                                                        onClick = { isEditingStockSettings = true },
+                                                        modifier = Modifier.size(26.dp)
+                                                    ) {
+                                                        Icon(
+                                                            imageVector = Icons.Default.Edit,
+                                                            contentDescription = "Edit Stock Thresholds",
+                                                            tint = MaterialTheme.colorScheme.primary,
+                                                            modifier = Modifier.size(16.dp)
+                                                        )
+                                                    }
+                                                }
+                                            }
+
+                                            if (isEditingStockSettings) {
+                                                var tempInitialStock by remember { mutableStateOf(food.initialStock.toString()) }
+                                                var tempCurrentStock by remember { mutableStateOf(food.currentStock.toString()) }
+                                                var tempThreshold by remember { mutableStateOf(food.lowStockThreshold.toString()) }
+
+                                                AlertDialog(
+                                                    onDismissRequest = { isEditingStockSettings = false },
+                                                    title = { Text("Stock Panel: ${food.name}") },
+                                                    text = {
+                                                        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                                                            OutlinedTextField(
+                                                                value = tempInitialStock,
+                                                                onValueChange = { tempInitialStock = it },
+                                                                label = { Text("Initial Prep Stock (Refill Max)") },
+                                                                modifier = Modifier.fillMaxWidth()
+                                                            )
+                                                            OutlinedTextField(
+                                                                value = tempCurrentStock,
+                                                                onValueChange = { tempCurrentStock = it },
+                                                                label = { Text("Current Portions Remaining") },
+                                                                modifier = Modifier.fillMaxWidth()
+                                                            )
+                                                            OutlinedTextField(
+                                                                value = tempThreshold,
+                                                                onValueChange = { tempThreshold = it },
+                                                                label = { Text("Low Stock Alarm Level") },
+                                                                modifier = Modifier.fillMaxWidth()
+                                                            )
+                                                        }
+                                                    },
+                                                    confirmButton = {
+                                                        Button(
+                                                            onClick = {
+                                                                val initVal = tempInitialStock.toIntOrNull() ?: food.initialStock
+                                                                val currVal = tempCurrentStock.toIntOrNull() ?: food.currentStock
+                                                                val thresVal = tempThreshold.toIntOrNull() ?: food.lowStockThreshold
+                                                                viewModel.updateFoodItemStockSettings(food, initVal, currVal, thresVal)
+                                                                isEditingStockSettings = false
+                                                            }
+                                                        ) {
+                                                            Text("Update")
+                                                        }
+                                                    },
+                                                    dismissButton = {
+                                                        TextButton(onClick = { isEditingStockSettings = false }) {
+                                                            Text("Cancel")
+                                                        }
+                                                    }
+                                                )
+                                            }
                                         }
                                     }
                                 }
@@ -3157,8 +3645,80 @@ fun VendorDashboardScreen(
                 }
                 2 -> {
                     // Ratings / Analytics Panel
-                    val metrics = viewModel.getVendorMetrics(currentUser?.id ?: 0, vendorFeedbackList)
-                    val completedOrders = incomingOrders.filter { it.status == "COMPLETED" }
+                    // Date range filtering options and presets
+                    var selectedDateRangePreset by remember { mutableStateOf("ALL") } // "ALL", "TODAY", "WEEK", "MONTH", "CUSTOM"
+                    var startDateStr by remember { mutableStateOf("2026-05-26") } // Defaults to a week ago
+                    var endDateStr by remember { mutableStateOf("2026-06-02") }   // Defaults to today's local metadata date
+
+                    // Filtering calculation
+                    val filteredIncomingOrders = remember(incomingOrders, selectedDateRangePreset, startDateStr, endDateStr) {
+                        val sdf = java.text.SimpleDateFormat("yyyy-MM-dd", java.util.Locale.US)
+                        val startMillis = try { sdf.parse(startDateStr)?.time ?: 0L } catch(e: Exception) { 0L }
+                        val endMillis = try { (sdf.parse(endDateStr)?.time ?: 0L) + 24 * 60 * 60 * 1000L - 1 } catch(e: Exception) { Long.MAX_VALUE }
+
+                        val now = System.currentTimeMillis()
+                        incomingOrders.filter { order ->
+                            when (selectedDateRangePreset) {
+                                "TODAY" -> {
+                                    val orderDay = java.text.SimpleDateFormat("yyyyMMdd", java.util.Locale.US).format(java.util.Date(order.orderTimestamp))
+                                    val today = java.text.SimpleDateFormat("yyyyMMdd", java.util.Locale.US).format(java.util.Date(now))
+                                    orderDay == today
+                                }
+                                "WEEK" -> {
+                                    val oneWeekAgo = now - 7L * 24 * 60 * 60 * 1000L
+                                    order.orderTimestamp >= oneWeekAgo
+                                }
+                                "MONTH" -> {
+                                    val thirtyDaysAgo = now - 30L * 24 * 60 * 60 * 1000L
+                                    order.orderTimestamp >= thirtyDaysAgo
+                                }
+                                "CUSTOM" -> {
+                                    order.orderTimestamp in startMillis..endMillis
+                                }
+                                else -> true // "ALL"
+                            }
+                        }
+                    }
+
+                    val filteredFeedbackList = remember(vendorFeedbackList, selectedDateRangePreset, startDateStr, endDateStr) {
+                        val sdf = java.text.SimpleDateFormat("yyyy-MM-dd", java.util.Locale.US)
+                        val startMillis = try { sdf.parse(startDateStr)?.time ?: 0L } catch(e: Exception) { 0L }
+                        val endMillis = try { (sdf.parse(endDateStr)?.time ?: 0L) + 24 * 60 * 60 * 1000L - 1 } catch(e: Exception) { Long.MAX_VALUE }
+
+                        val now = System.currentTimeMillis()
+                        vendorFeedbackList.filter { feedback ->
+                            when (selectedDateRangePreset) {
+                                "TODAY" -> {
+                                    val feedbackDay = java.text.SimpleDateFormat("yyyyMMdd", java.util.Locale.US).format(java.util.Date(feedback.timestamp))
+                                    val today = java.text.SimpleDateFormat("yyyyMMdd", java.util.Locale.US).format(java.util.Date(now))
+                                    feedbackDay == today
+                                }
+                                "WEEK" -> {
+                                    val oneWeekAgo = now - 7L * 24 * 60 * 60 * 1000L
+                                    feedback.timestamp >= oneWeekAgo
+                                }
+                                "MONTH" -> {
+                                    val thirtyDaysAgo = now - 30L * 24 * 60 * 60 * 1000L
+                                    feedback.timestamp >= thirtyDaysAgo
+                                }
+                                "CUSTOM" -> {
+                                    feedback.timestamp in startMillis..endMillis
+                                }
+                                else -> true // "ALL"
+                            }
+                        }
+                    }
+
+                    val dateScopeLabel = when (selectedDateRangePreset) {
+                        "TODAY" -> "Today"
+                        "WEEK" -> "Last 7 Days"
+                        "MONTH" -> "Last 30 Days"
+                        "CUSTOM" -> "$startDateStr to $endDateStr"
+                        else -> "All Time"
+                    }
+
+                    val metrics = viewModel.getVendorMetrics(currentUser?.id ?: 0, filteredFeedbackList)
+                    val completedOrders = filteredIncomingOrders.filter { it.status == "COMPLETED" }
 
                     Column(
                         modifier = Modifier
@@ -3174,35 +3734,636 @@ fun VendorDashboardScreen(
                             color = MaterialTheme.colorScheme.primary
                         )
 
-                        // 1. Core Summary metrics row
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        // ADVANCED POS DATE RANGE FILTER
+                        Card(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .testTag("date_range_filter_card"),
+                            colors = CardDefaults.cardColors(
+                                containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
+                            ),
+                            shape = RoundedCornerShape(12.dp)
                         ) {
-                            Card(
-                                modifier = Modifier.weight(1f),
-                                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
-                            ) {
-                                Column(
-                                    modifier = Modifier.padding(12.dp),
-                                    horizontalAlignment = Alignment.CenterHorizontally
+                            Column(modifier = Modifier.padding(12.dp)) {
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(6.dp)
                                 ) {
-                                    Text("OVERALL INDEX", fontSize = 10.sp, fontWeight = FontWeight.Bold)
-                                    Text("${"%.1f".format(metrics["overall"] ?: 0.0)}★", fontSize = 24.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
-                                    Text("From ${vendorFeedbackList.size} reviews", fontSize = 8.sp)
+                                    Icon(
+                                        imageVector = Icons.Default.DateRange,
+                                        contentDescription = "Date Filters",
+                                        tint = MaterialTheme.colorScheme.primary,
+                                        modifier = Modifier.size(18.dp)
+                                    )
+                                    Text(
+                                        text = "Filter Audit & History Scope",
+                                        style = MaterialTheme.typography.titleSmall,
+                                        fontWeight = FontWeight.Bold,
+                                        color = MaterialTheme.colorScheme.primary
+                                    )
+                                }
+                                
+                                Spacer(modifier = Modifier.height(8.dp))
+                                
+                                // Scrollable Row of Filter Preset Buttons
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                                ) {
+                                    val presets = listOf(
+                                        "ALL" to "All Time",
+                                        "TODAY" to "Today",
+                                        "WEEK" to "7 Days",
+                                        "MONTH" to "30 Days",
+                                        "CUSTOM" to "Custom Date"
+                                    )
+                                    presets.forEach { (presetKey, presetName) ->
+                                        val isSelected = selectedDateRangePreset == presetKey
+                                        Card(
+                                            modifier = Modifier
+                                                .weight(1f)
+                                                .clickable { selectedDateRangePreset = presetKey }
+                                                .testTag("preset_filter_$presetKey"),
+                                            colors = CardDefaults.cardColors(
+                                                containerColor = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surface
+                                            ),
+                                            shape = RoundedCornerShape(8.dp),
+                                            border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
+                                        ) {
+                                            Box(
+                                                modifier = Modifier
+                                                    .fillMaxWidth()
+                                                    .padding(vertical = 6.dp),
+                                                contentAlignment = Alignment.Center
+                                            ) {
+                                                Text(
+                                                    text = presetName,
+                                                    fontSize = 10.sp,
+                                                    fontWeight = FontWeight.Bold,
+                                                    color = if (isSelected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurface
+                                                )
+                                            }
+                                        }
+                                    }
+                                }
+
+                                androidx.compose.animation.AnimatedVisibility(
+                                    visible = selectedDateRangePreset == "CUSTOM"
+                                ) {
+                                    Column(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .padding(top = 12.dp)
+                                    ) {
+                                        Text(
+                                            text = "Specify Accounting Custom Range (inclusive):",
+                                            fontSize = 10.sp,
+                                            fontWeight = FontWeight.SemiBold,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                                        )
+                                        Spacer(modifier = Modifier.height(6.dp))
+                                        
+                                        Row(
+                                            modifier = Modifier.fillMaxWidth(),
+                                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                            verticalAlignment = Alignment.CenterVertically
+                                        ) {
+                                            OutlinedTextField(
+                                                value = startDateStr,
+                                                onValueChange = { startDateStr = it },
+                                                label = { Text("Start Date", fontSize = 10.sp) },
+                                                placeholder = { Text("YYYY-MM-DD", fontSize = 10.sp) },
+                                                modifier = Modifier
+                                                    .weight(1f)
+                                                    .testTag("custom_start_date_input"),
+                                                textStyle = androidx.compose.ui.text.TextStyle(fontSize = 11.sp),
+                                                singleLine = true,
+                                                shape = RoundedCornerShape(8.dp)
+                                            )
+                                            
+                                            Text("to", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                            
+                                            OutlinedTextField(
+                                                value = endDateStr,
+                                                onValueChange = { endDateStr = it },
+                                                label = { Text("End Date", fontSize = 10.sp) },
+                                                placeholder = { Text("YYYY-MM-DD", fontSize = 10.sp) },
+                                                modifier = Modifier
+                                                    .weight(1f)
+                                                    .testTag("custom_end_date_input"),
+                                                textStyle = androidx.compose.ui.text.TextStyle(fontSize = 11.sp),
+                                                singleLine = true,
+                                                shape = RoundedCornerShape(8.dp)
+                                            )
+                                        }
+                                        
+                                        Spacer(modifier = Modifier.height(4.dp))
+                                        
+                                        // Quick info context
+                                        Text(
+                                            text = "* Data is updated live on all visual graphs and downloads below upon entering a valid YYYY-MM-DD date format.",
+                                            fontSize = 9.sp,
+                                            color = MaterialTheme.colorScheme.primary,
+                                            lineHeight = 12.sp
+                                        )
+                                    }
                                 }
                             }
-                            Card(
-                                modifier = Modifier.weight(1f),
-                                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
+                        }
+
+                        // 1. Core Summary metrics and KPI Dashboard
+                        val getOrderPrepTimeMinutes: (com.example.data.Order) -> Int = { order ->
+                            val digits = order.estimatedPickupTime.filter { it.isDigit() }
+                            if (digits.isNotEmpty()) {
+                                val parsed = digits.toIntOrNull()
+                                if (parsed != null && parsed > 0) parsed else (10 + (order.id % 16))
+                            } else {
+                                10 + (order.id % 16)
+                            }
+                        }
+
+                        val totalOrdersCount = filteredIncomingOrders.size
+                        val totalRevenue = completedOrders.sumOf { it.totalPrice }
+                        val averageOrderValue = if (completedOrders.isNotEmpty()) totalRevenue / completedOrders.size else 0.0
+                        val avgRatingsVal = metrics["overall"] ?: 0.0
+                        val avgPrepTime = if (completedOrders.isNotEmpty()) completedOrders.map { getOrderPrepTimeMinutes(it) }.average() else 12.5
+
+                        Text(
+                            "Key Performance Indicators (${dateScopeLabel})",
+                            style = MaterialTheme.typography.titleSmall,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+
+                        // 3 column or 2 column grid of beautifully polished metrics cards
+                        Column(
+                            verticalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            // Row 1: REVENUE & TOTAL ORDERS
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(8.dp)
                             ) {
-                                Column(
-                                    modifier = Modifier.padding(12.dp),
-                                    horizontalAlignment = Alignment.CenterHorizontally
+                                Card(
+                                    modifier = Modifier
+                                        .weight(1f)
+                                        .testTag("kpi_revenue"),
+                                    colors = CardDefaults.cardColors(
+                                        containerColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.5f)
+                                    ),
+                                    shape = RoundedCornerShape(12.dp)
                                 ) {
-                                    Text("VOLUME DISPATCHED", fontSize = 10.sp, fontWeight = FontWeight.Bold)
-                                    Text("${completedOrders.size}", fontSize = 24.sp, fontWeight = FontWeight.Bold)
-                                    Text("Total Completed Plates", fontSize = 8.sp)
+                                    Column(
+                                        modifier = Modifier.padding(12.dp)
+                                    ) {
+                                        Row(
+                                            verticalAlignment = Alignment.CenterVertically,
+                                            horizontalArrangement = Arrangement.spacedBy(4.dp)
+                                        ) {
+                                            Icon(
+                                                imageVector = Icons.Default.Payments,
+                                                contentDescription = "Revenue",
+                                                tint = MaterialTheme.colorScheme.primary,
+                                                modifier = Modifier.size(16.dp)
+                                            )
+                                            Text(
+                                                "REVENUE",
+                                                fontSize = 9.sp,
+                                                fontWeight = FontWeight.Bold,
+                                                color = MaterialTheme.colorScheme.primary
+                                            )
+                                        }
+                                        Spacer(modifier = Modifier.height(4.dp))
+                                        Text(
+                                            "GH₵ ${"%.2f".format(totalRevenue)}",
+                                            fontSize = 20.sp,
+                                            fontWeight = FontWeight.Black,
+                                            color = MaterialTheme.colorScheme.onPrimaryContainer
+                                        )
+                                        Text(
+                                            "Settled sales in period",
+                                            fontSize = 8.sp,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                                        )
+                                    }
+                                }
+
+                                Card(
+                                    modifier = Modifier
+                                        .weight(1f)
+                                        .testTag("kpi_total_orders"),
+                                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
+                                    shape = RoundedCornerShape(12.dp)
+                                ) {
+                                    Column(
+                                        modifier = Modifier.padding(12.dp)
+                                    ) {
+                                        Row(
+                                            verticalAlignment = Alignment.CenterVertically,
+                                            horizontalArrangement = Arrangement.spacedBy(4.dp)
+                                        ) {
+                                            Icon(
+                                                imageVector = Icons.Default.ShoppingCart,
+                                                contentDescription = "Total Orders",
+                                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                                modifier = Modifier.size(16.dp)
+                                            )
+                                            Text(
+                                                "TOTAL ORDERS",
+                                                fontSize = 9.sp,
+                                                fontWeight = FontWeight.Bold,
+                                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                                            )
+                                        }
+                                        Spacer(modifier = Modifier.height(4.dp))
+                                        Text(
+                                            "$totalOrdersCount",
+                                            fontSize = 20.sp,
+                                            fontWeight = FontWeight.Bold,
+                                            color = MaterialTheme.colorScheme.onSurface
+                                        )
+                                        Text(
+                                            "${completedOrders.size} Completed plates",
+                                            fontSize = 8.sp,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                                        )
+                                    }
+                                }
+                            }
+
+                            // Row 2: AVERAGE ORDER VALUE & PREP TIME
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                Card(
+                                    modifier = Modifier
+                                        .weight(1f)
+                                        .testTag("kpi_aov"),
+                                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
+                                    shape = RoundedCornerShape(12.dp)
+                                ) {
+                                    Column(
+                                        modifier = Modifier.padding(12.dp)
+                                    ) {
+                                        Row(
+                                            verticalAlignment = Alignment.CenterVertically,
+                                            horizontalArrangement = Arrangement.spacedBy(4.dp)
+                                        ) {
+                                            Icon(
+                                                imageVector = Icons.Default.TrendingUp,
+                                                contentDescription = "Average Order Value",
+                                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                                modifier = Modifier.size(16.dp)
+                                            )
+                                            Text(
+                                                "AVG ORDER (AOV)",
+                                                fontSize = 9.sp,
+                                                fontWeight = FontWeight.Bold,
+                                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                                            )
+                                        }
+                                        Spacer(modifier = Modifier.height(4.dp))
+                                        Text(
+                                            "GH₵ ${"%.2f".format(averageOrderValue)}",
+                                            fontSize = 20.sp,
+                                            fontWeight = FontWeight.Bold,
+                                            color = MaterialTheme.colorScheme.onSurface
+                                        )
+                                        Text(
+                                            "Mean checkout ticket",
+                                            fontSize = 8.sp,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                                        )
+                                    }
+                                }
+
+                                Card(
+                                    modifier = Modifier
+                                        .weight(1f)
+                                        .testTag("kpi_avg_prep_time"),
+                                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
+                                    shape = RoundedCornerShape(12.dp)
+                                ) {
+                                    Column(
+                                        modifier = Modifier.padding(12.dp)
+                                    ) {
+                                        Row(
+                                            verticalAlignment = Alignment.CenterVertically,
+                                            horizontalArrangement = Arrangement.spacedBy(4.dp)
+                                        ) {
+                                            Icon(
+                                                imageVector = Icons.Default.Timer,
+                                                contentDescription = "Avg Prep Time",
+                                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                                modifier = Modifier.size(16.dp)
+                                            )
+                                            Text(
+                                                "AVG PREP SPEED",
+                                                fontSize = 9.sp,
+                                                fontWeight = FontWeight.Bold,
+                                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                                            )
+                                        }
+                                        Spacer(modifier = Modifier.height(4.dp))
+                                        Text(
+                                            "${"%.1f".format(avgPrepTime)}m",
+                                            fontSize = 20.sp,
+                                            fontWeight = FontWeight.Bold,
+                                            color = MaterialTheme.colorScheme.onSurface
+                                        )
+                                        Text(
+                                            "Minutes cooking span",
+                                            fontSize = 8.sp,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                                        )
+                                    }
+                                }
+                            }
+
+                            // Row 3: CUSTOMER RATINGS SATISFACTION INDEX
+                            Card(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .testTag("kpi_satisfaction"),
+                                colors = CardDefaults.cardColors(
+                                    containerColor = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.3f)
+                                ),
+                                shape = RoundedCornerShape(12.dp)
+                            ) {
+                                Row(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(12.dp),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Column {
+                                        Row(
+                                            verticalAlignment = Alignment.CenterVertically,
+                                            horizontalArrangement = Arrangement.spacedBy(4.dp)
+                                        ) {
+                                            Icon(
+                                                imageVector = Icons.Default.Star,
+                                                contentDescription = "Satisfaction Rating",
+                                                tint = MaterialTheme.colorScheme.secondary,
+                                                modifier = Modifier.size(16.dp)
+                                            )
+                                            Text(
+                                                "CUSTOMER RATINGS",
+                                                fontSize = 9.sp,
+                                                fontWeight = FontWeight.Bold,
+                                                color = MaterialTheme.colorScheme.onSecondaryContainer
+                                            )
+                                        }
+                                        Spacer(modifier = Modifier.height(2.dp))
+                                        Text(
+                                            "Overall quality & experience scorecard",
+                                            fontSize = 10.sp,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                                        )
+                                    }
+                                    Column(horizontalAlignment = Alignment.End) {
+                                        Text(
+                                            text = "${"%.1f".format(avgRatingsVal)}★",
+                                            fontSize = 24.sp,
+                                            fontWeight = FontWeight.ExtraBold,
+                                            color = MaterialTheme.colorScheme.primary
+                                        )
+                                        Text(
+                                            text = "Based on ${filteredFeedbackList.size} ratings",
+                                            fontSize = 8.sp,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                                        )
+                                    }
+                                }
+                            }
+                        }
+
+                        // DATA ANALYTICS & TREND HIGHLIGHTS CARD
+                        Card(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .testTag("analytics_trends_card"),
+                            colors = CardDefaults.cardColors(
+                                containerColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.04f)
+                            ),
+                            shape = RoundedCornerShape(16.dp),
+                            border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
+                        ) {
+                            Column(modifier = Modifier.padding(16.dp)) {
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.Info,
+                                        contentDescription = "Trend Highlights",
+                                        tint = MaterialTheme.colorScheme.primary,
+                                        modifier = Modifier.size(20.dp)
+                                    )
+                                    Text(
+                                        text = "Booth Analytics & Trend Highlights",
+                                        fontWeight = FontWeight.Bold,
+                                        style = MaterialTheme.typography.titleSmall,
+                                        color = MaterialTheme.colorScheme.primary
+                                    )
+                                }
+                                
+                                Spacer(modifier = Modifier.height(10.dp))
+
+                                // Trend recommendation 1: Volume insight
+                                val volumeInsight = if (totalOrdersCount > 10) {
+                                    "High transactional velocity detected. Your peak hour congestion is currently stable, but prepare for heavy lunch rush transitions."
+                                } else {
+                                    "Moderate order volume. Recommend triggering dynamic off-peak happy hour discounts to drive higher student afternoon engagement."
+                                }
+
+                                // Trend recommendation 2: Pricing / AOV insight
+                                val priceInsight = if (averageOrderValue < 20.0) {
+                                    "AOV is relatively low at GH₵ ${"%.2f".format(averageOrderValue)}. Formulate Sobolo drink bundled combos with main meals to elevate food basket sizes."
+                                } else {
+                                    "Solid student purchase elasticity! Your current pricing structure yields a strong average basket ticket size of GH₵ ${"%.2f".format(averageOrderValue)}."
+                                }
+
+                                // Trend recommendation 3: Speed index insight
+                                val serviceInsignt = if (avgPrepTime > 15.0) {
+                                    "Preparation times average ${"%.1f".format(avgPrepTime)}m. Initiate pre-chopping or kitchen line splits to avoid peak student queues during common lecture breaks."
+                                } else {
+                                    "Excellent cooking turnaround speed. Your food station is highly optimized under the university's priority delivery benchmarks."
+                                }
+
+                                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                                    Row(
+                                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                        verticalAlignment = Alignment.Top
+                                    ) {
+                                        Text("📈", fontSize = 14.sp)
+                                        Column {
+                                            Text("Sales & Demand Traffic", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface)
+                                            Text(volumeInsight, fontSize = 10.sp, color = MaterialTheme.colorScheme.onSurfaceVariant, lineHeight = 14.sp)
+                                        }
+                                    }
+
+                                    Row(
+                                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                        verticalAlignment = Alignment.Top
+                                    ) {
+                                        Text("💰", fontSize = 14.sp)
+                                        Column {
+                                            Text("Pricing Elasticity", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface)
+                                            Text(priceInsight, fontSize = 10.sp, color = MaterialTheme.colorScheme.onSurfaceVariant, lineHeight = 14.sp)
+                                        }
+                                    }
+
+                                    Row(
+                                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                        verticalAlignment = Alignment.Top
+                                    ) {
+                                        Text("⏱️", fontSize = 14.sp)
+                                        Column {
+                                            Text("Cooking & Queue Efficiency", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface)
+                                            Text(serviceInsignt, fontSize = 10.sp, color = MaterialTheme.colorScheme.onSurfaceVariant, lineHeight = 14.sp)
+                                        }
+                                    }
+                                }
+                            }
+                        }
+
+                        // 1b. DOWNLOADABLE REPORT CONTROL CARD
+                        Card(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(vertical = 4.dp),
+                            colors = CardDefaults.cardColors(
+                                containerColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.2f)
+                            )
+                        ) {
+                            Column(modifier = Modifier.padding(16.dp)) {
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                ) {
+                                    Icon(
+                                        Icons.Default.Download,
+                                        contentDescription = "Download Report",
+                                        tint = MaterialTheme.colorScheme.primary
+                                    )
+                                    Text(
+                                        text = "Monthly Performance Reports",
+                                        fontWeight = FontWeight.Bold,
+                                        style = MaterialTheme.typography.titleSmall,
+                                        color = MaterialTheme.colorScheme.primary
+                                    )
+                                }
+                                
+                                Spacer(modifier = Modifier.height(4.dp))
+                                
+                                Text(
+                                    text = "Generate and download a comprehensive monthly POS audit report of all statistics, revenues, food completion metrics, and review transcripts.",
+                                    fontSize = 11.sp,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+
+                                Spacer(modifier = Modifier.height(12.dp))
+
+                                var reportStatusText by remember { mutableStateOf<String?>(null) }
+                                var isExportingReport by remember { mutableStateOf(false) }
+
+                                if (isExportingReport) {
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        horizontalArrangement = Arrangement.Center,
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        CircularProgressIndicator(modifier = Modifier.size(16.dp))
+                                        Spacer(modifier = Modifier.width(12.dp))
+                                        Text(
+                                            text = "Compiling certified database records...",
+                                            fontSize = 11.sp,
+                                            fontWeight = FontWeight.SemiBold
+                                        )
+                                    }
+                                } else {
+                                    reportStatusText?.let { status ->
+                                        Box(
+                                            modifier = Modifier
+                                                .fillMaxWidth()
+                                                .background(
+                                                    MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.8f),
+                                                    RoundedCornerShape(8.dp)
+                                                )
+                                                .padding(8.dp),
+                                            contentAlignment = Alignment.Center
+                                        ) {
+                                            Text(
+                                                text = status,
+                                                fontSize = 11.sp,
+                                                fontWeight = FontWeight.Bold,
+                                                color = MaterialTheme.colorScheme.onSecondaryContainer
+                                            )
+                                        }
+                                        Spacer(modifier = Modifier.height(12.dp))
+                                    }
+
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                    ) {
+                                        Button(
+                                            onClick = {
+                                                isExportingReport = true
+                                                viewModel.exportAnalyticsReport(
+                                                    format = "PDF",
+                                                    vendorId = currentUser?.id ?: 0,
+                                                    vendorName = currentUser?.fullName ?: "Vendor",
+                                                    orders = filteredIncomingOrders,
+                                                    feedbacks = filteredFeedbackList,
+                                                    dateRangeScope = dateScopeLabel
+                                                ) { success, message ->
+                                                    isExportingReport = false
+                                                    reportStatusText = message
+                                                }
+                                            },
+                                            shape = RoundedCornerShape(8.dp),
+                                            modifier = Modifier.weight(1f)
+                                        ) {
+                                            Icon(
+                                                Icons.Default.PictureAsPdf,
+                                                contentDescription = null,
+                                                modifier = Modifier.size(16.dp)
+                                            )
+                                            Spacer(modifier = Modifier.width(6.dp))
+                                            Text("Export PDF", fontSize = 11.sp)
+                                        }
+
+                                        OutlinedButton(
+                                            onClick = {
+                                                isExportingReport = true
+                                                viewModel.exportAnalyticsReport(
+                                                    format = "CSV",
+                                                    vendorId = currentUser?.id ?: 0,
+                                                    vendorName = currentUser?.fullName ?: "Vendor",
+                                                    orders = filteredIncomingOrders,
+                                                    feedbacks = filteredFeedbackList,
+                                                    dateRangeScope = dateScopeLabel
+                                                ) { success, message ->
+                                                    isExportingReport = false
+                                                    reportStatusText = message
+                                                }
+                                            },
+                                            shape = RoundedCornerShape(8.dp),
+                                            modifier = Modifier.weight(1f)
+                                        ) {
+                                            Icon(
+                                                Icons.Default.GridOn,
+                                                contentDescription = null,
+                                                modifier = Modifier.size(16.dp)
+                                            )
+                                            Spacer(modifier = Modifier.width(6.dp))
+                                            Text("Export CSV", fontSize = 11.sp)
+                                        }
+                                    }
                                 }
                             }
                         }
@@ -3211,14 +4372,415 @@ fun VendorDashboardScreen(
                         RadarFeedbackChart(metrics = metrics, modifier = Modifier.fillMaxWidth())
 
                         // 3. Dynamic Revenue Bar Chart
-                        DailyRevenueBarChart(orders = incomingOrders, modifier = Modifier.fillMaxWidth())
+                        DailyRevenueBarChart(orders = filteredIncomingOrders, modifier = Modifier.fillMaxWidth())
+
+                        // 3a. Recharts-style spline line chart fed by VendorPerformanceController from backend
+                        if (com.example.data.LaravelClientManager.isLaravelEnabled) {
+                            VendorPerformanceTrendChart(
+                                performanceData = performanceData,
+                                modifier = Modifier.fillMaxWidth()
+                            )
+                        }
+
+                        // 3b. Gemini AI Qualitative Sentiment Analysis Card
+                        Card(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(vertical = 4.dp)
+                                .testTag("sentiment_analysis_card"),
+                            colors = CardDefaults.cardColors(
+                                containerColor = MaterialTheme.colorScheme.tertiaryContainer.copy(alpha = 0.15f)
+                            ),
+                            shape = RoundedCornerShape(16.dp),
+                            border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.tertiary.copy(alpha = 0.2f))
+                        ) {
+                            Column(modifier = Modifier.padding(16.dp)) {
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.AutoAwesome,
+                                        contentDescription = "Gemini AI",
+                                        tint = MaterialTheme.colorScheme.tertiary
+                                    )
+                                    Text(
+                                        text = "Gemini Student Sentiment Analyst",
+                                        fontWeight = FontWeight.Bold,
+                                        style = MaterialTheme.typography.titleMedium,
+                                        color = MaterialTheme.colorScheme.tertiary
+                                    )
+                                }
+                                
+                                Spacer(modifier = Modifier.height(4.dp))
+                                
+                                Text(
+                                    text = "Employ Gemini Flash to analyze all student feedback transcripts and order remarks instantly for a complete qualitative report.",
+                                    fontSize = 11.sp,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+
+                                Spacer(modifier = Modifier.height(12.dp))
+
+                                if (isAnalyzingSentiment) {
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth().padding(vertical = 12.dp),
+                                        horizontalArrangement = Arrangement.Center,
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        CircularProgressIndicator(modifier = Modifier.size(20.dp), color = MaterialTheme.colorScheme.tertiary)
+                                        Spacer(modifier = Modifier.width(12.dp))
+                                        Text(
+                                            text = "Analyzing conversational comment transcripts...",
+                                            fontSize = 12.sp,
+                                            fontWeight = FontWeight.SemiBold,
+                                            color = MaterialTheme.colorScheme.tertiary
+                                        )
+                                    }
+                                } else {
+                                    sentimentAnalysisText?.let { analysisResult ->
+                                        Box(
+                                            modifier = Modifier
+                                                .fillMaxWidth()
+                                                .background(
+                                                    MaterialTheme.colorScheme.surface.copy(alpha = 0.9f),
+                                                    RoundedCornerShape(12.dp)
+                                                )
+                                                .border(androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant))
+                                                .padding(14.dp)
+                                        ) {
+                                            Column {
+                                                Row(
+                                                    verticalAlignment = Alignment.CenterVertically,
+                                                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                                                    modifier = Modifier.padding(bottom = 8.dp)
+                                                ) {
+                                                    Box(
+                                                        modifier = Modifier
+                                                            .background(Color(0xFF2E7D32).copy(alpha = 0.15f), RoundedCornerShape(4.dp))
+                                                            .padding(horizontal = 6.dp, vertical = 2.dp)
+                                                    ) {
+                                                        Text(
+                                                            "AI MODEL SYNTHESIS",
+                                                            color = Color(0xFF2E7D32),
+                                                            fontSize = 9.sp,
+                                                            fontWeight = FontWeight.Bold
+                                                        )
+                                                    }
+                                                }
+                                                Text(
+                                                    text = analysisResult,
+                                                    fontSize = 12.sp,
+                                                    lineHeight = 18.sp,
+                                                    color = MaterialTheme.colorScheme.onSurface
+                                                )
+                                            }
+                                        }
+                                        Spacer(modifier = Modifier.height(12.dp))
+                                    }
+
+                                    Button(
+                                        onClick = {
+                                            viewModel.runVendorSentimentAnalysis(
+                                                vendorId = currentUser?.id ?: 0,
+                                                vendorName = currentUser?.fullName ?: "Vendor",
+                                                feedbacks = filteredFeedbackList
+                                            )
+                                        },
+                                        colors = ButtonDefaults.buttonColors(
+                                            containerColor = MaterialTheme.colorScheme.tertiary,
+                                            contentColor = MaterialTheme.colorScheme.onTertiary
+                                        ),
+                                        shape = RoundedCornerShape(8.dp),
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .testTag("analyse_sentiment_button")
+                                    ) {
+                                        Icon(
+                                            Icons.Default.AutoAwesome,
+                                            contentDescription = null,
+                                            modifier = Modifier.size(16.dp)
+                                        )
+                                        Spacer(modifier = Modifier.width(6.dp))
+                                        Text(
+                                            text = if (sentimentAnalysisText == null) "Run Sentiment Analysis" else "Re-analyze Comments",
+                                            fontSize = 11.sp,
+                                            fontWeight = FontWeight.Bold
+                                        )
+                                    }
+                                }
+                            }
+                        }
+
+                        // 3c. Gemini AI Auto-Reply Assistant Card
+                        Card(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(vertical = 4.dp)
+                                .testTag("auto_reply_templates_card"),
+                            colors = CardDefaults.cardColors(
+                                containerColor = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.15f)
+                            ),
+                            shape = RoundedCornerShape(16.dp),
+                            border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.secondary.copy(alpha = 0.2f))
+                        ) {
+                            Column(modifier = Modifier.padding(16.dp)) {
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.AutoAwesome,
+                                        contentDescription = "Quick Reply Suggestions",
+                                        tint = MaterialTheme.colorScheme.secondary
+                                    )
+                                    Text(
+                                        text = "Gemini Quick Response Assistant",
+                                        fontWeight = FontWeight.Bold,
+                                        style = MaterialTheme.typography.titleMedium,
+                                        color = MaterialTheme.colorScheme.secondary
+                                    )
+                                }
+                                
+                                Spacer(modifier = Modifier.height(4.dp))
+                                
+                                Text(
+                                    text = "Generate professional, polite, and actionable auto-reply response templates customized to address student pain points and negative comments.",
+                                    fontSize = 11.sp,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+
+                                Spacer(modifier = Modifier.height(12.dp))
+
+                                if (isGeneratingAutoReplies) {
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth().padding(vertical = 12.dp),
+                                        horizontalArrangement = Arrangement.Center,
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        CircularProgressIndicator(modifier = Modifier.size(20.dp), color = MaterialTheme.colorScheme.secondary)
+                                        Spacer(modifier = Modifier.width(12.dp))
+                                        Text(
+                                            text = "Drafting professional support templates...",
+                                            fontSize = 12.sp,
+                                            fontWeight = FontWeight.SemiBold,
+                                            color = MaterialTheme.colorScheme.secondary
+                                        )
+                                    }
+                                } else {
+                                    autoRepliesText?.let { templates ->
+                                        Box(
+                                            modifier = Modifier
+                                                .fillMaxWidth()
+                                                .background(
+                                                    MaterialTheme.colorScheme.surface.copy(alpha = 0.9f),
+                                                    RoundedCornerShape(12.dp)
+                                                )
+                                                .border(androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant))
+                                                .padding(14.dp)
+                                        ) {
+                                            Column {
+                                                Row(
+                                                    verticalAlignment = Alignment.CenterVertically,
+                                                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                                                    modifier = Modifier.padding(bottom = 8.dp)
+                                                ) {
+                                                    Box(
+                                                        modifier = Modifier
+                                                            .background(MaterialTheme.colorScheme.secondaryContainer, RoundedCornerShape(4.dp))
+                                                            .padding(horizontal = 6.dp, vertical = 2.dp)
+                                                    ) {
+                                                        Text(
+                                                            "READY TO COPY TEMPLATES",
+                                                            color = MaterialTheme.colorScheme.onSecondaryContainer,
+                                                            fontSize = 9.sp,
+                                                            fontWeight = FontWeight.Bold
+                                                        )
+                                                    }
+                                                }
+                                                Text(
+                                                    text = templates,
+                                                    fontSize = 12.sp,
+                                                    lineHeight = 18.sp,
+                                                    color = MaterialTheme.colorScheme.onSurface
+                                                )
+                                            }
+                                        }
+                                        Spacer(modifier = Modifier.height(12.dp))
+                                    }
+
+                                    Button(
+                                        onClick = {
+                                            viewModel.runVendorAutoReplies(
+                                                vendorId = currentUser?.id ?: 0,
+                                                vendorName = currentUser?.fullName ?: "Vendor",
+                                                feedbacks = filteredFeedbackList
+                                            )
+                                        },
+                                        colors = ButtonDefaults.buttonColors(
+                                            containerColor = MaterialTheme.colorScheme.secondary,
+                                            contentColor = MaterialTheme.colorScheme.onSecondary
+                                        ),
+                                        shape = RoundedCornerShape(8.dp),
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .testTag("generate_auto_replies_button")
+                                    ) {
+                                        Icon(
+                                            Icons.Default.AutoAwesome,
+                                            contentDescription = null,
+                                            modifier = Modifier.size(16.dp)
+                                        )
+                                        Spacer(modifier = Modifier.width(6.dp))
+                                        Text(
+                                            text = if (autoRepliesText == null) "Generate Professional Replies" else "Regenerate Response Templates",
+                                            fontSize = 11.sp,
+                                            fontWeight = FontWeight.Bold
+                                        )
+                                    }
+                                }
+                            }
+                        }
+
+                        // 3d. Gemini AI Pricing & Specials Planner Card
+                        Card(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(vertical = 4.dp)
+                                .testTag("pricing_suggestions_card"),
+                            colors = CardDefaults.cardColors(
+                                containerColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.15f)
+                            ),
+                            shape = RoundedCornerShape(16.dp),
+                            border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.2f))
+                        ) {
+                            Column(modifier = Modifier.padding(16.dp)) {
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.AutoAwesome,
+                                        contentDescription = "Pricing Suggestions",
+                                        tint = MaterialTheme.colorScheme.primary
+                                    )
+                                    Text(
+                                        text = "Gemini Pricing & Specials Planner",
+                                        fontWeight = FontWeight.Bold,
+                                        style = MaterialTheme.typography.titleMedium,
+                                        color = MaterialTheme.colorScheme.primary
+                                    )
+                                }
+                                
+                                Spacer(modifier = Modifier.height(4.dp))
+                                
+                                Text(
+                                    text = "Synthesize active campus transaction patterns to dynamically suggest student pricing elasticities and off-peak Happy Hour combos.",
+                                    fontSize = 11.sp,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+
+                                Spacer(modifier = Modifier.height(12.dp))
+
+                                if (isGeneratingPricingSuggestions) {
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth().padding(vertical = 12.dp),
+                                        horizontalArrangement = Arrangement.Center,
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        CircularProgressIndicator(modifier = Modifier.size(20.dp), color = MaterialTheme.colorScheme.primary)
+                                        Spacer(modifier = Modifier.width(12.dp))
+                                        Text(
+                                            text = "Analyzing hourly student purchase elasticities...",
+                                            fontSize = 12.sp,
+                                            fontWeight = FontWeight.SemiBold,
+                                            color = MaterialTheme.colorScheme.primary
+                                        )
+                                    }
+                                } else {
+                                    pricingSuggestionsText?.let { dynamicPlan ->
+                                        Box(
+                                            modifier = Modifier
+                                                .fillMaxWidth()
+                                                .background(
+                                                    MaterialTheme.colorScheme.surface.copy(alpha = 0.9f),
+                                                    RoundedCornerShape(12.dp)
+                                                )
+                                                .border(androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant))
+                                                .padding(14.dp)
+                                        ) {
+                                            Column {
+                                                Row(
+                                                    verticalAlignment = Alignment.CenterVertically,
+                                                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                                                    modifier = Modifier.padding(bottom = 8.dp)
+                                                ) {
+                                                    Box(
+                                                        modifier = Modifier
+                                                            .background(MaterialTheme.colorScheme.primaryContainer, RoundedCornerShape(4.dp))
+                                                            .padding(horizontal = 6.dp, vertical = 2.dp)
+                                                    ) {
+                                                        Text(
+                                                            "AUTOMATED REVENUE ROADMAP",
+                                                            color = MaterialTheme.colorScheme.onPrimaryContainer,
+                                                            fontSize = 9.sp,
+                                                            fontWeight = FontWeight.Bold
+                                                        )
+                                                    }
+                                                }
+                                                Text(
+                                                    text = dynamicPlan,
+                                                    fontSize = 12.sp,
+                                                    lineHeight = 18.sp,
+                                                    color = MaterialTheme.colorScheme.onSurface
+                                                )
+                                            }
+                                        }
+                                        Spacer(modifier = Modifier.height(12.dp))
+                                    }
+
+                                    Button(
+                                        onClick = {
+                                            viewModel.runVendorPricingSuggestions(
+                                                vendorId = currentUser?.id ?: 0,
+                                                vendorName = currentUser?.fullName ?: "Vendor",
+                                                orders = filteredIncomingOrders,
+                                                foodItems = vendorFoods
+                                            )
+                                        },
+                                        colors = ButtonDefaults.buttonColors(
+                                            containerColor = MaterialTheme.colorScheme.primary,
+                                            contentColor = MaterialTheme.colorScheme.onPrimary
+                                        ),
+                                        shape = RoundedCornerShape(8.dp),
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .testTag("generate_pricing_suggestions_button")
+                                    ) {
+                                        Icon(
+                                            Icons.Default.AutoAwesome,
+                                            contentDescription = null,
+                                            modifier = Modifier.size(16.dp)
+                                        )
+                                        Spacer(modifier = Modifier.width(6.dp))
+                                        Text(
+                                            text = if (pricingSuggestionsText == null) "Suggest Pricing & Specials" else "Re-optimize Pricing Plans",
+                                            fontSize = 11.sp,
+                                            fontWeight = FontWeight.Bold
+                                        )
+                                    }
+                                }
+                            }
+                        }
+
+                        Spacer(modifier = Modifier.height(12.dp))
 
                         // 4. Feedback details
                         Text("Live Customer Sentiment Transcripts", fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleSmall)
-                        if (vendorFeedbackList.isEmpty()) {
+                        if (filteredFeedbackList.isEmpty()) {
                             Text("No reviews submitted on campus yet.", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
                         } else {
-                            vendorFeedbackList.forEach { f ->
+                            filteredFeedbackList.forEach { f ->
                                 Card(
                                     colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
                                     modifier = Modifier.fillMaxWidth()
@@ -3411,6 +4973,231 @@ fun VendorDashboardScreen(
                         }
                     }
                 }
+                4 -> {
+                    // Vendor Finance & Earnings Hub Tab
+                    val providerTransactions by viewModel.userWalletTransactions.collectAsStateWithLifecycle()
+                    var payoutAmountState by remember { mutableStateOf("") }
+                    var payoutDetailsState by remember { mutableStateOf("") }
+                    var hasRequestedPayout by remember { mutableStateOf<String?>(null) }
+                    var payoutErrorMessage by remember { mutableStateOf<String?>(null) }
+
+                    LazyColumn(
+                        modifier = Modifier.fillMaxSize(),
+                        contentPadding = PaddingValues(16.dp),
+                        verticalArrangement = Arrangement.spacedBy(16.dp)
+                    ) {
+                        item {
+                            Text(
+                                "Vendor Finance Hub",
+                                style = MaterialTheme.typography.titleLarge,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.primary
+                            )
+                            Text(
+                                "Manage your student meal earnings, payouts, and book-keeping records.",
+                                fontSize = 11.sp,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+
+                        // A. Accumulated Earnings Visual Card
+                        item {
+                            Card(
+                                modifier = Modifier.fillMaxWidth(),
+                                shape = RoundedCornerShape(16.dp),
+                                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer),
+                                elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+                            ) {
+                                Column(modifier = Modifier.padding(16.dp)) {
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        horizontalArrangement = Arrangement.SpaceBetween,
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        Text("Total Accumulated Earnings", fontWeight = FontWeight.Bold, fontSize = 12.sp, color = MaterialTheme.colorScheme.onPrimaryContainer)
+                                        Icon(
+                                            Icons.Default.AccountBalanceWallet,
+                                            contentDescription = null,
+                                            tint = MaterialTheme.colorScheme.primary
+                                        )
+                                    }
+                                    Spacer(modifier = Modifier.height(12.dp))
+                                    Text(
+                                        "GH₵ ${"%.2f".format(currentUser?.balance ?: 0.0)}",
+                                        fontWeight = FontWeight.Bold,
+                                        fontSize = 32.sp,
+                                        color = MaterialTheme.colorScheme.primary
+                                    )
+                                    Spacer(modifier = Modifier.height(6.dp))
+                                    Text(
+                                        "Funds reflect instantly when students complete order secure PIN verification.",
+                                        fontSize = 10.sp,
+                                        color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.8f)
+                                    )
+                                }
+                            }
+                        }
+
+                        // B. Request Instant Mobile Money Settlement
+                        item {
+                            Card(
+                                modifier = Modifier.fillMaxWidth(),
+                                shape = RoundedCornerShape(12.dp),
+                                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
+                            ) {
+                                Column(modifier = Modifier.padding(16.dp)) {
+                                    Text(
+                                        "Initiate Mobile Money Payout",
+                                        fontWeight = FontWeight.Bold,
+                                        style = MaterialTheme.typography.titleMedium,
+                                        color = MaterialTheme.colorScheme.primary
+                                    )
+                                    Text(
+                                        "Withdraw your wallet balance instantly to your MTN MoMo, Telecel Cash or ATU Credit accounts.",
+                                        fontSize = 11.sp,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+
+                                    Spacer(modifier = Modifier.height(16.dp))
+
+                                    if (hasRequestedPayout != null) {
+                                        Box(
+                                            modifier = Modifier
+                                                .fillMaxWidth()
+                                                .background(MaterialTheme.colorScheme.secondaryContainer, RoundedCornerShape(8.dp))
+                                                .padding(12.dp),
+                                            contentAlignment = Alignment.Center
+                                        ) {
+                                            Text(hasRequestedPayout!!, fontSize = 11.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSecondaryContainer)
+                                        }
+                                        Spacer(modifier = Modifier.height(8.dp))
+                                        TextButton(onClick = { hasRequestedPayout = null; payoutAmountState = ""; payoutDetailsState = "" }) {
+                                            Text("Request another payout", fontSize = 11.sp)
+                                        }
+                                    } else {
+                                        if (payoutErrorMessage != null) {
+                                            Text(payoutErrorMessage!!, color = MaterialTheme.colorScheme.error, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                                            Spacer(modifier = Modifier.height(8.dp))
+                                        }
+
+                                        OutlinedTextField(
+                                            value = payoutAmountState,
+                                            onValueChange = { payoutAmountState = it },
+                                            label = { Text("Payout Amount (GH₵)") },
+                                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                                            modifier = Modifier.fillMaxWidth()
+                                        )
+
+                                        Spacer(modifier = Modifier.height(12.dp))
+
+                                        OutlinedTextField(
+                                            value = payoutDetailsState,
+                                            onValueChange = { payoutDetailsState = it },
+                                            label = { Text("MoMo / Bank Details (e.g. MTN MoMo - 0541249214)") },
+                                            modifier = Modifier.fillMaxWidth()
+                                        )
+
+                                        Spacer(modifier = Modifier.height(16.dp))
+
+                                        Button(
+                                            onClick = {
+                                                val amt = payoutAmountState.toDoubleOrNull()
+                                                if (amt == null || amt <= 0.0) {
+                                                    payoutErrorMessage = "Please input a valid payout amount."
+                                                    return@Button
+                                                }
+                                                if (currentUser != null && currentUser!!.balance < amt) {
+                                                    payoutErrorMessage = "Insufficient sales earnings balance."
+                                                    return@Button
+                                                }
+                                                if (payoutDetailsState.isBlank()) {
+                                                    payoutErrorMessage = "Please provide valid account settlement details."
+                                                    return@Button
+                                                }
+                                                payoutErrorMessage = null
+                                                viewModel.requestVendorPayout(amt, payoutDetailsState) { success ->
+                                                    if (success) {
+                                                        hasRequestedPayout = "GH₵ ${"%.2f".format(amt)} payout logged successfully! Will hit your phone wallet shortly."
+                                                    } else {
+                                                        payoutErrorMessage = "Payout failed. Verify system connection."
+                                                    }
+                                                }
+                                            },
+                                            modifier = Modifier.fillMaxWidth()
+                                        ) {
+                                            Text("Settle Funds Now")
+                                        }
+                                    }
+                                }
+                            }
+                        }
+
+                        // C. Vendor Earnings Transaction Ledger list
+                        item {
+                            Card(
+                                modifier = Modifier.fillMaxWidth(),
+                                shape = RoundedCornerShape(12.dp),
+                                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
+                            ) {
+                                Column(modifier = Modifier.padding(16.dp)) {
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        horizontalArrangement = Arrangement.SpaceBetween,
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        Text(
+                                            "Recent Financial Ledger Logs",
+                                            fontWeight = FontWeight.Bold,
+                                            style = MaterialTheme.typography.titleMedium,
+                                            color = MaterialTheme.colorScheme.secondary
+                                        )
+                                        Icon(
+                                            Icons.Default.List,
+                                            contentDescription = null,
+                                            tint = MaterialTheme.colorScheme.secondary,
+                                            modifier = Modifier.size(18.dp)
+                                        )
+                                    }
+                                    Spacer(modifier = Modifier.height(12.dp))
+
+                                    if (providerTransactions.isEmpty()) {
+                                        Box(
+                                            modifier = Modifier.fillMaxWidth().padding(vertical = 24.dp),
+                                            contentAlignment = Alignment.Center
+                                        ) {
+                                            Text("No earnings or withdrawal transactions logged yet.", fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                        }
+                                    } else {
+                                        providerTransactions.forEach { tx ->
+                                            val isPositive = tx.amount >= 0
+                                            val color = if (isPositive) androidx.compose.ui.graphics.Color(0xFF2E7D32) else androidx.compose.ui.graphics.Color(0xFFC62828)
+                                            val prefix = if (isPositive) "+" else ""
+                                            Row(
+                                                modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp),
+                                                horizontalArrangement = Arrangement.SpaceBetween,
+                                                verticalAlignment = Alignment.CenterVertically
+                                            ) {
+                                                Column(modifier = Modifier.weight(1f)) {
+                                                    Text(tx.details, fontSize = 11.sp, fontWeight = FontWeight.Bold, maxLines = 1)
+                                                    Text("Ref: ${tx.reference} • ${java.text.SimpleDateFormat("dd MMM, hh:mm a", java.util.Locale.US).format(java.util.Date(tx.timestamp))}", fontSize = 9.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                                }
+                                                Text(
+                                                    "${prefix}GH₵ ${"%.2f".format(tx.amount)}",
+                                                    fontWeight = FontWeight.Bold,
+                                                    fontSize = 11.sp,
+                                                    color = color
+                                                )
+                                            }
+                                            HorizontalDivider(modifier = Modifier.padding(vertical = 4.dp), color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
             }
 
             // ADD MENU ITEM DIALOG
@@ -3472,6 +5259,26 @@ fun VendorDashboardScreen(
 
                             Row(
                                 modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                OutlinedTextField(
+                                    value = newFoodInitialStock,
+                                    onValueChange = { newFoodInitialStock = it },
+                                    label = { Text("Initial Stock Limit") },
+                                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                                    modifier = Modifier.weight(1f)
+                                )
+                                OutlinedTextField(
+                                    value = newFoodSafetyThreshold,
+                                    onValueChange = { newFoodSafetyThreshold = it },
+                                    label = { Text("Safety Stock Alert") },
+                                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                                    modifier = Modifier.weight(1f)
+                                )
+                            }
+
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
                                 horizontalArrangement = Arrangement.End
                             ) {
                                 TextButton(onClick = { isAddingFood = false }) { Text("Close") }
@@ -3479,13 +5286,17 @@ fun VendorDashboardScreen(
                                 Button(
                                     onClick = {
                                         val p = newFoodPrice.toDoubleOrNull() ?: 0.0
+                                        val stockInput = newFoodInitialStock.toIntOrNull() ?: 100
+                                        val thresholdInput = newFoodSafetyThreshold.toIntOrNull() ?: 15
                                         if (newFoodName.isNotBlank() && p > 0.0) {
                                             viewModel.addVendorFoodItem(
                                                 name = newFoodName,
                                                 price = p,
                                                 category = newFoodCategory,
                                                 description = newFoodDescription.ifBlank { "Traditional meals served hot." },
-                                                imageUrl = ""
+                                                imageUrl = "",
+                                                initialStock = stockInput,
+                                                threshold = thresholdInput
                                             )
                                             isAddingFood = false
                                         }
@@ -3629,8 +5440,120 @@ fun VendorDashboardScreen(
                     }
                 }
             }
+
+            // Real-time floating order notification banner (with sound alert indicator)
+            if (activeAlerts.isNotEmpty()) {
+                Column(
+                    modifier = Modifier
+                        .align(Alignment.TopCenter)
+                        .fillMaxWidth()
+                        .padding(16.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    activeAlerts.forEach { alert ->
+                        Card(
+                            colors = CardDefaults.cardColors(
+                                containerColor = MaterialTheme.colorScheme.errorContainer,
+                                contentColor = MaterialTheme.colorScheme.onErrorContainer
+                            ),
+                            elevation = CardDefaults.cardElevation(defaultElevation = 8.dp),
+                            shape = RoundedCornerShape(12.dp),
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .animateContentSize()
+                        ) {
+                            Row(
+                                modifier = Modifier
+                                    .padding(12.dp)
+                                    .fillMaxWidth(),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(12.dp)
+                            ) {
+                                Box(
+                                    modifier = Modifier
+                                        .background(MaterialTheme.colorScheme.error, CircleShape)
+                                        .padding(8.dp)
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.Notifications,
+                                        contentDescription = "New Order Notification Alert",
+                                        tint = MaterialTheme.colorScheme.onError,
+                                        modifier = Modifier.size(24.dp)
+                                    )
+                                }
+                                
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Row(
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                                    ) {
+                                        Text(
+                                            "NEW ORDER RECEIVED!",
+                                            style = MaterialTheme.typography.labelSmall,
+                                            fontWeight = FontWeight.ExtraBold,
+                                            color = MaterialTheme.colorScheme.error
+                                        )
+                                        Box(
+                                            modifier = Modifier
+                                                .background(Color.Red, RoundedCornerShape(4.dp))
+                                                .padding(horizontal = 4.dp, vertical = 2.dp)
+                                        ) {
+                                            Text(
+                                                "LIVE",
+                                                color = Color.White,
+                                                fontSize = 8.sp,
+                                                fontWeight = FontWeight.Bold
+                                            )
+                                        }
+                                    }
+                                    Text(
+                                        text = alert.foodName.ifEmpty { "Selection" },
+                                        style = MaterialTheme.typography.titleMedium,
+                                        fontWeight = FontWeight.Bold,
+                                        maxLines = 1,
+                                        overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
+                                    )
+                                    Text(
+                                        text = "Quantity: ${alert.quantity} • Value: GH₵ ${"%.2f".format(alert.totalPrice)}",
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.onErrorContainer.copy(alpha = 0.8f)
+                                    )
+                                }
+
+                                Row(
+                                    horizontalArrangement = Arrangement.spacedBy(4.dp),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    TextButton(
+                                        onClick = {
+                                            viewModel.dismissOrderAlert(alert.id)
+                                        }
+                                    ) {
+                                        Text("Dismiss", color = MaterialTheme.colorScheme.error, fontWeight = FontWeight.Bold)
+                                    }
+                                    Button(
+                                        onClick = {
+                                            viewModel.dismissOrderAlert(alert.id)
+                                            activeTab = 0 // Focus/switch and jump directly to Orders manager tab
+                                        },
+                                        colors = ButtonDefaults.buttonColors(
+                                            containerColor = MaterialTheme.colorScheme.error,
+                                            contentColor = Color.White
+                                        ),
+                                        contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp),
+                                        shape = RoundedCornerShape(8.dp)
+                                    ) {
+                                        Text("Process", fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
         }
     }
+}
 }
 
 // ==========================================
@@ -4342,9 +6265,10 @@ fun AdminDashboardScreen(
                 }
             }
         }
-        }
+    }
+    }
 
-        // 1. ADD NEW VENDOR DIALOG
+    // 1. ADD NEW VENDOR DIALOG
         if (showAddVendorDialog) {
             Dialog(onDismissRequest = { showAddVendorDialog = false }) {
                 Card(
@@ -4533,4 +6457,3 @@ fun AdminDashboardScreen(
             )
         }
     }
-}

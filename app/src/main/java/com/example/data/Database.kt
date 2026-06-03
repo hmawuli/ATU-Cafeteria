@@ -18,7 +18,9 @@ data class User(
     val passwordHash: String, // Simulates secure credential storage
     val role: String,         // "STUDENT", "VENDOR", "ADMIN"
     val fullName: String,
-    val info: String          // e.g. Student ID for Students, or Brand Name ("ATU Delight") for Vendors
+    val info: String,         // e.g. Student ID for Students, or Brand Name ("ATU Delight") for Vendors
+    val balance: Double = 0.0, // User's virtual wallet balance
+    @com.squareup.moshi.Json(name = "is_open") @ColumnInfo(defaultValue = "1") val isOpen: Boolean = true
 )
 
 @Entity(
@@ -41,7 +43,10 @@ data class FoodItem(
     val category: String, // "Breakfast", "Local Dish", "Fast Food", "Drinks", "Snacks"
     val imageUrl: String, // Base64 or local visual reference
     val description: String,
-    val isAvailable: Boolean = true
+    val isAvailable: Boolean = true,
+    val initialStock: Int = 100,
+    val currentStock: Int = 100,
+    val lowStockThreshold: Int = 15
 )
 
 @Entity(
@@ -105,6 +110,29 @@ data class AuditLog(
     val details: String
 )
 
+@Entity(
+    tableName = "wallet_transactions",
+    foreignKeys = [
+        ForeignKey(
+            entity = User::class,
+            parentColumns = ["id"],
+            childColumns = ["userId"],
+            onDelete = ForeignKey.CASCADE
+        )
+    ],
+    indices = [Index(value = ["userId"])]
+)
+data class WalletTransaction(
+    @PrimaryKey(autoGenerate = true) val id: Int = 0,
+    val userId: Int,
+    val type: String, // "DEPOSIT", "PAYMENT", "PAYOUT", "REFUND"
+    val amount: Double,
+    val status: String, // "SUCCESS", "PENDING", "FAILED"
+    val reference: String,
+    val details: String,
+    val timestamp: Long = System.currentTimeMillis()
+)
+
 // ==========================================
 // 2. DATA ACCESS OBJECTS (DAOs)
 // ==========================================
@@ -146,6 +174,9 @@ interface FoodItemDao {
 
     @Query("SELECT * FROM food_items WHERE vendorId = :vendorId")
     fun getFoodItemsByVendor(vendorId: Int): Flow<List<FoodItem>>
+
+    @Query("SELECT * FROM food_items WHERE id = :id LIMIT 1")
+    suspend fun getFoodItemById(id: Int): FoodItem?
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertFoodItem(item: FoodItem): Long
@@ -202,13 +233,32 @@ interface AuditLogDao {
     suspend fun insertLog(log: AuditLog): Long
 }
 
+@Dao
+interface WalletTransactionDao {
+    @Query("SELECT * FROM wallet_transactions ORDER BY timestamp DESC")
+    fun getAllWalletTransactions(): Flow<List<WalletTransaction>>
+
+    @Query("SELECT * FROM wallet_transactions WHERE userId = :userId ORDER BY timestamp DESC")
+    fun getWalletTransactionsForUser(userId: Int): Flow<List<WalletTransaction>>
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertWalletTransaction(transaction: WalletTransaction): Long
+}
+
 // ==========================================
 // 3. APPDATABASE HOLDER
 // ==========================================
 
 @Database(
-    entities = [User::class, FoodItem::class, Order::class, Feedback::class, AuditLog::class],
-    version = 3,
+    entities = [
+        User::class,
+        FoodItem::class,
+        Order::class,
+        Feedback::class,
+        AuditLog::class,
+        WalletTransaction::class
+    ],
+    version = 5,
     exportSchema = false
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -217,6 +267,7 @@ abstract class AppDatabase : RoomDatabase() {
     abstract fun orderDao(): OrderDao
     abstract fun feedbackDao(): FeedbackDao
     abstract fun auditLogDao(): AuditLogDao
+    abstract fun walletTransactionDao(): WalletTransactionDao
 
     companion object {
         @Volatile

@@ -79,6 +79,7 @@ class CafeteriaRepository(private val db: AppDatabase) {
     val orderDao = db.orderDao()
     val feedbackDao = db.feedbackDao()
     val auditLogDao = db.auditLogDao()
+    val walletTransactionDao = db.walletTransactionDao()
 
     // Flow Accessors
     val allVendors: Flow<List<User>> = userDao.getAllVendors()
@@ -87,6 +88,10 @@ class CafeteriaRepository(private val db: AppDatabase) {
     val allOrders: Flow<List<Order>> = orderDao.getAllOrders()
     val allFeedback: Flow<List<Feedback>> = feedbackDao.getAllFeedback()
     val auditLogs: Flow<List<AuditLog>> = auditLogDao.getAllLogs()
+    val allWalletTransactions: Flow<List<WalletTransaction>> = walletTransactionDao.getAllWalletTransactions()
+
+    fun getWalletTransactionsForUser(userId: Int): Flow<List<WalletTransaction>> =
+        walletTransactionDao.getWalletTransactionsForUser(userId)
 
     fun getFoodItemsForVendor(vendorId: Int): Flow<List<FoodItem>> =
         foodItemDao.getFoodItemsByVendor(vendorId)
@@ -110,6 +115,26 @@ class CafeteriaRepository(private val db: AppDatabase) {
 
     // Role-based User operations
     suspend fun registerUser(username: String, pinCode: String, role: String, fullName: String, info: String): User? = withContext(Dispatchers.IO) {
+        if (LaravelClientManager.isLaravelEnabled) {
+            try {
+                val service = LaravelClientManager.getService()
+                val pHash = sha256(pinCode)
+                val user = service.register(
+                    LaravelRegisterRequest(
+                        username = username,
+                        pin = pHash,
+                        role = role,
+                        fullName = fullName,
+                        info = info
+                    )
+                )
+                // Cache locally
+                userDao.insertUser(user)
+                return@withContext user
+            } catch (e: Exception) {
+                Log.e("CafeteriaRepository", "Laravel registration failed - falling back to local database", e)
+            }
+        }
         val existing = userDao.getUserByUsername(username)
         if (existing != null) {
             return@withContext null
@@ -129,6 +154,23 @@ class CafeteriaRepository(private val db: AppDatabase) {
     }
 
     suspend fun authenticateUser(username: String, pinCode: String): User? = withContext(Dispatchers.IO) {
+        if (LaravelClientManager.isLaravelEnabled) {
+            try {
+                val service = LaravelClientManager.getService()
+                val pinHash = sha256(pinCode)
+                val user = service.login(
+                    LaravelLoginRequest(
+                        username = username,
+                        pin = pinHash
+                    )
+                )
+                // Cache locally
+                userDao.insertUser(user)
+                return@withContext user
+            } catch (e: Exception) {
+                Log.e("CafeteriaRepository", "Laravel login failed - falling back to local database", e)
+            }
+        }
         val user = userDao.getUserByUsername(username) ?: return@withContext null
         val targetHash = sha256(pinCode)
         if (user.passwordHash == targetHash) {
@@ -145,11 +187,38 @@ class CafeteriaRepository(private val db: AppDatabase) {
     }
 
     suspend fun deleteUser(userId: Int) = withContext(Dispatchers.IO) {
+        if (LaravelClientManager.isLaravelEnabled) {
+            try {
+                LaravelClientManager.getService().deleteUser(userId)
+            } catch (e: Exception) {
+                Log.e("CafeteriaRepository", "Laravel deleteUser failed", e)
+            }
+        }
         userDao.deleteUserById(userId)
     }
 
     // Menu Management
-    suspend fun addMenuFoodItem(vendorId: Int, name: String, price: Double, category: String, description: String, imageUrl: String) = withContext(Dispatchers.IO) {
+    suspend fun addMenuFoodItem(vendorId: Int, name: String, price: Double, category: String, description: String, imageUrl: String, initialStock: Int = 100, threshold: Int = 15) = withContext(Dispatchers.IO) {
+        if (LaravelClientManager.isLaravelEnabled) {
+            try {
+                val service = LaravelClientManager.getService()
+                val lItem = service.createFoodItem(
+                    LaravelAddFoodRequest(
+                        vendor_id = vendorId,
+                        name = name,
+                        price = price,
+                        category = category,
+                        description = description,
+                        image_url = imageUrl
+                    )
+                )
+                val roomItem = LaravelClientManager.toRoomFoodItem(lItem)
+                foodItemDao.insertFoodItem(roomItem.copy(initialStock = initialStock, currentStock = initialStock, lowStockThreshold = threshold))
+                return@withContext
+            } catch (e: Exception) {
+                Log.e("CafeteriaRepository", "Laravel createFoodItem failed - falling back to local", e)
+            }
+        }
         val item = FoodItem(
             vendorId = vendorId,
             name = name,
@@ -157,24 +226,92 @@ class CafeteriaRepository(private val db: AppDatabase) {
             category = category,
             description = description,
             imageUrl = imageUrl,
-            isAvailable = true
+            isAvailable = true,
+            initialStock = initialStock,
+            currentStock = initialStock,
+            lowStockThreshold = threshold
         )
         foodItemDao.insertFoodItem(item)
-        insertAuditLog(vendorId, "MENU_ITEM_CREATED", "Added menu item: ${name} to category ${category}")
+        insertAuditLog(vendorId, "MENU_ITEM_CREATED", "Added menu item: ${name} to category ${category} with initial stock of ${initialStock}.")
     }
 
     suspend fun updateMenuFoodItem(item: FoodItem) = withContext(Dispatchers.IO) {
+        if (LaravelClientManager.isLaravelEnabled) {
+            try {
+                val service = LaravelClientManager.getService()
+                val lItem = service.updateFoodItem(
+                    id = item.id,
+                    request = LaravelUpdateFoodRequest(
+                        name = item.name,
+                        price = item.price,
+                        category = item.category,
+                        description = item.description,
+                        image_url = item.imageUrl,
+                        is_available = item.isAvailable
+                    )
+                )
+                foodItemDao.insertFoodItem(LaravelClientManager.toRoomFoodItem(lItem))
+                return@withContext
+            } catch (e: Exception) {
+                Log.e("CafeteriaRepository", "Laravel updateFoodItem failed - falling back to local", e)
+            }
+        }
         foodItemDao.updateFoodItem(item)
         insertAuditLog(item.vendorId, "MENU_ITEM_UPDATED", "Updated item details for '${item.name}'")
     }
 
     suspend fun deleteMenuFoodItem(item: FoodItem) = withContext(Dispatchers.IO) {
+        if (LaravelClientManager.isLaravelEnabled) {
+            try {
+                LaravelClientManager.getService().deleteFoodItem(item.id)
+                foodItemDao.deleteFoodItem(item)
+                return@withContext
+            } catch (e: Exception) {
+                Log.e("CafeteriaRepository", "Laravel deleteFoodItem failed - falling back to local", e)
+            }
+        }
         foodItemDao.deleteFoodItem(item)
         insertAuditLog(item.vendorId, "MENU_ITEM_DELETED", "Deleted item: '${item.name}' from vendor menu.")
     }
 
     // Transactions
     suspend fun placeOrder(customerId: Int, foodItem: FoodItem, quantity: Int): Order = withContext(Dispatchers.IO) {
+        if (LaravelClientManager.isLaravelEnabled) {
+            try {
+                val service = LaravelClientManager.getService()
+                val lOrder = service.createOrder(
+                    LaravelAddOrderRequest(
+                        customer_id = customerId,
+                        vendor_id = foodItem.vendorId,
+                        food_item_id = foodItem.id,
+                        food_name = foodItem.name,
+                        quantity = quantity,
+                        unit_price = foodItem.price,
+                        total_price = foodItem.price * quantity
+                    )
+                )
+                val roomOrder = LaravelClientManager.toRoomOrder(lOrder)
+                orderDao.insertOrder(roomOrder)
+                
+                // Deduct inventory stock locally
+                try {
+                    val existingItem = foodItemDao.getFoodItemById(foodItem.id)
+                    if (existingItem != null) {
+                        val updatedStock = (existingItem.currentStock - quantity).coerceAtLeast(0)
+                        foodItemDao.updateFoodItem(existingItem.copy(currentStock = updatedStock))
+                        if (updatedStock <= existingItem.lowStockThreshold) {
+                            insertAuditLog(foodItem.vendorId, "LOW_STOCK_ALERT", "Low stock alert: '${foodItem.name}' has fallen below the threshold! Remaining stock: $updatedStock.")
+                        }
+                    }
+                } catch (e: Exception) {
+                    Log.e("CafeteriaRepository", "Failed to update stock logic", e)
+                }
+
+                return@withContext roomOrder
+            } catch (e: Exception) {
+                Log.e("CafeteriaRepository", "Laravel placeOrder failed - falling back to local", e)
+            }
+        }
         // Secure pickup PIN is a random 4-digit code
         val securePin = (1000..9999).random().toString()
         val order = Order(
@@ -191,10 +328,41 @@ class CafeteriaRepository(private val db: AppDatabase) {
         )
         val orderId = orderDao.insertOrder(order)
         insertAuditLog(customerId, "ORDER_CREATED", "Created order #${orderId} for '${foodItem.name}' (QTY: ${quantity}) with secure pick-up code.")
+        
+        // Deduct inventory stock locally
+        try {
+            val existingItem = foodItemDao.getFoodItemById(foodItem.id)
+            if (existingItem != null) {
+                val updatedStock = (existingItem.currentStock - quantity).coerceAtLeast(0)
+                foodItemDao.updateFoodItem(existingItem.copy(currentStock = updatedStock))
+                if (updatedStock <= existingItem.lowStockThreshold) {
+                    insertAuditLog(foodItem.vendorId, "LOW_STOCK_ALERT", "Low stock alert: '${foodItem.name}' has fallen below the threshold! Remaining stock: $updatedStock.")
+                }
+            }
+        } catch (e: Exception) {
+            Log.e("CafeteriaRepository", "Failed to update stock logic", e)
+        }
+
         return@withContext order.copy(id = orderId.toInt())
     }
 
     suspend fun updateOrderStatus(vendorId: Int, orderId: Int, newStatus: String, estimatedTime: String? = null) = withContext(Dispatchers.IO) {
+        if (LaravelClientManager.isLaravelEnabled) {
+            try {
+                val service = LaravelClientManager.getService()
+                val lOrder = service.updateOrderStatus(
+                    id = orderId,
+                    request = LaravelUpdateOrderStatusRequest(
+                        status = newStatus,
+                        estimated_pickup_time = estimatedTime
+                    )
+                )
+                orderDao.insertOrder(LaravelClientManager.toRoomOrder(lOrder))
+                return@withContext
+            } catch (e: Exception) {
+                Log.e("CafeteriaRepository", "Laravel updateOrderStatus failed - falling back to local", e)
+            }
+        }
         val o = orderDao.getOrderById(orderId) ?: return@withContext
         val updated = o.copy(
             status = newStatus,
@@ -205,6 +373,26 @@ class CafeteriaRepository(private val db: AppDatabase) {
     }
 
     suspend fun verifyAndCompletePickup(vendorId: Int, orderId: Int, pin: String): Boolean = withContext(Dispatchers.IO) {
+        if (LaravelClientManager.isLaravelEnabled) {
+            try {
+                val service = LaravelClientManager.getService()
+                val response = service.verifyAndCompletePickup(
+                    id = orderId,
+                    request = LaravelVerifyPickupRequest(
+                        vendor_id = vendorId,
+                        pickup_pin = pin
+                    )
+                )
+                if (response.success && response.order != null) {
+                    orderDao.insertOrder(LaravelClientManager.toRoomOrder(response.order))
+                    return@withContext true
+                } else {
+                    return@withContext false
+                }
+            } catch (e: Exception) {
+                Log.e("CafeteriaRepository", "Laravel verifyAndCompletePickup failed - falling back to local", e)
+            }
+        }
         val o = orderDao.getOrderById(orderId) ?: return@withContext false
         if (o.vendorId == vendorId && o.pickupPin == pin) {
             val updated = o.copy(status = "COMPLETED")
@@ -219,6 +407,27 @@ class CafeteriaRepository(private val db: AppDatabase) {
 
     // Feedback
     suspend fun submitFeedback(customerId: Int, orderId: Int, vendorId: Int, quality: Int, cleanliness: Int, speed: Int, value: Int, comment: String) = withContext(Dispatchers.IO) {
+        if (LaravelClientManager.isLaravelEnabled) {
+            try {
+                val service = LaravelClientManager.getService()
+                val lFeedback = service.createFeedback(
+                    LaravelAddFeedbackRequest(
+                        order_id = orderId,
+                        vendor_id = vendorId,
+                        customer_id = customerId,
+                        food_quality = quality,
+                        cleanliness = cleanliness,
+                        speed = speed,
+                        value = value,
+                        comment = comment
+                    )
+                )
+                feedbackDao.insertFeedback(LaravelClientManager.toRoomFeedback(lFeedback))
+                return@withContext
+            } catch (e: Exception) {
+                Log.e("CafeteriaRepository", "Laravel submitFeedback failed - falling back to local", e)
+            }
+        }
         val feedback = Feedback(
             orderId = orderId,
             vendorId = vendorId,
@@ -235,7 +444,111 @@ class CafeteriaRepository(private val db: AppDatabase) {
 
     // Logger
     suspend fun insertAuditLog(userId: Int, action: String, details: String) = withContext(Dispatchers.IO) {
+        if (LaravelClientManager.isLaravelEnabled) {
+            try {
+                val service = LaravelClientManager.getService()
+                val lLog = service.createAuditLog(
+                     LaravelAddAuditLogRequest(
+                         user_id = userId,
+                         action = action,
+                         details = details
+                     )
+                )
+                auditLogDao.insertLog(LaravelClientManager.toRoomAuditLog(lLog))
+                return@withContext
+            } catch (e: Exception) {
+                Log.e("CafeteriaRepository", "Laravel insertAuditLog failed", e)
+            }
+        }
         auditLogDao.insertLog(AuditLog(userId = userId, action = action, details = details))
+    }
+
+    // Performance Analytics
+    suspend fun getVendorPerformance(
+        vendorId: Int? = null,
+        startDate: String? = null,
+        endDate: String? = null
+    ): List<LaravelDailyPerformance> = withContext(Dispatchers.IO) {
+        if (LaravelClientManager.isLaravelEnabled) {
+            try {
+                val service = LaravelClientManager.getService()
+                val response = service.getVendorPerformance(vendorId, startDate, endDate)
+                if (response.success) {
+                    return@withContext response.daily_performance
+                }
+            } catch (e: Exception) {
+                Log.e("CafeteriaRepository", "Laravel getVendorPerformance failed", e)
+            }
+        }
+        return@withContext emptyList()
+    }
+
+    // Wallet repository interactions
+    suspend fun insertWalletTransaction(userId: Int, type: String, amount: Double, reference: String, details: String) = withContext(Dispatchers.IO) {
+        val transaction = WalletTransaction(
+            userId = userId,
+            type = type,
+            amount = amount,
+            status = "SUCCESS",
+            reference = reference,
+            details = details,
+            timestamp = System.currentTimeMillis()
+        )
+        walletTransactionDao.insertWalletTransaction(transaction)
+
+        // Adjust local user balance as well
+        val userItem = userDao.getUserSync(userId)
+        if (userItem != null) {
+            val updatedUser = userItem.copy(balance = userItem.balance + amount)
+            userDao.updateUser(updatedUser)
+        }
+    }
+
+    // Multi-table sync from Laravel to Local SQLite/Room DB Cache
+    suspend fun syncAllFromLaravel() = withContext(Dispatchers.IO) {
+        if (!LaravelClientManager.isLaravelEnabled) return@withContext
+        try {
+            Log.d("CafeteriaRepository", "Syncing all tables from Laravel API dynamically...")
+            val service = LaravelClientManager.getService()
+
+            // 1. Sync Users
+            val remoteUsers = service.getAllUsers()
+            for (u in remoteUsers) {
+                try {
+                    userDao.insertUser(u)
+                } catch (pe: Exception) {
+                    userDao.updateUser(u)
+                }
+            }
+
+            // 2. Sync Foods
+            val remoteFoods = service.getFoodItems()
+            for (f in remoteFoods) {
+                foodItemDao.insertFoodItem(LaravelClientManager.toRoomFoodItem(f))
+            }
+
+            // 3. Sync Orders
+            val remoteOrders = service.getAllOrders()
+            for (o in remoteOrders) {
+                orderDao.insertOrder(LaravelClientManager.toRoomOrder(o))
+            }
+
+            // 4. Sync Feedbacks
+            val remoteFeedback = service.getAllFeedback()
+            for (f in remoteFeedback) {
+                feedbackDao.insertFeedback(LaravelClientManager.toRoomFeedback(f))
+            }
+
+            // 5. Sync Audit Logs
+            val remoteLogs = service.getAllAuditLogs()
+            for (l in remoteLogs) {
+                auditLogDao.insertLog(LaravelClientManager.toRoomAuditLog(l))
+            }
+
+            Log.d("CafeteriaRepository", "Sync completed successfully!")
+        } catch (e: Exception) {
+            Log.e("CafeteriaRepository", "Laravel synchronization failed - continuing in local mode offline", e)
+        }
     }
 
     // ==========================================
@@ -396,5 +709,250 @@ class GeminiAnalyticsRepository {
                     "2. **Implement Dual-Line Service**: Have separate channels for cash/PIN-verification pickups and queue orders.\n" +
                     "3. **Campus Hygiene Protocol**: Arrange structured cleaning sweeps at 11:00 AM and 2:00 PM."
         }
+    }
+
+    suspend fun generateVendorSentimentAnalysis(
+        vendorName: String,
+        feedbacks: List<Feedback>
+    ): String = withContext(Dispatchers.IO) {
+        val apiKey = BuildConfig.GEMINI_API_KEY
+        if (apiKey.isEmpty() || apiKey == "MY_GEMINI_API_KEY") {
+            return@withContext "API Configuration Error: Gemini API key has not been entered into the AI Studio Secrets panel.\n\n" +
+                    "To generate real-time sentiment analytics:\n" +
+                    "1. Set up GEMINI_API_KEY in the Secrets/Env configuration panel.\n\n" +
+                    "Offline Local Simulated Sentiment Analysis:\n\n" +
+                    "### 📊 Overall Sentiment Balance\n" +
+                    "🟢 **Positive**: 78% | 🟡 **Neutral**: 14% | 🔴 **Negative**: 8%\n\n" +
+                    "### 🏆 Key Praise & Strengths\n" +
+                    "• **Value for Money**: Students consistently highlight generous portions of Waakye relative to prices.\n" +
+                    "• **Taste & Spiciness**: Shito and chicken seasoning received high praise across multiple comments.\n\n" +
+                    "### ⚠️ Key Friction Points & Complaints\n" +
+                    "• **Queue Waiting Bottlenecks**: Peak lunch transit congestion at 12:15 PM remains student friction point.\n" +
+                    "• **Order status signaling**: Students noted that sometimes orders are marked 'Ready' but are still being boxed."
+        }
+
+        val reviewSummary = feedbacks.mapIndexed { i, f ->
+            "Review #${i+1}: Quality=${f.ratingFoodQuality}, Cleanliness=${f.ratingCleanliness}, Speed=${f.ratingServiceSpeed}, Price=${f.ratingPriceValue}. Comment: \"${f.comment}\""
+        }.joinToString("\n")
+
+        val prompt = """
+            You are an advanced Customer Sentiment and Linguistic Specialist for the Accra Technical University (ATU) Cafeteria Board.
+            Perform a thorough qualitative sentiment analysis on student reviews and order comments for Vendor: '$vendorName'.
+            
+            STUDENT REVIEWS & TRANSCRIPTS:
+            $reviewSummary
+            
+            Based on this raw conversational text, generate a beautiful, concise, polished sentiment report. Your output must contain:
+            
+            1. **📊 Sentiment Balance Breakdown**: Provide estimated percentages for Positive, Neutral, and Negative sentiments based on comments and rating distributions.
+            2. **👍 Praise Highlights**: Summarize the leading aspects that students are happy about (e.g., taste, hygiene, hospitality, portion sizes).
+            3. **👎 Critical Actionable Friction Points**: Identify specific student complaints, pain points, or constructive criticism in their descriptions.
+            4. **💡 Executive Recommendation**: Give a 2-sentence summary recommendation to improve student experiences.
+            
+            Keep the content highly structured, engaging, and professional for a mobile dashboard. Use bold markdown headers and formatting.
+        """.trimIndent()
+
+        val request = GeminiGenerateRequest(
+            contents = listOf(
+                GeminiContent(
+                    parts = listOf(
+                        GeminiPart(text = prompt)
+                    )
+                )
+            )
+        )
+
+        try {
+            val response = RetrofitClient.geminiService.generateContent(apiKey, request)
+            response.candidates?.firstOrNull()?.content?.parts?.firstOrNull()?.text ?: "No sentiment insight received, try again later."
+        } catch (e: Exception) {
+            Log.e("GeminiSentiment", "Error communicating with Gemini", e)
+            "Offline Simulation Mode (Network/API Limit reached): \n\n" +
+                    "### 📊 Overall Sentiment Balance\n" +
+                    "🟢 **Positive**: 78% | 🟡 **Neutral**: 14% | 🔴 **Negative**: 8%\n\n" +
+                    "### 🏆 Key Praise & Strengths\n" +
+                    "• **Value for Money**: Students consistently highlight generous portions of Waakye relative to prices.\n" +
+                    "• **Taste & Spiciness**: Shito and chicken seasoning received high praise across multiple comments.\n\n" +
+                    "### ⚠️ Key Friction Points & Complaints\n" +
+                    "• **Queue Waiting Bottlenecks**: Peak lunch transit congestion at 12:15 PM remains student friction point.\n" +
+                    "• **Order status signaling**: Students noted that sometimes orders are marked 'Ready' but are still being boxed."
+        }
+    }
+
+    suspend fun generateVendorAutoReplies(
+        vendorName: String,
+        feedbacks: List<Feedback>
+    ): String = withContext(Dispatchers.IO) {
+        val apiKey = BuildConfig.GEMINI_API_KEY
+        if (apiKey.isEmpty() || apiKey == "MY_GEMINI_API_KEY") {
+            return@withContext "API Configuration Error: Gemini API key has not been entered into the AI Studio Secrets panel.\n\n" +
+                    "Offline Local Simulated Response Templates:\n\n" +
+                    "### 📝 Template 1: For Service Speed/Waiting Complaints\n" +
+                    "\"Dear Student, thank you for your valuable feedback. We are sincerely sorry you experienced a delay during peak hours. ATU Cafeteria values your time, and we are implementing pre-packaging and dual lines next week to speed up order collection. We hope to serve you better next time! - $vendorName\"\n\n" +
+                    "### 📝 Template 2: For Food Quality/Portion Complaints\n" +
+                    "\"Hello! Thank you for sharing your experience. We take food quality seriously. We want to ensure you get the best value for your money. Please show this message to our manager on your next visit so we can make this right. - $vendorName\"\n\n" +
+                    "### 📝 Template 3: For Booth Hygiene/Cleanliness Complaints\n" +
+                    "\"Thank you for bringing this to our attention. We are committed to strict hygienic protocols on campus. We have augmented our clean-up sweeps to address this immediately. Thank you for helping us keep ATU clean! - $vendorName\""
+        }
+
+        val reviewSummary = feedbacks.mapIndexed { i, f ->
+            "Review #${i+1}: Quality=${f.ratingFoodQuality}, Cleanliness=${f.ratingCleanliness}, Speed=${f.ratingServiceSpeed}, Price=${f.ratingPriceValue}. Comment: \"${f.comment}\""
+        }.joinToString("\n")
+
+        val prompt = """
+            You are a Professional Communications and PR specialist for the Accra Technical University (ATU) Cafeteria Board.
+            Your task is to generate professional, polite, and constructive custom auto-reply response templates for Vendor: '$vendorName' to use when responding to critical or negative student reviews and comments.
+            
+            STUDENT REVIEWS & COMMENTS:
+            $reviewSummary
+
+            Generate 3 customized, highly professional, polite response templates tailored to the specific friction points, complaints, or negative aspects found in the reviews (such as slow service, cleanliness issues, taste, or price-value mismatch). Each template should be actionable and present a solution.
+            
+            Format your response beautifully with:
+            - Clear Markdown headers (e.g., ### 📝 Template 1: [Topic Title])
+            - Brief explanation of when the vendor should use each template.
+            - The actual ready-to-copy placeholder response text enclosed in professional quotes.
+        """.trimIndent()
+
+        val request = GeminiGenerateRequest(
+            contents = listOf(
+                GeminiContent(
+                    parts = listOf(
+                        GeminiPart(text = prompt)
+                    )
+                )
+            )
+        )
+
+        try {
+            val response = RetrofitClient.geminiService.generateContent(apiKey, request)
+            response.candidates?.firstOrNull()?.content?.parts?.firstOrNull()?.text ?: "No template suggestions received, please try again."
+        } catch (e: Exception) {
+            Log.e("GeminiAutoReply", "Error communicating with Gemini", e)
+            "Offline Simulation Mode:\n\n" +
+                    "### 📝 Template 1: For Service Speed/Waiting Complaints\n" +
+                    "\"Dear Student, thank you for your valuable feedback. We are sincerely sorry you experienced a delay during peak hours. ATU Cafeteria values your time, and we are implementing pre-packaging and dual lines next week to speed up order collection. We hope to serve you better next time! - $vendorName\"\n\n" +
+                    "### 📝 Template 2: For Food Quality/Portion Complaints\n" +
+                    "\"Hello! Thank you for sharing your experience. We take food quality seriously. We want to ensure you get the best value for your money. Please show this message to our manager on your next visit so we can make this right. - $vendorName\"\n\n" +
+                    "### 📝 Template 3: For Booth Hygiene/Cleanliness Complaints\n" +
+                    "\"Thank you for bringing this to our attention. We are committed to strict hygienic protocols on campus. We have augmented our clean-up sweeps to address this immediately. Thank you for helping us keep ATU clean! - $vendorName\""
+        }
+    }
+
+    suspend fun generateMenuPricingSuggestions(
+        vendorName: String,
+        orders: List<Order>,
+        foodItems: List<FoodItem>
+    ): String = withContext(Dispatchers.IO) {
+        val apiKey = BuildConfig.GEMINI_API_KEY
+        if (apiKey.isEmpty() || apiKey == "MY_GEMINI_API_KEY") {
+            return@withContext "API Configuration Error: Gemini API key has not been entered into the AI Studio Secrets panel.\n\n" +
+                    "Offline Local Simulated Suggestions:\n\n" +
+                    "### ☀️ Breakfast Peak Hour Suggestions (8:00 AM - 10:30 AM)\n" +
+                    "• **Special**: 'Rise & Shine Porridge Combo' (Koko + Egg + Bread) reduced from GH₵ 18.00 to **GH₵ 15.00**.\n" +
+                    "• **Pricing Strategy**: Maintain current prices for single pastries as they are highly price-elastic for students first thing in the morning.\n\n" +
+                    "### 🍚 Lunch Rush hour Suggestions (11:30 AM - 2:00 PM)\n" +
+                    "• **Dynamic Pricing**: Waakye premium packages with fish & egg can support a **5% peak price increase** (GH₵ 30 to GH₵ 31.50) due to high demand.\n" +
+                    "• **Special Combo**: 'ATU Lunch Champion' (Waakye + Sobolo) bundled for GH₵ 35.00 (saves 12% compared to separate purchases).\n\n" +
+                    "### 🍹 Afternoon Slack Hour Suggestions (2:30 PM - 5:00 PM)\n" +
+                    "• **Specials**: 'Happy Hour Drinks': Discount Sobolo and fresh juices by **20%** to generate traffic during lecture intervals."
+        }
+
+        val cal = java.util.Calendar.getInstance()
+        var breakfastCount = 0
+        var lunchCount = 0
+        var dinnerCount = 0
+        
+        val breakfastItems = java.util.HashMap<String, Int>()
+        val lunchItems = java.util.HashMap<String, Int>()
+        val dinnerItems = java.util.HashMap<String, Int>()
+
+        for (order in orders) {
+            cal.timeInMillis = order.orderTimestamp
+            val hour = cal.get(java.util.Calendar.HOUR_OF_DAY)
+            val qty = order.quantity
+            val name = order.foodName
+            
+            when (hour) {
+                in 6..10 -> {
+                    breakfastCount += qty
+                    breakfastItems[name] = (breakfastItems[name] ?: 0) + qty
+                }
+                in 11..14 -> {
+                    lunchCount += qty
+                    lunchItems[name] = (lunchItems[name] ?: 0) + qty
+                }
+                else -> {
+                    dinnerCount += qty
+                    dinnerItems[name] = (dinnerItems[name] ?: 0) + qty
+                }
+            }
+        }
+
+        val menuListStr = foodItems.joinToString("\n") { "• ${it.name} (${it.category}) - GH₵ ${"%.2f".format(it.price)}" }
+
+        val bSorted = breakfastItems.entries.sortedByDescending { it.value }.take(3).joinToString(", ") { "${it.key} (${it.value} units)" }
+        val lSorted = lunchItems.entries.sortedByDescending { it.value }.take(3).joinToString(", ") { "${it.key} (${it.value} units)" }
+        val dSorted = dinnerItems.entries.sortedByDescending { it.value }.take(3).joinToString(", ") { "${it.key} (${it.value} units)" }
+
+        val prompt = xmlDocClean("""
+            You are an expert hospitality consultant and algorithmic pricing strategist for the Accra Technical University (ATU) Cafeteria Board.
+            Analyze the following menu and actual purchase demand logs for the Vendor '$vendorName' to suggest optimal menu pricing strategies and daily specials.
+            
+            CURRENT MENU OVERVIEW:
+            $menuListStr
+            
+            REAL-TIME PURCHASE PATTERNS (By Time of Day):
+            
+            1. **Breakfast Period (6:00 AM - 10:59 AM)**:
+               - Total items ordered: $breakfastCount units
+               - Top selling dishes: ${if (bSorted.isEmpty()) "No data yet" else bSorted}
+               
+            2. **Lunch Period (11:00 AM - 2:59 PM)**:
+               - Total items ordered: $lunchCount units
+               - Top selling dishes: ${if (lSorted.isEmpty()) "No data yet" else lSorted}
+               
+            3. **Late Afternoon & Evening (3:00 PM onwards)**:
+               - Total items ordered: $dinnerCount units
+               - Top selling dishes: ${if (dSorted.isEmpty()) "No data yet" else dSorted}
+               
+            Based on these realistic demand trends, provide a structured intelligence report containing exactly:
+            
+            - **☀️ Breakfast Hour pricing & specials**: Analyze if early lecture slots justify breakfast combo bundles (e.g. porridge & pastry combos) and recommend pricing.
+            - **🍚 Lunch Rush Peak strategies**: Since lunch is the most crowded period at ATU, should the vendor use dynamic pricing (slight premium on waakye/jollof peak demand) or meal/drink combos (e.g., adding Sobolo) to speed up lines? Recommend exact price adjustments.
+            - **🍹 Off-Peak Happy Hour promotions**: Propose discounts or clearance pricing to encourage sales during off-peak windows (2:30 PM - 4:30 PM) to clear stock of perishables.
+            
+            Keep the report beautifully styled with bullet points, bold percentages, and bold pricing figures (GH₵) so vendors can read them instantly on their phone dashboard.
+        """.trimIndent())
+
+        val request = GeminiGenerateRequest(
+            contents = listOf(
+                GeminiContent(
+                    parts = listOf(
+                        GeminiPart(text = prompt)
+                    )
+                )
+            )
+        )
+
+        try {
+            val response = RetrofitClient.geminiService.generateContent(apiKey, request)
+            response.candidates?.firstOrNull()?.content?.parts?.firstOrNull()?.text ?: "No price recommendations generated by ATU Intelligence at this time."
+        } catch (e: Exception) {
+            Log.e("GeminiPricing", "Error communicating with Gemini", e)
+            "Offline Simulation Mode:\n\n" +
+                    "### ☀️ Breakfast Peak Hour Suggestions (8:00 AM - 10:30 AM)\n" +
+                    "• **Special**: 'Rise & Shine Porridge Combo' (Koko + Egg + Bread) reduced from GH₵ 18.00 to **GH₵ 15.00**.\n" +
+                    "• **Pricing Strategy**: Maintain current prices for single pastries as they are highly price-elastic for students first thing in the morning.\n\n" +
+                    "### 🍚 Lunch Rush hour Suggestions (11:30 AM - 2:00 PM)\n" +
+                    "• **Dynamic Pricing**: Waakye premium packages with fish & egg can support a **5% peak price increase** (GH₵ 30 to GH₵ 31.50) due to high demand.\n" +
+                    "• **Special Combo**: 'ATU Lunch Champion' (Waakye + Sobolo) bundled for GH₵ 35.00 (saves 12% compared to separate purchases).\n\n" +
+                    "### 🍹 Afternoon Slack Hour Suggestions (2:30 PM - 5:00 PM)\n" +
+                    "• **Specials**: 'Happy Hour Drinks': Discount Sobolo and fresh juices by **20%** to generate traffic during lecture intervals."
+        }
+    }
+
+    private fun xmlDocClean(input: String): String {
+        return input.replace("<", "&lt;").replace(">", "&gt;")
     }
 }
