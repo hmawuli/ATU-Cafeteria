@@ -80,6 +80,7 @@ class CafeteriaRepository(private val db: AppDatabase) {
     val feedbackDao = db.feedbackDao()
     val auditLogDao = db.auditLogDao()
     val walletTransactionDao = db.walletTransactionDao()
+    val foodItemFeedbackDao = db.foodItemFeedbackDao()
 
     // Flow Accessors
     val allVendors: Flow<List<User>> = userDao.getAllVendors()
@@ -87,8 +88,12 @@ class CafeteriaRepository(private val db: AppDatabase) {
     val allFoodItems: Flow<List<FoodItem>> = foodItemDao.getAllFoodItems()
     val allOrders: Flow<List<Order>> = orderDao.getAllOrders()
     val allFeedback: Flow<List<Feedback>> = feedbackDao.getAllFeedback()
+    val allFoodFeedback: Flow<List<FoodItemFeedback>> = foodItemFeedbackDao.getAllFoodFeedback()
     val auditLogs: Flow<List<AuditLog>> = auditLogDao.getAllLogs()
     val allWalletTransactions: Flow<List<WalletTransaction>> = walletTransactionDao.getAllWalletTransactions()
+
+    fun getFeedbackForFoodItem(foodItemId: Int): Flow<List<FoodItemFeedback>> =
+        foodItemFeedbackDao.getFeedbackForFoodItem(foodItemId)
 
     fun getWalletTransactionsForUser(userId: Int): Flow<List<WalletTransaction>> =
         walletTransactionDao.getWalletTransactionsForUser(userId)
@@ -442,6 +447,36 @@ class CafeteriaRepository(private val db: AppDatabase) {
         insertAuditLog(customerId, "FEEDBACK_SUBMITTED", "Submitted review for order #${orderId} on food quality(${quality}), cleanliness(${cleanliness})")
     }
 
+    suspend fun submitFoodFeedback(customerId: Int, orderId: Int, foodItemId: Int, rating: Int, comment: String) = withContext(Dispatchers.IO) {
+        if (LaravelClientManager.isLaravelEnabled) {
+            try {
+                val service = LaravelClientManager.getService()
+                val lFeedback = service.createFoodFeedback(
+                    LaravelAddFoodFeedbackRequest(
+                        order_id = orderId,
+                        food_item_id = foodItemId,
+                        customer_id = customerId,
+                        rating = rating,
+                        comment = comment
+                    )
+                )
+                foodItemFeedbackDao.insertFoodFeedback(LaravelClientManager.toRoomFoodItemFeedback(lFeedback))
+                return@withContext
+            } catch (e: Exception) {
+                Log.e("CafeteriaRepository", "Laravel submitFoodFeedback failed - falling back to local", e)
+            }
+        }
+        val feedback = FoodItemFeedback(
+            orderId = orderId,
+            foodItemId = foodItemId,
+            customerId = customerId,
+            rating = rating,
+            comment = comment
+        )
+        foodItemFeedbackDao.insertFoodFeedback(feedback)
+        insertAuditLog(customerId, "FOOD_FEEDBACK_SUBMITTED", "Submitted review for food item #${foodItemId} on order #${orderId} with rating (${rating})")
+    }
+
     // Logger
     suspend fun insertAuditLog(userId: Int, action: String, details: String) = withContext(Dispatchers.IO) {
         if (LaravelClientManager.isLaravelEnabled) {
@@ -539,6 +574,16 @@ class CafeteriaRepository(private val db: AppDatabase) {
                 feedbackDao.insertFeedback(LaravelClientManager.toRoomFeedback(f))
             }
 
+            // 4a. Sync Food Feedbacks
+            try {
+                val remoteFoodFeedback = service.getAllFoodFeedback()
+                for (ff in remoteFoodFeedback) {
+                    foodItemFeedbackDao.insertFoodFeedback(LaravelClientManager.toRoomFoodItemFeedback(ff))
+                }
+            } catch (ffe: Exception) {
+                Log.e("CafeteriaRepository", "Syncing food feedbacks failed", ffe)
+            }
+
             // 5. Sync Audit Logs
             val remoteLogs = service.getAllAuditLogs()
             for (l in remoteLogs) {
@@ -548,6 +593,28 @@ class CafeteriaRepository(private val db: AppDatabase) {
             Log.d("CafeteriaRepository", "Sync completed successfully!")
         } catch (e: Exception) {
             Log.e("CafeteriaRepository", "Laravel synchronization failed - continuing in local mode offline", e)
+        }
+    }
+
+    suspend fun fetchLaravelNotifications(): List<LaravelDatabaseNotification> = withContext(Dispatchers.IO) {
+        if (!LaravelClientManager.isLaravelEnabled) return@withContext emptyList()
+        try {
+            val response = LaravelClientManager.getService().getDatabaseNotifications()
+            if (response.success) {
+                return@withContext response.notifications
+            }
+        } catch (e: Exception) {
+            Log.e("CafeteriaRepository", "Failed to fetch remote notifications", e)
+        }
+        emptyList()
+    }
+
+    suspend fun markLaravelNotificationsAsRead() = withContext(Dispatchers.IO) {
+        if (!LaravelClientManager.isLaravelEnabled) return@withContext
+        try {
+            LaravelClientManager.getService().markAllNotificationsAsRead()
+        } catch (e: Exception) {
+            Log.e("CafeteriaRepository", "Failed to mark notifications as read", e)
         }
     }
 
@@ -621,6 +688,18 @@ class CafeteriaRepository(private val db: AppDatabase) {
 
             for (r in pastReviews) {
                 feedbackDao.insertFeedback(r)
+            }
+
+            // Seed food-specific feedback scores
+            val pastFoodFeedback = listOf(
+                FoodItemFeedback(id = 1, orderId = 1001, foodItemId = 101, customerId = stud1.id, rating = 5, comment = "Excellent spicy seasoning, chicken was crispy and warm!", timestamp = System.currentTimeMillis() - 86400000 * 2),
+                FoodItemFeedback(id = 2, orderId = 1002, foodItemId = 102, customerId = stud2.id, rating = 4, comment = "Very thirst-quenching Sobolo so sweet and delicious.", timestamp = System.currentTimeMillis() - 86400000 * 1),
+                FoodItemFeedback(id = 3, orderId = 1003, foodItemId = 201, customerId = stud1.id, rating = 5, comment = "Best Waakye supreme packaging on campus! Must try.", timestamp = System.currentTimeMillis() - 86400000 * 3),
+                FoodItemFeedback(id = 4, orderId = 1004, foodItemId = 202, customerId = stud2.id, rating = 4, comment = "Rich soft pounded fufu, the meat soup was extremely rich.", timestamp = System.currentTimeMillis() - 86400000 * 4)
+            )
+
+            for (ff in pastFoodFeedback) {
+                foodItemFeedbackDao.insertFoodFeedback(ff)
             }
 
             // Seed logs
@@ -949,6 +1028,81 @@ class GeminiAnalyticsRepository {
                     "• **Special Combo**: 'ATU Lunch Champion' (Waakye + Sobolo) bundled for GH₵ 35.00 (saves 12% compared to separate purchases).\n\n" +
                     "### 🍹 Afternoon Slack Hour Suggestions (2:30 PM - 5:00 PM)\n" +
                     "• **Specials**: 'Happy Hour Drinks': Discount Sobolo and fresh juices by **20%** to generate traffic during lecture intervals."
+        }
+    }
+
+    suspend fun generateNutritionCoaching(
+        dailyTargetKcal: Float,
+        currentKcal: Float,
+        protein: Float,
+        carbs: Float,
+        fat: Float,
+        availableFoodItems: List<FoodItem>
+    ): String = withContext(Dispatchers.IO) {
+        val apiKey = BuildConfig.GEMINI_API_KEY
+        if (apiKey.isEmpty() || apiKey == "MY_GEMINI_API_KEY") {
+            return@withContext "API Key Configuration Error: Gemini API key has not been entered into the Secrets tab.\n\n" +
+                    "Offline Local Simulated Diet Coaching:\n\n" +
+                    "### 🛡️ Daily Macro Analysis\n" +
+                    "• **Calories**: ${currentKcal.toInt()} / ${dailyTargetKcal.toInt()} kcal (${"%.1f".format(if (dailyTargetKcal > 0) (currentKcal / dailyTargetKcal) * 100 else 0f)}% met)\n" +
+                    "• **Protein**: ${protein.toInt()}g (Target: 130g) - " + (if (protein < 50) "Critical deficit! Increase lean meat or egg intake." else "A healthy foundation!") + "\n" +
+                    "• **Carbs**: ${carbs.toInt()}g - Primary energy source for active lectures.\n" +
+                    "• **Fats**: ${fat.toInt()}g - Balanced dietary lipids.\n\n" +
+                    "### 🍏 Smart Meal Recommendations\n" +
+                    "1. **High-Protein Option**: Choose **Waakye with Egg & Fish** or **Pounded Yam with Goat Soup** from the cafeteria to fulfill your protein targets while respecting your ${dailyTargetKcal.toInt()} kcal budget.\n" +
+                    "2. **Hydration Boost**: Pair with local **Sobolo** or a light beverage instead of soda to minimize blood sugar spikes durings lecturings.\n\n" +
+                    "### 💡 Lifestyle Tips\n" +
+                    "• Try to allocate 40% of your calorie consumption for breakfast and lunch. Avoid heavy carbohydrate menus after 6:00 PM to improve sleep quality."
+        }
+
+        val foodMenuStr = availableFoodItems.joinToString("\n") {
+            "• ${it.name} (Price: GH₵ ${it.price}, Category: ${it.category}, Description: ${it.description})"
+        }
+
+        val prompt = """
+            You are an expert Sports Nutritionist and Academic Health Advisor representing the Accra Technical University (ATU) Cafeteria Wellness Board.
+            Analyze the following student's modern nutrition state and available campus diner menus:
+            
+            DAILY GOALS & CURRENT TARGETS:
+            - Target Calorie Budget: ${dailyTargetKcal.toInt()} kcal
+            - Calories Logged Today: ${currentKcal.toInt()} kcal
+            - Macronutrients Logged Today:
+              * Protein: ${protein.toInt()}g
+              * Carbohydrates: ${carbs.toInt()}g
+              * Fats: ${fat.toInt()}g
+              
+            AVAILABLE DISHES AT ATU CAFETERIA:
+            $foodMenuStr
+            
+            Generate a personalized health advisor report in beautiful Markdown containing exactly these sections:
+            1. **🎯 Personalized Calorie & Macro Scorecard**: Assess whether their current macros are balanced, noting deficiencies or excess (e.g. low protein, too much carbs).
+            2. **🍽️ Customized Meal Recommendations**: Recommend exactly 2 matching dishes from the provided ATU cafeteria menu list that will optimize their macros and stay within budget. Specify the price and vendor name if applicable.
+            3. **⚡ Nutrition Advice for ATU Studies**: Give 2 practical wellness tips to stay focused during lectures, avoid "food coma" drowsiness during Accra afternoon humidity, or build lean muscle.
+            
+            Make sure your response has a bright, encouraging, supportive tone. Limit the response to 400 words.
+        """.trimIndent()
+
+        val request = GeminiGenerateRequest(
+            contents = listOf(
+                GeminiContent(
+                    parts = listOf(
+                        GeminiPart(text = prompt)
+                    )
+                )
+            )
+        )
+
+        try {
+            val response = RetrofitClient.geminiService.generateContent(apiKey, request)
+            response.candidates?.firstOrNull()?.content?.parts?.firstOrNull()?.text ?: "No nutrition insight generated."
+        } catch (e: Exception) {
+            Log.e("GeminiNutrition", "Error communicating with Gemini", e)
+            "Offline Simulation Mode:\n\n" +
+                    "### 🛡️ Daily Macro Analysis\n" +
+                    "• **Calories**: ${currentKcal.toInt()} / ${dailyTargetKcal.toInt()} kcal\n" +
+                    "• **Protein**: ${protein.toInt()}g logged vs 130g goal\n\n" +
+                    "### 🍏 Smart Meal Recommendations\n" +
+                    "• **High Protein**: Select double eggs with Waakye from the local stands to lift your macro density!"
         }
     }
 

@@ -133,6 +133,26 @@ data class LaravelAddFeedbackRequest(
 )
 
 @JsonClass(generateAdapter = true)
+data class LaravelFoodItemFeedback(
+    val id: Int,
+    val order_id: Int,
+    val food_item_id: Int,
+    val customer_id: Int,
+    val rating: Int,
+    val comment: String?,
+    val timestamp: Long
+)
+
+@JsonClass(generateAdapter = true)
+data class LaravelAddFoodFeedbackRequest(
+    val order_id: Int,
+    val food_item_id: Int,
+    val customer_id: Int,
+    val rating: Int,
+    val comment: String
+)
+
+@JsonClass(generateAdapter = true)
 data class LaravelAuditLog(
     val id: Int,
     val user_id: Int,
@@ -175,6 +195,35 @@ data class LaravelDailyPerformance(
 data class LaravelPerformanceResponse(
     val success: Boolean,
     val daily_performance: List<LaravelDailyPerformance>
+)
+
+@JsonClass(generateAdapter = true)
+data class LaravelNotificationData(
+    val order_id: Int,
+    val vendor_id: Int,
+    val total_price: Double,
+    val old_status: String,
+    val new_status: String,
+    val message: String,
+    val time: String
+)
+
+@JsonClass(generateAdapter = true)
+data class LaravelDatabaseNotification(
+    val id: String,
+    val type: String,
+    val notifiable_type: String,
+    val notifiable_id: Int,
+    val data: LaravelNotificationData,
+    val read_at: String?,
+    val created_at: String?,
+    val updated_at: String?
+)
+
+@JsonClass(generateAdapter = true)
+data class LaravelNotificationsResponse(
+    val success: Boolean,
+    val notifications: List<LaravelDatabaseNotification>
 )
 
 // ==========================================
@@ -236,6 +285,15 @@ interface LaravelApiService {
     @POST("api/feedback")
     suspend fun createFeedback(@Body request: LaravelAddFeedbackRequest): LaravelFeedback
 
+    @GET("api/food-items/feedback")
+    suspend fun getAllFoodFeedback(): List<LaravelFoodItemFeedback>
+
+    @GET("api/food-items/{foodItemId}/feedback")
+    suspend fun getFoodItemFeedback(@Path("foodItemId") foodItemId: Int): List<LaravelFoodItemFeedback>
+
+    @POST("api/food-items/feedback")
+    suspend fun createFoodFeedback(@Body request: LaravelAddFoodFeedbackRequest): LaravelFoodItemFeedback
+
     @GET("api/audit-logs")
     suspend fun getAllAuditLogs(): List<LaravelAuditLog>
 
@@ -251,6 +309,12 @@ interface LaravelApiService {
         @Query("start_date") startDate: String? = null,
         @Query("end_date") endDate: String? = null
     ): LaravelPerformanceResponse
+
+    @GET("api/notifications")
+    suspend fun getDatabaseNotifications(): LaravelNotificationsResponse
+
+    @POST("api/notifications/mark-read")
+    suspend fun markAllNotificationsAsRead(): LaravelGeneralResponse
 }
 
 // ==========================================
@@ -355,6 +419,18 @@ object LaravelClientManager {
             ratingCleanliness = l.rating_cleanliness,
             ratingServiceSpeed = l.rating_service_speed,
             ratingPriceValue = l.rating_price_value,
+            comment = l.comment ?: "",
+            timestamp = l.timestamp
+        )
+    }
+
+    fun toRoomFoodItemFeedback(l: LaravelFoodItemFeedback): FoodItemFeedback {
+        return FoodItemFeedback(
+            id = l.id,
+            orderId = l.order_id,
+            foodItemId = l.food_item_id,
+            customerId = l.customer_id,
+            rating = l.rating,
             comment = l.comment ?: "",
             timestamp = l.timestamp
         )

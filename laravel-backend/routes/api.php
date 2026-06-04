@@ -8,6 +8,7 @@ use App\Http\Controllers\Api\VendorAuthController;
 use App\Http\Controllers\Api\FoodItemController;
 use App\Http\Controllers\Api\OrderController;
 use App\Http\Controllers\Api\FeedbackController;
+use App\Http\Controllers\Api\FoodItemFeedbackController;
 use App\Http\Controllers\Api\AuditLogController;
 use App\Http\Controllers\Api\VendorController;
 use App\Http\Controllers\Api\WalletController;
@@ -57,7 +58,9 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/vendor/my-orders', [VendorController::class, 'getMyOrders']);
     Route::get('/vendor/analytics', [VendorController::class, 'getMyAnalytics']);
     Route::get('/vendor/analytics/comparative', [VendorController::class, 'getComparativeAnalytics']);
+    Route::get('/vendor/performance-metrics', [VendorPerformanceController::class, 'getVendorPerformanceMetrics']);
     Route::get('/vendor/performance', [VendorPerformanceController::class, 'getPerformance']);
+    Route::get('/vendor/recharts-sales', [VendorPerformanceController::class, 'exportSalesForRecharts']);
     Route::post('/vendor/toggle-status', [VendorController::class, 'toggleStatus']);
 
     // Digital Wallet & Core Transactions Subsystem
@@ -90,13 +93,23 @@ Route::get('/food-items/vendor/{vendorId}', [FoodItemController::class, 'getVend
 // Pre-Orders & Transactions Endpoints
 Route::get('/orders', [OrderController::class, 'index']);
 Route::get('/orders/customer/{customerId}', [OrderController::class, 'getCustomerOrders']);
+Route::get('/orders/student/{studentId}', [OrderController::class, 'getCustomerOrders']);
+Route::get('/orders/history/{studentId}', [OrderController::class, 'getCustomerOrders']);
 Route::get('/orders/vendor/{vendorId}', [OrderController::class, 'getVendorOrders']);
 Route::post('/orders', [OrderController::class, 'store']);
+
+Route::get('/vendor/performance-analytics', [VendorPerformanceController::class, 'getVendorPerformanceMetrics']);
+Route::get('/vendor/performance-metrics', [VendorPerformanceController::class, 'getVendorPerformanceMetrics']);
+Route::get('/vendor/performance-recharts', [VendorPerformanceController::class, 'exportSalesForRecharts']);
 
 // Customer Compliance & Feedback Endpoints
 Route::get('/feedback', [FeedbackController::class, 'index']);
 Route::get('/feedback/vendor/{vendorId}', [FeedbackController::class, 'getVendorFeedback']);
 Route::post('/feedback', [FeedbackController::class, 'store']);
+
+Route::get('/food-items/feedback', [FoodItemFeedbackController::class, 'index']);
+Route::get('/food-items/{foodItemId}/feedback', [FoodItemFeedbackController::class, 'getByFoodItem']);
+Route::post('/food-items/feedback', [FoodItemFeedbackController::class, 'store']);
 
 // Centralised Quality Assurance Traceability Audit Logs Endpoints
 Route::get('/audit-logs', [AuditLogController::class, 'index']);

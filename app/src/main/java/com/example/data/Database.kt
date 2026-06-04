@@ -133,6 +133,34 @@ data class WalletTransaction(
     val timestamp: Long = System.currentTimeMillis()
 )
 
+@Entity(
+    tableName = "food_item_feedback",
+    foreignKeys = [
+        ForeignKey(
+            entity = Order::class,
+            parentColumns = ["id"],
+            childColumns = ["orderId"],
+            onDelete = ForeignKey.CASCADE
+        ),
+        ForeignKey(
+            entity = FoodItem::class,
+            parentColumns = ["id"],
+            childColumns = ["foodItemId"],
+            onDelete = ForeignKey.CASCADE
+        )
+    ],
+    indices = [Index(value = ["orderId"]), Index(value = ["foodItemId"]), Index(value = ["customerId"])]
+)
+data class FoodItemFeedback(
+    @PrimaryKey(autoGenerate = true) val id: Int = 0,
+    val orderId: Int,
+    val foodItemId: Int,
+    val customerId: Int,
+    val rating: Int, // 1 to 5
+    val comment: String,
+    val timestamp: Long = System.currentTimeMillis()
+)
+
 // ==========================================
 // 2. DATA ACCESS OBJECTS (DAOs)
 // ==========================================
@@ -245,6 +273,18 @@ interface WalletTransactionDao {
     suspend fun insertWalletTransaction(transaction: WalletTransaction): Long
 }
 
+@Dao
+interface FoodItemFeedbackDao {
+    @Query("SELECT * FROM food_item_feedback ORDER BY timestamp DESC")
+    fun getAllFoodFeedback(): Flow<List<FoodItemFeedback>>
+
+    @Query("SELECT * FROM food_item_feedback WHERE foodItemId = :foodItemId ORDER BY timestamp DESC")
+    fun getFeedbackForFoodItem(foodItemId: Int): Flow<List<FoodItemFeedback>>
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertFoodFeedback(feedback: FoodItemFeedback): Long
+}
+
 // ==========================================
 // 3. APPDATABASE HOLDER
 // ==========================================
@@ -256,9 +296,10 @@ interface WalletTransactionDao {
         Order::class,
         Feedback::class,
         AuditLog::class,
-        WalletTransaction::class
+        WalletTransaction::class,
+        FoodItemFeedback::class
     ],
-    version = 5,
+    version = 6,
     exportSchema = false
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -268,6 +309,7 @@ abstract class AppDatabase : RoomDatabase() {
     abstract fun feedbackDao(): FeedbackDao
     abstract fun auditLogDao(): AuditLogDao
     abstract fun walletTransactionDao(): WalletTransactionDao
+    abstract fun foodItemFeedbackDao(): FoodItemFeedbackDao
 
     companion object {
         @Volatile

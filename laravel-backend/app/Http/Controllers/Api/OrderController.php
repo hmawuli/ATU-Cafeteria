@@ -23,12 +23,38 @@ class OrderController extends Controller
 
     /**
      * Get orders placed by a specific student.
+     * Supports filtering by status or searching by food name/status.
      */
-    public function getCustomerOrders($customerId)
+    public function getCustomerOrders(Request $request, $customerId)
     {
-        $orders = Order::where('customer_id', $customerId)
-            ->orderBy('order_timestamp', 'desc')
-            ->get();
+        $ordersQuery = Order::where(function ($query) use ($customerId) {
+            $query->where('customer_id', $customerId)
+                  ->orWhere('student_id', $customerId);
+        });
+
+        // 1. Filter by Status
+        $status = $request->input('status');
+        if ($status && $status !== '') {
+            $normalizedStatus = strtoupper(trim($status));
+            if ($normalizedStatus === 'READY FOR PICKUP' || $normalizedStatus === 'READY_FOR_PICKUP' || $normalizedStatus === 'READY') {
+                $normalizedStatus = 'READY';
+            } elseif ($normalizedStatus === 'CANCEL' || $normalizedStatus === 'CANCELED') {
+                $normalizedStatus = 'CANCELLED';
+            }
+            $ordersQuery->where('status', $normalizedStatus);
+        }
+
+        // 2. Search filtering (food name, ID, or status)
+        $search = $request->input('search');
+        if ($search && $search !== '') {
+            $ordersQuery->where(function ($query) use ($search) {
+                $query->where('food_name', 'like', '%' . $search . '%')
+                      ->orWhere('id', 'like', '%' . $search . '%')
+                      ->orWhere('status', 'like', '%' . $search . '%');
+            });
+        }
+
+        $orders = $ordersQuery->orderBy('order_timestamp', 'desc')->get();
         return response()->json($orders, 200);
     }
 
@@ -281,6 +307,19 @@ class OrderController extends Controller
 
             return $order;
         });
+
+        // Notify the student user of the status change (e.g. preparation, readiness)
+        $studentId = $updatedOrder->customer_id ?? $updatedOrder->student_id;
+        if ($studentId) {
+            $student = \App\Models\User::find($studentId);
+            if ($student) {
+                try {
+                    $student->notify(new \App\Notifications\OrderStatusChangedNotification($updatedOrder, $oldStatus, $newStatus));
+                } catch (\Exception $e) {
+                    \Illuminate\Support\Facades\Log::error("Failed to notify student {$studentId} of order status updated to {$newStatus}: " . $e->getMessage());
+                }
+            }
+        }
 
         if (strtoupper($oldStatus) === 'PENDING' && strtoupper($newStatus) === 'COMPLETED') {
             event(new OrderStatusCompleted($updatedOrder));

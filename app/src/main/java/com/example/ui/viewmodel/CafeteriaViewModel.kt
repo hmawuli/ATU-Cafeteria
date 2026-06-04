@@ -61,6 +61,9 @@ class CafeteriaViewModel(application: Application) : AndroidViewModel(applicatio
     val allFeedback: StateFlow<List<Feedback>> = repository.allFeedback
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
+    val allFoodFeedback: StateFlow<List<FoodItemFeedback>> = repository.allFoodFeedback
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
     val auditLogs: StateFlow<List<AuditLog>> = repository.auditLogs
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
@@ -144,12 +147,28 @@ class CafeteriaViewModel(application: Application) : AndroidViewModel(applicatio
     private val _isGeneratingPricingSuggestions = MutableStateFlow(false)
     val isGeneratingPricingSuggestions: StateFlow<Boolean> = _isGeneratingPricingSuggestions.asStateFlow()
 
+    private val _nutritionCoachingText = MutableStateFlow<String?>(null)
+    val nutritionCoachingText: StateFlow<String?> = _nutritionCoachingText.asStateFlow()
+
+    private val _isAnalyzingNutrition = MutableStateFlow(false)
+    val isAnalyzingNutrition: StateFlow<Boolean> = _isAnalyzingNutrition.asStateFlow()
+
     // 5. In-App Real-time Order Notifications
     private val _newOrderAlerts = MutableStateFlow<List<Order>>(emptyList())
     val newOrderAlerts: StateFlow<List<Order>> = _newOrderAlerts.asStateFlow()
 
     private val seenOrderIds = java.util.Collections.synchronizedSet(mutableSetOf<Int>())
     private var isFirstOrderLoad = true
+
+    // Real-time Database Notifications support for Students (Laravel sync)
+    private val _studentNotifications = MutableStateFlow<List<com.example.data.LaravelDatabaseNotification>>(emptyList())
+    val studentNotifications: StateFlow<List<com.example.data.LaravelDatabaseNotification>> = _studentNotifications.asStateFlow()
+
+    private val _activeStudentAlerts = MutableStateFlow<List<com.example.data.LaravelDatabaseNotification>>(emptyList())
+    val activeStudentAlerts: StateFlow<List<com.example.data.LaravelDatabaseNotification>> = _activeStudentAlerts.asStateFlow()
+
+    private val seenNotificationIds = java.util.Collections.synchronizedSet(mutableSetOf<String>())
+    private var isFirstNotificationLoad = true
 
     init {
         viewModelScope.launch {
@@ -174,7 +193,7 @@ class CafeteriaViewModel(application: Application) : AndroidViewModel(applicatio
     }
 
     private fun startRealTimeNotificationTimer() {
-        // 1. Coroutine to reset/clear notification queue cleanly as users toggle
+        // 1. Coroutine to reset/clear VENDOR notification queue cleanly as users toggle
         viewModelScope.launch {
             _currentUser.collect { user ->
                 if (user == null || user.role != "VENDOR") {
@@ -185,15 +204,31 @@ class CafeteriaViewModel(application: Application) : AndroidViewModel(applicatio
             }
         }
 
-        // 2. Continuous Polling Job: every 8s syncs if user is VENDOR & Laravel is enabled
+        // 1b. Coroutine to reset/clear STUDENT notification queue cleanly as users toggle
+        viewModelScope.launch {
+            _currentUser.collect { user ->
+                if (user == null || user.role != "STUDENT") {
+                    seenNotificationIds.clear()
+                    _studentNotifications.value = emptyList()
+                    _activeStudentAlerts.value = emptyList()
+                    isFirstNotificationLoad = true
+                }
+            }
+        }
+
+        // 2. Continuous Polling Job: every 8s syncs if user is VENDOR/STUDENT & Laravel is enabled
         viewModelScope.launch {
             while (true) {
                 delay(8000)
                 val user = _currentUser.value
-                if (user != null && user.role == "VENDOR" && LaravelClientManager.isLaravelEnabled) {
+                if (user != null && LaravelClientManager.isLaravelEnabled) {
                     try {
                         repository.syncAllFromLaravel()
-                        refreshVendorPerformance(user.id)
+                        if (user.role == "VENDOR") {
+                            refreshVendorPerformance(user.id)
+                        } else if (user.role == "STUDENT") {
+                            pollStudentNotifications()
+                        }
                     } catch (e: Exception) {
                         Log.e("CafeteriaViewModel", "Periodic background sync failed", e)
                     }
@@ -226,6 +261,45 @@ class CafeteriaViewModel(application: Application) : AndroidViewModel(applicatio
                     }
                 }
             }
+        }
+    }
+
+    fun pollStudentNotifications() {
+        viewModelScope.launch {
+            val notifications = repository.fetchLaravelNotifications()
+            _studentNotifications.value = notifications
+
+            if (isFirstNotificationLoad) {
+                notifications.forEach { seenNotificationIds.add(it.id) }
+                isFirstNotificationLoad = false
+            } else {
+                // Find any new database notifications that represent an update from PREPARING to READY
+                val newReadyAlerts = notifications.filter {
+                    !seenNotificationIds.contains(it.id) &&
+                    it.data.new_status.uppercase() == "READY" &&
+                    it.data.old_status.uppercase() == "PREPARING"
+                }
+
+                if (newReadyAlerts.isNotEmpty()) {
+                    newReadyAlerts.forEach { notif ->
+                        seenNotificationIds.add(notif.id)
+                        playSoundNotification()
+                    }
+                    _activeStudentAlerts.value = _activeStudentAlerts.value + newReadyAlerts
+                }
+            }
+        }
+    }
+
+    fun dismissStudentAlert(notifId: String) {
+        _activeStudentAlerts.value = _activeStudentAlerts.value.filter { it.id != notifId }
+    }
+
+    fun clearAllStudentNotifications() {
+        viewModelScope.launch {
+            repository.markLaravelNotificationsAsRead()
+            _studentNotifications.value = emptyList()
+            _activeStudentAlerts.value = emptyList()
         }
     }
 
@@ -525,6 +599,20 @@ class CafeteriaViewModel(application: Application) : AndroidViewModel(applicatio
             )
             // Transition status manually in simulation to ensure feedback loop completes
             repository.insertAuditLog(user.id, "FEEDBACK_POSTED", "Verified review recorded for order #${orderId}.")
+            onComplete()
+        }
+    }
+
+    fun submitFoodFeedback(orderId: Int, foodItemId: Int, rating: Int, comment: String, onComplete: () -> Unit) {
+        viewModelScope.launch {
+            val user = _currentUser.value ?: return@launch
+            repository.submitFoodFeedback(
+                customerId = user.id,
+                orderId = orderId,
+                foodItemId = foodItemId,
+                rating = rating,
+                comment = comment
+            )
             onComplete()
         }
     }
@@ -888,6 +976,35 @@ class CafeteriaViewModel(application: Application) : AndroidViewModel(applicatio
             } catch (e: Exception) {
                 e.printStackTrace()
                 onResult(false, "Export Error: ${e.localizedMessage}")
+            }
+        }
+    }
+
+    fun runNutritionCoaching(
+        dailyTargetKcal: Float,
+        currentKcal: Float,
+        protein: Float,
+        carbs: Float,
+        fat: Float,
+        availableFoodItems: List<com.example.data.FoodItem>
+    ) {
+        viewModelScope.launch {
+            _nutritionCoachingText.value = null
+            _isAnalyzingNutrition.value = true
+            try {
+                _nutritionCoachingText.value = geminiRepository.generateNutritionCoaching(
+                    dailyTargetKcal = dailyTargetKcal,
+                    currentKcal = currentKcal,
+                    protein = protein,
+                    carbs = carbs,
+                    fat = fat,
+                    availableFoodItems = availableFoodItems
+                )
+            } catch (e: Exception) {
+                Log.e("CafeteriaViewModel", "runNutritionCoaching failed", e)
+                _nutritionCoachingText.value = "Failed to synchronize lifestyle directives from Gemini. Verify network connection."
+            } finally {
+                _isAnalyzingNutrition.value = false
             }
         }
     }
