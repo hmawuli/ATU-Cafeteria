@@ -31,6 +31,14 @@ class DatabaseSeeder extends Seeder
             'password' => $studHash,
             'role' => 'STUDENT',
             'fullName' => 'Daniel Mensah',
+            'student_staff_id' => 'ATU-2024-D45',
+            'profile_info' => [
+                'department' => 'Computer Science',
+                'program' => 'BTech Software Engineering',
+                'level' => '300',
+                'telephone' => '+233 50 123 4567',
+                'email' => 'daniel.mensah@atu.edu.gh'
+            ],
             'info' => 'ATU-2024-D45',
         ]);
 
@@ -40,6 +48,14 @@ class DatabaseSeeder extends Seeder
             'password' => $studHash,
             'role' => 'STUDENT',
             'fullName' => 'Abena Osei',
+            'student_staff_id' => 'ATU-2025-S12',
+            'profile_info' => [
+                'department' => 'Applied Mathematics',
+                'program' => 'BTech Statistics',
+                'level' => '200',
+                'telephone' => '+233 24 987 6543',
+                'email' => 'abena.osei@atu.edu.gh'
+            ],
             'info' => 'ATU-2025-S12',
         ]);
 
@@ -49,6 +65,13 @@ class DatabaseSeeder extends Seeder
             'password' => $v1Hash,
             'role' => 'VENDOR',
             'fullName' => 'Mary Joint',
+            'student_staff_id' => 'ATU-VND-010',
+            'profile_info' => [
+                'outlet_name' => 'Auntie Mary Special',
+                'location' => 'Block C Cafeteria Booth 1',
+                'telephone' => '+233 27 111 2222',
+                'primary_category' => 'Rice & Local Dishes'
+            ],
             'info' => 'Auntie Mary Special',
         ]);
 
@@ -58,6 +81,13 @@ class DatabaseSeeder extends Seeder
             'password' => $v2Hash,
             'role' => 'VENDOR',
             'fullName' => 'Kofi Local Kitchen',
+            'student_staff_id' => 'ATU-VND-011',
+            'profile_info' => [
+                'outlet_name' => 'ATU Local Hub',
+                'location' => 'Main Dining Annex A Booth 3',
+                'telephone' => '+233 26 333 4444',
+                'primary_category' => 'Traditional Dishes'
+            ],
             'info' => 'ATU Local Hub',
         ]);
 
@@ -67,6 +97,13 @@ class DatabaseSeeder extends Seeder
             'password' => $v3Hash,
             'role' => 'VENDOR',
             'fullName' => 'Bakery & Treats',
+            'student_staff_id' => 'ATU-VND-012',
+            'profile_info' => [
+                'outlet_name' => 'ATU Snack Corner',
+                'location' => 'Science Block Lobby Kiosk',
+                'telephone' => '+233 20 555 6666',
+                'primary_category' => 'Pastries & Drinks'
+            ],
             'info' => 'ATU Snack Corner',
         ]);
 
@@ -76,6 +113,13 @@ class DatabaseSeeder extends Seeder
             'password' => $adminHash,
             'role' => 'ADMIN',
             'fullName' => 'Dr. Emmanuel Kaku',
+            'student_staff_id' => 'ATU-ADM-099',
+            'profile_info' => [
+                'office' => 'Quality Assurance Directorate Block B',
+                'administrative_title' => 'Director of Academic Quality',
+                'telephone' => '+233 55 999 8888',
+                'email' => 'emmanuel.kaku@atu.edu.gh'
+            ],
             'info' => 'ATU Quality Assurance',
         ]);
 

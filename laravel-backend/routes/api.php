@@ -58,6 +58,8 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/vendor/my-orders', [VendorController::class, 'getMyOrders']);
     Route::get('/vendor/analytics', [VendorController::class, 'getMyAnalytics']);
     Route::get('/vendor/analytics/comparative', [VendorController::class, 'getComparativeAnalytics']);
+    Route::get('/vendor/analytics/gemini-report', [VendorController::class, 'getMyGeminiReport']);
+    Route::get('/vendor/{vendorId}/gemini-report', [VendorController::class, 'getVendorGeminiReport']);
     Route::get('/vendor/performance-metrics', [VendorPerformanceController::class, 'getVendorPerformanceMetrics']);
     Route::get('/vendor/performance', [VendorPerformanceController::class, 'getPerformance']);
     Route::get('/vendor/recharts-sales', [VendorPerformanceController::class, 'exportSalesForRecharts']);
@@ -92,6 +94,7 @@ Route::get('/food-items/vendor/{vendorId}', [FoodItemController::class, 'getVend
 
 // Pre-Orders & Transactions Endpoints
 Route::get('/orders', [OrderController::class, 'index']);
+Route::get('/orders/{id}', [OrderController::class, 'show']);
 Route::get('/orders/customer/{customerId}', [OrderController::class, 'getCustomerOrders']);
 Route::get('/orders/student/{studentId}', [OrderController::class, 'getCustomerOrders']);
 Route::get('/orders/history/{studentId}', [OrderController::class, 'getCustomerOrders']);

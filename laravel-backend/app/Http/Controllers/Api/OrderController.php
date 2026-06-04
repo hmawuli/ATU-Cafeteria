@@ -22,6 +22,21 @@ class OrderController extends Controller
     }
 
     /**
+     * Display the specified order details and status.
+     */
+    public function show($id)
+    {
+        $order = Order::find($id);
+        if (!$order) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Order not found.'
+            ], 404);
+        }
+        return response()->json($order, 200);
+    }
+
+    /**
      * Get orders placed by a specific student.
      * Supports filtering by status or searching by food name/status.
      */
@@ -189,6 +204,18 @@ class OrderController extends Controller
 
             return $createdOrder;
         });
+
+        // Notify the vendor of the new incoming pre-order
+        if ($order->vendor_id) {
+            $vendor = \App\Models\User::find($order->vendor_id);
+            if ($vendor) {
+                try {
+                    $vendor->notify(new \App\Notifications\NewIncomingOrderNotification($order));
+                } catch (\Exception $e) {
+                    \Illuminate\Support\Facades\Log::error("Failed to notify vendor {$order->vendor_id} of new order #{$order->id}: " . $e->getMessage());
+                }
+            }
+        }
 
         return response()->json($order, 201);
     }
@@ -371,6 +398,19 @@ class OrderController extends Controller
 
                 return $order;
             });
+
+            // Notify the student user of the status change to COMPLETED
+            $studentId = $updatedOrder->customer_id ?? $updatedOrder->student_id;
+            if ($studentId) {
+                $student = \App\Models\User::find($studentId);
+                if ($student) {
+                    try {
+                        $student->notify(new \App\Notifications\OrderStatusChangedNotification($updatedOrder, 'READY', 'COMPLETED'));
+                    } catch (\Exception $e) {
+                        \Illuminate\Support\Facades\Log::error("Failed to notify student {$studentId} of order completed: " . $e->getMessage());
+                    }
+                }
+            }
 
             return response()->json([
                 'success' => true,

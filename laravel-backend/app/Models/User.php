@@ -23,6 +23,8 @@ class User extends Authenticatable
         'password', // Stores SHA-256 pin-code hashes for cross-client compliance
         'role',     // STUDENT, VENDOR, ADMIN
         'fullName',
+        'student_staff_id', // ATU unique student/staff registration ID
+        'profile_info',     // Extended profile details (array)
         'info',     // Student Id or Brand description
         'balance',  // User's virtual wallet balance
         'is_open',  // Vendor open status
@@ -36,6 +38,7 @@ class User extends Authenticatable
     protected $casts = [
         'is_open' => 'boolean',
         'balance' => 'double',
+        'profile_info' => 'array',
     ];
 
     /**

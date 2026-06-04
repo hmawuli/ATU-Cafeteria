@@ -13,12 +13,14 @@ class Vendor extends Model
 
     protected $fillable = [
         'name',
+        'location',
         'contact_info',
         'operational_status',
     ];
 
     protected $casts = [
         'name' => 'string',
+        'location' => 'string',
         'contact_info' => 'string',
         'operational_status' => 'string',
     ];

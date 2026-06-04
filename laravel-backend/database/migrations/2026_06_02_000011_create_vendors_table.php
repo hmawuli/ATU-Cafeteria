@@ -14,6 +14,7 @@ return new class extends Migration
         Schema::create('vendors', function (Blueprint $table) {
             $table->id();
             $table->string('name');
+            $table->string('location')->nullable();
             $table->string('contact_info')->nullable();
             $table->string('operational_status')->default('active'); // active, inactive, suspended
             $table->timestamps();

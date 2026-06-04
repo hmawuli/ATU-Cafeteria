@@ -78,6 +78,37 @@ class VendorController extends Controller
     }
 
     /**
+     * Generate an AI-powered Gemini performance report for the logged-in vendor.
+     */
+    public function getMyGeminiReport(Request $request)
+    {
+        $user = $request->user();
+
+        if (strtoupper($user->role) !== 'VENDOR' && strtoupper($user->role) !== 'ADMIN') {
+            return response()->json([
+                'success' => false,
+                'message' => 'Unauthorized. This resource requires VENDOR or ADMIN privileges.'
+            ], 403);
+        }
+
+        $service = new \App\Services\GeminiPerformanceReportService();
+        $report = $service->generateReport($user->id);
+
+        return response()->json($report, 200);
+    }
+
+    /**
+     * Generate an AI-powered Gemini performance report for any specific vendor (e.g. for ADMIN overview).
+     */
+    public function getVendorGeminiReport(Request $request, $vendorId)
+    {
+        $service = new \App\Services\GeminiPerformanceReportService();
+        $report = $service->generateReport(intval($vendorId));
+
+        return response()->json($report, 200);
+    }
+
+    /**
      * Toggle or explicitly set the authenticated vendor's open status (is_open).
      */
     public function toggleStatus(Request $request)

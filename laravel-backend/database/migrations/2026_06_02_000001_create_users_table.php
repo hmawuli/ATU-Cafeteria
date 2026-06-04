@@ -17,6 +17,8 @@ return new class extends Migration
             $table->string('password'); // Represents SHA-256 string for PIN codes
             $table->string('role');     // STUDENT, VENDOR, ADMIN
             $table->string('fullName');
+            $table->string('student_staff_id')->nullable()->unique(); // ATU Student or Staff unique identifier registration ID
+            $table->text('profile_info')->nullable(); // Consolidated profile metadata e.g. department, telephone, program of study
             $table->text('info')->nullable();
             $table->decimal('balance', 10, 2)->default(0.00);
             $table->boolean('is_open')->default(true);
