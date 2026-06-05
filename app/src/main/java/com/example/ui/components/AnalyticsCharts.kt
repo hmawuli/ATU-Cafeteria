@@ -24,6 +24,14 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.text.font.FontWeight
 import kotlin.math.cos
 import kotlin.math.sin
+import androidx.compose.foundation.border
+import androidx.compose.foundation.gestures.detectDragGestures
+import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.platform.testTag
+import kotlin.math.roundToInt
 
 // ==========================================
 // 1. RADAR / SPIDER CHART FOR FEEDBACK MATRIX
@@ -796,6 +804,375 @@ fun VendorPerformanceTrendChart(
                     modifier = Modifier
                         .align(Alignment.BottomStart)
                         .padding(start = 2.dp, bottom = 20.dp)
+                )
+            }
+        }
+    }
+}
+
+// ==========================================
+// 5. WEEKLY REVENUE TREND LINE CHART (RECHARTS STYLE)
+// ==========================================
+
+data class WeeklyRevenueDataPoint(
+    val dateLabel: String,
+    val dayKey: String,
+    val revenue: Double
+)
+
+@Composable
+fun WeeklyRevenueTrendLineChart(
+    orders: List<Order>,
+    modifier: Modifier = Modifier
+) {
+    val primaryColor = MaterialTheme.colorScheme.primary
+    val secondaryColor = MaterialTheme.colorScheme.secondary
+    val gridColor = MaterialTheme.colorScheme.outlineVariant
+    val labelColor = MaterialTheme.colorScheme.onSurface
+    val cardBg = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.25f)
+
+    // Last 7 days data generation
+    val weeklyData = remember(orders) {
+        val list = mutableListOf<WeeklyRevenueDataPoint>()
+        val sdfLabel = SimpleDateFormat("EEE (MM/dd)", Locale.US)
+        val sdfDayKey = SimpleDateFormat("yyyy-MM-dd", Locale.US)
+        
+        for (i in 6 downTo 0) {
+            val cal = Calendar.getInstance()
+            cal.add(Calendar.DAY_OF_YEAR, -i)
+            
+            val dayStartCal = Calendar.getInstance().apply {
+                time = cal.time
+                set(Calendar.HOUR_OF_DAY, 0)
+                set(Calendar.MINUTE, 0)
+                set(Calendar.SECOND, 0)
+                set(Calendar.MILLISECOND, 0)
+            }
+            val startMillis = dayStartCal.timeInMillis
+            val endMillis = startMillis + 24 * 60 * 60 * 1000L - 1
+            
+            val dateLabel = sdfLabel.format(cal.time)
+            val dayKey = sdfDayKey.format(cal.time)
+            
+            val completedRev = orders.filter {
+                it.status == "COMPLETED" && it.orderTimestamp in startMillis..endMillis
+            }.sumOf { it.totalPrice }
+            
+            list.add(WeeklyRevenueDataPoint(dateLabel, dayKey, completedRev))
+        }
+        list
+    }
+
+    val maxRevenue = remember(weeklyData) {
+        weeklyData.maxOfOrNull { it.revenue }?.toFloat()?.coerceAtLeast(10f) ?: 10f
+    }
+    
+    var selectedIndex by remember { mutableStateOf<Int?>(null) }
+
+    Column(
+        modifier = modifier
+            .fillMaxWidth()
+            .background(cardBg, RoundedCornerShape(16.dp))
+            .border(1.dp, MaterialTheme.colorScheme.outlineVariant, RoundedCornerShape(16.dp))
+            .padding(16.dp)
+            .testTag("weekly_revenue_trend_line_chart")
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth().padding(bottom = 12.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Column {
+                Text(
+                    text = "Weekly Revenue Trend (Last 7 Days)",
+                    style = MaterialTheme.typography.titleSmall,
+                    fontWeight = FontWeight.Bold,
+                    color = labelColor
+                )
+                Text(
+                    text = "Completed Orders Revenue History",
+                    style = MaterialTheme.typography.bodySmall,
+                    fontSize = 11.sp,
+                    color = labelColor.copy(alpha = 0.6f)
+                )
+            }
+            
+            // Icon Badge
+            Box(
+                modifier = Modifier
+                    .background(MaterialTheme.colorScheme.primaryContainer, RoundedCornerShape(8.dp))
+                    .padding(horizontal = 8.dp, vertical = 4.dp)
+            ) {
+                Text(
+                    text = "7D Revenue Trend",
+                    fontSize = 10.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onPrimaryContainer
+                )
+            }
+        }
+
+        Spacer(modifier = Modifier.height(8.dp))
+
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(180.dp)
+        ) {
+            Canvas(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .pointerInput(weeklyData) {
+                        detectTapGestures(
+                            onPress = { offset ->
+                                val paddingLeft = 45.dp.toPx()
+                                val paddingBottom = 20.dp.toPx()
+                                val chartWidth = size.width - paddingLeft
+                                val spaceBetween = chartWidth / (weeklyData.size - 1)
+                                
+                                val rawIdx = ((offset.x - paddingLeft) / spaceBetween).roundToInt()
+                                selectedIndex = rawIdx.coerceIn(0, weeklyData.size - 1)
+                            }
+                        )
+                    }
+                    .pointerInput(weeklyData) {
+                        detectDragGestures(
+                            onDragEnd = { selectedIndex = null },
+                            onDragCancel = { selectedIndex = null },
+                            onDrag = { change, dragAmount ->
+                                val paddingLeft = 45.dp.toPx()
+                                val paddingBottom = 20.dp.toPx()
+                                val chartWidth = size.width - paddingLeft
+                                val spaceBetween = chartWidth / (weeklyData.size - 1)
+                                
+                                val rawIdx = ((change.position.x - paddingLeft) / spaceBetween).roundToInt()
+                                selectedIndex = rawIdx.coerceIn(0, weeklyData.size - 1)
+                            }
+                        )
+                    }
+            ) {
+                val paddingLeft = 45.dp.toPx()
+                val paddingBottom = 20.dp.toPx()
+                val chartWidth = size.width - paddingLeft
+                val chartHeight = size.height - paddingBottom
+
+                // Horizontal Grid lines and axis labels
+                val gridLinesCount = 3
+                for (i in 0..gridLinesCount) {
+                    val y = chartHeight * (i / gridLinesCount.toFloat())
+                    drawLine(
+                        color = gridColor.copy(alpha = 0.3f),
+                        start = Offset(paddingLeft, y),
+                        end = Offset(size.width, y),
+                        strokeWidth = 1.dp.toPx()
+                    )
+                }
+
+                // Coordinate Frame Axes
+                drawLine(
+                    color = gridColor,
+                    start = Offset(paddingLeft, 0f),
+                    end = Offset(paddingLeft, chartHeight),
+                    strokeWidth = 1.dp.toPx()
+                )
+                drawLine(
+                    color = gridColor,
+                    start = Offset(paddingLeft, chartHeight),
+                    end = Offset(size.width, chartHeight),
+                    strokeWidth = 1.dp.toPx()
+                )
+
+                // Render Recharts spline path
+                if (weeklyData.isNotEmpty()) {
+                    val segmentWidth = chartWidth / (weeklyData.size - 1)
+                    val linePath = Path()
+                    val fillPath = Path()
+
+                    weeklyData.forEachIndexed { idx, pt ->
+                        val cx = paddingLeft + (idx * segmentWidth)
+                        val cy = chartHeight - (pt.revenue.toFloat() / maxRevenue) * chartHeight
+
+                        if (idx == 0) {
+                            linePath.moveTo(cx, cy)
+                            fillPath.moveTo(cx, chartHeight)
+                            fillPath.lineTo(cx, cy)
+                        } else {
+                            val prevPt = weeklyData[idx - 1]
+                            val prevX = paddingLeft + ((idx - 1) * segmentWidth)
+                            val prevY = chartHeight - (prevPt.revenue.toFloat() / maxRevenue) * chartHeight
+
+                            // Cubic bezier spline interpolation representing elegant Recharts trend curve
+                            linePath.cubicTo(
+                                (prevX + cx) / 2f, prevY,
+                                (prevX + cx) / 2f, cy,
+                                cx, cy
+                            )
+                            fillPath.cubicTo(
+                                (prevX + cx) / 2f, prevY,
+                                (prevX + cx) / 2f, cy,
+                                cx, cy
+                            )
+                        }
+
+                        if (idx == weeklyData.size - 1) {
+                            fillPath.lineTo(cx, chartHeight)
+                            fillPath.lineTo(paddingLeft, chartHeight)
+                            fillPath.close()
+                        }
+                    }
+
+                    // Draw translucent underlay gradient representation of Recharts AreaChart
+                    drawPath(
+                        path = fillPath,
+                        brush = androidx.compose.ui.graphics.Brush.verticalGradient(
+                            colors = listOf(
+                                primaryColor.copy(alpha = 0.25f),
+                                Color.Transparent
+                            )
+                        )
+                    )
+
+                    // Draw spline curve stroke line
+                    drawPath(
+                        path = linePath,
+                        color = primaryColor,
+                        style = Stroke(
+                            width = 3.dp.toPx(),
+                            cap = StrokeCap.Round
+                        )
+                    )
+
+                    // Optional Guideline for selection
+                    selectedIndex?.let { hoverIdx ->
+                        val hx = paddingLeft + (hoverIdx * segmentWidth)
+                        val hy = chartHeight - (weeklyData[hoverIdx].revenue.toFloat() / maxRevenue) * chartHeight
+                        
+                        // Vertical dotted reference line
+                        drawLine(
+                            color = secondaryColor.copy(alpha = 0.7f),
+                            start = Offset(hx, 0f),
+                            end = Offset(hx, chartHeight),
+                            strokeWidth = 1.dp.toPx(),
+                            pathEffect = androidx.compose.ui.graphics.PathEffect.dashPathEffect(floatArrayOf(10f, 10f), 0f)
+                        )
+
+                        // Draw focus intersection anchor point
+                        drawCircle(
+                            color = secondaryColor,
+                            radius = 6.dp.toPx(),
+                            center = Offset(hx, hy)
+                        )
+                        drawCircle(
+                            color = Color.White,
+                            radius = 3.dp.toPx(),
+                            center = Offset(hx, hy)
+                        )
+                    }
+
+                    // Normal point anchors
+                    weeklyData.forEachIndexed { idx, pt ->
+                        val cx = paddingLeft + (idx * segmentWidth)
+                        val cy = chartHeight - (pt.revenue.toFloat() / maxRevenue) * chartHeight
+
+                        drawCircle(
+                            color = primaryColor,
+                            radius = 4.dp.toPx(),
+                            center = Offset(cx, cy)
+                        )
+                        drawCircle(
+                            color = Color.White,
+                            radius = 1.5.dp.toPx(),
+                            center = Offset(cx, cy)
+                        )
+                    }
+                }
+            }
+
+            // High Precision Axis Indicators
+            // Max Value Tick Label
+            Text(
+                text = "GH₵ ${"%.1f".format(maxRevenue)}",
+                fontSize = 8.sp,
+                fontWeight = FontWeight.Bold,
+                color = labelColor.copy(alpha = 0.7f),
+                modifier = Modifier
+                    .align(Alignment.TopStart)
+                    .padding(start = 2.dp)
+            )
+
+            // Zero Value Tick Label
+            Text(
+                text = "0",
+                fontSize = 8.sp,
+                color = labelColor.copy(alpha = 0.5f),
+                modifier = Modifier
+                    .align(Alignment.BottomStart)
+                    .padding(start = 2.dp, bottom = 22.dp)
+            )
+
+            // Horizontal Date labels
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(start = 45.dp)
+                    .align(Alignment.BottomStart)
+                    .height(18.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                if (weeklyData.isNotEmpty()) {
+                    Text(text = weeklyData[0].dateLabel, fontSize = 7.5.sp, fontWeight = FontWeight.Bold, color = labelColor.copy(alpha = 0.6f))
+                    if (weeklyData.size > 3) {
+                        Text(text = weeklyData[weeklyData.size / 2].dateLabel, fontSize = 7.5.sp, fontWeight = FontWeight.Bold, color = labelColor.copy(alpha = 0.6f))
+                    }
+                    if (weeklyData.size > 1) {
+                        Text(text = weeklyData[weeklyData.size - 1].dateLabel, fontSize = 7.5.sp, fontWeight = FontWeight.Bold, color = labelColor.copy(alpha = 0.6f))
+                    }
+                }
+            }
+        }
+
+        // Selected interactive point hover card feedback ("Tooltip")
+        selectedIndex?.let { idx ->
+            if (idx in weeklyData.indices) {
+                val dataPoint = weeklyData[idx]
+                Card(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(top = 12.dp)
+                        .testTag("weekly_chart_tooltip"),
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.9f)),
+                    shape = RoundedCornerShape(8.dp)
+                ) {
+                    Row(
+                        modifier = Modifier.padding(10.dp).fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Column {
+                            Text("Selected Point:", fontSize = 8.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.secondary)
+                            Text(dataPoint.dateLabel, fontWeight = FontWeight.SemiBold, fontSize = 11.sp, color = MaterialTheme.colorScheme.onSecondaryContainer)
+                        }
+                        Column(horizontalAlignment = Alignment.End) {
+                            Text("Day Revenue:", fontSize = 8.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.secondary)
+                            Text("GH₵ ${"%.2f".format(dataPoint.revenue)}", fontWeight = FontWeight.ExtraBold, fontSize = 12.sp, color = MaterialTheme.colorScheme.onSecondaryContainer)
+                        }
+                    }
+                }
+            }
+        } ?: run {
+            // Interactive assistance description instruction
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(top = 8.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                Text(
+                    text = "💡 Tap or drag across the line graph above to inspect exact daily performance stats.",
+                    fontSize = 9.sp,
+                    color = labelColor.copy(alpha = 0.5f),
+                    fontWeight = FontWeight.Medium
                 )
             }
         }

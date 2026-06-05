@@ -153,6 +153,12 @@ class CafeteriaViewModel(application: Application) : AndroidViewModel(applicatio
     private val _isAnalyzingNutrition = MutableStateFlow(false)
     val isAnalyzingNutrition: StateFlow<Boolean> = _isAnalyzingNutrition.asStateFlow()
 
+    private val _vendorTodayInsights = MutableStateFlow<String?>(null)
+    val vendorTodayInsights: StateFlow<String?> = _vendorTodayInsights.asStateFlow()
+
+    private val _isAnalyzingTodayOrders = MutableStateFlow(false)
+    val isAnalyzingTodayOrders: StateFlow<Boolean> = _isAnalyzingTodayOrders.asStateFlow()
+
     // 5. In-App Real-time Order Notifications
     private val _newOrderAlerts = MutableStateFlow<List<Order>>(emptyList())
     val newOrderAlerts: StateFlow<List<Order>> = _newOrderAlerts.asStateFlow()
@@ -656,6 +662,31 @@ class CafeteriaViewModel(application: Application) : AndroidViewModel(applicatio
         }
     }
 
+    fun updateMenuFoodItemDetails(
+        foodItem: FoodItem,
+        name: String,
+        price: Double,
+        category: String,
+        description: String,
+        initialStock: Int,
+        currentStock: Int,
+        threshold: Int
+    ) {
+        viewModelScope.launch {
+            val updated = foodItem.copy(
+                name = name,
+                price = price,
+                category = category,
+                description = description,
+                initialStock = initialStock,
+                currentStock = currentStock,
+                lowStockThreshold = threshold
+            )
+            repository.updateMenuFoodItem(updated)
+            repository.insertAuditLog(foodItem.vendorId, "MENU_ITEM_UPDATED", "Updated item '${foodItem.name}' (ID: ${foodItem.id}): Name=$name, Price=GH₵$price, Category=$category, Description=$description.")
+        }
+    }
+
     fun predictStockExhaustion(foodItem: FoodItem, orders: List<Order>): String {
         val itemOrders = orders.filter { it.foodItemId == foodItem.id && it.status in listOf("PENDING", "PREPARING", "READY", "COMPLETED") }
         if (itemOrders.isEmpty()) {
@@ -718,6 +749,13 @@ class CafeteriaViewModel(application: Application) : AndroidViewModel(applicatio
         viewModelScope.launch {
             val vendor = _currentUser.value ?: return@launch
             repository.updateOrderStatus(vendor.id, orderId, newStatus, estimatedTime)
+        }
+    }
+
+    fun cancelOrder(orderId: Int, reason: String) {
+        viewModelScope.launch {
+            val vendor = _currentUser.value ?: return@launch
+            repository.cancelOrder(vendor.id, orderId, reason)
         }
     }
 
@@ -823,6 +861,20 @@ class CafeteriaViewModel(application: Application) : AndroidViewModel(applicatio
                 foodItems = filteredFoodItems
             )
             _isGeneratingPricingSuggestions.value = false
+        }
+    }
+
+    fun runVendorTodayInsights(vendorId: Int, vendorName: String, todayOrders: List<Order>) {
+        viewModelScope.launch {
+            _isAnalyzingTodayOrders.value = true
+            _vendorTodayInsights.value = null
+
+            val filteredOrders = todayOrders.filter { it.vendorId == vendorId }
+            _vendorTodayInsights.value = geminiRepository.generateTodayInsights(
+                vendorName = vendorName,
+                orders = filteredOrders
+            )
+            _isAnalyzingTodayOrders.value = false
         }
     }
 

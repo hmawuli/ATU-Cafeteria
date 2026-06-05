@@ -20,7 +20,9 @@ data class User(
     val fullName: String,
     val info: String,         // e.g. Student ID for Students, or Brand Name ("ATU Delight") for Vendors
     val balance: Double = 0.0, // User's virtual wallet balance
-    @com.squareup.moshi.Json(name = "is_open") @ColumnInfo(defaultValue = "1") val isOpen: Boolean = true
+    @com.squareup.moshi.Json(name = "is_open") @ColumnInfo(defaultValue = "1") val isOpen: Boolean = true,
+    val student_staff_id: String? = null,
+    val telephone: String? = null
 )
 
 @Entity(
@@ -268,6 +270,9 @@ interface WalletTransactionDao {
 
     @Query("SELECT * FROM wallet_transactions WHERE userId = :userId ORDER BY timestamp DESC")
     fun getWalletTransactionsForUser(userId: Int): Flow<List<WalletTransaction>>
+
+    @Query("SELECT * FROM wallet_transactions WHERE userId = :userId ORDER BY timestamp DESC")
+    suspend fun getWalletTransactionsForUserSync(userId: Int): List<WalletTransaction>
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertWalletTransaction(transaction: WalletTransaction): Long

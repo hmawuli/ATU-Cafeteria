@@ -377,6 +377,74 @@ class CafeteriaRepository(private val db: AppDatabase) {
         insertAuditLog(vendorId, "ORDER_STATUS_CHANGED", "Order #${orderId} transitioned to: ${newStatus} (${estimatedTime ?: "No change to estimate"})")
     }
 
+    suspend fun cancelOrder(vendorId: Int, orderId: Int, reason: String) = withContext(Dispatchers.IO) {
+        if (LaravelClientManager.isLaravelEnabled) {
+            try {
+                val service = LaravelClientManager.getService()
+                val lOrder = service.updateOrderStatus(
+                    id = orderId,
+                    request = LaravelUpdateOrderStatusRequest(
+                        status = "CANCELLED",
+                        estimated_pickup_time = "Cancelled"
+                    )
+                )
+                orderDao.insertOrder(LaravelClientManager.toRoomOrder(lOrder))
+            } catch (e: Exception) {
+                Log.e("CafeteriaRepository", "Laravel cancelOrder failed - falling back to local", e)
+            }
+        }
+        val o = orderDao.getOrderById(orderId) ?: return@withContext
+        val updated = o.copy(
+            status = "CANCELLED",
+            estimatedPickupTime = "Cancelled"
+        )
+        orderDao.updateOrder(updated)
+        insertAuditLog(vendorId, "ORDER_CANCELLED", "Order #${orderId} for '${o.foodName}' (QTY: ${o.quantity}) was cancelled by Vendor. Reason: $reason")
+
+        // Dynamic stock restoration
+        try {
+            val food = foodItemDao.getFoodItemById(o.foodItemId)
+            if (food != null) {
+                val restoredStock = food.currentStock + o.quantity
+                foodItemDao.updateFoodItem(food.copy(currentStock = restoredStock))
+                insertAuditLog(vendorId, "INVENTORY_ADJUSTED", "Restored ${o.quantity} portions of '${food.name}' back to stock because of cancellation. New stock: $restoredStock.")
+            }
+        } catch (e: Exception) {
+            Log.e("CafeteriaRepository", "Failed to restore inventory stock on cancel order", e)
+        }
+
+        // Automatic financial reversal
+        try {
+            val transactions = walletTransactionDao.getWalletTransactionsForUserSync(o.customerId)
+            val hasPaidWithWallet = transactions.any {
+                it.type == "PAYMENT" && it.details.contains(o.foodName) && it.amount < 0
+            }
+            if (hasPaidWithWallet) {
+                // Refund student
+                val studentRef = "REF-" + (100000..999999).random()
+                insertWalletTransaction(
+                    userId = o.customerId,
+                    type = "REFUND",
+                    amount = o.totalPrice,
+                    reference = studentRef,
+                    details = "Refund for cancelled Order #${o.id} ('${o.foodName}') - Reason: $reason"
+                )
+                
+                // Debit vendor's earnings
+                val vendorRef = "REV-" + (100000..999999).random()
+                insertWalletTransaction(
+                    userId = vendorId,
+                    type = "PAYMENT",
+                    amount = -o.totalPrice,
+                    reference = vendorRef,
+                    details = "Earning reversal for cancelled Order #${o.id} ('${o.foodName}') - Reason: $reason"
+                )
+            }
+        } catch (e: Exception) {
+            Log.e("CafeteriaRepository", "Failed to process automatic refund", e)
+        }
+    }
+
     suspend fun verifyAndCompletePickup(vendorId: Int, orderId: Int, pin: String): Boolean = withContext(Dispatchers.IO) {
         if (LaravelClientManager.isLaravelEnabled) {
             try {
@@ -630,8 +698,8 @@ class CafeteriaRepository(private val db: AppDatabase) {
 
             // Create standard roles
             // 1. Student Customer
-            val stud1 = User(id = 1, username = "student", passwordHash = sha256("1234"), role = "STUDENT", fullName = "Daniel Mensah", info = "ATU-2024-D45")
-            val stud2 = User(id = 2, username = "student2", passwordHash = sha256("1234"), role = "STUDENT", fullName = "Abena Osei", info = "ATU-2025-S12")
+            val stud1 = User(id = 1, username = "student", passwordHash = sha256("1234"), role = "STUDENT", fullName = "Daniel Mensah", info = "ATU-2024-D45", student_staff_id = "ATU-2024-D45", telephone = "+233 50 123 4567")
+            val stud2 = User(id = 2, username = "student2", passwordHash = sha256("1234"), role = "STUDENT", fullName = "Abena Osei", info = "ATU-2025-S12", student_staff_id = "ATU-2025-S12", telephone = "+233 24 987 6543")
             userDao.insertUser(stud1)
             userDao.insertUser(stud2)
 
@@ -1028,6 +1096,133 @@ class GeminiAnalyticsRepository {
                     "• **Special Combo**: 'ATU Lunch Champion' (Waakye + Sobolo) bundled for GH₵ 35.00 (saves 12% compared to separate purchases).\n\n" +
                     "### 🍹 Afternoon Slack Hour Suggestions (2:30 PM - 5:00 PM)\n" +
                     "• **Specials**: 'Happy Hour Drinks': Discount Sobolo and fresh juices by **20%** to generate traffic during lecture intervals."
+        }
+    }
+
+    suspend fun generateTodayInsights(
+        vendorName: String,
+        orders: List<Order>
+    ): String = withContext(Dispatchers.IO) {
+        val apiKey = BuildConfig.GEMINI_API_KEY
+        
+        val cal = java.util.Calendar.getInstance()
+        val hourlyCount = IntArray(24)
+        val hourlyRevenue = DoubleArray(24)
+        val itemQuantities = java.util.HashMap<String, Int>()
+        val itemRevenue = java.util.HashMap<String, Double>()
+        var totalRev = 0.0
+        var totalQty = 0
+        
+        for (order in orders) {
+            cal.timeInMillis = order.orderTimestamp
+            val hour = cal.get(java.util.Calendar.HOUR_OF_DAY)
+            val qty = order.quantity
+            val price = order.totalPrice
+            val name = order.foodName
+            
+            hourlyCount[hour] += qty
+            hourlyRevenue[hour] += price
+            itemQuantities[name] = (itemQuantities[name] ?: 0) + qty
+            itemRevenue[name] = (itemRevenue[name] ?: 0.0) + price
+            totalRev += price
+            totalQty += qty
+        }
+        
+        // Find busiest hour range
+        var busiestHourIndex = -1
+        var maxHourlyQty = 0
+        for (h in 0..23) {
+            if (hourlyCount[h] > maxHourlyQty) {
+                maxHourlyQty = hourlyCount[h]
+                busiestHourIndex = h
+            }
+        }
+        
+        val busiestHourStr = if (busiestHourIndex != -1) {
+            val startHour = busiestHourIndex
+            val endHour = (busiestHourIndex + 1) % 24
+            val startAmPm = if (startHour >= 12) "PM" else "AM"
+            val displayStart = if (startHour % 12 == 0) 12 else startHour % 12
+            val endAmPm = if (endHour >= 12) "PM" else "AM"
+            val displayEnd = if (endHour % 12 == 0) 12 else endHour % 12
+            "$displayStart $startAmPm - $displayEnd $endAmPm"
+        } else {
+            "No orders logged today yet."
+        }
+        
+        // Find most ordered item
+        val topItem = itemQuantities.entries.maxByOrNull { it.value }
+        val topItemStr = if (topItem != null) {
+            "${topItem.key} (${topItem.value} units - GH₵ ${"%.2f".format(itemRevenue[topItem.key] ?: 0.0)})"
+        } else {
+            "No orders logged today yet."
+        }
+
+        if (apiKey.isEmpty() || apiKey == "MY_GEMINI_API_KEY") {
+            if (orders.isEmpty()) {
+                return@withContext "API Configuration Error: Gemini API key has not been entered into the AI Studio Secrets panel.\n\n" +
+                        "Offline Local Simulated Today's Insights:\n\n" +
+                        "• **Busiest Hour**: Lunch Rush (12:00 PM - 1:30 PM) is usually the peak. Jollof and Waakye sales spike by over **35%**.\n" +
+                        "• **Most Demanded Item**: Waakye Premium Combo (with fish, egg, and extra shito) is expected to be the most ordered item.\n" +
+                        "• **Vendor Pro-Tip**: Prepare Sobolo packaging and dynamic combo bundles before 11:30 AM to minimize queue bottlenecks."
+            } else {
+                return@withContext "API Configuration Error: Gemini API key has not been entered into the AI Studio Secrets panel.\n\n" +
+                        "Offline Local Simulated Today's Insights:\n\n" +
+                        "### 📊 Today's Live Sales Analytics\n" +
+                        "• **Busiest Hour**: **$busiestHourStr**\n" +
+                        "• **Most Ordered Item**: **$topItemStr**\n" +
+                        "• **Total Revenue**: **GH₵ ${"%.2f".format(totalRev)}** across **$totalQty** items ordered.\n\n" +
+                        "### 💡 Smart Recommendations for $vendorName\n" +
+                        "1. **Peak Demand Action**: Your busiest window was around **$busiestHourStr**. Consider preparing pre-packaged portions 15 minutes before this peak to serve students instantaneously!\n" +
+                        "2. **Menu Focus**: **$topItemStr** is leading your sales today. Ensure ingredients are adequately stocked to avoid missing out on late-afternoon orders.\n" +
+                        "3. **Dynamic Bundle**: Bundle your top seller with Sobolo for an elegant multi-item savings deal (e.g. GH₵ 2.00 off combo) to increase average ticket size."
+            }
+        }
+
+        val prompt = xmlDocClean("""
+            You are an expert AI business intelligence analyst for the Accra Technical University (ATU) Cafeteria Board.
+            Analyze today's live sales transactions for the vendor '$vendorName' to generate critical operational insights and actionable advice.
+            
+            TODAY'S RAW SALES METRICS:
+            - **Total Sales Revenue Today**: GH₵ ${"%.2f".format(totalRev)}
+            - **Total Items Sold**: $totalQty units
+            - **Busiest Registered Hour**: $busiestHourStr
+            - **Most Demanded Menu Item**: $topItemStr
+            
+            FEEDBACK & SALES TRANSACTION LOGS DETAIL:
+            ${if (orders.isEmpty()) "No orders recorded yet." else orders.joinToString("\n") { "• Order #${it.id}: ${it.foodName} (QTY: ${it.quantity}), Revenue: GH₵ ${"%.2f".format(it.totalPrice)}, Status: ${it.status}, Customer ID: ${it.customerId}" }}
+            
+            Based on these realistic intraday sales trends, generate a structured intelligence update containing:
+            
+            - **🔥 Peak Intensity analysis**: Report on the 'Busiest Hour' ($busiestHourStr) with tips on how $vendorName can handle this rush (e.g. queue management or pre-prep).
+            - **✨ Star Product performance**: Analyze the 'Most Ordered Item' ($topItemStr) and dynamic suggestions to cross-promote it or manage inventory around it.
+            - **💡 Immediate Operational Pro-Tip**: A bold, highly practical tip tailored specifically to today's transaction size and items to optimize profitability or food waste.
+            
+            Keep the report beautifully styled with concise bullets, bold keys, and clear pricing symbols (GH₵) so vendors can read and digest them in seconds. Keep it compact!
+        """.trimIndent())
+
+        val request = GeminiGenerateRequest(
+            contents = listOf(
+                GeminiContent(
+                    parts = listOf(
+                        GeminiPart(text = prompt)
+                    )
+                )
+            )
+        )
+
+        try {
+            val response = RetrofitClient.geminiService.generateContent(apiKey, request)
+            response.candidates?.firstOrNull()?.content?.parts?.firstOrNull()?.text ?: "No today's insights generated by ATU Intelligence at this time."
+        } catch (e: Exception) {
+            Log.e("GeminiTodayInsights", "Error communicating with Gemini", e)
+            "Offline Simulation Mode:\n\n" +
+                    "### 📊 Today's Live Sales Analytics\n" +
+                    "• **Busiest Hour**: **$busiestHourStr**\n" +
+                    "• **Most Ordered Item**: **$topItemStr**\n" +
+                    "• **Total Revenue**: **GH₵ ${"%.2f".format(totalRev)}** across **$totalQty** items ordered.\n\n" +
+                    "### 💡 Smart Recommendations for $vendorName\n" +
+                    "1. **Peak Demand Action**: Your busiest window was around **$busiestHourStr**. Consider preparing pre-packaged portions 15 minutes before this peak to serve students instantaneously!"
         }
     }
 
