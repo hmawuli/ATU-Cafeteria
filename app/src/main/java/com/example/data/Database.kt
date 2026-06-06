@@ -22,7 +22,9 @@ data class User(
     val balance: Double = 0.0, // User's virtual wallet balance
     @com.squareup.moshi.Json(name = "is_open") @ColumnInfo(defaultValue = "1") val isOpen: Boolean = true,
     val student_staff_id: String? = null,
-    val telephone: String? = null
+    val telephone: String? = null,
+    val logoUrl: String? = null,
+    val pictureUrl: String? = null
 )
 
 @Entity(
@@ -304,7 +306,7 @@ interface FoodItemFeedbackDao {
         WalletTransaction::class,
         FoodItemFeedback::class
     ],
-    version = 6,
+    version = 7,
     exportSchema = false
 )
 abstract class AppDatabase : RoomDatabase() {

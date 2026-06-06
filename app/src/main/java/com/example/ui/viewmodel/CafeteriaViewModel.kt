@@ -421,19 +421,30 @@ class CafeteriaViewModel(application: Application) : AndroidViewModel(applicatio
         }
     }
 
-    fun addVendor(username: String, pinCode: String, fullName: String, info: String, onResult: (Boolean) -> Unit) {
+    fun addVendor(
+        username: String,
+        pinCode: String,
+        fullName: String,
+        info: String,
+        logoUrl: String? = null,
+        pictureUrl: String? = null,
+        onResult: (Boolean) -> Unit
+    ) {
         viewModelScope.launch {
             _isLoading.value = true
             val brandOrId = info.ifBlank { "ATU Cafeteria Vendor" }
             val isRegistered = repository.registerUser(username, pinCode, "VENDOR", fullName, brandOrId)
-            _isLoading.value = false
             if (isRegistered != null) {
+                val updatedWithMedia = isRegistered.copy(logoUrl = logoUrl, pictureUrl = pictureUrl)
+                repository.updateUser(updatedWithMedia)
                 val admin = realAdminUser.value ?: _currentUser.value
                 if (admin != null) {
                     repository.insertAuditLog(admin.id, "VENDOR_ADDED", "Vendor '$fullName' added by Admin.")
                 }
+                _isLoading.value = false
                 onResult(true)
             } else {
+                _isLoading.value = false
                 onResult(false)
             }
         }

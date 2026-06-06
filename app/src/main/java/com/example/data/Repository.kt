@@ -704,9 +704,36 @@ class CafeteriaRepository(private val db: AppDatabase) {
             userDao.insertUser(stud2)
 
             // 2. Vendors
-            val v1 = User(id = 10, username = "maryjoint", passwordHash = sha256("1111"), role = "VENDOR", fullName = "Mary Joint", info = "Auntie Mary Special")
-            val v2 = User(id = 11, username = "atkitch", passwordHash = sha256("2222"), role = "VENDOR", fullName = "Kofi Local Kitchen", info = "ATU Local Hub")
-            val v3 = User(id = 12, username = "snackbag", passwordHash = sha256("3333"), role = "VENDOR", fullName = "Bakery & Treats", info = "ATU Snack Corner")
+            val v1 = User(
+                id = 10,
+                username = "maryjoint",
+                passwordHash = sha256("1111"),
+                role = "VENDOR",
+                fullName = "Mary Joint",
+                info = "Auntie Mary Special",
+                logoUrl = "https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=120&auto=format&fit=crop&q=60",
+                pictureUrl = "https://images.unsplash.com/photo-1555396273-367ea4eb4db5?w=500&auto=format&fit=crop&q=60"
+            )
+            val v2 = User(
+                id = 11,
+                username = "atkitch",
+                passwordHash = sha256("2222"),
+                role = "VENDOR",
+                fullName = "Kofi Local Kitchen",
+                info = "ATU Local Hub",
+                logoUrl = "https://images.unsplash.com/photo-1504674900247-0877df9cc836?w=120&auto=format&fit=crop&q=60",
+                pictureUrl = "https://images.unsplash.com/photo-1556910103-1c02745aae4d?w=500&auto=format&fit=crop&q=60"
+            )
+            val v3 = User(
+                id = 12,
+                username = "snackbag",
+                passwordHash = sha256("3333"),
+                role = "VENDOR",
+                fullName = "Bakery & Treats",
+                info = "ATU Snack Corner",
+                logoUrl = "https://images.unsplash.com/photo-1517433456452-f9633a875f6f?w=120&auto=format&fit=crop&q=60",
+                pictureUrl = "https://images.unsplash.com/photo-1509440159596-0249088772ff?w=500&auto=format&fit=crop&q=60"
+            )
             userDao.insertUser(v1)
             userDao.insertUser(v2)
             userDao.insertUser(v3)

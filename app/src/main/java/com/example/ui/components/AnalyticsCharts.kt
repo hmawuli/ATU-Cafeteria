@@ -1,5 +1,8 @@
 package com.example.ui.components
 
+import android.webkit.WebView
+import android.webkit.WebViewClient
+import androidx.compose.ui.viewinterop.AndroidView
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
@@ -1178,4 +1181,603 @@ fun WeeklyRevenueTrendLineChart(
         }
     }
 }
+
+@Composable
+fun D3DashboardChart(
+    orders: List<Order>,
+    modifier: Modifier = Modifier
+) {
+    val sdf = SimpleDateFormat("yyyy-MM-dd", Locale.US)
+    val parsedData = remember(orders) {
+        orders.groupBy {
+            sdf.format(Date(it.orderTimestamp))
+        }.mapValues { entry ->
+            val volume = entry.value.size
+            val revenue = entry.value.filter { it.status == "COMPLETED" }.sumOf { it.totalPrice }
+            Pair(volume, revenue)
+        }.toSortedMap()
+    }
+
+    val jsonStr = remember(parsedData) {
+        val jsonBuilder = StringBuilder("[")
+        parsedData.entries.forEachIndexed { index, entry ->
+            jsonBuilder.append("{")
+            jsonBuilder.append("\"date\":\"${entry.key}\",")
+            jsonBuilder.append("\"volume\":${entry.value.first},")
+            jsonBuilder.append("\"revenue\":${entry.value.second}")
+            jsonBuilder.append("}")
+            if (index < parsedData.size - 1) {
+                jsonBuilder.append(",")
+            }
+        }
+        jsonBuilder.append("]")
+        jsonBuilder.toString()
+    }
+
+    val htmlContent = remember(jsonStr) {
+        """
+        <!DOCTYPE html>
+        <html>
+        <head>
+            <meta name="viewport" content="width=device-width, initial-scale=1.0">
+            <script src="https://d3js.org/d3.v7.min.js"></script>
+            <style>
+                body {
+                    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+                    margin: 0;
+                    padding: 8px;
+                    background-color: #1a1a1a;
+                    color: #e0e0e0;
+                }
+                .chart-container {
+                    background-color: #212121;
+                    border-radius: 8px;
+                    padding: 12px;
+                    margin-bottom: 12px;
+                    box-shadow: 0 2px 4px rgba(0,0,0,0.15);
+                    border: 1px solid #333333;
+                }
+                h3 {
+                    margin-top: 0;
+                    margin-bottom: 4px;
+                    color: #2196F3;
+                    font-size: 11px;
+                    font-weight: bold;
+                    text-transform: uppercase;
+                    letter-spacing: 0.5px;
+                }
+                .bar {
+                    fill: #2196F3;
+                    rx: 2;
+                }
+                .line {
+                    fill: none;
+                    stroke: #4CAF50;
+                    stroke-width: 2.5;
+                }
+                .dot {
+                    fill: #4CAF50;
+                    stroke: #212121;
+                    stroke-width: 1.5;
+                }
+                .axis text {
+                    fill: #aaaaaa;
+                    font-size: 8px;
+                }
+                .axis path, .axis line {
+                    stroke: #444444;
+                }
+                .grid line {
+                    stroke: #333333;
+                    stroke-opacity: 0.5;
+                    shape-rendering: crispEdges;
+                }
+                .tooltip {
+                    position: absolute;
+                    background-color: rgba(30,30,30,0.95);
+                    border: 1px solid #555555;
+                    color: #ffffff;
+                    padding: 6px;
+                    border-radius: 4px;
+                    pointer-events: none;
+                    font-size: 9px;
+                    opacity: 0;
+                    transition: opacity 0.15s;
+                    z-index: 9999;
+                }
+            </style>
+        </head>
+        <body>
+            <div class="chart-container">
+                <h3>📊 D3.js Daily Order Volume</h3>
+                <div id="volume-chart"></div>
+            </div>
+            <div class="chart-container">
+                <h3>📈 D3.js Total Revenue Trend (GH₵)</h3>
+                <div id="revenue-chart"></div>
+            </div>
+
+            <div class="tooltip" id="tooltip"></div>
+
+            <script>
+                const data = $jsonStr;
+                
+                const margin = {top: 15, right: 15, bottom: 30, left: 35};
+                const width = window.innerWidth - margin.left - margin.right - 20;
+                const height = 110 - margin.top - margin.bottom;
+
+                // Tooltip
+                const tooltip = d3.select("#tooltip");
+
+                if (data.length === 0) {
+                    const emptyInfo = "<div style='font-size:10px;color:#888;text-align:center;padding:12px;'>No order transactions in filters.</div>";
+                    document.getElementById("volume-chart").innerHTML = emptyInfo;
+                    document.getElementById("revenue-chart").innerHTML = emptyInfo;
+                } else {
+                    // --- volume chart ---
+                    const svgVol = d3.select("#volume-chart")
+                        .append("svg")
+                        .attr("width", width + margin.left + margin.right)
+                        .attr("height", height + margin.top + margin.bottom)
+                        .append("g")
+                        .attr("transform", "translate(" + margin.left + "," + margin.top + ")");
+
+                    const xVol = d3.scaleBand()
+                        .range([0, width])
+                        .domain(data.map(d => d.date))
+                        .padding(0.3);
+
+                    const yVol = d3.scaleLinear()
+                        .range([height, 0])
+                        .domain([0, d3.max(data, d => d.volume) || 5]);
+
+                    // Grids
+                    svgVol.append("g")			
+                        .attr("class", "grid")
+                        .call(d3.axisLeft(yVol).tickSize(-width).tickFormat(""));
+
+                    svgVol.append("g")
+                        .attr("class", "axis")
+                        .attr("transform", "translate(0," + height + ")")
+                        .call(d3.axisBottom(xVol))
+                        .selectAll("text")
+                        .style("text-anchor", "end")
+                        .attr("dx", "-.5em")
+                        .attr("dy", ".15em")
+                        .attr("transform", "rotate(-25)");
+
+                    svgVol.append("g")
+                        .attr("class", "axis")
+                        .call(d3.axisLeft(yVol).ticks(4));
+
+                    svgVol.selectAll(".bar")
+                        .data(data)
+                        .enter().append("rect")
+                        .attr("class", "bar")
+                        .attr("x", d => xVol(d.date))
+                        .attr("width", xVol.bandwidth())
+                        .attr("y", d => yVol(d.volume))
+                        .attr("height", d => height - yVol(d.volume))
+                        .on("touchstart", function(event, d) {
+                            tooltip.style("opacity", 1)
+                                .html("Date: " + d.date + "<br>Orders: " + d.volume);
+                        })
+                        .on("touchend", function() {
+                            tooltip.style("opacity", 0);
+                        });
+
+                    // --- revenue chart ---
+                    const svgRev = d3.select("#revenue-chart")
+                        .append("svg")
+                        .attr("width", width + margin.left + margin.right)
+                        .attr("height", height + margin.top + margin.bottom)
+                        .append("g")
+                        .attr("transform", "translate(" + margin.left + "," + margin.top + ")");
+
+                    const xRev = d3.scalePoint()
+                        .range([0, width])
+                        .domain(data.map(d => d.date))
+                        .padding(0.3);
+
+                    const yRev = d3.scaleLinear()
+                        .range([height, 0])
+                        .domain([0, d3.max(data, d => d.revenue) * 1.1 || 10]);
+
+                    svgRev.append("g")			
+                        .attr("class", "grid")
+                        .call(d3.axisLeft(yRev).tickSize(-width).tickFormat(""));
+
+                    svgRev.append("g")
+                        .attr("class", "axis")
+                        .attr("transform", "translate(0," + height + ")")
+                        .call(d3.axisBottom(xRev))
+                        .selectAll("text")
+                        .style("text-anchor", "end")
+                        .attr("dx", "-.5em")
+                        .attr("dy", ".15em")
+                        .attr("transform", "rotate(-25)");
+
+                    svgRev.append("g")
+                        .attr("class", "axis")
+                        .call(d3.axisLeft(yRev).ticks(4));
+
+                    const valueline = d3.line()
+                        .x(d => xRev(d.date))
+                        .y(d => yRev(d.revenue))
+                        .curve(d3.curveMonotoneX);
+
+                    svgRev.append("path")
+                        .data([data])
+                        .attr("class", "line")
+                        .attr("d", valueline);
+
+                    svgRev.selectAll(".dot")
+                        .data(data)
+                        .enter().append("circle")
+                        .attr("class", "dot")
+                        .attr("cx", d => xRev(d.date))
+                        .attr("cy", d => yRev(d.revenue))
+                        .attr("r", 4)
+                        .on("touchstart", function(event, d) {
+                            tooltip.style("opacity", 1)
+                                .html("Date: " + d.date + "<br>Revenue: GH₵ " + d.revenue.toFixed(2));
+                        })
+                        .on("touchend", function() {
+                            tooltip.style("opacity", 0);
+                        });
+                }
+            </script>
+        </body>
+        </html>
+        """.trimIndent()
+    }
+
+    Card(
+        modifier = modifier
+            .fillMaxWidth()
+            .testTag("d3_js_vendor_dashboard"),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+        shape = RoundedCornerShape(16.dp),
+        border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
+    ) {
+        Column(modifier = Modifier.padding(16.dp)) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                Text("📈", fontSize = 20.sp)
+                Column {
+                    Text(
+                        text = "D3.js Interactive Visualizer",
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.primary
+                    )
+                    Text(
+                        text = "Sophisticated charting powered by D3 web standards engine",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            }
+
+            Spacer(modifier = Modifier.height(14.dp))
+
+            AndroidView(
+                factory = { context ->
+                    android.webkit.WebView(context).apply {
+                        settings.javaScriptEnabled = true
+                        webViewClient = android.webkit.WebViewClient()
+                        settings.domStorageEnabled = true
+                        settings.useWideViewPort = true
+                        settings.loadWithOverviewMode = true
+                        setBackgroundColor(android.graphics.Color.TRANSPARENT)
+                    }
+                },
+                update = { webView ->
+                    webView.loadDataWithBaseURL("https://localhost", htmlContent, "text/html", "UTF-8", null)
+                },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(340.dp)
+            )
+        }
+    }
+}
+
+@Composable
+fun RechartsDashboardChart(
+    orders: List<Order>,
+    modifier: Modifier = Modifier
+) {
+    val dailyJson = remember(orders) {
+        val list = mutableListOf<String>()
+        val sdfLabel = SimpleDateFormat("MM-dd", Locale.US)
+        for (i in 13 downTo 0) {
+            val cal = Calendar.getInstance()
+            cal.add(Calendar.DAY_OF_YEAR, -i)
+            
+            val dayStart = cal.clone() as Calendar
+            dayStart.set(Calendar.HOUR_OF_DAY, 0)
+            dayStart.set(Calendar.MINUTE, 0)
+            dayStart.set(Calendar.SECOND, 0)
+            dayStart.set(Calendar.MILLISECOND, 0)
+            val startMillis = dayStart.timeInMillis
+            val endMillis = startMillis + 24 * 60 * 60 * 1000L - 1
+            
+            val dateLabel = sdfLabel.format(cal.time)
+            
+            val completedRev = orders.filter {
+                it.orderTimestamp in startMillis..endMillis && it.status == "COMPLETED"
+            }.sumOf { it.totalPrice }
+            
+            val completedCount = orders.count {
+                it.orderTimestamp in startMillis..endMillis && it.status == "COMPLETED"
+            }
+            
+            list.add("""{"date": "$dateLabel", "revenue": $completedRev, "count": $completedCount}""")
+        }
+        list.joinToString(prefix = "[", postfix = "]", separator = ",")
+    }
+
+    val weeklyJson = remember(orders) {
+        val list = mutableListOf<String>()
+        for (i in 7 downTo 0) {
+            val weekCal = Calendar.getInstance()
+            weekCal.add(Calendar.WEEK_OF_YEAR, -i)
+            
+            val startOfWeek = weekCal.clone() as Calendar
+            startOfWeek.set(Calendar.DAY_OF_WEEK, startOfWeek.firstDayOfWeek)
+            startOfWeek.set(Calendar.HOUR_OF_DAY, 0)
+            startOfWeek.set(Calendar.MINUTE, 0)
+            startOfWeek.set(Calendar.SECOND, 0)
+            startOfWeek.set(Calendar.MILLISECOND, 0)
+            
+            val endOfWeek = startOfWeek.clone() as Calendar
+            endOfWeek.add(Calendar.DAY_OF_WEEK, 7)
+            endOfWeek.add(Calendar.MILLISECOND, -1)
+            
+            val startMillis = startOfWeek.timeInMillis
+            val endMillis = endOfWeek.timeInMillis
+            
+            val formattedWeekLabel = if (i == 0) "Current Wk" else "Wk -$i"
+            
+            val completedRev = orders.filter {
+                it.orderTimestamp in startMillis..endMillis && it.status == "COMPLETED"
+            }.sumOf { it.totalPrice }
+            
+            val completedCount = orders.count {
+                it.orderTimestamp in startMillis..endMillis && it.status == "COMPLETED"
+            }
+            
+            list.add("""{"week": "$formattedWeekLabel", "revenue": $completedRev, "count": $completedCount}""")
+        }
+        list.joinToString(prefix = "[", postfix = "]", separator = ",")
+    }
+
+    val totalRevenue = remember(orders) {
+        orders.filter { it.status == "COMPLETED" }.sumOf { it.totalPrice }
+    }
+    val totalVolume = remember(orders) {
+        orders.count { it.status == "COMPLETED" }
+    }
+
+    val htmlContent = remember(dailyJson, weeklyJson, totalRevenue, totalVolume) {
+        """
+        <!DOCTYPE html>
+        <html>
+        <head>
+            <meta charset="UTF-8">
+            <meta name="viewport" content="width=device-width, initial-scale=1.0">
+            <title>Recharts Dashboard</title>
+            <!-- Load React -->
+            <script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
+            <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
+            <!-- Load Prop-Types -->
+            <script src="https://unpkg.com/prop-types@15.8.1/prop-types.min.js" crossorigin></script>
+            <!-- Load Recharts -->
+            <script src="https://unpkg.com/recharts@2.12.7/umd/Recharts.js" crossorigin></script>
+            <!-- Load Babel -->
+            <script src="https://unpkg.com/@babel/standalone/babel.min.js" crossorigin></script>
+            <style>
+                body {
+                    margin: 0;
+                    padding: 8px;
+                    background-color: #1a1a1a;
+                    color: #e0e0e0;
+                    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+                }
+                .card {
+                    background-color: #212121;
+                    border: 1px solid #333333;
+                    border-radius: 8px;
+                    padding: 12px;
+                    margin-bottom: 12px;
+                    box-shadow: 0 2px 4px rgba(0,0,0,0.15);
+                }
+                .header {
+                    margin-bottom: 12px;
+                }
+                .title {
+                    font-size: 11px;
+                    font-weight: bold;
+                    color: #4fc3f7;
+                    margin: 0;
+                    text-transform: uppercase;
+                    letter-spacing: 0.5px;
+                }
+                .subtitle {
+                    font-size: 9px;
+                    color: #888;
+                    margin: 2px 0 0 0;
+                }
+                .chart-container {
+                    height: 180px;
+                    position: relative;
+                }
+                .stats-row {
+                    display: flex;
+                    justify-content: space-between;
+                    margin-bottom: 12px;
+                    gap: 8px;
+                }
+                .stat-card {
+                    background-color: #242424;
+                    border: 1px solid #3a3a3a;
+                    border-radius: 6px;
+                    padding: 8px;
+                    flex: 1;
+                    text-align: center;
+                }
+                .stat-value {
+                    font-size: 13px;
+                    font-weight: bold;
+                    color: #81c784;
+                }
+                .stat-label {
+                    font-size: 8px;
+                    color: #aaa;
+                    margin-top: 2px;
+                    text-transform: uppercase;
+                }
+            </style>
+        </head>
+        <body>
+            <div id="root"></div>
+
+            <script type="text/babel">
+                const { 
+                    AreaChart, Area, BarChart, Bar, LineChart, Line,
+                    XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer
+                } = Recharts;
+
+                const dailyData = $dailyJson;
+                const weeklyData = $weeklyJson;
+                const totalVolume = $totalVolume;
+                const totalRevenue = $totalRevenue;
+
+                function App() {
+                    return (
+                        <div>
+                            <div className="stats-row">
+                                <div className="stat-card">
+                                    <div className="stat-value">GH₵ {totalRevenue.toFixed(2)}</div>
+                                    <div className="stat-label">Total Revenue</div>
+                                </div>
+                                <div className="stat-card">
+                                    <div className="stat-value">{totalVolume}</div>
+                                    <div className="stat-label">Order Volume</div>
+                                </div>
+                            </div>
+
+                            <div className="card">
+                                <div className="header">
+                                    <p className="title">Daily Revenue Trend</p>
+                                    <p className="subtitle">Interactive 14-day sales lifecycle</p>
+                                </div>
+                                <div className="chart-container">
+                                    <ResponsiveContainer width="100%" height="100%">
+                                        <AreaChart data={dailyData} margin={{ top: 5, right: 5, left: -25, bottom: 5 }}>
+                                            <defs>
+                                                <linearGradient id="colorRevenue" x1="0" y1="0" x2="0" y2="1">
+                                                    <stop offset="5%" stopColor="#4fc3f7" stopOpacity={0.8}/>
+                                                    <stop offset="95%" stopColor="#4fc3f7" stopOpacity={0.1}/>
+                                                </linearGradient>
+                                            </defs>
+                                            <CartesianGrid strokeDasharray="3 3" stroke="#2d2d2d" />
+                                            <XAxis dataKey="date" stroke="#888" style={{ fontSize: '8px' }} />
+                                            <YAxis stroke="#888" style={{ fontSize: '8px' }} />
+                                            <Tooltip contentStyle={{ backgroundColor: '#222', borderColor: '#444', fontSize: '9px' }} />
+                                            <Legend wrapperStyle={{ fontSize: '9px', marginTop: '4px' }} />
+                                            <Area type="monotone" dataKey="revenue" name="Revenue (GH₵)" stroke="#4fc3f7" fillOpacity={1} fill="url(#colorRevenue)" />
+                                        </AreaChart>
+                                    </ResponsiveContainer>
+                                </div>
+                            </div>
+
+                            <div className="card">
+                                <div className="header">
+                                    <p className="title">Weekly Business Revenue Progression</p>
+                                    <p className="subtitle">Aggregate order revenue trends grouped by full calendar weeks</p>
+                                </div>
+                                <div className="chart-container">
+                                    <ResponsiveContainer width="100%" height="100%">
+                                        <BarChart data={weeklyData} margin={{ top: 5, right: 5, left: -25, bottom: 5 }}>
+                                            <CartesianGrid strokeDasharray="3 3" stroke="#2d2d2d" />
+                                            <XAxis dataKey="week" stroke="#888" style={{ fontSize: '8px' }} />
+                                            <YAxis stroke="#888" style={{ fontSize: '8px' }} />
+                                            <Tooltip contentStyle={{ backgroundColor: '#222', borderColor: '#444', fontSize: '9px' }} />
+                                            <Legend wrapperStyle={{ fontSize: '9px', marginTop: '4px' }} />
+                                            <Bar dataKey="revenue" name="Weekly Rev (GH₵)" fill="#81c784" radius={[4, 4, 0, 0]} />
+                                            <Bar dataKey="count" name="Weekly Orders" fill="#e57373" radius={[4, 4, 0, 0]} />
+                                        </BarChart>
+                                    </ResponsiveContainer>
+                                </div>
+                            </div>
+                        </div>
+                    );
+                }
+
+                const container = document.getElementById('root');
+                const root = ReactDOM.createRoot(container);
+                root.render(<App />);
+            </script>
+        </body>
+        </html>
+        """.trimIndent()
+    }
+
+    Card(
+        modifier = modifier
+            .fillMaxWidth()
+            .testTag("recharts_vendor_dashboard"),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+        shape = RoundedCornerShape(16.dp),
+        border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
+    ) {
+        Column(modifier = Modifier.padding(16.dp)) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                Text("📈", fontSize = 20.sp)
+                Column {
+                    Text(
+                        text = "Recharts Analytics Dashboard",
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.primary
+                    )
+                    Text(
+                        text = "High-fidelity charting powered by React & Recharts engine",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            }
+
+            Spacer(modifier = Modifier.height(14.dp))
+
+            AndroidView(
+                factory = { context ->
+                    android.webkit.WebView(context).apply {
+                        settings.javaScriptEnabled = true
+                        webViewClient = android.webkit.WebViewClient()
+                        settings.domStorageEnabled = true
+                        settings.useWideViewPort = true
+                        settings.loadWithOverviewMode = true
+                        setBackgroundColor(android.graphics.Color.TRANSPARENT)
+                    }
+                },
+                update = { webView ->
+                    webView.loadDataWithBaseURL("https://localhost", htmlContent, "text/html", "UTF-8", null)
+                },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(490.dp)
+            )
+        }
+    }
+}
+
 

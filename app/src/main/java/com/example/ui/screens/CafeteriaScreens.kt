@@ -36,6 +36,8 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import kotlinx.coroutines.launch
 import androidx.navigation.NavController
 import com.example.data.*
+import com.example.ui.components.D3DashboardChart
+import com.example.ui.components.RechartsDashboardChart
 import com.example.ui.components.DailyRevenueBarChart
 import com.example.ui.components.RadarFeedbackChart
 import com.example.ui.components.StudentTrendsLineChart
@@ -1022,9 +1024,34 @@ fun StudentDashboardScreen(
                                             Column(modifier = Modifier.padding(10.dp)) {
                                                 Row(
                                                     verticalAlignment = Alignment.CenterVertically,
-                                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                                    horizontalArrangement = Arrangement.spacedBy(6.dp),
                                                     modifier = Modifier.fillMaxWidth()
                                                 ) {
+                                                    Card(
+                                                        shape = androidx.compose.foundation.shape.CircleShape,
+                                                        modifier = Modifier.size(24.dp),
+                                                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
+                                                    ) {
+                                                        v.logoUrl?.let { logo ->
+                                                            coil.compose.AsyncImage(
+                                                                model = logo,
+                                                                contentDescription = null,
+                                                                modifier = Modifier.fillMaxSize(),
+                                                                contentScale = androidx.compose.ui.layout.ContentScale.Crop
+                                                            )
+                                                        } ?: Box(
+                                                            modifier = Modifier.fillMaxSize(),
+                                                            contentAlignment = Alignment.Center
+                                                        ) {
+                                                            Text(
+                                                                text = v.fullName.take(1).uppercase(),
+                                                                fontSize = 10.sp,
+                                                                fontWeight = FontWeight.Bold,
+                                                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                                                            )
+                                                        }
+                                                    }
+
                                                     Text(
                                                         text = v.fullName,
                                                         fontSize = 11.sp,
@@ -1112,6 +1139,116 @@ fun StudentDashboardScreen(
                                     Icon(Icons.Default.Star, contentDescription = null, modifier = Modifier.size(14.dp), tint = Color(0xFF2E2E2E))
                                     Spacer(modifier = Modifier.width(4.dp))
                                     Text("🏆 Booth Standings", fontSize = 10.sp, fontWeight = FontWeight.Bold)
+                                }
+                            }
+                        }
+
+                        val selectedVendor = allVendors.find { it.id == selectedVendorIdFilter }
+                        if (selectedVendor != null) {
+                            item {
+                                Card(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(vertical = 8.dp),
+                                    shape = RoundedCornerShape(16.dp),
+                                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))
+                                ) {
+                                    Box(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .height(130.dp)
+                                    ) {
+                                        selectedVendor.pictureUrl?.let { coverUrl ->
+                                            coil.compose.AsyncImage(
+                                                model = coverUrl,
+                                                contentDescription = null,
+                                                modifier = Modifier.fillMaxSize(),
+                                                contentScale = androidx.compose.ui.layout.ContentScale.Crop
+                                            )
+                                        } ?: Box(
+                                            modifier = Modifier
+                                                .fillMaxSize()
+                                                .background(
+                                                    androidx.compose.ui.graphics.Brush.linearGradient(
+                                                        listOf(MaterialTheme.colorScheme.primary, MaterialTheme.colorScheme.secondary)
+                                                    )
+                                                )
+                                        )
+
+                                        Box(
+                                            modifier = Modifier
+                                                .fillMaxSize()
+                                                .background(
+                                                    androidx.compose.ui.graphics.Brush.verticalGradient(
+                                                        colors = listOf(Color.Transparent, Color.Black.copy(alpha = 0.75f)),
+                                                        startY = 100f
+                                                    )
+                                                )
+                                        )
+
+                                        Row(
+                                            modifier = Modifier
+                                                .fillMaxSize()
+                                                .padding(12.dp),
+                                            verticalAlignment = Alignment.Bottom,
+                                            horizontalArrangement = Arrangement.spacedBy(10.dp)
+                                        ) {
+                                            Card(
+                                                shape = androidx.compose.foundation.shape.CircleShape,
+                                                modifier = Modifier.size(44.dp).border(2.dp, Color.White, androidx.compose.foundation.shape.CircleShape),
+                                                colors = CardDefaults.cardColors(containerColor = Color.White)
+                                            ) {
+                                                selectedVendor.logoUrl?.let { logo ->
+                                                    coil.compose.AsyncImage(
+                                                        model = logo,
+                                                        contentDescription = null,
+                                                        modifier = Modifier.fillMaxSize(),
+                                                        contentScale = androidx.compose.ui.layout.ContentScale.Crop
+                                                    )
+                                                } ?: Box(
+                                                    modifier = Modifier.fillMaxSize(),
+                                                    contentAlignment = Alignment.Center
+                                                ) {
+                                                    Text(
+                                                        text = selectedVendor.fullName.take(1).uppercase(),
+                                                        fontSize = 18.sp,
+                                                        fontWeight = FontWeight.Bold,
+                                                        color = MaterialTheme.colorScheme.primary
+                                                    )
+                                                }
+                                            }
+
+                                            Column {
+                                                Text(
+                                                    text = selectedVendor.fullName,
+                                                    fontWeight = FontWeight.Bold,
+                                                    fontSize = 16.sp,
+                                                    color = Color.White
+                                                )
+                                                Text(
+                                                    text = selectedVendor.info.ifBlank { "Campus Vendor Booth" },
+                                                    fontSize = 11.sp,
+                                                    color = Color.White.copy(alpha = 0.85f)
+                                                )
+                                            }
+                                        }
+
+                                        IconButton(
+                                            onClick = { selectedVendorIdFilter = null },
+                                            modifier = Modifier
+                                                .align(Alignment.TopEnd)
+                                                .padding(6.dp)
+                                                .background(Color.Black.copy(alpha = 0.5f), androidx.compose.foundation.shape.CircleShape)
+                                                .size(28.dp)
+                                        ) {
+                                            Icon(
+                                                imageVector = Icons.Default.Close,
+                                                contentDescription = "Clear Vendor Filter",
+                                                tint = Color.White,
+                                                modifier = Modifier.size(16.dp)
+                                            )
+                                        }
+                                    }
                                 }
                             }
                         }
@@ -3891,7 +4028,7 @@ fun StudentDashboardScreen(
 // 4. VENDOR WORKSPACE & VERIFICATION SCREEN
 // ==========================================
 
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class, androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
 @Composable
 fun VendorDashboardScreen(
     viewModel: CafeteriaViewModel,
@@ -5753,6 +5890,58 @@ fun VendorDashboardScreen(
                                 }
                             }
 
+                            val lowStockFoods = vendorFoods.filter { it.currentStock <= it.lowStockThreshold }
+                            if (lowStockFoods.isNotEmpty()) {
+                                item {
+                                    Card(
+                                        modifier = Modifier.fillMaxWidth().testTag("bulk_restock_badge"),
+                                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.errorContainer),
+                                        shape = RoundedCornerShape(12.dp)
+                                    ) {
+                                        Row(
+                                            modifier = Modifier.padding(12.dp),
+                                            verticalAlignment = Alignment.CenterVertically,
+                                            horizontalArrangement = Arrangement.spacedBy(10.dp)
+                                        ) {
+                                            Icon(
+                                                imageVector = Icons.Default.Warning,
+                                                contentDescription = "Warning Low Stock",
+                                                tint = MaterialTheme.colorScheme.error
+                                            )
+                                            Column(modifier = Modifier.weight(1f)) {
+                                                Text(
+                                                    "⚠️ RE-STOCK ALERTS: ${lowStockFoods.size} items low!",
+                                                    fontWeight = FontWeight.Bold,
+                                                    style = MaterialTheme.typography.bodyMedium,
+                                                    color = MaterialTheme.colorScheme.onErrorContainer
+                                                )
+                                                Text(
+                                                    "The following cuisines have hit safety levels: ${lowStockFoods.joinToString { it.name }}",
+                                                    fontSize = 11.sp,
+                                                    color = MaterialTheme.colorScheme.onErrorContainer.copy(alpha = 0.85f)
+                                                )
+                                            }
+                                            Button(
+                                                onClick = {
+                                                    lowStockFoods.forEach { food ->
+                                                        viewModel.updateFoodItemStockSettings(
+                                                            food,
+                                                            food.initialStock,
+                                                            food.initialStock,
+                                                            food.lowStockThreshold
+                                                        )
+                                                    }
+                                                },
+                                                colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error),
+                                                contentPadding = PaddingValues(horizontal = 8.dp, vertical = 2.dp)
+                                            ) {
+                                                Text("Reset All", fontSize = 10.sp, fontWeight = FontWeight.Bold, color = Color.White)
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+
                             if (vendorFoods.isEmpty()) {
                                 item {
                                     Box(
@@ -5852,6 +6041,24 @@ fun VendorDashboardScreen(
                                                             fontSize = 10.sp,
                                                             color = MaterialTheme.colorScheme.onSurfaceVariant
                                                         )
+
+                                                        if (food.currentStock <= food.lowStockThreshold) {
+                                                            Box(
+                                                                modifier = Modifier
+                                                                    .background(
+                                                                        MaterialTheme.colorScheme.errorContainer,
+                                                                        RoundedCornerShape(6.dp)
+                                                                    )
+                                                                    .padding(horizontal = 6.dp, vertical = 2.dp)
+                                                            ) {
+                                                                Text(
+                                                                    "🚨 RE-STOCK NEEDED",
+                                                                    color = MaterialTheme.colorScheme.onErrorContainer,
+                                                                    fontSize = 9.sp,
+                                                                    fontWeight = FontWeight.Bold
+                                                                )
+                                                            }
+                                                        }
                                                     }
                                                     
                                                     val depletionTime = viewModel.predictStockExhaustion(food, incomingOrders)
@@ -6832,6 +7039,14 @@ fun VendorDashboardScreen(
                             }
                         }
 
+                        // 1c. d3.js Interactive Dashboard Chart View
+                        D3DashboardChart(orders = filteredIncomingOrders, modifier = Modifier.fillMaxWidth())
+
+                        Spacer(modifier = Modifier.height(8.dp))
+
+                        // Recharts Interactive Dashboard Chart View
+                        RechartsDashboardChart(orders = filteredIncomingOrders, modifier = Modifier.fillMaxWidth())
+
                         // 2. Dynamic Radar Visual Chart
                         RadarFeedbackChart(metrics = metrics, modifier = Modifier.fillMaxWidth())
 
@@ -7243,24 +7458,160 @@ fun VendorDashboardScreen(
                         Spacer(modifier = Modifier.height(12.dp))
 
                         // 4. Feedback details
-                        Text("Live Customer Sentiment Transcripts", fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleSmall)
+                        Text("Live Customer Student Feedback Log", fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.primary)
                         if (filteredFeedbackList.isEmpty()) {
-                            Text("No reviews submitted on campus yet.", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            Card(
+                                modifier = Modifier.fillMaxWidth(),
+                                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))
+                            ) {
+                                Box(modifier = Modifier.fillMaxWidth().padding(32.dp), contentAlignment = Alignment.Center) {
+                                    Text("No reviews have been submitted by students for physical dishes yet.", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant, fontWeight = FontWeight.Medium)
+                                }
+                            }
                         } else {
                             filteredFeedbackList.forEach { f ->
+                                val studentUser = allUsers.find { it.id == f.customerId }
+                                val studentName = studentUser?.fullName ?: "Verified Student"
+                                val studentIdStr = studentUser?.student_staff_id ?: studentUser?.info ?: "ATU Student"
+
                                 Card(
                                     colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-                                    modifier = Modifier.fillMaxWidth()
+                                    elevation = CardDefaults.cardElevation(defaultElevation = 1.dp),
+                                    shape = RoundedCornerShape(12.dp),
+                                    border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)),
+                                    modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp)
                                 ) {
-                                    Column(modifier = Modifier.padding(12.dp)) {
+                                    Column(modifier = Modifier.padding(14.dp)) {
                                         Row(
                                             modifier = Modifier.fillMaxWidth(),
-                                            horizontalArrangement = Arrangement.SpaceBetween
+                                            horizontalArrangement = Arrangement.SpaceBetween,
+                                            verticalAlignment = Alignment.CenterVertically
                                         ) {
-                                            Text("Star metrics: Quality=${f.ratingFoodQuality} Cleanliness=${f.ratingCleanliness}", fontSize = 10.sp, fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.secondary)
-                                            Text("Order Ref #${f.orderId}", fontSize = 9.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                                Box(
+                                                    modifier = Modifier
+                                                        .size(32.dp)
+                                                        .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.1f), androidx.compose.foundation.shape.CircleShape),
+                                                    contentAlignment = Alignment.Center
+                                                ) {
+                                                    Text(studentName.take(1).uppercase(), fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
+                                                }
+                                                Column {
+                                                    Text(studentName, fontWeight = FontWeight.Bold, fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurface)
+                                                    Text(studentIdStr, fontSize = 9.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                                }
+                                            }
+                                            Text(
+                                                text = "Order Ref: #${f.orderId}",
+                                                fontSize = 10.sp,
+                                                fontWeight = FontWeight.SemiBold,
+                                                color = MaterialTheme.colorScheme.secondary,
+                                                modifier = Modifier
+                                                    .background(MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.4f), RoundedCornerShape(4.dp))
+                                                    .padding(horizontal = 6.dp, vertical = 2.dp)
+                                            )
                                         }
-                                        Text("\"${f.comment}\"", style = MaterialTheme.typography.bodySmall, fontStyle = androidx.compose.ui.text.font.FontStyle.Italic)
+
+                                        Spacer(modifier = Modifier.height(10.dp))
+
+                                        androidx.compose.foundation.layout.FlowRow(
+                                            modifier = Modifier.fillMaxWidth(),
+                                            horizontalArrangement = Arrangement.spacedBy(6.dp),
+                                            verticalArrangement = Arrangement.spacedBy(6.dp)
+                                        ) {
+                                            Row(
+                                                verticalAlignment = Alignment.CenterVertically,
+                                                horizontalArrangement = Arrangement.spacedBy(2.dp),
+                                                modifier = Modifier
+                                                    .background(MaterialTheme.colorScheme.surfaceVariant, RoundedCornerShape(6.dp))
+                                                    .padding(horizontal = 6.dp, vertical = 2.dp)
+                                            ) {
+                                                Text("🍔 Food Taste: ", fontSize = 9.sp, fontWeight = FontWeight.SemiBold)
+                                                repeat(5) { index ->
+                                                    Icon(
+                                                        imageVector = Icons.Default.Star,
+                                                        contentDescription = null,
+                                                        tint = if (index < f.ratingFoodQuality) Color(0xFFFFB300) else Color.LightGray,
+                                                        modifier = Modifier.size(10.dp)
+                                                    )
+                                                }
+                                            }
+
+                                            Row(
+                                                verticalAlignment = Alignment.CenterVertically,
+                                                horizontalArrangement = Arrangement.spacedBy(2.dp),
+                                                modifier = Modifier
+                                                    .background(MaterialTheme.colorScheme.surfaceVariant, RoundedCornerShape(6.dp))
+                                                    .padding(horizontal = 6.dp, vertical = 2.dp)
+                                            ) {
+                                                Text("✨ Hygiene: ", fontSize = 9.sp, fontWeight = FontWeight.SemiBold)
+                                                repeat(5) { index ->
+                                                    Icon(
+                                                        imageVector = Icons.Default.Star,
+                                                        contentDescription = null,
+                                                        tint = if (index < f.ratingCleanliness) Color(0xFFFFB300) else Color.LightGray,
+                                                        modifier = Modifier.size(10.dp)
+                                                    )
+                                                }
+                                            }
+
+                                            Row(
+                                                verticalAlignment = Alignment.CenterVertically,
+                                                horizontalArrangement = Arrangement.spacedBy(2.dp),
+                                                modifier = Modifier
+                                                    .background(MaterialTheme.colorScheme.surfaceVariant, RoundedCornerShape(6.dp))
+                                                    .padding(horizontal = 6.dp, vertical = 2.dp)
+                                            ) {
+                                                Text("⏱️ Service Speed: ", fontSize = 9.sp, fontWeight = FontWeight.SemiBold)
+                                                repeat(5) { index ->
+                                                    Icon(
+                                                        imageVector = Icons.Default.Star,
+                                                        contentDescription = null,
+                                                        tint = if (index < f.ratingServiceSpeed) Color(0xFFFFB300) else Color.LightGray,
+                                                        modifier = Modifier.size(10.dp)
+                                                    )
+                                                }
+                                            }
+
+                                            Row(
+                                                verticalAlignment = Alignment.CenterVertically,
+                                                horizontalArrangement = Arrangement.spacedBy(2.dp),
+                                                modifier = Modifier
+                                                    .background(MaterialTheme.colorScheme.surfaceVariant, RoundedCornerShape(6.dp))
+                                                    .padding(horizontal = 6.dp, vertical = 2.dp)
+                                            ) {
+                                                Text("💰 Price Value: ", fontSize = 9.sp, fontWeight = FontWeight.SemiBold)
+                                                repeat(5) { index ->
+                                                    Icon(
+                                                        imageVector = Icons.Default.Star,
+                                                        contentDescription = null,
+                                                        tint = if (index < f.ratingPriceValue) Color(0xFFFFB300) else Color.LightGray,
+                                                        modifier = Modifier.size(10.dp)
+                                                    )
+                                                }
+                                            }
+                                        }
+
+                                        Spacer(modifier = Modifier.height(10.dp))
+
+                                        Box(
+                                            modifier = Modifier
+                                                .fillMaxWidth()
+                                                .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f), RoundedCornerShape(8.dp))
+                                                .padding(10.dp)
+                                        ) {
+                                            Column {
+                                                Text("STUDENT REMARKS", fontStyle = androidx.compose.ui.text.font.FontStyle.Normal, fontSize = 8.sp, fontWeight = FontWeight.ExtraBold, color = MaterialTheme.colorScheme.primary)
+                                                Spacer(modifier = Modifier.height(2.dp))
+                                                Text(
+                                                    text = f.comment.ifBlank { "No detailed comments entered by user." },
+                                                    fontSize = 11.sp, 
+                                                    color = MaterialTheme.colorScheme.onSurface, 
+                                                    style = MaterialTheme.typography.bodySmall,
+                                                    fontStyle = if (f.comment.isNotBlank()) androidx.compose.ui.text.font.FontStyle.Italic else androidx.compose.ui.text.font.FontStyle.Normal
+                                                )
+                                            }
+                                        }
                                     }
                                 }
                             }
@@ -7317,6 +7668,112 @@ fun VendorDashboardScreen(
                                     shape = RoundedCornerShape(8.dp)
                                 ) {
                                     Text("Publish to Students", fontSize = 12.sp)
+                                }
+                            }
+                        }
+
+                        // 1b. Update Brand Visuality (Logo & Cover)
+                        var selfLogoUrl by remember(currentUser) { mutableStateOf(currentUser?.logoUrl ?: "") }
+                        var selfPictureUrl by remember(currentUser) { mutableStateOf(currentUser?.pictureUrl ?: "") }
+                        var showUpdateSuccessMsg by remember { mutableStateOf(false) }
+
+                        Card(
+                            modifier = Modifier.fillMaxWidth().testTag("brand_visuals_card"),
+                            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))
+                        ) {
+                            Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                                Text("🎨 Profile Brand Visuals", fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleSmall, color = MaterialTheme.colorScheme.primary)
+                                Text("Alter your brand's digital signage, including rounding avatar logos and header covers seen by students.", fontSize = 10.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+
+                                Spacer(modifier = Modifier.height(4.dp))
+
+                                // Logo Edit Field
+                                Text("Vendor Logo Icon Link", fontWeight = FontWeight.SemiBold, fontSize = 11.sp)
+                                OutlinedTextField(
+                                    value = selfLogoUrl,
+                                    onValueChange = { selfLogoUrl = it },
+                                    label = { Text("Logo Photo URL") },
+                                    modifier = Modifier.fillMaxWidth(),
+                                    singleLine = true
+                                )
+
+                                // Logo presets Row
+                                Row(
+                                    horizontalArrangement = Arrangement.spacedBy(4.dp),
+                                    modifier = Modifier.fillMaxWidth(),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Text("Logo presets:", fontSize = 9.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                    listOf(
+                                        "🍲" to "https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=120&auto=format&fit=crop&q=60",
+                                        "🍔" to "https://images.unsplash.com/photo-1504674900247-0877df9cc836?w=120&auto=format&fit=crop&q=60",
+                                        "🍰" to "https://images.unsplash.com/photo-1517433456452-f9633a875f6f?w=120&auto=format&fit=crop&q=60",
+                                        "🥤" to "https://images.unsplash.com/photo-1497534446932-c925b458314e?w=120&auto=format&fit=crop&q=60"
+                                    ).forEach { (emoji, url) ->
+                                        FilterChip(
+                                            selected = selfLogoUrl == url,
+                                            onClick = { selfLogoUrl = url },
+                                            label = { Text(emoji, fontSize = 10.sp) }
+                                        )
+                                    }
+                                }
+
+                                Spacer(modifier = Modifier.height(4.dp))
+
+                                // Picture Edit Field
+                                Text("Vendor Cover Backdrop Link", fontWeight = FontWeight.SemiBold, fontSize = 11.sp)
+                                OutlinedTextField(
+                                    value = selfPictureUrl,
+                                    onValueChange = { selfPictureUrl = it },
+                                    label = { Text("Cover Picture URL") },
+                                    modifier = Modifier.fillMaxWidth(),
+                                    singleLine = true
+                                )
+
+                                // Cover presets Row
+                                Row(
+                                    horizontalArrangement = Arrangement.spacedBy(4.dp),
+                                    modifier = Modifier.fillMaxWidth(),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Text("Cover presets:", fontSize = 9.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                    listOf(
+                                        "🍛 Jollof Joint" to "https://images.unsplash.com/photo-1555396273-367ea4eb4db5?w=500&auto=format&fit=crop&q=60",
+                                        "🥖 Baker/Treats" to "https://images.unsplash.com/photo-1509440159596-0249088772ff?w=500&auto=format&fit=crop&q=60",
+                                        "🥗 Salad/Healthy" to "https://images.unsplash.com/photo-1540420773420-3366772f4999?w=500&auto=format&fit=crop&q=60"
+                                    ).forEach { (label, url) ->
+                                        FilterChip(
+                                            selected = selfPictureUrl == url,
+                                            onClick = { selfPictureUrl = url },
+                                            label = { Text(label, fontSize = 8.sp) }
+                                        )
+                                    }
+                                }
+
+                                if (showUpdateSuccessMsg) {
+                                    Text("Visual configurations synchronized instantly!", color = Color(0xFF4CAF50), fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                                }
+
+                                Spacer(modifier = Modifier.height(4.dp))
+
+                                Button(
+                                    onClick = {
+                                        currentUser?.let { cu ->
+                                            val updatedUser = cu.copy(
+                                                logoUrl = selfLogoUrl.ifBlank { null },
+                                                pictureUrl = selfPictureUrl.ifBlank { null }
+                                            )
+                                            viewModel.updateVendor(updatedUser, newPinCode = null) { success ->
+                                                if (success) {
+                                                    showUpdateSuccessMsg = true
+                                                }
+                                            }
+                                        }
+                                    },
+                                    modifier = Modifier.align(Alignment.End),
+                                    shape = RoundedCornerShape(8.dp)
+                                ) {
+                                    Text("Save Visual Changes", fontSize = 12.sp)
                                 }
                             }
                         }
@@ -8616,6 +9073,10 @@ fun AdminDashboardScreen(
     var editInfo by remember { mutableStateOf("") }
     var editPinCode by remember { mutableStateOf("") }
     var editError by remember { mutableStateOf<String?>(null) }
+    var addLogoUrl by remember { mutableStateOf("") }
+    var addPictureUrl by remember { mutableStateOf("") }
+    var editLogoUrl by remember { mutableStateOf("") }
+    var editPictureUrl by remember { mutableStateOf("") }
 
     var listSelection by remember { mutableIntStateOf(0) } // 0: Manage Vendors, 1: Student Directory
 
@@ -8846,6 +9307,8 @@ fun AdminDashboardScreen(
                                                             editFullName = vendor.fullName
                                                             editInfo = vendor.info
                                                             editPinCode = ""
+                                                            editLogoUrl = vendor.logoUrl ?: ""
+                                                            editPictureUrl = vendor.pictureUrl ?: ""
                                                             editError = null
                                                             vendorToEdit = vendor
                                                         },
@@ -9340,6 +9803,58 @@ fun AdminDashboardScreen(
                             singleLine = true
                         )
 
+                        Text("Logo Setup", fontWeight = FontWeight.SemiBold, fontSize = 11.sp, color = MaterialTheme.colorScheme.primary)
+                        OutlinedTextField(
+                            value = addLogoUrl,
+                            onValueChange = { addLogoUrl = it },
+                            label = { Text("Logo Image URL") },
+                            modifier = Modifier.fillMaxWidth(),
+                            singleLine = true
+                        )
+                        Row(
+                            horizontalArrangement = Arrangement.spacedBy(4.dp),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            listOf(
+                                "🍲" to "https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=120&auto=format&fit=crop&q=60",
+                                "🍔" to "https://images.unsplash.com/photo-1504674900247-0877df9cc836?w=120&auto=format&fit=crop&q=60",
+                                "🍰" to "https://images.unsplash.com/photo-1517433456452-f9633a875f6f?w=120&auto=format&fit=crop&q=60",
+                                "🥤" to "https://images.unsplash.com/photo-1497534446932-c925b458314e?w=120&auto=format&fit=crop&q=60"
+                            ).forEach { (emoji, url) ->
+                                FilterChip(
+                                    selected = addLogoUrl == url,
+                                    onClick = { addLogoUrl = url },
+                                    label = { Text(emoji) }
+                                )
+                            }
+                        }
+
+                        Text("Cover Photo Setup", fontWeight = FontWeight.SemiBold, fontSize = 11.sp, color = MaterialTheme.colorScheme.primary)
+                        OutlinedTextField(
+                            value = addPictureUrl,
+                            onValueChange = { addPictureUrl = it },
+                            label = { Text("Cover Banner Image URL") },
+                            modifier = Modifier.fillMaxWidth(),
+                            singleLine = true
+                        )
+                        Row(
+                            horizontalArrangement = Arrangement.spacedBy(4.dp),
+                            modifier = Modifier.fillMaxWidth(),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            listOf(
+                                "🍛 Traditional" to "https://images.unsplash.com/photo-1555396273-367ea4eb4db5?w=500&auto=format&fit=crop&q=60",
+                                "🥖 Bakery/Treats" to "https://images.unsplash.com/photo-1509440159596-0249088772ff?w=500&auto=format&fit=crop&q=60",
+                                "🥗 Healthy" to "https://images.unsplash.com/photo-1540420773420-3366772f4999?w=500&auto=format&fit=crop&q=60"
+                            ).forEach { (label, url) ->
+                                FilterChip(
+                                    selected = addPictureUrl == url,
+                                    onClick = { addPictureUrl = url },
+                                    label = { Text(label, fontSize = 9.sp) }
+                                )
+                            }
+                        }
+
                         addError?.let {
                             Text(it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.Bold)
                         }
@@ -9358,9 +9873,23 @@ fun AdminDashboardScreen(
                                     if (addUsername.isBlank() || addFullName.isBlank() || addPinCode.length < 4) {
                                         addError = "Username, Full Name, and a 4+ digit PIN are mandatory."
                                     } else {
-                                        viewModel.addVendor(addUsername, addPinCode, addFullName, addInfo) { success ->
+                                        viewModel.addVendor(
+                                            username = addUsername,
+                                            pinCode = addPinCode,
+                                            fullName = addFullName,
+                                            info = addInfo,
+                                            logoUrl = addLogoUrl.ifBlank { null },
+                                            pictureUrl = addPictureUrl.ifBlank { null }
+                                        ) { success ->
                                             if (success) {
                                                 showAddVendorDialog = false
+                                                addUsername = ""
+                                                addFullName = ""
+                                                addInfo = ""
+                                                addPinCode = ""
+                                                addLogoUrl = ""
+                                                addPictureUrl = ""
+                                                addError = null
                                             } else {
                                                 addError = "Username already exists."
                                             }
@@ -9416,6 +9945,58 @@ fun AdminDashboardScreen(
                             singleLine = true
                         )
 
+                        Text("Logo Setup", fontWeight = FontWeight.SemiBold, fontSize = 11.sp, color = MaterialTheme.colorScheme.primary)
+                        OutlinedTextField(
+                            value = editLogoUrl,
+                            onValueChange = { editLogoUrl = it },
+                            label = { Text("Logo Image URL") },
+                            modifier = Modifier.fillMaxWidth(),
+                            singleLine = true
+                        )
+                        Row(
+                            horizontalArrangement = Arrangement.spacedBy(4.dp),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            listOf(
+                                "🍲" to "https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=120&auto=format&fit=crop&q=60",
+                                "🍔" to "https://images.unsplash.com/photo-1504674900247-0877df9cc836?w=120&auto=format&fit=crop&q=60",
+                                "🍰" to "https://images.unsplash.com/photo-1517433456452-f9633a875f6f?w=120&auto=format&fit=crop&q=60",
+                                "🥤" to "https://images.unsplash.com/photo-1497534446932-c925b458314e?w=120&auto=format&fit=crop&q=60"
+                            ).forEach { (emoji, url) ->
+                                FilterChip(
+                                    selected = editLogoUrl == url,
+                                    onClick = { editLogoUrl = url },
+                                    label = { Text(emoji) }
+                                )
+                            }
+                        }
+
+                        Text("Cover Photo Setup", fontWeight = FontWeight.SemiBold, fontSize = 11.sp, color = MaterialTheme.colorScheme.primary)
+                        OutlinedTextField(
+                            value = editPictureUrl,
+                            onValueChange = { editPictureUrl = it },
+                            label = { Text("Cover Banner Image URL") },
+                            modifier = Modifier.fillMaxWidth(),
+                            singleLine = true
+                        )
+                        Row(
+                            horizontalArrangement = Arrangement.spacedBy(4.dp),
+                            modifier = Modifier.fillMaxWidth(),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            listOf(
+                                "🍛 Traditional" to "https://images.unsplash.com/photo-1555396273-367ea4eb4db5?w=500&auto=format&fit=crop&q=60",
+                                "🥖 Bakery/Treats" to "https://images.unsplash.com/photo-1509440159596-0249088772ff?w=500&auto=format&fit=crop&q=60",
+                                "🥗 Healthy" to "https://images.unsplash.com/photo-1540420773420-3366772f4999?w=500&auto=format&fit=crop&q=60"
+                            ).forEach { (label, url) ->
+                                FilterChip(
+                                    selected = editPictureUrl == url,
+                                    onClick = { editPictureUrl = url },
+                                    label = { Text(label, fontSize = 9.sp) }
+                                )
+                            }
+                        }
+
                         editError?.let {
                             Text(it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.Bold)
                         }
@@ -9436,7 +10017,12 @@ fun AdminDashboardScreen(
                                     } else if (!editPinCode.isEmpty() && editPinCode.length < 4) {
                                         editError = "PIN must be at least 4 digits if updated."
                                     } else {
-                                        val updatedVendor = vendor.copy(fullName = editFullName, info = editInfo.ifBlank { "ATU Cafeteria Vendor" })
+                                        val updatedVendor = vendor.copy(
+                                            fullName = editFullName,
+                                            info = editInfo.ifBlank { "ATU Cafeteria Vendor" },
+                                            logoUrl = editLogoUrl.ifBlank { null },
+                                            pictureUrl = editPictureUrl.ifBlank { null }
+                                        )
                                         viewModel.updateVendor(updatedVendor, editPinCode.ifEmpty { null }) { success ->
                                             if (success) {
                                                 vendorToEdit = null
