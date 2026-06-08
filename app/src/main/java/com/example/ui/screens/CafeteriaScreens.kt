@@ -589,6 +589,23 @@ fun getNutritionalProfile(food: FoodItem): Triple<Float, Float, Float> {
     }
 }
 
+@Composable
+fun RatingMetricBadge(label: String, value: Double) {
+    Card(
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+        shape = RoundedCornerShape(8.dp)
+    ) {
+        Row(
+            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(3.dp)
+        ) {
+            Text(label, fontSize = 10.sp, fontWeight = FontWeight.Bold)
+            Text("${"%.1f".format(value)}★", fontSize = 10.sp, fontWeight = FontWeight.ExtraBold, color = Color(0xFFFF9100))
+        }
+    }
+}
+
 // ==========================================
 // 3. STUDENT FOOD ORDERING & RATING PORTAL
 // ==========================================
@@ -1158,100 +1175,222 @@ fun StudentDashboardScreen(
                                     shape = RoundedCornerShape(16.dp),
                                     colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))
                                 ) {
-                                    Box(
-                                        modifier = Modifier
-                                            .fillMaxWidth()
-                                            .height(130.dp)
-                                    ) {
-                                        selectedVendor.pictureUrl?.let { coverUrl ->
-                                            coil.compose.AsyncImage(
-                                                model = coverUrl,
-                                                contentDescription = null,
-                                                modifier = Modifier.fillMaxSize(),
-                                                contentScale = androidx.compose.ui.layout.ContentScale.Crop
-                                            )
-                                        } ?: Box(
-                                            modifier = Modifier
-                                                .fillMaxSize()
-                                                .background(
-                                                    androidx.compose.ui.graphics.Brush.linearGradient(
-                                                        listOf(MaterialTheme.colorScheme.primary, MaterialTheme.colorScheme.secondary)
-                                                    )
-                                                )
-                                        )
-
+                                    Column {
                                         Box(
                                             modifier = Modifier
-                                                .fillMaxSize()
-                                                .background(
-                                                    androidx.compose.ui.graphics.Brush.verticalGradient(
-                                                        colors = listOf(Color.Transparent, Color.Black.copy(alpha = 0.75f)),
-                                                        startY = 100f
-                                                    )
-                                                )
-                                        )
-
-                                        Row(
-                                            modifier = Modifier
-                                                .fillMaxSize()
-                                                .padding(12.dp),
-                                            verticalAlignment = Alignment.Bottom,
-                                            horizontalArrangement = Arrangement.spacedBy(10.dp)
+                                                .fillMaxWidth()
+                                                .height(130.dp)
                                         ) {
-                                            Card(
-                                                shape = androidx.compose.foundation.shape.CircleShape,
-                                                modifier = Modifier.size(44.dp).border(2.dp, Color.White, androidx.compose.foundation.shape.CircleShape),
-                                                colors = CardDefaults.cardColors(containerColor = Color.White)
-                                            ) {
-                                                selectedVendor.logoUrl?.let { logo ->
-                                                    coil.compose.AsyncImage(
-                                                        model = logo,
-                                                        contentDescription = null,
-                                                        modifier = Modifier.fillMaxSize(),
-                                                        contentScale = androidx.compose.ui.layout.ContentScale.Crop
-                                                    )
-                                                } ?: Box(
+                                            selectedVendor.pictureUrl?.let { coverUrl ->
+                                                coil.compose.AsyncImage(
+                                                    model = coverUrl,
+                                                    contentDescription = null,
                                                     modifier = Modifier.fillMaxSize(),
-                                                    contentAlignment = Alignment.Center
-                                                ) {
-                                                    Text(
-                                                        text = selectedVendor.fullName.take(1).uppercase(),
-                                                        fontSize = 18.sp,
-                                                        fontWeight = FontWeight.Bold,
-                                                        color = MaterialTheme.colorScheme.primary
+                                                    contentScale = androidx.compose.ui.layout.ContentScale.Crop
+                                                )
+                                            } ?: Box(
+                                                modifier = Modifier
+                                                    .fillMaxSize()
+                                                    .background(
+                                                        androidx.compose.ui.graphics.Brush.linearGradient(
+                                                            listOf(MaterialTheme.colorScheme.primary, MaterialTheme.colorScheme.secondary)
+                                                        )
                                                     )
+                                            )
+
+                                            Box(
+                                                modifier = Modifier
+                                                    .fillMaxSize()
+                                                    .background(
+                                                        androidx.compose.ui.graphics.Brush.verticalGradient(
+                                                            colors = listOf(Color.Transparent, Color.Black.copy(alpha = 0.75f)),
+                                                            startY = 100f
+                                                        )
+                                                    )
+                                            )
+
+                                            Row(
+                                                modifier = Modifier
+                                                    .fillMaxSize()
+                                                    .padding(12.dp),
+                                                verticalAlignment = Alignment.Bottom,
+                                                horizontalArrangement = Arrangement.spacedBy(10.dp)
+                                            ) {
+                                                Card(
+                                                    shape = androidx.compose.foundation.shape.CircleShape,
+                                                    modifier = Modifier.size(44.dp).border(2.dp, Color.White, androidx.compose.foundation.shape.CircleShape),
+                                                    colors = CardDefaults.cardColors(containerColor = Color.White)
+                                                ) {
+                                                    selectedVendor.logoUrl?.let { logo ->
+                                                        coil.compose.AsyncImage(
+                                                            model = logo,
+                                                            contentDescription = null,
+                                                            modifier = Modifier.fillMaxSize(),
+                                                            contentScale = androidx.compose.ui.layout.ContentScale.Crop
+                                                        )
+                                                    } ?: Box(
+                                                        modifier = Modifier.fillMaxSize(),
+                                                        contentAlignment = Alignment.Center
+                                                    ) {
+                                                        Text(
+                                                            text = selectedVendor.fullName.take(1).uppercase(),
+                                                            fontSize = 18.sp,
+                                                            fontWeight = FontWeight.Bold,
+                                                            color = MaterialTheme.colorScheme.primary
+                                                        )
+                                                    }
+                                                }
+
+                                                Column {
+                                                    Text(
+                                                        text = selectedVendor.fullName,
+                                                        fontWeight = FontWeight.Bold,
+                                                        fontSize = 16.sp,
+                                                        color = Color.White
+                                                    )
+                                                    Text(
+                                                        text = selectedVendor.info.ifBlank { "Campus Vendor Booth" },
+                                                        fontSize = 11.sp,
+                                                        color = Color.White.copy(alpha = 0.85f)
+                                                    )
+                                                    val mBasic = viewModel.getVendorMetrics(selectedVendor.id, allFeedback)
+                                                    val overallBasic = mBasic["overall"] ?: 0.0
+                                                    val countBasic = allFeedback.count { it.vendorId == selectedVendor.id }
+                                                    if (overallBasic > 0.0) {
+                                                        Spacer(modifier = Modifier.height(2.dp))
+                                                        Row(
+                                                            verticalAlignment = Alignment.CenterVertically,
+                                                            horizontalArrangement = Arrangement.spacedBy(4.dp)
+                                                        ) {
+                                                            Icon(Icons.Default.Star, contentDescription = null, tint = Color(0xFFFFB300), modifier = Modifier.size(12.dp))
+                                                            Text(
+                                                                text = "${"%.1f".format(overallBasic)}/5★ ($countBasic ${if (countBasic == 1) "review" else "reviews"})",
+                                                                fontSize = 10.sp,
+                                                                fontWeight = FontWeight.Bold,
+                                                                color = Color.White
+                                                            )
+                                                        }
+                                                    }
                                                 }
                                             }
 
-                                            Column {
-                                                Text(
-                                                    text = selectedVendor.fullName,
-                                                    fontWeight = FontWeight.Bold,
-                                                    fontSize = 16.sp,
-                                                    color = Color.White
-                                                )
-                                                Text(
-                                                    text = selectedVendor.info.ifBlank { "Campus Vendor Booth" },
-                                                    fontSize = 11.sp,
-                                                    color = Color.White.copy(alpha = 0.85f)
+                                            IconButton(
+                                                onClick = { selectedVendorIdFilter = null },
+                                                modifier = Modifier
+                                                    .align(Alignment.TopEnd)
+                                                    .padding(6.dp)
+                                                    .background(Color.Black.copy(alpha = 0.5f), androidx.compose.foundation.shape.CircleShape)
+                                                    .size(28.dp)
+                                            ) {
+                                                Icon(
+                                                    imageVector = Icons.Default.Close,
+                                                    contentDescription = "Clear Vendor Filter",
+                                                    tint = Color.White,
+                                                    modifier = Modifier.size(16.dp)
                                                 )
                                             }
                                         }
 
-                                        IconButton(
-                                            onClick = { selectedVendorIdFilter = null },
-                                            modifier = Modifier
-                                                .align(Alignment.TopEnd)
-                                                .padding(6.dp)
-                                                .background(Color.Black.copy(alpha = 0.5f), androidx.compose.foundation.shape.CircleShape)
-                                                .size(28.dp)
-                                        ) {
-                                            Icon(
-                                                imageVector = Icons.Default.Close,
-                                                contentDescription = "Clear Vendor Filter",
-                                                tint = Color.White,
-                                                modifier = Modifier.size(16.dp)
-                                            )
+                                        // Detailed rating breakdown & Written reviews
+                                        val m = viewModel.getVendorMetrics(selectedVendor.id, allFeedback)
+                                        val count = allFeedback.count { it.vendorId == selectedVendor.id }
+                                        if (count > 0) {
+                                            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
+                                            Column(modifier = Modifier.padding(12.dp)) {
+                                                Text(
+                                                    text = "Vendor Rating Breakdown",
+                                                    style = MaterialTheme.typography.labelMedium,
+                                                    fontWeight = FontWeight.Bold,
+                                                    color = MaterialTheme.colorScheme.primary,
+                                                    modifier = Modifier.padding(bottom = 6.dp)
+                                                )
+
+                                                Row(
+                                                    modifier = Modifier.fillMaxWidth(),
+                                                    horizontalArrangement = Arrangement.SpaceBetween
+                                                ) {
+                                                    RatingMetricBadge(label = "🍔 Taste", value = m["foodQuality"] ?: 0.0)
+                                                    RatingMetricBadge(label = "🫧 Hygiene", value = m["cleanliness"] ?: 0.0)
+                                                    RatingMetricBadge(label = "⚡ Speed", value = m["speed"] ?: 0.0)
+                                                    RatingMetricBadge(label = "💰 Value", value = m["priceValue"] ?: 0.0)
+                                                }
+
+                                                Spacer(modifier = Modifier.height(10.dp))
+
+                                                var showReviewsList by remember(selectedVendor.id) { mutableStateOf(false) }
+                                                Row(
+                                                    modifier = Modifier
+                                                        .fillMaxWidth()
+                                                        .clickable { showReviewsList = !showReviewsList }
+                                                        .padding(vertical = 4.dp),
+                                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                                    verticalAlignment = Alignment.CenterVertically
+                                                ) {
+                                                    Text(
+                                                        text = "💬 Read Customer Reviews ($count)",
+                                                        fontSize = 11.sp,
+                                                        fontWeight = FontWeight.Bold,
+                                                        color = MaterialTheme.colorScheme.secondary
+                                                    )
+                                                    Icon(
+                                                        imageVector = if (showReviewsList) Icons.Default.KeyboardArrowUp else Icons.Default.KeyboardArrowDown,
+                                                        contentDescription = null,
+                                                        tint = MaterialTheme.colorScheme.secondary,
+                                                        modifier = Modifier.size(16.dp)
+                                                    )
+                                                }
+
+                                                if (showReviewsList) {
+                                                    val feedbacksForThisVendor = allFeedback.filter { it.vendorId == selectedVendor.id }
+                                                    Column(
+                                                        verticalArrangement = Arrangement.spacedBy(6.dp),
+                                                        modifier = Modifier.padding(top = 6.dp)
+                                                    ) {
+                                                        feedbacksForThisVendor.sortedByDescending { it.timestamp }.take(4).forEach { f ->
+                                                            Card(
+                                                                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.5f)),
+                                                                shape = RoundedCornerShape(8.dp),
+                                                                modifier = Modifier.fillMaxWidth()
+                                                            ) {
+                                                                Column(modifier = Modifier.padding(8.dp)) {
+                                                                    Row(
+                                                                        horizontalArrangement = Arrangement.SpaceBetween,
+                                                                        verticalAlignment = Alignment.CenterVertically,
+                                                                        modifier = Modifier.fillMaxWidth()
+                                                                    ) {
+                                                                        val avgF = (f.ratingFoodQuality + f.ratingCleanliness + f.ratingServiceSpeed + f.ratingPriceValue) / 4.0
+                                                                        Row(
+                                                                            verticalAlignment = Alignment.CenterVertically,
+                                                                            horizontalArrangement = Arrangement.spacedBy(2.dp)
+                                                                        ) {
+                                                                            repeat(5) { starIdx ->
+                                                                                Icon(
+                                                                                    imageVector = Icons.Default.Star,
+                                                                                    contentDescription = null,
+                                                                                    tint = if (starIdx < avgF.toInt()) Color(0xFFFFB300) else MaterialTheme.colorScheme.outlineVariant,
+                                                                                    modifier = Modifier.size(10.dp)
+                                                                                )
+                                                                            }
+                                                                            Spacer(modifier = Modifier.width(4.dp))
+                                                                            Text("${"%.1f".format(avgF)}★", fontSize = 10.sp, fontWeight = FontWeight.Bold)
+                                                                        }
+                                                                        val dateStr = java.text.SimpleDateFormat("MMM dd, yyyy", java.util.Locale.US).format(java.util.Date(f.timestamp))
+                                                                        Text(dateStr, fontSize = 9.sp, color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f))
+                                                                    }
+                                                                    if (f.comment.isNotBlank()) {
+                                                                        Spacer(modifier = Modifier.height(4.dp))
+                                                                        Text(
+                                                                            text = f.comment,
+                                                                            fontSize = 11.sp,
+                                                                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                                                                        )
+                                                                    }
+                                                                }
+                                                            }
+                                                        }
+                                                    }
+                                                }
+                                            }
                                         }
                                     }
                                 }
@@ -2342,7 +2481,7 @@ fun StudentDashboardScreen(
                                                                     ) {
                                                                         Icon(Icons.Default.Star, contentDescription = null, modifier = Modifier.size(12.dp))
                                                                         Spacer(modifier = Modifier.width(6.dp))
-                                                                        Text("Log Safety Review", fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                                                                        Text("Rate & Review Vendor", fontSize = 11.sp, fontWeight = FontWeight.Bold)
                                                                     }
                                                                 } else {
                                                                     val avgRating = (orderFeedback.ratingFoodQuality + orderFeedback.ratingCleanliness + orderFeedback.ratingServiceSpeed + orderFeedback.ratingPriceValue) / 4.0
@@ -3486,6 +3625,218 @@ fun StudentDashboardScreen(
                             }
                         }
 
+                        // 2.3 Laravel Notification Channels & Dispatcher History
+                        item {
+                            val emailEnabled by viewModel.isEmailNotificationEnabled.collectAsStateWithLifecycle()
+                            val pushEnabled by viewModel.isPushNotificationEnabled.collectAsStateWithLifecycle()
+                            val dispatchedEmails by viewModel.dispatchedEmails.collectAsStateWithLifecycle()
+                            val dispatchedPushes by viewModel.dispatchedPushNotifications.collectAsStateWithLifecycle()
+                            var isLogHistoryExpanded by remember { mutableStateOf(false) }
+
+                            Card(
+                                modifier = Modifier.fillMaxWidth().testTag("laravel_notifications_card"),
+                                shape = RoundedCornerShape(12.dp),
+                                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
+                            ) {
+                                Column(modifier = Modifier.padding(16.dp)) {
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        horizontalArrangement = Arrangement.SpaceBetween,
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        Text(
+                                            "Laravel Notification Channels",
+                                            fontWeight = FontWeight.Bold,
+                                            style = MaterialTheme.typography.titleMedium,
+                                            color = MaterialTheme.colorScheme.primary
+                                        )
+                                        Box(
+                                            modifier = Modifier
+                                                .background(
+                                                    if (LaravelClientManager.isLaravelEnabled) Color(0xFF2E7D32).copy(alpha = 0.15f)
+                                                    else MaterialTheme.colorScheme.secondaryContainer,
+                                                    RoundedCornerShape(6.dp)
+                                                )
+                                                .padding(horizontal = 6.dp, vertical = 2.dp)
+                                        ) {
+                                            Text(
+                                                text = if (LaravelClientManager.isLaravelEnabled) "Laravel Active" else "Offline Simulation",
+                                                fontSize = 9.sp,
+                                                fontWeight = FontWeight.Bold,
+                                                color = if (LaravelClientManager.isLaravelEnabled) Color(0xFF2E7D32) else MaterialTheme.colorScheme.onSecondaryContainer
+                                            )
+                                        }
+                                    }
+                                    Spacer(modifier = Modifier.height(6.dp))
+                                    Text(
+                                        "Manage SMTP Email and FMC Push alert dispatches triggered by Laravel in response to order status changes from pending to ready.",
+                                        fontSize = 11.sp,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+
+                                    Spacer(modifier = Modifier.height(14.dp))
+
+                                    // Channel 1: SMTP Email Channel
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        horizontalArrangement = Arrangement.SpaceBetween,
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        Row(
+                                            modifier = Modifier.weight(1f),
+                                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                            verticalAlignment = Alignment.Top
+                                        ) {
+                                            Text("📧", fontSize = 18.sp)
+                                            Column {
+                                                Text("Laravel SMTP Mail Notification", fontWeight = FontWeight.SemiBold, fontSize = 12.sp)
+                                                Text("Dispatches high-fidelity emails to user inbox when chef completes meal preparation.", fontSize = 10.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                            }
+                                        }
+                                        Switch(
+                                            checked = emailEnabled,
+                                            onCheckedChange = { viewModel.isEmailNotificationEnabled.value = it }
+                                        )
+                                    }
+
+                                    Spacer(modifier = Modifier.height(12.dp))
+
+                                    // Channel 2: FCM Push Channel
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        horizontalArrangement = Arrangement.SpaceBetween,
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        Row(
+                                            modifier = Modifier.weight(1f),
+                                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                            verticalAlignment = Alignment.Top
+                                        ) {
+                                            Text("📱", fontSize = 18.sp)
+                                            Column {
+                                                Text("Laravel FCM Push Notification", fontWeight = FontWeight.SemiBold, fontSize = 12.sp)
+                                                Text("Broadcasts immediate high-priority push events to registered client devices.", fontSize = 10.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                            }
+                                        }
+                                        Switch(
+                                            checked = pushEnabled,
+                                            onCheckedChange = { viewModel.isPushNotificationEnabled.value = it }
+                                        )
+                                    }
+
+                                    val totalLogsCount = dispatchedEmails.size + dispatchedPushes.size
+                                    if (totalLogsCount > 0) {
+                                        Spacer(modifier = Modifier.height(14.dp))
+                                        HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
+                                        Spacer(modifier = Modifier.height(10.dp))
+
+                                        Row(
+                                            modifier = Modifier
+                                                .fillMaxWidth()
+                                                .clickable { isLogHistoryExpanded = !isLogHistoryExpanded }
+                                                .padding(vertical = 4.dp),
+                                            horizontalArrangement = Arrangement.SpaceBetween,
+                                            verticalAlignment = Alignment.CenterVertically
+                                        ) {
+                                            Text(
+                                                "📜 Dispatched Channel Outbox ($totalLogsCount)",
+                                                fontWeight = FontWeight.Bold,
+                                                fontSize = 11.sp,
+                                                color = MaterialTheme.colorScheme.secondary
+                                            )
+                                            Icon(
+                                                imageVector = if (isLogHistoryExpanded) Icons.Default.KeyboardArrowUp else Icons.Default.KeyboardArrowDown,
+                                                contentDescription = null,
+                                                tint = MaterialTheme.colorScheme.secondary,
+                                                modifier = Modifier.size(16.dp)
+                                            )
+                                        }
+
+                                        if (isLogHistoryExpanded) {
+                                            Column(
+                                                modifier = Modifier.padding(top = 8.dp),
+                                                verticalArrangement = Arrangement.spacedBy(8.dp)
+                                            ) {
+                                                // Combine logs and sort chronologically latest first
+                                                val emailLogs = dispatchedEmails.map { it to "EMAIL" }
+                                                val pushLogs = dispatchedPushes.map { it to "PUSH" }
+                                                val combined = (emailLogs + pushLogs).sortedByDescending {
+                                                    if (it.second == "EMAIL") (it.first as com.example.ui.viewmodel.MockEmailNotification).timestamp
+                                                    else (it.first as com.example.ui.viewmodel.MockPushNotification).timestamp
+                                                }
+
+                                                combined.forEach { record ->
+                                                    if (record.second == "EMAIL") {
+                                                        val email = record.first as com.example.ui.viewmodel.MockEmailNotification
+                                                        Card(
+                                                            colors = CardDefaults.cardColors(containerColor = Color(0xFFFFF9C4).copy(alpha = 0.4f)),
+                                                            border = BorderStroke(1.dp, Color(0xFFFBC02D).copy(alpha = 0.7f)),
+                                                            shape = RoundedCornerShape(8.dp),
+                                                            modifier = Modifier.fillMaxWidth()
+                                                        ) {
+                                                            Column(modifier = Modifier.padding(10.dp)) {
+                                                                Row(
+                                                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                                                    modifier = Modifier.fillMaxWidth()
+                                                                ) {
+                                                                    Text("📧 SMTP EMAIL DISPATCHED", fontWeight = FontWeight.Bold, fontSize = 9.sp, color = Color(0xFFF57F17))
+                                                                    Text(
+                                                                        java.text.SimpleDateFormat("hh:mm:ss a", java.util.Locale.US).format(java.util.Date(email.timestamp)),
+                                                                        fontSize = 8.sp,
+                                                                        color = Color.Gray
+                                                                    )
+                                                                }
+                                                                Spacer(modifier = Modifier.height(4.dp))
+                                                                Text("To: ${email.studentEmail}", fontWeight = FontWeight.Bold, fontSize = 10.sp)
+                                                                Text("Subject: ${email.subject}", fontWeight = FontWeight.SemiBold, fontSize = 10.sp)
+                                                                Spacer(modifier = Modifier.height(4.dp))
+                                                                Text(
+                                                                    email.body,
+                                                                    fontSize = 9.sp,
+                                                                    color = Color.DarkGray,
+                                                                    lineHeight = 11.sp
+                                                                )
+                                                            }
+                                                        }
+                                                    } else {
+                                                        val push = record.first as com.example.ui.viewmodel.MockPushNotification
+                                                        Card(
+                                                            colors = CardDefaults.cardColors(containerColor = Color(0xFFE3F2FD).copy(alpha = 0.4f)),
+                                                            border = BorderStroke(1.dp, Color(0xFF1E88E5).copy(alpha = 0.7f)),
+                                                            shape = RoundedCornerShape(8.dp),
+                                                            modifier = Modifier.fillMaxWidth()
+                                                        ) {
+                                                            Column(modifier = Modifier.padding(10.dp)) {
+                                                                Row(
+                                                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                                                    modifier = Modifier.fillMaxWidth()
+                                                                ) {
+                                                                    Text("📱 FCM PUSH SENT", fontWeight = FontWeight.Bold, fontSize = 9.sp, color = Color(0xFF1565C0))
+                                                                    Text(
+                                                                        java.text.SimpleDateFormat("hh:mm:ss a", java.util.Locale.US).format(java.util.Date(push.timestamp)),
+                                                                        fontSize = 8.sp,
+                                                                        color = Color.Gray
+                                                                    )
+                                                                }
+                                                                Spacer(modifier = Modifier.height(4.dp))
+                                                                Text("Title: ${push.title}", fontWeight = FontWeight.Bold, fontSize = 10.sp)
+                                                                Text(
+                                                                    push.body,
+                                                                    fontSize = 9.sp,
+                                                                    color = Color.DarkGray
+                                                                )
+                                                            }
+                                                        }
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+
                         // 3. Security logs / helpdesk inquiry ticket
                         item {
                             Card(
@@ -4473,12 +4824,12 @@ fun StudentDashboardScreen(
                     ) {
                         Column(modifier = Modifier.padding(24.dp)) {
                             Text(
-                                "Vendor Performance Feed",
+                                "Rate & Review Vendor",
                                 fontWeight = FontWeight.Bold,
                                 style = MaterialTheme.typography.titleMedium,
                                 color = MaterialTheme.colorScheme.primary
                             )
-                            Text("Rate '${order.foodName}' vendor quality, healthiness & speeds:", fontSize = 11.sp)
+                            Text("Rate '${order.foodName}' vendor and share your experience:", fontSize = 11.sp)
                             Spacer(modifier = Modifier.height(16.dp))
 
                             // 1. Food Quality Slider
@@ -4604,11 +4955,15 @@ fun StudentDashboardScreen(
                                                 foodItemRating = 5
                                                 foodItemComment = ""
                                                 feedbackComment = ""
+                                                foodQualityRating = 5
+                                                cleanlinessRating = 5
+                                                speedRating = 5
+                                                priceRating = 5
                                             }
                                         }
                                     }
                                 ) {
-                                    Text("Inject Data Metric")
+                                    Text("Submit Rating & Review")
                                 }
                             }
                         }

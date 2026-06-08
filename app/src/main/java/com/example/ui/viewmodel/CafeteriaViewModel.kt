@@ -10,6 +10,25 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.delay
 import android.util.Log
 
+data class MockEmailNotification(
+    val id: String,
+    val orderId: Int,
+    val studentEmail: String,
+    val vendorName: String,
+    val itemName: String,
+    val subject: String,
+    val body: String,
+    val timestamp: Long = System.currentTimeMillis()
+)
+
+data class MockPushNotification(
+    val id: String,
+    val orderId: Int,
+    val title: String,
+    val body: String,
+    val timestamp: Long = System.currentTimeMillis()
+)
+
 class CafeteriaViewModel(application: Application) : AndroidViewModel(application) {
 
     private val db = AppDatabase.getDatabase(application)
@@ -176,6 +195,18 @@ class CafeteriaViewModel(application: Application) : AndroidViewModel(applicatio
     private val _activeStudentAlerts = MutableStateFlow<List<com.example.data.LaravelDatabaseNotification>>(emptyList())
     val activeStudentAlerts: StateFlow<List<com.example.data.LaravelDatabaseNotification>> = _activeStudentAlerts.asStateFlow()
 
+    // Laravel SMTP Mail & FCM Push Channels Prefs & Logs
+    val isEmailNotificationEnabled = MutableStateFlow(true)
+    val isPushNotificationEnabled = MutableStateFlow(true)
+
+    private val _dispatchedEmails = MutableStateFlow<List<MockEmailNotification>>(emptyList())
+    val dispatchedEmails: StateFlow<List<MockEmailNotification>> = _dispatchedEmails.asStateFlow()
+
+    private val _dispatchedPushNotifications = MutableStateFlow<List<MockPushNotification>>(emptyList())
+    val dispatchedPushNotifications: StateFlow<List<MockPushNotification>> = _dispatchedPushNotifications.asStateFlow()
+
+    private val localSeenReadyOrderIds = java.util.Collections.synchronizedSet(mutableSetOf<Int>())
+
     private val seenNotificationIds = java.util.Collections.synchronizedSet(mutableSetOf<String>())
     private var isFirstNotificationLoad = true
 
@@ -211,6 +242,74 @@ class CafeteriaViewModel(application: Application) : AndroidViewModel(applicatio
                 val activeUser = _currentUser.value
                 if (activeUser != null && activeUser.role == "VENDOR" && event.vendorId == activeUser.id) {
                     processIncomingWebSocketOrder(event)
+                }
+            }
+        }
+
+        // Live observe customer orders to trigger Laravel push / email notifications on PENDING/PREPARING -> READY transitions
+        viewModelScope.launch {
+            var isFirstCollection = true
+            customerOrders.collect { currentOrders ->
+                if (currentOrders.isEmpty()) return@collect
+                
+                if (isFirstCollection) {
+                    currentOrders.forEach { order ->
+                        if (order.status.uppercase() == "READY") {
+                            localSeenReadyOrderIds.add(order.id)
+                        }
+                    }
+                    isFirstCollection = false
+                } else {
+                    currentOrders.forEach { order ->
+                        if (order.status.uppercase() == "READY" && !localSeenReadyOrderIds.contains(order.id)) {
+                            localSeenReadyOrderIds.add(order.id)
+                            
+                            val user = _currentUser.value
+                            val studentEmail = if (user?.username?.contains("@") == true) user.username else "${user?.username ?: "student"}@atu.edu.gh"
+                            val itemName = order.foodName
+                            val vendorName = allUsers.value.find { it.id == order.vendorId }?.fullName ?: "Vendor #${order.vendorId}"
+                            val pPin = order.pickupPin
+                            val pPrice = order.totalPrice
+                            
+                            // Send simulated Email Notification (Laravel Mail Channel)
+                            if (isEmailNotificationEnabled.value) {
+                                val subject = "📧 [SMTP Laravel Mailer] Order #${order.id} is Ready!"
+                                val body = """
+                                    Hello ${user?.fullName ?: "Student"},
+                                    
+                                    Your order #${order.id} for "$itemName" from $vendorName has successfully compiled on the system floor and is officially ready for pickup!
+                                    
+                                    Pick-up Verification Pin: $pPin
+                                    Total Transaction Amount: GH₵ ${"%.2f".format(pPrice)}
+                                    
+                                    Warm regards,
+                                    Accra Technical University Food Court System.
+                                """.trimIndent()
+                                
+                                val emailNotif = MockEmailNotification(
+                                    id = java.util.UUID.randomUUID().toString(),
+                                    orderId = order.id,
+                                    studentEmail = studentEmail,
+                                    vendorName = vendorName,
+                                    itemName = itemName,
+                                    subject = subject,
+                                    body = body
+                                )
+                                _dispatchedEmails.value = _dispatchedEmails.value + emailNotif
+                            }
+                            
+                            // Send simulated Push Notification (Laravel FCM Push Channel)
+                            if (isPushNotificationEnabled.value) {
+                                val pushNotif = MockPushNotification(
+                                    id = java.util.UUID.randomUUID().toString(),
+                                    orderId = order.id,
+                                    title = "📱 [Laravel FCM] Order Ready for Pickup!",
+                                    body = "Your food '$itemName' from $vendorName is hot & ready! Use Ticket Pin: $pPin."
+                                )
+                                _dispatchedPushNotifications.value = _dispatchedPushNotifications.value + pushNotif
+                            }
+                        }
+                    }
                 }
             }
         }
