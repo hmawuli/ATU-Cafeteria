@@ -18,6 +18,7 @@ return new class extends Migration
             $table->unsignedBigInteger('user_id')->nullable(); // Standardised user_id for enterprise orders
             $table->unsignedBigInteger('vendor_id');
             $table->unsignedBigInteger('food_item_id')->nullable(); // Nullable to support advanced multi-item packages
+            $table->unsignedBigInteger('menu_item_id')->nullable(); // Link to standard MenuItems
             $table->string('food_name')->nullable();
             $table->integer('quantity')->nullable();
             $table->decimal('unit_price', 10, 2)->nullable();
@@ -32,6 +33,7 @@ return new class extends Migration
             $table->foreign('student_id')->references('id')->on('users')->onDelete('cascade');
             $table->foreign('user_id')->references('id')->on('users')->onDelete('cascade');
             $table->foreign('vendor_id')->references('id')->on('users')->onDelete('cascade');
+            $table->foreign('menu_item_id')->references('id')->on('menu_items')->onDelete('cascade');
         });
     }
 

@@ -12,6 +12,6 @@ val AtuSurface = Color(0xFFFFFFFF)
 // Dark Color Scheme
 val AtuDarkNavy = Color(0xFF2C5282)
 val AtuDarkAmber = Color(0xFFFFB000)
-val AtuDarkBg = Color(0xFF0F172A) // Sleek Slate Pitch Dark
-val AtuDarkSurface = Color(0xFF1E293B) // Dark Carbon Surface
+val AtuDarkBg = Color(0xFFFAF9F6) // Warm Off-White
+val AtuDarkSurface = Color(0xFFFFFFFF) // Crisp White Surface
 

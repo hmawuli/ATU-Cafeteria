@@ -20,8 +20,8 @@ private val DarkColorScheme =
     surface = AtuDarkSurface,
     onPrimary = Color.White,
     onSecondary = Color.Black,
-    onBackground = Color(0xFFF1F5F9),
-    onSurface = Color(0xFFF1F5F9)
+    onBackground = Color(0xFF1E293B),
+    onSurface = Color(0xFF1E293B)
   )
 
 private val LightColorScheme =
@@ -41,7 +41,7 @@ private val LightColorScheme =
 fun MyApplicationTheme(
   darkTheme: Boolean = isSystemInDarkTheme(),
   // Dynamic color is available on Android 12+
-  dynamicColor: Boolean = true,
+  dynamicColor: Boolean = false,
   content: @Composable () -> Unit,
 ) {
   val colorScheme =

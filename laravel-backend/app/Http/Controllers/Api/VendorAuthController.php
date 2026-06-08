@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Models\User;
 use App\Models\AuditLog;
+use App\Services\JwtService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Facades\DB;
@@ -61,8 +62,8 @@ class VendorAuthController extends Controller
             return $createdUser;
         });
 
-        // Generate Sanctum access token
-        $token = $user->createToken('vendor-token')->plainTextToken;
+        // Generate JWT access token
+        $token = JwtService::generateToken($user);
         $response = $user->toArray();
         $response['token'] = $token;
 
@@ -110,8 +111,8 @@ class VendorAuthController extends Controller
                 'details' => "Vendor {$user->fullName} logged in successfully via Sanctum.",
             ]);
 
-            // Secure token issue
-            $token = $user->createToken('vendor-token')->plainTextToken;
+            // Secure JWT token issue
+            $token = JwtService::generateToken($user);
             $responseData = $user->toArray();
             $responseData['token'] = $token;
 

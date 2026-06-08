@@ -172,6 +172,11 @@ class VendorPerformanceController extends Controller
                 ? round(($totalCompletionTimeSeconds / $completedCount) / 60, 1)
                 : 0.0;
 
+            $totalOrdersCount = Order::where('vendor_id', $vendor->id)->count();
+            $fulfillmentRate = $totalOrdersCount > 0 
+                ? round(($completedCount / $totalOrdersCount) * 100, 1) 
+                : 100.0;
+
             // Check if they are in the new vendors table to pull extra operational status / contact info if joined
             $vendorMeta = \App\Models\Vendor::where('name', $vendor->fullName)
                 ->orWhere('id', $vendor->id)
@@ -183,9 +188,13 @@ class VendorPerformanceController extends Controller
                 'contact_info' => $vendorMeta ? $vendorMeta->contact_info : ($vendor->info ?? 'N/A'),
                 'operational_status' => $vendorMeta ? $vendorMeta->operational_status : 'active',
                 'total_completed_orders' => $completedCount,
+                'total_orders' => $totalOrdersCount,
                 'total_sales' => round($totalSales, 2),
                 'avg_completion_time_minutes' => $avgCompletionTimeMinutes,
-                'avg_completion_time_display' => $avgCompletionTimeMinutes > 0 ? "{$avgCompletionTimeMinutes} mins" : "N/A"
+                'avg_completion_time_display' => $avgCompletionTimeMinutes > 0 ? "{$avgCompletionTimeMinutes} mins" : "N/A",
+                'average_delivery_time' => $avgCompletionTimeMinutes,
+                'average_delivery_time_display' => $avgCompletionTimeMinutes > 0 ? "{$avgCompletionTimeMinutes} mins" : "N/A",
+                'order_fulfillment_rate' => $fulfillmentRate
             ];
         }
 
@@ -208,9 +217,13 @@ class VendorPerformanceController extends Controller
                     'contact_info' => $dbVendor->contact_info ?? 'N/A',
                     'operational_status' => $dbVendor->operational_status ?? 'active',
                     'total_completed_orders' => 0,
+                    'total_orders' => 0,
                     'total_sales' => 0.0,
                     'avg_completion_time_minutes' => 0.0,
-                    'avg_completion_time_display' => 'N/A'
+                    'avg_completion_time_display' => 'N/A',
+                    'average_delivery_time' => 0.0,
+                    'average_delivery_time_display' => 'N/A',
+                    'order_fulfillment_rate' => 100.0
                 ];
             }
         }

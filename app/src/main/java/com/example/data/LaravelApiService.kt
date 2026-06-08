@@ -198,6 +198,30 @@ data class LaravelPerformanceResponse(
 )
 
 @JsonClass(generateAdapter = true)
+data class LaravelVendorMetric(
+    val vendor_id: Int,
+    val vendor_name: String,
+    val contact_info: String,
+    val operational_status: String,
+    val total_completed_orders: Int,
+    val total_orders: Int,
+    val total_sales: Double,
+    val avg_completion_time_minutes: Double,
+    val avg_completion_time_display: String,
+    val average_delivery_time: Double,
+    val average_delivery_time_display: String,
+    val order_fulfillment_rate: Double
+)
+
+@JsonClass(generateAdapter = true)
+data class LaravelVendorPerformanceMetricsResponse(
+    val success: Boolean,
+    val message: String,
+    val performance: List<LaravelVendorMetric>,
+    val generated_at: String
+)
+
+@JsonClass(generateAdapter = true)
 data class LaravelNotificationData(
     val order_id: Int,
     val vendor_id: Int,
@@ -224,6 +248,93 @@ data class LaravelDatabaseNotification(
 data class LaravelNotificationsResponse(
     val success: Boolean,
     val notifications: List<LaravelDatabaseNotification>
+)
+
+// ==========================================
+// CHAT SUBSYSTEM MODELS
+// ==========================================
+
+@JsonClass(generateAdapter = true)
+data class LaravelChatMessage(
+    val id: Int,
+    val sender_id: Int,
+    val receiver_id: Int,
+    val message: String,
+    val is_read: Boolean,
+    val created_at: String?,
+    val updated_at: String?
+)
+
+@JsonClass(generateAdapter = true)
+data class LaravelSendChatRequest(
+    val receiver_id: Int,
+    val message: String
+)
+
+@JsonClass(generateAdapter = true)
+data class LaravelRecentChatPartner(
+    val id: Int,
+    val username: String,
+    val fullName: String,
+    val role: String,
+    val info: String?,
+    val last_message: String?,
+    val last_message_time: String?,
+    val unread_count: Int
+)
+
+@JsonClass(generateAdapter = true)
+data class LaravelRecentChatsResponse(
+    val success: Boolean,
+    val chats: List<LaravelRecentChatPartner>
+)
+
+@JsonClass(generateAdapter = true)
+data class LaravelConversationResponse(
+    val success: Boolean,
+    val messages: List<LaravelChatMessage>
+)
+
+@JsonClass(generateAdapter = true)
+data class LaravelSendChatResponse(
+    val success: Boolean,
+    val message: String,
+    val chat_message: LaravelChatMessage
+)
+
+// ==========================================
+// PAYSTACK SUBSYSTEM MODELS
+// ==========================================
+
+@JsonClass(generateAdapter = true)
+data class LaravelPaystackInitRequest(
+    val email: String,
+    val amount: Double,
+    val purpose: String // "WALLET_TOPUP", "DIRECT_ORDER_PAY"
+)
+
+@JsonClass(generateAdapter = true)
+data class LaravelPaystackInitDetails(
+    val authorization_url: String,
+    val access_code: String,
+    val reference: String,
+    val amount: Double
+)
+
+@JsonClass(generateAdapter = true)
+data class LaravelPaystackInitResponse(
+    val success: Boolean,
+    val message: String,
+    val data: LaravelPaystackInitDetails
+)
+
+@JsonClass(generateAdapter = true)
+data class LaravelPaystackVerifyResponse(
+    val success: Boolean,
+    val message: String,
+    val reference: String,
+    val amount: Double,
+    val purpose: String
 )
 
 // ==========================================
@@ -310,11 +421,31 @@ interface LaravelApiService {
         @Query("end_date") endDate: String? = null
     ): LaravelPerformanceResponse
 
+    @GET("api/vendor/performance-metrics")
+    suspend fun getVendorPerformanceMetrics(): LaravelVendorPerformanceMetricsResponse
+
     @GET("api/notifications")
     suspend fun getDatabaseNotifications(): LaravelNotificationsResponse
 
     @POST("api/notifications/mark-read")
     suspend fun markAllNotificationsAsRead(): LaravelGeneralResponse
+
+    // Chat API Methods
+    @GET("api/chats/recent")
+    suspend fun getRecentChats(): LaravelRecentChatsResponse
+
+    @GET("api/chats/conversation/{otherUserId}")
+    suspend fun getConversation(@Path("otherUserId") otherUserId: Int): LaravelConversationResponse
+
+    @POST("api/chats/send")
+    suspend fun sendChatMessage(@Body request: LaravelSendChatRequest): LaravelSendChatResponse
+
+    // Paystack API Methods
+    @POST("api/paystack/initialize")
+    suspend fun initializePaystack(@Body request: LaravelPaystackInitRequest): LaravelPaystackInitResponse
+
+    @GET("api/paystack/verify/{reference}")
+    suspend fun verifyPaystack(@Path("reference") reference: String, @Query("amount") amount: Double, @Query("purpose") purpose: String): LaravelPaystackVerifyResponse
 }
 
 // ==========================================

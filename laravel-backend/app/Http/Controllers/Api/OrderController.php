@@ -160,18 +160,31 @@ class OrderController extends Controller
             'customer_id' => 'required|integer|exists:users,id',
             'student_id' => 'required|integer|exists:users,id',
             'vendor_id' => 'required|integer|exists:users,id',
-            'food_item_id' => 'required|integer',
-            'food_name' => 'required|string',
-            'quantity' => 'required|integer|min:1',
-            'unit_price' => 'required|numeric',
-            'total_price' => 'required|numeric',
+            'food_item_id' => 'nullable|integer',
+            'menu_item_id' => 'nullable|integer|exists:menu_items,id',
+            'food_name' => 'required|string|min:2',
+            'quantity' => 'required|integer|min:1|max:100',
+            'unit_price' => 'required|numeric|min:0.01',
+            'total_price' => 'required|numeric|min:0.01',
         ]);
 
         if ($validator->fails()) {
             return response()->json([
                 'success' => false,
-                'message' => 'Input parameters invalid.',
+                'message' => 'Input parameters invalid or missing.',
                 'errors' => $validator->errors()
+            ], 400);
+        }
+
+        // Additional business logic validation: Verify that unit_price * quantity yields total_price reasonably
+        $expectedTotalPrice = round($request->input('unit_price') * $request->input('quantity'), 2);
+        $totalPriceInput = round($request->input('total_price'), 2);
+        if (abs($expectedTotalPrice - $totalPriceInput) > 0.1) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Validation error: total_price does not match quantity multiplied by unit_price.',
+                'expected' => $expectedTotalPrice,
+                'received' => $totalPriceInput
             ], 400);
         }
 
@@ -182,8 +195,10 @@ class OrderController extends Controller
             $createdOrder = Order::create([
                 'customer_id' => $request->input('customer_id'),
                 'student_id' => $request->input('student_id'),
+                'user_id' => $request->input('customer_id'),
                 'vendor_id' => $request->input('vendor_id'),
                 'food_item_id' => $request->input('food_item_id'),
+                'menu_item_id' => $request->input('menu_item_id'),
                 'food_name' => $request->input('food_name'),
                 'quantity' => $request->input('quantity'),
                 'unit_price' => $request->input('unit_price'),
@@ -433,5 +448,155 @@ class OrderController extends Controller
             'success' => false,
             'message' => 'Verification PIN mismatch. Access Denied.'
         ], 401);
+    }
+
+    /**
+     * Get orders placed by the currently authenticated student.
+     */
+    public function getAuthenticatedStudentOrders(Request $request)
+    {
+        $user = $request->user();
+        if (!$user) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Unauthenticated.'
+            ], 401);
+        }
+
+        $orders = Order::where('customer_id', $user->id)
+            ->orWhere('student_id', $user->id)
+            ->orWhere('user_id', $user->id)
+            ->orderBy('order_timestamp', 'desc')
+            ->get();
+
+        return response()->json([
+            'success' => true,
+            'orders' => $orders
+        ], 200);
+    }
+
+    /**
+     * Place a new secure order for the currently authenticated student.
+     */
+    public function storeAuthenticatedStudentOrder(Request $request)
+    {
+        $user = $request->user();
+        if (!$user) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Unauthenticated.'
+            ], 401);
+        }
+
+        $validator = Validator::make($request->all(), [
+            'vendor_id' => 'required|integer|exists:users,id',
+            'food_item_id' => 'nullable|integer',
+            'menu_item_id' => 'nullable|integer|exists:menu_items,id',
+            'food_name' => 'required|string|min:2',
+            'quantity' => 'required|integer|min:1|max:100',
+            'unit_price' => 'required|numeric|min:0.01',
+            'total_price' => 'required|numeric|min:0.01',
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Validation failed.',
+                'errors' => $validator->errors()
+            ], 400);
+        }
+
+        $expectedTotalPrice = round($request->input('unit_price') * $request->input('quantity'), 2);
+        $totalPriceInput = round($request->input('total_price'), 2);
+        if (abs($expectedTotalPrice - $totalPriceInput) > 0.1) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Validation error: total_price does not match quantity multiplied by unit_price.',
+                'expected' => $expectedTotalPrice,
+                'received' => $totalPriceInput
+            ], 400);
+        }
+
+        // Verify balance
+        if ($user->balance < $totalPriceInput) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Insufficient wallet balance. Please top up your wallet first.'
+            ], 400);
+        }
+
+        // Generate a random secure 4-digit pickup PIN
+        $securePin = (string) rand(1000, 9999);
+
+        try {
+            $order = DB::transaction(function () use ($request, $user, $securePin, $totalPriceInput) {
+                // Deduct balance from user
+                $user->balance = $user->balance - $totalPriceInput;
+                $user->save();
+
+                // Create Order
+                $createdOrder = Order::create([
+                    'customer_id' => $user->id,
+                    'student_id' => $user->id,
+                    'user_id' => $user->id,
+                    'vendor_id' => $request->input('vendor_id'),
+                    'food_item_id' => $request->input('food_item_id'),
+                    'menu_item_id' => $request->input('menu_item_id'),
+                    'food_name' => $request->input('food_name'),
+                    'quantity' => $request->input('quantity'),
+                    'unit_price' => $request->input('unit_price'),
+                    'total_price' => $request->input('total_price'),
+                    'order_timestamp' => time() * 1000,
+                    'status' => 'PENDING',
+                    'pickup_pin' => $securePin,
+                    'estimated_pickup_time' => 'Calculating...',
+                ]);
+
+                // Create Wallet Transaction
+                \App\Models\WalletTransaction::create([
+                    'user_id' => $user->id,
+                    'type' => 'PAYMENT',
+                    'amount' => -$totalPriceInput,
+                    'status' => 'SUCCESS',
+                    'reference' => 'TXN-ORD-' . uniqid() . '-' . time(),
+                    'details' => "Paid for Pre-order #{$createdOrder->id} ('{$createdOrder->food_name}')"
+                ]);
+
+                // Register Audit Log
+                AuditLog::create([
+                    'user_id' => $user->id,
+                    'timestamp' => time() * 1000,
+                    'action' => 'ORDER_CREATED',
+                    'details' => "Pre-order #{$createdOrder->id} created securely for '{$createdOrder->food_name}' by Student {$user->fullName} with verification PIN: {$securePin}. Wallet debited: GHS {$totalPriceInput}.",
+                ]);
+
+                return $createdOrder;
+            });
+
+            // Notify vendor
+            if ($order->vendor_id) {
+                $vendor = \App\Models\User::find($order->vendor_id);
+                if ($vendor) {
+                    try {
+                        $vendor->notify(new \App\Notifications\NewIncomingOrderNotification($order));
+                    } catch (\Exception $e) {
+                        \Illuminate\Support\Facades\Log::error("Failed to notify vendor {$order->vendor_id} of secure order #{$order->id}: " . $e->getMessage());
+                    }
+                }
+            }
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Order placed successfully.',
+                'order' => $order
+            ], 201);
+
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to place order securely on server.',
+                'error' => $e->getMessage()
+            ], 500);
+        }
     }
 }

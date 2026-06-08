@@ -42,6 +42,9 @@ class CafeteriaViewModel(application: Application) : AndroidViewModel(applicatio
     private val _vendorPerformanceList = MutableStateFlow<List<com.example.data.LaravelDailyPerformance>>(emptyList())
     val vendorPerformanceList: StateFlow<List<com.example.data.LaravelDailyPerformance>> = _vendorPerformanceList.asStateFlow()
 
+    private val _vendorPerformanceMetricsList = MutableStateFlow<List<com.example.data.LaravelVendorMetric>>(emptyList())
+    val vendorPerformanceMetricsList: StateFlow<List<com.example.data.LaravelVendorMetric>> = _vendorPerformanceMetricsList.asStateFlow()
+
     // 2. Room Reactive Streams
     val allVendors: StateFlow<List<User>> = repository.allVendors
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
@@ -191,10 +194,27 @@ class CafeteriaViewModel(application: Application) : AndroidViewModel(applicatio
                     if (user.role == "VENDOR") {
                         _isStoreClosed.value = !user.isOpen
                         refreshVendorPerformance(user.id)
+                        // Trigger Laravel Echo socket connection pipeline
+                        LaravelEchoWebSocketManager.startListening(user.id)
+                    } else {
+                        LaravelEchoWebSocketManager.stopListening()
                     }
+                } else {
+                    LaravelEchoWebSocketManager.stopListening()
                 }
             }
         }
+        
+        // Listen to WebSocket flow emissions to stream real-time pre-orders to dashboard
+        viewModelScope.launch {
+            LaravelEchoWebSocketManager.realTimeOrderFlow.collect { event ->
+                val activeUser = _currentUser.value
+                if (activeUser != null && activeUser.role == "VENDOR" && event.vendorId == activeUser.id) {
+                    processIncomingWebSocketOrder(event)
+                }
+            }
+        }
+        
         startRealTimeNotificationTimer()
     }
 
@@ -320,6 +340,51 @@ class CafeteriaViewModel(application: Application) : AndroidViewModel(applicatio
 
     fun dismissOrderAlert(orderId: Int) {
         _newOrderAlerts.value = _newOrderAlerts.value.filter { it.id != orderId }
+    }
+
+    private fun processIncomingWebSocketOrder(event: LaravelEchoWebSocketManager.OrderBroadcastEvent) {
+        viewModelScope.launch {
+            // Instantly sound alert chime
+            playSoundNotification()
+            
+            val isAlreadyCached = seenOrderIds.contains(event.orderId)
+            if (!isAlreadyCached) {
+                val dbRecord = repository.orderDao.getOrderById(event.orderId)
+                if (dbRecord == null) {
+                    val orderModel = Order(
+                        id = event.orderId,
+                        customerId = 999, // default student fallback reference
+                        vendorId = event.vendorId,
+                        foodItemId = 1,
+                        foodName = event.foodName,
+                        quantity = event.qty,
+                        unitPrice = event.totalPrice / event.qty,
+                        totalPrice = event.totalPrice,
+                        orderTimestamp = event.timestamp,
+                        status = "PENDING",
+                        pickupPin = (1000..9999).random().toString(),
+                        estimatedPickupTime = "Calculating..."
+                    )
+                    repository.orderDao.insertOrder(orderModel)
+                    seenOrderIds.add(event.orderId)
+                    
+                    // Alert layout list prepended dynamically with smooth animation entry bounds
+                    _newOrderAlerts.value = _newOrderAlerts.value + orderModel
+                }
+            }
+            
+            // Recompute metrics scorecards
+            refreshVendorPerformance(event.vendorId)
+            
+            // Perform fallback REST Sync to keep everything completely in-tact online
+            if (LaravelClientManager.isLaravelEnabled) {
+                try {
+                    repository.syncAllFromLaravel()
+                } catch (e: Exception) {
+                    Log.e("CafeteriaViewModel", "Real-time sync fallbacks failed gracefully", e)
+                }
+            }
+        }
     }
 
     fun syncAllFromLaravel(onResult: (Boolean) -> Unit) {
@@ -594,6 +659,9 @@ class CafeteriaViewModel(application: Application) : AndroidViewModel(applicatio
                 try {
                     val perf = repository.getVendorPerformance(id)
                     _vendorPerformanceList.value = perf
+                    
+                    val metrics = repository.getVendorPerformanceMetrics()
+                    _vendorPerformanceMetricsList.value = metrics
                 } catch (e: Exception) {
                     Log.e("CafeteriaViewModel", "refreshVendorPerformance failed", e)
                 }
@@ -1070,5 +1138,137 @@ class CafeteriaViewModel(application: Application) : AndroidViewModel(applicatio
                 _isAnalyzingNutrition.value = false
             }
         }
+    }
+
+    // ==========================================
+    // CHAT & PAYSTACK SYSTEM INTEGRATION
+    // ==========================================
+
+    private val _chatConversation = MutableStateFlow<List<LaravelChatMessage>>(emptyList())
+    val chatConversation: StateFlow<List<LaravelChatMessage>> = _chatConversation.asStateFlow()
+
+    private val _recentChats = MutableStateFlow<List<LaravelRecentChatPartner>>(emptyList())
+    val recentChats: StateFlow<List<LaravelRecentChatPartner>> = _recentChats.asStateFlow()
+
+    private val _isChatLoading = MutableStateFlow(false)
+    val isChatLoading: StateFlow<Boolean> = _isChatLoading.asStateFlow()
+
+    fun refreshRecentChats() {
+        if (!LaravelClientManager.isLaravelEnabled) return
+        viewModelScope.launch {
+            try {
+                val service = LaravelClientManager.getService()
+                val response = service.getRecentChats()
+                if (response.success) {
+                    _recentChats.value = response.chats
+                }
+            } catch (e: Exception) {
+                Log.e("CafeteriaViewModel", "Failed to load recent chats", e)
+            }
+        }
+    }
+
+    fun loadConversation(otherUserId: Int) {
+        if (!LaravelClientManager.isLaravelEnabled) return
+        viewModelScope.launch {
+            _isChatLoading.value = true
+            try {
+                val service = LaravelClientManager.getService()
+                val response = service.getConversation(otherUserId)
+                if (response.success) {
+                    _chatConversation.value = response.messages
+                }
+            } catch (e: Exception) {
+                Log.e("CafeteriaViewModel", "Failed to load conversation for user $otherUserId", e)
+            } finally {
+                _isChatLoading.value = false
+            }
+        }
+    }
+
+    fun sendChatMessage(receiverId: Int, message: String, onResult: (Boolean) -> Unit) {
+        if (!LaravelClientManager.isLaravelEnabled) {
+            onResult(false)
+            return
+        }
+        viewModelScope.launch {
+            try {
+                val service = LaravelClientManager.getService()
+                val response = service.sendChatMessage(LaravelSendChatRequest(receiverId, message))
+                if (response.success) {
+                    _chatConversation.value = _chatConversation.value + response.chat_message
+                    refreshRecentChats()
+                    onResult(true)
+                } else {
+                    onResult(false)
+                }
+            } catch (e: Exception) {
+                Log.e("CafeteriaViewModel", "Failed to send chat message", e)
+                onResult(false)
+            }
+        }
+    }
+
+    fun initPaystackPayment(email: String, amount: Double, purpose: String, onResult: (LaravelPaystackInitDetails?) -> Unit) {
+        if (!LaravelClientManager.isLaravelEnabled) {
+            val ref = "MOCK-PAY-" + System.currentTimeMillis()
+            onResult(
+                LaravelPaystackInitDetails(
+                    authorization_url = "https://checkout.paystack.com/mock-gateway-redirect?ref=$ref",
+                    access_code = "MOCK_AC_OFFLINE",
+                    reference = ref,
+                    amount = amount
+                )
+            )
+            return
+        }
+        viewModelScope.launch {
+            try {
+                val service = LaravelClientManager.getService()
+                val response = service.initializePaystack(LaravelPaystackInitRequest(email, amount, purpose))
+                if (response.success) {
+                    onResult(response.data)
+                } else {
+                    onResult(null)
+                }
+            } catch (e: Exception) {
+                Log.e("CafeteriaViewModel", "Paystack initialization failed", e)
+                onResult(null)
+            }
+        }
+    }
+
+    fun verifyPaystackPayment(reference: String, amount: Double, purpose: String, onResult: (Boolean) -> Unit) {
+        if (!LaravelClientManager.isLaravelEnabled) {
+            viewModelScope.launch {
+                if (purpose == "WALLET_TOPUP") {
+                    rechargeWallet(amount)
+                }
+                onResult(true)
+            }
+            return
+        }
+        viewModelScope.launch {
+            try {
+                val service = LaravelClientManager.getService()
+                val response = service.verifyPaystack(reference, amount, purpose)
+                if (response.success) {
+                    if (purpose == "WALLET_TOPUP") {
+                        syncAllFromLaravel { }
+                    }
+                    onResult(true)
+                } else {
+                    onResult(false)
+                }
+            } catch (e: Exception) {
+                Log.e("CafeteriaViewModel", "Paystack payment verification failed", e)
+                onResult(false)
+            }
+        }
+    }
+
+    override fun onCleared() {
+        super.onCleared()
+        LaravelEchoWebSocketManager.stopListening()
     }
 }

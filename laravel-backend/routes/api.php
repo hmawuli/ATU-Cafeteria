@@ -13,6 +13,9 @@ use App\Http\Controllers\Api\AuditLogController;
 use App\Http\Controllers\Api\VendorController;
 use App\Http\Controllers\Api\WalletController;
 use App\Http\Controllers\Api\VendorPerformanceController;
+use App\Http\Controllers\Api\MenuController;
+use App\Http\Controllers\Api\ChatController;
+use App\Http\Controllers\Api\PaystackPaymentController;
 
 // Register explicit listeners for OrderStatusCompleted event
 Event::listen(
@@ -39,8 +42,31 @@ Route::post('/student/login', [StudentAuthController::class, 'login']);
 Route::post('/vendor/register', [VendorAuthController::class, 'register']);
 Route::post('/vendor/login', [VendorAuthController::class, 'login']);
 
-// Protected Authenticated Endpoints
-Route::middleware('auth:sanctum')->group(function () {
+// Protected Authenticated Endpoints - Supports both Sanctum and Secure JWT Auth
+Route::middleware(function ($request, $next) {
+    $authHeader = $request->header('Authorization') ?: $request->header('X-Auth-Token');
+    if ($authHeader && preg_match('/Bearer\s(\S+)/', $authHeader, $matches)) {
+        $token = $matches[1];
+    } else {
+        $token = $authHeader;
+    }
+
+    if ($token) {
+        $user = \App\Services\JwtService::getUserFromToken($token);
+        if ($user) {
+            auth()->setUser($user);
+            $request->setUserResolver(function () use ($user) {
+                return $user;
+            });
+            return $next($request);
+        }
+    }
+
+    // Pass through Sanctum if no JWT was validated
+    return app(\Illuminate\Auth\Middleware\Authenticate::class)->handle($request, function ($req) use ($next) {
+        return $next($req);
+    }, 'sanctum');
+})->group(function () {
     Route::post('/logout', [AuthController::class, 'logout']);
     Route::delete('/users/{id}', [AuthController::class, 'deleteUser']);
 
@@ -86,9 +112,33 @@ Route::middleware('auth:sanctum')->group(function () {
             'message' => 'All database notifications marked as read.'
         ]);
     });
+
+    // Vendor Menu Management Protected Endpoints
+    Route::post('/menus', [MenuController::class, 'store']);
+    Route::put('/menus/{id}', [MenuController::class, 'update']);
+    Route::delete('/menus/{id}', [MenuController::class, 'destroy']);
+    Route::post('/menu-items', [MenuController::class, 'storeMenuItem']);
+
+    // Chat Conversation Protected Endpoints
+    Route::get('/chats/conversation/{otherUserId}', [ChatController::class, 'getConversation']);
+    Route::post('/chats/send', [ChatController::class, 'sendMessage']);
+    Route::get('/chats/recent', [ChatController::class, 'getRecentChats']);
+
+    // Paystack Payment Integration Protected Endpoints
+    Route::post('/paystack/initialize', [PaystackPaymentController::class, 'initialize']);
+    Route::get('/paystack/verify/{reference}', [PaystackPaymentController::class, 'verify']);
+
+    // Authenticated Student Orders Endpoints
+    Route::get('/student/orders', [OrderController::class, 'getAuthenticatedStudentOrders']);
+    Route::post('/student/orders', [OrderController::class, 'storeAuthenticatedStudentOrder']);
 });
 
-// Menu & Food Items Endpoints (Public Reads)
+// Menu, Standalone Menu Items, & Food Items Endpoints (Public Reads)
+Route::get('/menus', [MenuController::class, 'index']);
+Route::get('/menus/vendor/{vendorId}', [MenuController::class, 'getVendorMenu']);
+Route::get('/menu-items', [MenuController::class, 'listMenuItems']);
+Route::get('/menu-items/vendor/{vendorId}', [MenuController::class, 'getVendorMenuItems']);
+
 Route::get('/food-items', [FoodItemController::class, 'index']);
 Route::get('/food-items/vendor/{vendorId}', [FoodItemController::class, 'getVendorFoodItems']);
 

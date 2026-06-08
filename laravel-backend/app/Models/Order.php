@@ -17,6 +17,7 @@ class Order extends Model
         'user_id',
         'vendor_id',
         'food_item_id',
+        'menu_item_id',
         'food_name',
         'quantity',
         'unit_price',
@@ -33,6 +34,7 @@ class Order extends Model
         'user_id' => 'integer',
         'vendor_id' => 'integer',
         'food_item_id' => 'integer',
+        'menu_item_id' => 'integer',
         'quantity' => 'integer',
         'unit_price' => 'double',
         'total_price' => 'double',
@@ -109,6 +111,14 @@ class Order extends Model
     public function foodItem()
     {
         return $this->belongsTo(FoodItem::class, 'food_item_id');
+    }
+
+    /**
+     * Get the menu item record, if it exists.
+     */
+    public function menuItem()
+    {
+        return $this->belongsTo(MenuItem::class, 'menu_item_id');
     }
 
     /**

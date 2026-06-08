@@ -298,6 +298,15 @@ class CafeteriaRepository(private val db: AppDatabase) {
                 val roomOrder = LaravelClientManager.toRoomOrder(lOrder)
                 orderDao.insertOrder(roomOrder)
                 
+                // Dispatch WebSocket broadcast instantly to subscriber roles in real-time
+                com.example.data.LaravelEchoWebSocketManager.broadcastOrderPlacedLocally(
+                    orderId = roomOrder.id,
+                    vendorId = roomOrder.vendorId,
+                    foodName = roomOrder.foodName,
+                    qty = roomOrder.quantity,
+                    totalPrice = roomOrder.totalPrice
+                )
+                
                 // Deduct inventory stock locally
                 try {
                     val existingItem = foodItemDao.getFoodItemById(foodItem.id)
@@ -333,6 +342,15 @@ class CafeteriaRepository(private val db: AppDatabase) {
         )
         val orderId = orderDao.insertOrder(order)
         insertAuditLog(customerId, "ORDER_CREATED", "Created order #${orderId} for '${foodItem.name}' (QTY: ${quantity}) with secure pick-up code.")
+        
+        // Dispatch WebSocket broadcast instantly to subscriber roles in real-time
+        com.example.data.LaravelEchoWebSocketManager.broadcastOrderPlacedLocally(
+            orderId = orderId.toInt(),
+            vendorId = order.vendorId,
+            foodName = order.foodName,
+            qty = order.quantity,
+            totalPrice = order.totalPrice
+        )
         
         // Deduct inventory stock locally
         try {
@@ -581,6 +599,21 @@ class CafeteriaRepository(private val db: AppDatabase) {
                 }
             } catch (e: Exception) {
                 Log.e("CafeteriaRepository", "Laravel getVendorPerformance failed", e)
+            }
+        }
+        return@withContext emptyList()
+    }
+
+    suspend fun getVendorPerformanceMetrics(): List<LaravelVendorMetric> = withContext(Dispatchers.IO) {
+        if (LaravelClientManager.isLaravelEnabled) {
+            try {
+                val service = LaravelClientManager.getService()
+                val response = service.getVendorPerformanceMetrics()
+                if (response.success) {
+                    return@withContext response.performance
+                }
+            } catch (e: Exception) {
+                Log.e("CafeteriaRepository", "Laravel getVendorPerformanceMetrics failed", e)
             }
         }
         return@withContext emptyList()

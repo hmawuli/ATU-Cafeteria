@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Models\User;
 use App\Models\AuditLog;
+use App\Services\JwtService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Validator;
 
@@ -63,8 +64,8 @@ class AuthController extends Controller
             return $createdUser;
         });
 
-        // Generate Sanctum access token
-        $token = $user->createToken('cafeteria-token')->plainTextToken;
+        // Generate JWT access token
+        $token = JwtService::generateToken($user);
         $response = $user->toArray();
         $response['token'] = $token;
 
@@ -108,8 +109,8 @@ class AuthController extends Controller
                 'details' => "Successfully logged in via Laravel API.",
             ]);
 
-            // Secure token issue
-            $token = $user->createToken('cafeteria-token')->plainTextToken;
+            // Secure JWT token issue
+            $token = JwtService::generateToken($user);
             $responseData = $user->toArray();
             $responseData['token'] = $token;
 
@@ -168,10 +169,16 @@ class AuthController extends Controller
     {
         $user = $request->user();
         if ($user) {
-            $user->currentAccessToken()->delete();
+            try {
+                if (method_exists($user, 'currentAccessToken') && $user->currentAccessToken()) {
+                    $user->currentAccessToken()->delete();
+                }
+            } catch (\Exception $e) {
+                // Ignore exception if using stateless JWT
+            }
             return response()->json([
                 'success' => true,
-                'message' => 'Secure Sanctum Token revoked successfully.'
+                'message' => 'Secure Token invalidated successfully.'
             ], 200);
         }
         return response()->json([

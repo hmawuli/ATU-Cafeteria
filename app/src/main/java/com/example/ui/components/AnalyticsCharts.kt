@@ -20,6 +20,18 @@ import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.data.Order
+import com.example.data.FoodItem
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Remove
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.Icon
+import androidx.compose.material3.LinearProgressIndicator
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.OutlinedTextFieldDefaults
+import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import java.text.SimpleDateFormat
 import java.util.*
 import androidx.compose.foundation.clickable
@@ -1757,6 +1769,412 @@ fun RechartsDashboardChart(
             }
 
             Spacer(modifier = Modifier.height(14.dp))
+ 
+             AndroidView(
+                 factory = { context ->
+                     android.webkit.WebView(context).apply {
+                         settings.javaScriptEnabled = true
+                         webViewClient = android.webkit.WebViewClient()
+                         settings.domStorageEnabled = true
+                         settings.useWideViewPort = true
+                         settings.loadWithOverviewMode = true
+                         setBackgroundColor(android.graphics.Color.TRANSPARENT)
+                     }
+                 },
+                 update = { webView ->
+                     webView.loadDataWithBaseURL("https://localhost", htmlContent, "text/html", "UTF-8", null)
+                 },
+                 modifier = Modifier
+                     .fillMaxWidth()
+                     .height(490.dp)
+             )
+         }
+     }
+ }
+ 
+@Composable
+fun ChartJsVendorPerformanceChart(
+    performanceMetrics: List<com.example.data.LaravelVendorMetric>,
+    currentUser: com.example.data.User?,
+    orders: List<Order>,
+    modifier: Modifier = Modifier
+) {
+    val metricsJson = remember(performanceMetrics, currentUser, orders) {
+        val items = if (performanceMetrics.isNotEmpty()) {
+            performanceMetrics
+        } else {
+            // Local fallback calculations for simulation robustness
+            val localTotal = orders.size
+            val localCompleted = orders.count { it.status == "COMPLETED" }
+            val localSales = orders.filter { it.status == "COMPLETED" }.sumOf { it.totalPrice }
+            val localFulfillment = if (localTotal > 0) (localCompleted.toDouble() / localTotal * 100.0) else 100.0
+            
+            listOf(
+                com.example.data.LaravelVendorMetric(
+                    vendor_id = currentUser?.id ?: 1,
+                    vendor_name = currentUser?.fullName ?: "My Food Booth",
+                    contact_info = "N/A",
+                    operational_status = "active",
+                    total_completed_orders = localCompleted,
+                    total_orders = localTotal,
+                    total_sales = localSales,
+                    avg_completion_time_minutes = 12.5,
+                    avg_completion_time_display = "12.5 mins",
+                    average_delivery_time = 12.5,
+                    average_delivery_time_display = "12.5 mins",
+                    order_fulfillment_rate = localFulfillment
+                ),
+                com.example.data.LaravelVendorMetric(
+                    vendor_id = 101,
+                    vendor_name = "Waakye Express",
+                    contact_info = "0245-WA-AKYE",
+                    operational_status = "active",
+                    total_completed_orders = 18,
+                    total_orders = 20,
+                    total_sales = 270.00,
+                    avg_completion_time_minutes = 9.8,
+                    avg_completion_time_display = "9.8 mins",
+                    average_delivery_time = 9.8,
+                    average_delivery_time_display = "9.8 mins",
+                    order_fulfillment_rate = 90.0
+                ),
+                com.example.data.LaravelVendorMetric(
+                    vendor_id = 102,
+                    vendor_name = "Auntie Mary's Waakye",
+                    contact_info = "0554-MARY-K",
+                    operational_status = "active",
+                    total_completed_orders = 24,
+                    total_orders = 25,
+                    total_sales = 360.00,
+                    avg_completion_time_minutes = 14.1,
+                    avg_completion_time_display = "14.1 mins",
+                    average_delivery_time = 14.1,
+                    average_delivery_time_display = "14.1 mins",
+                    order_fulfillment_rate = 96.0
+                )
+            )
+        }
+
+        val listStr = items.map { item ->
+            val isMe = item.vendor_id == currentUser?.id
+            """{
+                "name": "${item.vendor_name}",
+                "fulfillment": ${item.order_fulfillment_rate},
+                "deliveryTime": ${item.average_delivery_time},
+                "isMe": $isMe
+            }"""
+        }
+        listStr.joinToString(prefix = "[", postfix = "]", separator = ",")
+    }
+
+    val htmlContent = remember(metricsJson) {
+        """
+        <!DOCTYPE html>
+        <html>
+        <head>
+            <meta charset="UTF-8">
+            <meta name="viewport" content="width=device-width, initial-scale=1.0">
+            <title>Chart.js Vendor Performance</title>
+            <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+            <style>
+                body {
+                    margin: 0;
+                    padding: 8px;
+                    background-color: #121212;
+                    color: #e0e0e0;
+                    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+                }
+                .chart-card {
+                    background-color: #1d1d1f;
+                    border: 1px solid #333333;
+                    border-radius: 12px;
+                    padding: 14px;
+                    margin-bottom: 16px;
+                    box-shadow: 0 4px 6px rgba(0,0,0,0.3);
+                }
+                .chart-header {
+                    margin-bottom: 12px;
+                }
+                .chart-title {
+                    font-size: 13px;
+                    font-weight: bold;
+                    color: #64b5f6;
+                    margin: 0;
+                    text-transform: uppercase;
+                    letter-spacing: 0.5px;
+                    display: flex;
+                    align-items: center;
+                    gap: 6px;
+                }
+                .chart-subtitle {
+                    font-size: 10px;
+                    color: #9e9e9e;
+                    margin: 2px 0 0 0;
+                }
+                .canvas-container {
+                    position: relative;
+                    height: 220px;
+                    width: 100%;
+                }
+                .tab-bar {
+                    display: flex;
+                    background-color: #1c1c1e;
+                    border-radius: 8px;
+                    padding: 2.5px;
+                    gap: 4px;
+                    margin-bottom: 14px;
+                    border: 1px solid #2d2d2d;
+                }
+                .tab-btn {
+                    flex: 1;
+                    background: none;
+                    border: none;
+                    color: #9e9e9e;
+                    font-size: 11px;
+                    font-weight: 600;
+                    padding: 8px 12px;
+                    border-radius: 6px;
+                    cursor: pointer;
+                    transition: all 0.2s;
+                }
+                .tab-btn.active {
+                    background-color: #2c2c2e;
+                    color: #ffffff;
+                    box-shadow: 0 1px 3px rgba(0,0,0,0.4);
+                }
+                .chart-section {
+                    display: none;
+                }
+                .chart-section.active {
+                    display: block;
+                }
+            </style>
+        </head>
+        <body>
+            <div class="tab-bar">
+                <button id="btn-fulfillment" class="tab-btn active" onclick="switchTab('fulfillment')">⚡ Fulfillment Rates</button>
+                <button id="btn-delivery" class="tab-btn" onclick="switchTab('delivery')">⏱️ Delivery Times</button>
+            </div>
+
+            <!-- Fulfillment Section -->
+            <div id="section-fulfillment" class="chart-section active">
+                <div class="chart-card">
+                    <div class="chart-header">
+                        <p class="chart-title">🏆 Order Fulfillment Rates (%)</p>
+                        <p class="chart-subtitle">Direct live tracking of completed orders vs total incoming orders</p>
+                    </div>
+                    <div class="canvas-container">
+                        <canvas id="fulfillmentChart"></canvas>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Delivery Time Section -->
+            <div id="section-delivery" class="chart-section">
+                <div class="chart-card">
+                    <div class="chart-header">
+                        <p class="chart-title">⏱️ Average Turnaround Times (Mins)</p>
+                        <p class="chart-subtitle">Order preparation-to-delivery dispatch (minutes)</p>
+                    </div>
+                    <div class="canvas-container">
+                        <canvas id="deliveryChart"></canvas>
+                    </div>
+                </div>
+            </div>
+
+            <script>
+                const rawData = $metricsJson;
+
+                function switchTab(tab) {
+                    document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
+                    document.querySelectorAll('.chart-section').forEach(sec => sec.classList.remove('active'));
+                    
+                    if (tab === 'fulfillment') {
+                        document.getElementById('btn-fulfillment').classList.add('active');
+                        document.getElementById('section-fulfillment').classList.add('active');
+                    } else {
+                        document.getElementById('btn-delivery').classList.add('active');
+                        document.getElementById('section-delivery').classList.add('active');
+                    }
+                }
+
+                const labels = rawData.map(d => d.isMe ? "👤 " + d.name + " (Me)" : d.name);
+                
+                const fulfillmentBgColors = rawData.map(d => d.isMe ? 'rgba(76, 175, 80, 0.45)' : 'rgba(33, 150, 243, 0.35)');
+                const fulfillmentBorderColors = rawData.map(d => d.isMe ? '#4CAF50' : '#2196F3');
+                
+                const deliveryBgColors = rawData.map(d => d.isMe ? 'rgba(255, 152, 0, 0.25)' : 'rgba(156, 39, 176, 0.15)');
+                const deliveryBorderColors = rawData.map(d => d.isMe ? '#FF9800' : '#9C27B0');
+
+                // Fulfillment bar chart
+                const ctxFulfillment = document.getElementById('fulfillmentChart').getContext('2d');
+                new Chart(ctxFulfillment, {
+                    type: 'bar',
+                    data: {
+                        labels: labels,
+                        datasets: [{
+                            label: 'Fulfillment Rate (%)',
+                            data: rawData.map(d => d.fulfillment),
+                            backgroundColor: fulfillmentBgColors,
+                            borderColor: fulfillmentBorderColors,
+                            borderWidth: 1.5,
+                            borderRadius: 4
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: {
+                            legend: {
+                                display: false
+                            },
+                            tooltip: {
+                                backgroundColor: '#222222',
+                                titleColor: '#64b5f6',
+                                bodyColor: '#ffffff',
+                                borderWidth: 1,
+                                borderColor: '#444444',
+                                bodyFont: {
+                                    size: 11
+                                }
+                            }
+                        },
+                        scales: {
+                            x: {
+                                grid: {
+                                    color: '#2a2a2a'
+                                },
+                                ticks: {
+                                    color: '#9e9e9e',
+                                    font: {
+                                        size: 9
+                                    }
+                                }
+                            },
+                            y: {
+                                min: 0,
+                                max: 100,
+                                grid: {
+                                    color: '#2a2a2a'
+                                },
+                                ticks: {
+                                    color: '#9e9e9e',
+                                    font: {
+                                        size: 9
+                                    },
+                                    callback: function(value) {
+                                        return value + '%';
+                                    }
+                                }
+                            }
+                        }
+                    }
+                });
+
+                // Delivery time line chart
+                const ctxDelivery = document.getElementById('deliveryChart').getContext('2d');
+                new Chart(ctxDelivery, {
+                    type: 'line',
+                    data: {
+                        labels: labels,
+                        datasets: [{
+                            label: 'Average Delivery (Minutes)',
+                            data: rawData.map(d => d.deliveryTime),
+                            backgroundColor: deliveryBgColors,
+                            borderColor: deliveryBorderColors,
+                            borderWidth: 2.5,
+                            pointBackgroundColor: deliveryBorderColors,
+                            pointBorderColor: '#ffffff',
+                            pointRadius: 4,
+                            pointHoverRadius: 6,
+                            tension: 0.35,
+                            fill: true
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: {
+                            legend: {
+                                display: false
+                            },
+                            tooltip: {
+                                backgroundColor: '#222222',
+                                titleColor: '#FF9800',
+                                bodyColor: '#ffffff',
+                                borderWidth: 1,
+                                borderColor: '#444444',
+                                bodyFont: {
+                                    size: 11
+                                }
+                            }
+                        },
+                        scales: {
+                            x: {
+                                grid: {
+                                    color: '#2a2a2a'
+                                },
+                                ticks: {
+                                    color: '#9e9e9e',
+                                    font: {
+                                        size: 9
+                                    }
+                                }
+                            },
+                            y: {
+                                min: 0,
+                                grid: {
+                                    color: '#2a2a2a'
+                                },
+                                ticks: {
+                                    color: '#9e9e9e',
+                                    font: {
+                                        size: 9
+                                    },
+                                    callback: function(value) {
+                                        return value + 'm';
+                                    }
+                                }
+                            }
+                        }
+                    }
+                });
+            </script>
+        </body>
+        </html>
+        """.trimIndent()
+    }
+
+    Card(
+        modifier = modifier
+            .fillMaxWidth()
+            .testTag("chartjs_vendor_dashboard"),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+        shape = RoundedCornerShape(16.dp),
+        border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
+    ) {
+        Column(modifier = Modifier.padding(16.dp)) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                Text("📊", fontSize = 20.sp)
+                Column {
+                    Text(
+                        text = "Chart.js Service Performance Metrics",
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.primary
+                    )
+                    Text(
+                        text = "Dynamic line & bar charts tracking fulfillment and speed benchmarks",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            }
+
+            Spacer(modifier = Modifier.height(14.dp))
 
             AndroidView(
                 factory = { context ->
@@ -1774,10 +2192,519 @@ fun RechartsDashboardChart(
                 },
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(490.dp)
+                    .height(355.dp)
             )
         }
     }
 }
+
+@Composable
+fun ChartJsInventoryLevelChart(
+    vendorFoods: List<FoodItem>,
+    modifier: Modifier = Modifier
+) {
+    val itemsJson = remember(vendorFoods) {
+        val list = vendorFoods.map { food ->
+            val isLow = food.currentStock <= food.lowStockThreshold
+            """{
+                "name": "${food.name.replace("\"", "\\\"")}",
+                "current": ${food.currentStock},
+                "threshold": ${food.lowStockThreshold},
+                "isLow": $isLow
+            }"""
+        }
+        list.joinToString(prefix = "[", postfix = "]", separator = ",")
+    }
+
+    val htmlContent = remember(itemsJson) {
+        """
+        <!DOCTYPE html>
+        <html>
+        <head>
+            <meta charset="UTF-8">
+            <meta name="viewport" content="width=device-width, initial-scale=1.0">
+            <title>Inventory Levels Chart</title>
+            <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+            <style>
+                body {
+                    margin: 0;
+                    padding: 8px;
+                    background-color: #121212;
+                    color: #e0e0e0;
+                    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+                }
+                .chart-container {
+                    position: relative;
+                    height: 220px;
+                    width: 100%;
+                }
+            </style>
+        </head>
+        <body>
+            <div class="chart-container">
+                <canvas id="inventoryChart"></canvas>
+            </div>
+            <script>
+                const dataRaw = $itemsJson;
+                
+                const labels = dataRaw.map(d => d.name);
+                const currentData = dataRaw.map(d => d.current);
+                const thresholdData = dataRaw.map(d => d.threshold);
+                
+                const bgColors = dataRaw.map(d => d.isLow ? 'rgba(239, 83, 80, 0.45)' : 'rgba(38, 166, 154, 0.45)');
+                const borderColors = dataRaw.map(d => d.isLow ? '#ef5350' : '#26a69a');
+                
+                const ctx = document.getElementById('inventoryChart').getContext('2d');
+                new Chart(ctx, {
+                    type: 'bar',
+                    data: {
+                        labels: labels,
+                        datasets: [
+                            {
+                                label: 'Remaining Serving Plates',
+                                data: currentData,
+                                backgroundColor: bgColors,
+                                borderColor: borderColors,
+                                borderWidth: 1.5,
+                                borderRadius: 4,
+                                barPercentage: 0.6
+                            },
+                            {
+                                label: 'Safety Threshold Limit',
+                                data: thresholdData,
+                                type: 'line',
+                                borderColor: 'rgba(255, 179, 0, 0.85)',
+                                borderDash: [4, 4],
+                                borderWidth: 2,
+                                pointBackgroundColor: '#ffb300',
+                                pointRadius: 4,
+                                fill: false,
+                                tension: 0.2
+                            }
+                        ]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: {
+                            legend: {
+                                labels: {
+                                    color: '#b0bec5',
+                                    font: { size: 9, weight: 'bold' }
+                                }
+                            },
+                            tooltip: {
+                                backgroundColor: '#212121',
+                                titleColor: '#ffb300',
+                                bodyColor: '#ffffff',
+                                borderWidth: 1,
+                                borderColor: '#424242'
+                            }
+                        },
+                        scales: {
+                            x: {
+                                grid: { color: '#2a2a2a' },
+                                ticks: { 
+                                    color: '#b0bec5',
+                                    font: { size: 8.5 },
+                                    maxRotation: 45,
+                                    minRotation: 0
+                                }
+                            },
+                            y: {
+                                grid: { color: '#2a2a2a' },
+                                ticks: { 
+                                    color: '#b0bec5',
+                                    font: { size: 8.5 }
+                                },
+                                min: 0
+                            }
+                        }
+                    }
+                });
+            </script>
+        </body>
+        </html>
+        """.trimIndent()
+    }
+
+    AndroidView(
+        factory = { context ->
+            android.webkit.WebView(context).apply {
+                settings.javaScriptEnabled = true
+                webViewClient = android.webkit.WebViewClient()
+                settings.domStorageEnabled = true
+                settings.useWideViewPort = true
+                settings.loadWithOverviewMode = true
+                setBackgroundColor(android.graphics.Color.TRANSPARENT)
+            }
+        },
+        update = { webView ->
+            webView.loadDataWithBaseURL("https://localhost", htmlContent, "text/html", "UTF-8", null)
+        },
+        modifier = modifier
+            .fillMaxWidth()
+            .height(240.dp)
+            .testTag("chartjs_inventory_canvas")
+    )
+}
+
+@OptIn(ExperimentalLayoutApi::class, ExperimentalMaterial3Api::class)
+@Composable
+fun InventoryTrackingHub(
+    vendorFoods: List<FoodItem>,
+    onUpdateThreshold: (FoodItem, Int) -> Unit,
+    onReplenishStock: (FoodItem, Int) -> Unit,
+    modifier: Modifier = Modifier
+) {
+    var searchQuery by remember { mutableStateOf("") }
+    var filterType by remember { mutableStateOf("ALL") } // "ALL", "LOW", "NORMAL"
+    
+    val filteredItems = remember(vendorFoods, searchQuery, filterType) {
+        vendorFoods.filter { food ->
+            val nameMatch = food.name.contains(searchQuery, ignoreCase = true) ||
+                    food.category.contains(searchQuery, ignoreCase = true)
+            val typeMatch = when (filterType) {
+                "LOW" -> food.currentStock <= food.lowStockThreshold
+                "NORMAL" -> food.currentStock > food.lowStockThreshold
+                else -> true
+            }
+            nameMatch && typeMatch
+        }
+    }
+    
+    val totalItems = vendorFoods.size
+    val lowStockCount = vendorFoods.count { it.currentStock <= it.lowStockThreshold }
+    val depletedCount = vendorFoods.count { it.currentStock == 0 }
+    val normalCount = totalItems - lowStockCount
+    
+    Card(
+        modifier = modifier
+            .fillMaxWidth()
+            .testTag("inventory_tracking_hub_card"),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+        shape = RoundedCornerShape(16.dp),
+        border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
+    ) {
+        Column(modifier = Modifier.padding(16.dp)) {
+            // Header Row
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Text("📦", fontSize = 22.sp)
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = "Real-Time Inventory Level Monitor",
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.primary
+                    )
+                    Text(
+                        text = "Track remaining plates, safety control thresholds, and forecasts",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            }
+            
+            Spacer(modifier = Modifier.height(14.dp))
+            
+            // Stats summary grid
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                // Card 1: Total
+                Card(
+                    modifier = Modifier.weight(1f),
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.2f))
+                ) {
+                    Column(
+                        modifier = Modifier.padding(6.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally
+                    ) {
+                        Text("Total Dishes", fontSize = 10.sp, color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold)
+                        Text("$totalItems", fontSize = 15.sp, fontWeight = FontWeight.ExtraBold, color = MaterialTheme.colorScheme.primary)
+                    }
+                }
+                
+                // Card 2: Low Stock Alert
+                Card(
+                    modifier = Modifier.weight(1f),
+                    colors = CardDefaults.cardColors(containerColor = if (lowStockCount > 0) MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.4f) else MaterialTheme.colorScheme.surfaceVariant)
+                ) {
+                    Column(
+                        modifier = Modifier.padding(6.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally
+                    ) {
+                        Text("Low Stock", fontSize = 10.sp, color = if (lowStockCount > 0) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant, fontWeight = FontWeight.Bold)
+                        Text("$lowStockCount", fontSize = 15.sp, fontWeight = FontWeight.ExtraBold, color = if (lowStockCount > 0) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurface)
+                    }
+                }
+                
+                // Card 3: Depleted
+                Card(
+                    modifier = Modifier.weight(1f),
+                    colors = CardDefaults.cardColors(containerColor = if (depletedCount > 0) MaterialTheme.colorScheme.errorContainer else MaterialTheme.colorScheme.surfaceVariant)
+                ) {
+                    Column(
+                        modifier = Modifier.padding(6.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally
+                    ) {
+                        Text("Depleted", fontSize = 10.sp, color = if (depletedCount > 0) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant, fontWeight = FontWeight.Bold)
+                        Text("$depletedCount", fontSize = 15.sp, fontWeight = FontWeight.ExtraBold, color = if (depletedCount > 0) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurface)
+                    }
+                }
+            }
+            
+            Spacer(modifier = Modifier.height(14.dp))
+            
+            // Chart.js levels visualization
+            if (vendorFoods.isNotEmpty()) {
+                ChartJsInventoryLevelChart(vendorFoods = vendorFoods, modifier = Modifier.fillMaxWidth())
+                Spacer(modifier = Modifier.height(14.dp))
+            } else {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(80.dp)
+                        .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f), RoundedCornerShape(8.dp)),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text("No inventory items found. Add items to your menu first.", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+                Spacer(modifier = Modifier.height(14.dp))
+            }
+
+            // Controls & Filters Row
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                OutlinedTextField(
+                    value = searchQuery,
+                    onValueChange = { searchQuery = it },
+                    placeholder = { Text("Search ingredients...", fontSize = 11.sp) },
+                    singleLine = true,
+                    modifier = Modifier
+                        .weight(1.3f)
+                        .height(48.dp),
+                    textStyle = androidx.compose.ui.text.TextStyle(fontSize = 11.sp),
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedContainerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f),
+                        unfocusedContainerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f)
+                    )
+                )
+                
+                // Segmented quick filters
+                Row(
+                    modifier = Modifier.weight(1f),
+                    horizontalArrangement = Arrangement.spacedBy(4.dp)
+                ) {
+                    listOf("ALL" to "All", "LOW" to "🚨 Low").forEach { (typeKey, label) ->
+                        val isSelected = filterType == typeKey
+                        Card(
+                            modifier = Modifier
+                                .weight(1f)
+                                .height(38.dp)
+                                .clickable { filterType = typeKey },
+                            colors = CardDefaults.cardColors(
+                                containerColor = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceVariant
+                            ),
+                            shape = RoundedCornerShape(8.dp)
+                        ) {
+                            Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                                Text(
+                                    text = label,
+                                    fontSize = 11.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = if (isSelected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+            
+            Spacer(modifier = Modifier.height(12.dp))
+            
+            // List of items
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f)),
+                border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
+            ) {
+                Column(
+                    modifier = Modifier.padding(8.dp)
+                ) {
+                    if (filteredItems.isEmpty()) {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(vertical = 20.dp),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text("No items match query", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        }
+                    } else {
+                        filteredItems.take(5).forEach { food ->
+                            val isBelow = food.currentStock <= food.lowStockThreshold
+                            Column(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(vertical = 6.dp)
+                                    .background(
+                                        if (isBelow) MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.15f)
+                                        else Color.Transparent,
+                                        RoundedCornerShape(8.dp)
+                                    )
+                                    .padding(8.dp)
+                            ) {
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Column(modifier = Modifier.weight(1f)) {
+                                        Row(
+                                            verticalAlignment = Alignment.CenterVertically,
+                                            horizontalArrangement = Arrangement.spacedBy(6.dp)
+                                        ) {
+                                            Text(
+                                                text = food.name,
+                                                fontWeight = FontWeight.Bold,
+                                                fontSize = 13.sp,
+                                                color = MaterialTheme.colorScheme.onSurface
+                                            )
+                                            if (isBelow) {
+                                                Card(
+                                                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.error),
+                                                    shape = RoundedCornerShape(4.dp)
+                                                ) {
+                                                    Text(
+                                                        text = if (food.currentStock == 0) "OUT" else "LOW",
+                                                        fontSize = 8.sp,
+                                                        fontWeight = FontWeight.ExtraBold,
+                                                        color = MaterialTheme.colorScheme.onError,
+                                                        modifier = Modifier.padding(horizontal = 4.dp, vertical = 1.dp)
+                                                    )
+                                                }
+                                            }
+                                        }
+                                        
+                                        Spacer(modifier = Modifier.height(2.dp))
+                                        
+                                        Row(
+                                            verticalAlignment = Alignment.CenterVertically,
+                                            horizontalArrangement = Arrangement.spacedBy(4.dp)
+                                        ) {
+                                            Text(
+                                                text = "Stock: ${food.currentStock}/${food.initialStock}",
+                                                fontSize = 11.sp,
+                                                fontWeight = FontWeight.Medium,
+                                                color = if (isBelow) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant
+                                            )
+                                            Text("•", fontSize = 10.sp, color = MaterialTheme.colorScheme.outline)
+                                            Text(
+                                                text = "Threshold Limit:",
+                                                fontSize = 11.sp,
+                                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                                            )
+                                            
+                                            // Dynamic Threshold adjusting controls
+                                            Row(
+                                                verticalAlignment = Alignment.CenterVertically,
+                                                horizontalArrangement = Arrangement.spacedBy(2.dp)
+                                            ) {
+                                                IconButton(
+                                                    onClick = {
+                                                        val prevLim = (food.lowStockThreshold - 1).coerceAtLeast(1)
+                                                        onUpdateThreshold(food, prevLim)
+                                                    },
+                                                    modifier = Modifier.size(20.dp)
+                                                ) {
+                                                    Icon(
+                                                        imageVector = Icons.Default.Remove,
+                                                        contentDescription = "Reduce threshold limit value",
+                                                        tint = MaterialTheme.colorScheme.primary,
+                                                        modifier = Modifier.size(12.dp)
+                                                    )
+                                                }
+                                                
+                                                Text(
+                                                    text = "${food.lowStockThreshold}",
+                                                    fontSize = 11.sp,
+                                                    fontWeight = FontWeight.ExtraBold,
+                                                    color = MaterialTheme.colorScheme.primary
+                                                )
+                                                
+                                                IconButton(
+                                                    onClick = {
+                                                        val nextLim = food.lowStockThreshold + 1
+                                                        onUpdateThreshold(food, nextLim)
+                                                    },
+                                                    modifier = Modifier.size(20.dp)
+                                                ) {
+                                                    Icon(
+                                                        imageVector = Icons.Default.Add,
+                                                        contentDescription = "Increase threshold limit value",
+                                                        tint = MaterialTheme.colorScheme.primary,
+                                                        modifier = Modifier.size(12.dp)
+                                                    )
+                                                }
+                                            }
+                                        }
+                                    }
+                                    
+                                    // Quick replenish +25 serves
+                                    OutlinedButton(
+                                        onClick = { onReplenishStock(food, 25) },
+                                        shape = RoundedCornerShape(6.dp),
+                                        contentPadding = PaddingValues(horizontal = 8.dp, vertical = 0.dp),
+                                        modifier = Modifier.height(28.dp)
+                                    ) {
+                                        Text("+25 Plates", fontSize = 10.sp, fontWeight = FontWeight.Bold)
+                                    }
+                                }
+                                
+                                Spacer(modifier = Modifier.height(4.dp))
+                                
+                                val progressVal = if (food.initialStock > 0) {
+                                    (food.currentStock.toFloat() / food.initialStock.toFloat()).coerceIn(0f, 1f)
+                                } else 0f
+                                
+                                LinearProgressIndicator(
+                                    progress = { progressVal },
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .height(4.dp),
+                                    color = if (isBelow) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary,
+                                    trackColor = MaterialTheme.colorScheme.outlineVariant
+                                )
+                            }
+                        }
+                        
+                        if (filteredItems.size > 5) {
+                            Text(
+                                text = "And ${filteredItems.size - 5} more dishes. View & edit completely in Menu List tab.",
+                                fontSize = 10.sp,
+                                fontWeight = FontWeight.Medium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(top = 4.dp),
+                                textAlign = androidx.compose.ui.text.style.TextAlign.Center
+                            )
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
 
 

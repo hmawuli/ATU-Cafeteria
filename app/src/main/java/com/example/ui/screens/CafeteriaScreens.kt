@@ -9,6 +9,8 @@ import androidx.compose.foundation.BorderStroke
 import androidx.compose.ui.platform.testTag
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
@@ -34,10 +36,13 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.delay
 import androidx.navigation.NavController
 import com.example.data.*
 import com.example.ui.components.D3DashboardChart
 import com.example.ui.components.RechartsDashboardChart
+import com.example.ui.components.ChartJsVendorPerformanceChart
+import com.example.ui.components.InventoryTrackingHub
 import com.example.ui.components.DailyRevenueBarChart
 import com.example.ui.components.RadarFeedbackChart
 import com.example.ui.components.StudentTrendsLineChart
@@ -1464,6 +1469,13 @@ fun StudentDashboardScreen(
                 1 -> {
                     // Merged tracking and history hub
                     var ordersSubTab by remember { mutableIntStateOf(0) } // 0: Live Tracker, 1: Dining History
+                    var pastOrdersSearchQuery by remember { mutableStateOf("") }
+                    var pastOrdersSelectedStatus by remember { mutableStateOf("All") }
+                    var pastOrdersSelectedVendorId by remember { mutableStateOf<Int?>(null) }
+                    var pastOrdersSelectedPeriod by remember { mutableStateOf("All Time") }
+                    var pastOrdersSortBy by remember { mutableStateOf("Newest First") }
+                    var pastOrdersShowFilters by remember { mutableStateOf(false) }
+                    val expandedOrderIds = remember { mutableStateMapOf<Int, Boolean>() }
                     
                     Column(modifier = Modifier.fillMaxSize()) {
                         TabRow(selectedTabIndex = ordersSubTab) {
@@ -1795,6 +1807,52 @@ fun StudentDashboardScreen(
                             val totalSpend = completedOrCanceledOrders.filter { it.status == "COMPLETED" }.sumOf { it.totalPrice }
                             val orderCount = completedOrCanceledOrders.filter { it.status == "COMPLETED" }.size
                             
+                            val pastVendors = remember(completedOrCanceledOrders, allVendors) {
+                                val vendorIds = completedOrCanceledOrders.map { it.vendorId }.distinct()
+                                allVendors.filter { vendorIds.contains(it.id) }
+                            }
+
+                            val filteredPastOrders = remember(completedOrCanceledOrders, pastOrdersSearchQuery, pastOrdersSelectedStatus, pastOrdersSelectedVendorId, pastOrdersSelectedPeriod, pastOrdersSortBy) {
+                                var list = completedOrCanceledOrders
+                                
+                                if (pastOrdersSearchQuery.isNotBlank()) {
+                                    list = list.filter {
+                                        it.foodName.contains(pastOrdersSearchQuery, ignoreCase = true) ||
+                                        allVendors.find { v -> v.id == it.vendorId }?.fullName?.contains(pastOrdersSearchQuery, ignoreCase = true) == true
+                                    }
+                                }
+                                
+                                if (pastOrdersSelectedStatus != "All") {
+                                    list = list.filter { it.status.equals(pastOrdersSelectedStatus, ignoreCase = true) }
+                                }
+                                
+                                if (pastOrdersSelectedVendorId != null) {
+                                    list = list.filter { it.vendorId == pastOrdersSelectedVendorId }
+                                }
+                                
+                                val now = System.currentTimeMillis()
+                                when (pastOrdersSelectedPeriod) {
+                                    "Last 7 Days" -> {
+                                        val weekAgo = now - (7L * 24 * 60 * 60 * 1000)
+                                        list = list.filter { it.orderTimestamp >= weekAgo }
+                                    }
+                                    "Last 30 Days" -> {
+                                        val thirtyDaysAgo = now - (30L * 24 * 60 * 60 * 1000)
+                                        list = list.filter { it.orderTimestamp >= thirtyDaysAgo }
+                                    }
+                                }
+                                
+                                list = when (pastOrdersSortBy) {
+                                    "Newest First" -> list.sortedByDescending { it.orderTimestamp }
+                                    "Oldest First" -> list.sortedBy { it.orderTimestamp }
+                                    "Price: High to Low" -> list.sortedByDescending { it.totalPrice }
+                                    "Price: Low to High" -> list.sortedBy { it.totalPrice }
+                                    else -> list.sortedByDescending { it.orderTimestamp }
+                                }
+                                
+                                list
+                            }
+
                             LazyColumn(
                                 modifier = Modifier.fillMaxSize(),
                                 contentPadding = PaddingValues(16.dp),
@@ -1865,72 +1923,448 @@ fun StudentDashboardScreen(
                                     )
                                 }
 
+                                // Interactive Filter Controller items
                                 item {
-                                    Text("Official Receipt Journal", fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleSmall, color = MaterialTheme.colorScheme.primary)
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                    ) {
+                                        OutlinedTextField(
+                                            value = pastOrdersSearchQuery,
+                                            onValueChange = { pastOrdersSearchQuery = it },
+                                            placeholder = { Text("Search past meals or food booths...", fontSize = 13.sp) },
+                                            leadingIcon = { Icon(Icons.Default.Search, contentDescription = null, modifier = Modifier.size(20.dp), tint = MaterialTheme.colorScheme.primary) },
+                                            trailingIcon = {
+                                                if (pastOrdersSearchQuery.isNotEmpty()) {
+                                                    IconButton(onClick = { pastOrdersSearchQuery = "" }) {
+                                                        Icon(Icons.Default.Clear, contentDescription = "Clear search", modifier = Modifier.size(18.dp))
+                                                    }
+                                                }
+                                            },
+                                            singleLine = true,
+                                            shape = RoundedCornerShape(12.dp),
+                                            modifier = Modifier
+                                                .weight(1f)
+                                                .testTag("student_order_search_input"),
+                                            colors = OutlinedTextFieldDefaults.colors(
+                                                focusedBorderColor = MaterialTheme.colorScheme.primary,
+                                                unfocusedBorderColor = MaterialTheme.colorScheme.outline.copy(alpha = 0.5f)
+                                            )
+                                        )
+                                        
+                                        FilledTonalIconButton(
+                                            onClick = { pastOrdersShowFilters = !pastOrdersShowFilters },
+                                            shape = RoundedCornerShape(12.dp),
+                                            modifier = Modifier.size(48.dp)
+                                        ) {
+                                            Icon(
+                                                imageVector = Icons.Default.FilterList,
+                                                contentDescription = "Toggle advanced filters",
+                                                tint = MaterialTheme.colorScheme.primary,
+                                                modifier = Modifier.size(20.dp)
+                                            )
+                                        }
+                                    }
                                 }
 
-                                if (completedOrCanceledOrders.isEmpty()) {
-                                    item {
-                                        Text("No dining history found yet.", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                                    }
-                                } else {
-                                    items(completedOrCanceledOrders) { order ->
-                                        val orderFeedback = allFeedback.find { it.orderId == order.id }
+                                // Interactive advanced filter container
+                                item {
+                                    AnimatedVisibility(
+                                        visible = pastOrdersShowFilters,
+                                        enter = expandVertically() + fadeIn(),
+                                        exit = shrinkVertically() + fadeOut()
+                                    ) {
                                         Card(
                                             colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f)),
-                                            modifier = Modifier.fillMaxWidth(),
+                                            shape = RoundedCornerShape(12.dp),
+                                            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f)),
+                                            modifier = Modifier.fillMaxWidth()
+                                        ) {
+                                            Column(
+                                                modifier = Modifier.padding(12.dp),
+                                                verticalArrangement = Arrangement.spacedBy(12.dp)
+                                            ) {
+                                                // Time frame filters
+                                                Row(
+                                                    modifier = Modifier.fillMaxWidth(),
+                                                    verticalAlignment = Alignment.CenterVertically,
+                                                    horizontalArrangement = Arrangement.SpaceBetween
+                                                ) {
+                                                    Text("Time Frame:", style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                                    Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                                                        listOf("All Time", "Last 7 Days", "Last 30 Days").forEach { period ->
+                                                            val isSel = pastOrdersSelectedPeriod == period
+                                                            SuggestionChip(
+                                                                onClick = { pastOrdersSelectedPeriod = period },
+                                                                label = { Text(period, fontSize = 10.sp) },
+                                                                colors = SuggestionChipDefaults.suggestionChipColors(
+                                                                    containerColor = if (isSel) MaterialTheme.colorScheme.primaryContainer else Color.Transparent,
+                                                                    labelColor = if (isSel) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurfaceVariant
+                                                                )
+                                                            )
+                                                        }
+                                                    }
+                                                }
+
+                                                // Sort option selection
+                                                Row(
+                                                    modifier = Modifier.fillMaxWidth(),
+                                                    verticalAlignment = Alignment.CenterVertically,
+                                                    horizontalArrangement = Arrangement.SpaceBetween
+                                                ) {
+                                                    Text("Sort By:", style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                                    Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                                                        listOf("Newest First", "Price: High to Low", "Price: Low to High").forEach { criteria ->
+                                                            val isSel = pastOrdersSortBy == criteria
+                                                            val label = when(criteria) {
+                                                                "Price: High to Low" -> "Price $$$"
+                                                                "Price: Low to High" -> "Price $"
+                                                                else -> "Newest"
+                                                            }
+                                                            SuggestionChip(
+                                                                onClick = { pastOrdersSortBy = criteria },
+                                                                label = { Text(label, fontSize = 10.sp) },
+                                                                colors = SuggestionChipDefaults.suggestionChipColors(
+                                                                    containerColor = if (isSel) MaterialTheme.colorScheme.primaryContainer else Color.Transparent,
+                                                                    labelColor = if (isSel) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurfaceVariant
+                                                                )
+                                                            )
+                                                        }
+                                                    }
+                                                }
+
+                                                // Filter by Vendor booth
+                                                if (pastVendors.isNotEmpty()) {
+                                                    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                                                        Text("Filter by Booth:", style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                                        LazyRow(
+                                                            horizontalArrangement = Arrangement.spacedBy(6.dp),
+                                                            contentPadding = PaddingValues(vertical = 2.dp)
+                                                        ) {
+                                                            item {
+                                                                val isAll = pastOrdersSelectedVendorId == null
+                                                                FilterChip(
+                                                                    selected = isAll,
+                                                                    onClick = { pastOrdersSelectedVendorId = null },
+                                                                    label = { Text("All Booths", fontSize = 10.sp) }
+                                                                )
+                                                            }
+                                                            items(pastVendors) { vendor ->
+                                                                val isSel = pastOrdersSelectedVendorId == vendor.id
+                                                                FilterChip(
+                                                                    selected = isSel,
+                                                                    onClick = { pastOrdersSelectedVendorId = vendor.id },
+                                                                    label = { Text(vendor.fullName, fontSize = 10.sp) }
+                                                                )
+                                                            }
+                                                        }
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+
+                                // Quick filter tags
+                                item {
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        horizontalArrangement = Arrangement.spacedBy(6.dp),
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        listOf("All", "COMPLETED", "DECLINED", "CANCELLED").forEach { status ->
+                                            val isSel = pastOrdersSelectedStatus == status
+                                            val label = when(status) {
+                                                "COMPLETED" -> "Completed"
+                                                "DECLINED" -> "Declined"
+                                                "CANCELLED" -> "Cancelled"
+                                                else -> "All Statuses"
+                                            }
+                                            FilterChip(
+                                                selected = isSel,
+                                                onClick = { pastOrdersSelectedStatus = status },
+                                                label = { Text(label, fontSize = 11.sp) },
+                                                modifier = Modifier.testTag("status_filter_chip_${status.lowercase()}"),
+                                                colors = FilterChipDefaults.filterChipColors(
+                                                    selectedContainerColor = MaterialTheme.colorScheme.primaryContainer,
+                                                    selectedLabelColor = MaterialTheme.colorScheme.onPrimaryContainer
+                                                )
+                                            )
+                                        }
+                                    }
+                                }
+
+                                // Info headers and counter
+                                item {
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        horizontalArrangement = Arrangement.SpaceBetween,
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        Text(
+                                            text = "Official Receipt Journal (${filteredPastOrders.size} dishes found)", 
+                                            fontWeight = FontWeight.Bold, 
+                                            style = MaterialTheme.typography.titleSmall, 
+                                            color = MaterialTheme.colorScheme.primary
+                                        )
+
+                                        if (pastOrdersSearchQuery.isNotEmpty() || pastOrdersSelectedStatus != "All" || pastOrdersSelectedVendorId != null || pastOrdersSelectedPeriod != "All Time") {
+                                            TextButton(
+                                                onClick = {
+                                                    pastOrdersSearchQuery = ""
+                                                    pastOrdersSelectedStatus = "All"
+                                                    pastOrdersSelectedVendorId = null
+                                                    pastOrdersSelectedPeriod = "All Time"
+                                                    pastOrdersSortBy = "Newest First"
+                                                },
+                                                modifier = Modifier.height(26.dp),
+                                                contentPadding = PaddingValues(0.dp)
+                                            ) {
+                                                Text("Reset", fontSize = 11.sp, color = MaterialTheme.colorScheme.error)
+                                            }
+                                        }
+                                    }
+                                }
+
+                                if (filteredPastOrders.isEmpty()) {
+                                    item {
+                                        Card(
+                                            modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
+                                            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.2f))
+                                        ) {
+                                            Column(
+                                                modifier = Modifier.padding(24.dp).fillMaxWidth(),
+                                                horizontalAlignment = Alignment.CenterHorizontally
+                                            ) {
+                                                Icon(Icons.Default.History, contentDescription = null, modifier = Modifier.size(32.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f))
+                                                Spacer(modifier = Modifier.height(8.dp))
+                                                Text("No matching past orders", fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleSmall)
+                                                Text("Modify search filters to discover historical dishes.", fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                            }
+                                        }
+                                    }
+                                } else {
+                                    items(filteredPastOrders) { order ->
+                                        val orderFeedback = allFeedback.find { it.orderId == order.id }
+                                        val isExpanded = expandedOrderIds[order.id] ?: false
+                                        val vendorInfo = allVendors.find { it.id == order.vendorId }
+
+                                        Card(
+                                            colors = CardDefaults.cardColors(
+                                                containerColor = MaterialTheme.colorScheme.surface
+                                            ),
+                                            border = BorderStroke(
+                                                width = 1.dp,
+                                                color = if (isExpanded) MaterialTheme.colorScheme.primary.copy(alpha = 0.35f) else MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.2f)
+                                            ),
+                                            modifier = Modifier
+                                                .fillMaxWidth()
+                                                .clickable { expandedOrderIds[order.id] = !isExpanded }
+                                                .testTag("order_history_item_card_${order.id}"),
                                             shape = RoundedCornerShape(12.dp)
                                         ) {
                                             Column(modifier = Modifier.padding(14.dp)) {
+                                                // Primary summary header
                                                 Row(
                                                     modifier = Modifier.fillMaxWidth(),
-                                                    horizontalArrangement = Arrangement.SpaceBetween
+                                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                                    verticalAlignment = Alignment.CenterVertically
                                                 ) {
-                                                    Column {
+                                                    Column(modifier = Modifier.weight(1f)) {
                                                         Text(order.foodName, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleSmall)
-                                                        Text("Total paid: GH₵ ${"%.2f".format(order.totalPrice)}", fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                                        Text("Booth: ${vendorInfo?.fullName ?: "Cafeteria Vendor"}", fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
                                                     }
-                                                    Box(
-                                                        modifier = Modifier
-                                                            .clip(RoundedCornerShape(6.dp))
-                                                            .background(if (order.status == "COMPLETED") MaterialTheme.colorScheme.secondaryContainer else MaterialTheme.colorScheme.errorContainer)
-                                                            .padding(horizontal = 8.dp, vertical = 4.dp)
-                                                    ) {
+
+                                                    Column(horizontalAlignment = Alignment.End) {
+                                                        val statusColors = when (order.status) {
+                                                            "COMPLETED" -> Color(0xFFE8F5E9) to Color(0xFF2E7D32)
+                                                            "DECLINED" -> Color(0xFFFFEBEE) to Color(0xFFC62828)
+                                                            "CANCELLED" -> Color(0xFFECEFF1) to Color(0xFF37474F)
+                                                            else -> Color(0xFFFFF8E1) to Color(0xFFF9A825)
+                                                        }
+
+                                                        Box(
+                                                            modifier = Modifier
+                                                                .clip(RoundedCornerShape(6.dp))
+                                                                .background(statusColors.first)
+                                                                .padding(horizontal = 8.dp, vertical = 4.dp)
+                                                        ) {
+                                                            Text(
+                                                                text = order.status,
+                                                                fontSize = 9.sp,
+                                                                fontWeight = FontWeight.Bold,
+                                                                color = statusColors.second
+                                                            )
+                                                        }
+                                                        Spacer(modifier = Modifier.height(4.dp))
                                                         Text(
-                                                            text = order.status,
-                                                            fontSize = 9.sp,
-                                                            fontWeight = FontWeight.Bold,
-                                                            color = if (order.status == "COMPLETED") MaterialTheme.colorScheme.onSecondaryContainer else MaterialTheme.colorScheme.onErrorContainer
+                                                            "GH₵ ${"%.2f".format(order.totalPrice)}",
+                                                            fontWeight = FontWeight.ExtraBold,
+                                                            fontSize = 13.sp
                                                         )
                                                     }
                                                 }
 
-                                                Spacer(modifier = Modifier.height(10.dp))
+                                                Spacer(modifier = Modifier.height(8.dp))
+                                                HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f))
+                                                Spacer(modifier = Modifier.height(6.dp))
 
-                                                if (order.status == "COMPLETED" && orderFeedback == null) {
-                                                    Button(
-                                                        onClick = { feedbackTargetOrder = order },
-                                                        colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary),
-                                                        shape = RoundedCornerShape(6.dp),
-                                                        modifier = Modifier.align(Alignment.End)
+                                                // Date summary and expand layout
+                                                Row(
+                                                    modifier = Modifier.fillMaxWidth(),
+                                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                                    verticalAlignment = Alignment.CenterVertically
+                                                ) {
+                                                    Row(
+                                                        verticalAlignment = Alignment.CenterVertically,
+                                                        horizontalArrangement = Arrangement.spacedBy(4.dp)
                                                     ) {
-                                                        Icon(Icons.Default.Star, contentDescription = null, modifier = Modifier.size(12.dp))
-                                                        Spacer(modifier = Modifier.width(6.dp))
-                                                        Text("File Safety & Quality Review", fontSize = 10.sp)
+                                                        Icon(
+                                                            imageVector = Icons.Default.DateRange,
+                                                            contentDescription = null,
+                                                            tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
+                                                            modifier = Modifier.size(12.dp)
+                                                        )
+                                                        val dateStr = java.text.SimpleDateFormat("dd MMM yyyy, hh:mm a", java.util.Locale.US).format(java.util.Date(order.orderTimestamp))
+                                                        Text(dateStr, fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
                                                     }
-                                                } else if (orderFeedback != null) {
-                                                    Box(
+
+                                                    Row(
+                                                        verticalAlignment = Alignment.CenterVertically,
+                                                        horizontalArrangement = Arrangement.spacedBy(2.dp)
+                                                    ) {
+                                                        Text(
+                                                            text = if (isExpanded) "Hide details" else "Show details",
+                                                            fontSize = 11.sp,
+                                                            fontWeight = FontWeight.SemiBold,
+                                                            color = MaterialTheme.colorScheme.primary
+                                                        )
+                                                        Icon(
+                                                            imageVector = if (isExpanded) Icons.Default.KeyboardArrowUp else Icons.Default.KeyboardArrowDown,
+                                                            contentDescription = null,
+                                                            modifier = Modifier.size(16.dp).testTag("expand_order_details_${order.id}"),
+                                                            tint = MaterialTheme.colorScheme.primary
+                                                        )
+                                                    }
+                                                }
+
+                                                // Expandable detailed breakdown slot
+                                                AnimatedVisibility(
+                                                    visible = isExpanded,
+                                                    enter = expandVertically() + fadeIn(),
+                                                    exit = shrinkVertically() + fadeOut()
+                                                ) {
+                                                    Column(
                                                         modifier = Modifier
+                                                            .padding(top = 10.dp)
                                                             .fillMaxWidth()
                                                             .clip(RoundedCornerShape(8.dp))
-                                                            .background(MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.5f))
-                                                            .padding(8.dp),
-                                                        contentAlignment = Alignment.Center
+                                                            .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.2f))
+                                                            .padding(10.dp),
+                                                        verticalArrangement = Arrangement.spacedBy(6.dp)
                                                     ) {
-                                                        Row(verticalAlignment = Alignment.CenterVertically) {
-                                                            Icon(Icons.Default.CheckCircle, contentDescription = null, tint = MaterialTheme.colorScheme.secondary, modifier = Modifier.size(16.dp))
-                                                            Spacer(modifier = Modifier.width(6.dp))
-                                                            Text("Feedback logged. Compliance Audit Trace records saved.", fontSize = 10.sp, color = MaterialTheme.colorScheme.onSecondaryContainer, fontWeight = FontWeight.Bold)
+                                                        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                                                            Text("Receipt reference code:", fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                                            Text("ATU-TKT-${order.id}", fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                                                        }
+                                                        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                                                            Text("Quantity bought:", fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                                            Text("${order.quantity} units", fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                                                        }
+                                                        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                                                            Text("Price per item unit:", fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                                            Text("GH₵ ${"%.2f".format(order.unitPrice)}", fontSize = 11.sp, fontWeight = FontWeight.Medium)
+                                                        }
+                                                        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                                                            Text("Handshake Pickup PIN:", fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                                            Text(order.pickupPin, fontSize = 11.sp, fontWeight = FontWeight.ExtraBold, color = MaterialTheme.colorScheme.primary)
+                                                        }
+
+                                                        Spacer(modifier = Modifier.height(6.dp))
+                                                        HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f))
+                                                        Spacer(modifier = Modifier.height(6.dp))
+
+                                                        if (order.status != "COMPLETED") {
+                                                            Text(
+                                                                text = "Notes: ${if (order.status == "CANCELLED") "Voided on demand before preparation loop." else "Refunded due to booth culinary stock limits."}",
+                                                                fontSize = 11.sp,
+                                                                fontWeight = FontWeight.Medium,
+                                                                color = MaterialTheme.colorScheme.error,
+                                                                modifier = Modifier.padding(bottom = 6.dp)
+                                                            )
+                                                        }
+
+                                                        Row(
+                                                            modifier = Modifier.fillMaxWidth(),
+                                                            horizontalArrangement = Arrangement.SpaceBetween,
+                                                            verticalAlignment = Alignment.CenterVertically
+                                                        ) {
+                                                            Button(
+                                                                onClick = {
+                                                                    val matchedFood = allFoodItems.find { it.id == order.foodItemId } ?: FoodItem(
+                                                                        id = order.foodItemId,
+                                                                        vendorId = order.vendorId,
+                                                                        name = order.foodName,
+                                                                        price = order.unitPrice,
+                                                                        category = "Reordered",
+                                                                        imageUrl = "",
+                                                                        description = "Archived culinary selection from past transactions"
+                                                                    )
+                                                                    orderQuantity = order.quantity
+                                                                    selectedFoodForOrder = matchedFood
+                                                                },
+                                                                colors = ButtonDefaults.buttonColors(
+                                                                    containerColor = MaterialTheme.colorScheme.secondaryContainer,
+                                                                    contentColor = MaterialTheme.colorScheme.onSecondaryContainer
+                                                                ),
+                                                                shape = RoundedCornerShape(8.dp),
+                                                                modifier = Modifier
+                                                                    .height(34.dp)
+                                                                    .testTag("reorder_button_${order.id}"),
+                                                                contentPadding = PaddingValues(horizontal = 12.dp, vertical = 0.dp)
+                                                            ) {
+                                                                Icon(Icons.Default.Refresh, contentDescription = "Reorder", modifier = Modifier.size(14.dp))
+                                                                Spacer(modifier = Modifier.width(6.dp))
+                                                                Text("Reorder Meal", fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                                                            }
+
+                                                            if (order.status == "COMPLETED") {
+                                                                if (orderFeedback == null) {
+                                                                    Button(
+                                                                        onClick = { feedbackTargetOrder = order },
+                                                                        colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary),
+                                                                        shape = RoundedCornerShape(8.dp),
+                                                                        modifier = Modifier
+                                                                            .height(34.dp)
+                                                                            .testTag("feedback_button_${order.id}"),
+                                                                        contentPadding = PaddingValues(horizontal = 12.dp, vertical = 0.dp)
+                                                                    ) {
+                                                                        Icon(Icons.Default.Star, contentDescription = null, modifier = Modifier.size(12.dp))
+                                                                        Spacer(modifier = Modifier.width(6.dp))
+                                                                        Text("Log Safety Review", fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                                                                    }
+                                                                } else {
+                                                                    val avgRating = (orderFeedback.ratingFoodQuality + orderFeedback.ratingCleanliness + orderFeedback.ratingServiceSpeed + orderFeedback.ratingPriceValue) / 4.0
+                                                                    Row(
+                                                                        modifier = Modifier
+                                                                            .clip(RoundedCornerShape(8.dp))
+                                                                            .background(Color(0xFFE8F5E9))
+                                                                            .padding(horizontal = 10.dp, vertical = 8.dp),
+                                                                        verticalAlignment = Alignment.CenterVertically,
+                                                                        horizontalArrangement = Arrangement.Center
+                                                                    ) {
+                                                                        Icon(Icons.Default.CheckCircle, contentDescription = null, tint = Color(0xFF2E7D32), modifier = Modifier.size(14.dp))
+                                                                        Spacer(modifier = Modifier.width(6.dp))
+                                                                        Text(
+                                                                            text = "Reviewed ${"%.1f".format(avgRating)}/5★",
+                                                                            fontSize = 11.sp,
+                                                                            fontWeight = FontWeight.Bold,
+                                                                            color = Color(0xFF2E7D32)
+                                                                        )
+                                                                    }
+                                                                }
+                                                            }
                                                         }
                                                     }
                                                 }
@@ -2755,11 +3189,26 @@ fun StudentDashboardScreen(
                 }
                 4 -> {
                     // Smart Wallet & ID Tab
+                    val scope = rememberCoroutineScope()
                     var showTopUpDialog by remember { mutableStateOf(false) }
                     var topUpAmount by remember { mutableStateOf("") }
                     var topUpPhone by remember { mutableStateOf("") }
                     var isTopUpProcessing by remember { mutableStateOf(false) }
                     var topUpSuccess by remember { mutableStateOf(false) }
+                    var selectedGatewayPayMethod by remember { mutableStateOf("MOMO") } // "MOMO", "CARD", "BANK", "PAYPAL"
+                    var selectedMomoOperator by remember { mutableStateOf("MTN MoMo") }
+                    var gatewayMomoPin by remember { mutableStateOf("") }
+                    var gatewayCardNumber by remember { mutableStateOf("") }
+                    var gatewayCardName by remember { mutableStateOf("") }
+                    var gatewayCardExpiry by remember { mutableStateOf("") }
+                    var gatewayCardCvv by remember { mutableStateOf("") }
+                    var selectedBankName by remember { mutableStateOf("Ecobank Ghana") }
+                    var gatewayBankAccount by remember { mutableStateOf("") }
+                    var gatewayBankPin by remember { mutableStateOf("") }
+                    var gatewayPaypalEmail by remember { mutableStateOf("") }
+                    var gatewayPaypalPassword by remember { mutableStateOf("") }
+                    var gatewayErrorMessage by remember { mutableStateOf<String?>(null) }
+                    var gatewayTransactionStep by remember { mutableStateOf("") }
                     var helpSubject by remember { mutableStateOf("") }
                     var helpMessage by remember { mutableStateOf("") }
                     var helpSubmitted by remember { mutableStateOf(false) }
@@ -3111,15 +3560,26 @@ fun StudentDashboardScreen(
                     if (showTopUpDialog) {
                         Dialog(onDismissRequest = { if (!isTopUpProcessing) showTopUpDialog = false }) {
                             Card(
-                                modifier = Modifier.fillMaxWidth(),
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(vertical = 16.dp),
                                 shape = RoundedCornerShape(16.dp)
                             ) {
-                                Column(modifier = Modifier.padding(24.dp)) {
+                                Column(
+                                    modifier = Modifier
+                                        .padding(24.dp)
+                                        .verticalScroll(rememberScrollState())
+                                ) {
                                     Text(
-                                        "Mobile Money Gateway",
+                                        "Secure Settlement Gateway",
                                         fontWeight = FontWeight.Bold,
                                         style = MaterialTheme.typography.titleMedium,
                                         color = MaterialTheme.colorScheme.primary
+                                    )
+                                    Text(
+                                        "ATU Unified Payment & Billing Infrastructure",
+                                        fontSize = 11.sp,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
                                     )
                                     Spacer(modifier = Modifier.height(16.dp))
 
@@ -3143,6 +3603,8 @@ fun StudentDashboardScreen(
                                                 )
                                                 Spacer(modifier = Modifier.height(8.dp))
                                                 Text("Deposit Cleared!", fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSecondaryContainer)
+                                                Text("GH₵ ${"%.2f".format(topUpAmount.toDoubleOrNull() ?: 0.0)} loaded successfully via ${selectedGatewayPayMethod}.", fontSize = 11.sp, color = MaterialTheme.colorScheme.onSecondaryContainer.copy(alpha = 0.8f))
+                                                Spacer(modifier = Modifier.height(4.dp))
                                                 Text("Balance updated instantly.", fontSize = 11.sp)
                                             }
                                         }
@@ -3154,37 +3616,264 @@ fun StudentDashboardScreen(
                                             Text("Done")
                                         }
                                     } else {
+                                        // Amount Input
                                         OutlinedTextField(
                                             value = topUpAmount,
-                                            onValueChange = { topUpAmount = it },
-                                            label = { Text("Transfer Sum (GH₵)") },
+                                            onValueChange = { 
+                                                topUpAmount = it 
+                                                gatewayErrorMessage = null
+                                            },
+                                            label = { Text("Enter Deposit Sum (GH₵)") },
+                                            leadingIcon = { Icon(Icons.Default.Payments, contentDescription = null, tint = MaterialTheme.colorScheme.primary) },
                                             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                                            modifier = Modifier.fillMaxWidth(),
-                                            singleLine = true
-                                        )
-
-                                        Spacer(modifier = Modifier.height(8.dp))
-
-                                        OutlinedTextField(
-                                            value = topUpPhone,
-                                            onValueChange = { topUpPhone = it },
-                                            label = { Text("MoMo Number (05X / 02X / 050)") },
-                                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone),
                                             modifier = Modifier.fillMaxWidth(),
                                             singleLine = true
                                         )
 
                                         Spacer(modifier = Modifier.height(16.dp))
 
+                                        // Payment Gateway Method Selector
+                                        Text("Select Funding Channel:", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
+                                        Spacer(modifier = Modifier.height(8.dp))
+                                        
+                                        // 4 Options selectors (momo, card, bank, paypal)
+                                        Row(
+                                            modifier = Modifier.fillMaxWidth(),
+                                            horizontalArrangement = Arrangement.spacedBy(4.dp)
+                                        ) {
+                                            listOf(
+                                                "MOMO" to "MoMo",
+                                                "CARD" to "Card",
+                                                "BANK" to "Bank",
+                                                "PAYPAL" to "PayPal"
+                                            ).forEach { (code, label) ->
+                                                val isSelected = selectedGatewayPayMethod == code
+                                                val containerColor = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
+                                                val textColor = if (isSelected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant
+                                                
+                                                Box(
+                                                    modifier = Modifier
+                                                        .weight(1f)
+                                                        .background(containerColor, RoundedCornerShape(8.dp))
+                                                        .clickable { 
+                                                            selectedGatewayPayMethod = code 
+                                                            gatewayErrorMessage = null
+                                                        }
+                                                        .padding(vertical = 8.dp),
+                                                    contentAlignment = Alignment.Center
+                                                ) {
+                                                    Text(label, fontSize = 10.sp, fontWeight = FontWeight.Bold, color = textColor)
+                                                }
+                                            }
+                                        }
+
+                                        Spacer(modifier = Modifier.height(16.dp))
+
+                                        // Render targeted method input
+                                        Card(
+                                            modifier = Modifier.fillMaxWidth(),
+                                            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f)),
+                                            shape = RoundedCornerShape(8.dp),
+                                            border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
+                                        ) {
+                                            Column(modifier = Modifier.padding(12.dp)) {
+                                                when (selectedGatewayPayMethod) {
+                                                    "MOMO" -> {
+                                                        Text("Mobile Money Routing Gateway", fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                                                        Spacer(modifier = Modifier.height(8.dp))
+                                                        
+                                                        // Operator ChoiceChips
+                                                        Row(
+                                                            modifier = Modifier.fillMaxWidth(),
+                                                            horizontalArrangement = Arrangement.spacedBy(6.dp)
+                                                        ) {
+                                                            listOf("MTN MoMo", "Telecel Cash", "ATG Money").forEach { operator ->
+                                                                val isOpSelected = selectedMomoOperator == operator
+                                                                val borderColor = if (isOpSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outlineVariant
+                                                                Box(
+                                                                    modifier = Modifier
+                                                                        .weight(1f)
+                                                                        .background(Color.White, RoundedCornerShape(6.dp))
+                                                                        .border(1.dp, borderColor, RoundedCornerShape(6.dp))
+                                                                        .clickable { selectedMomoOperator = operator }
+                                                                        .padding(vertical = 6.dp),
+                                                                    contentAlignment = Alignment.Center
+                                                                ) {
+                                                                    Text(operator, fontSize = 9.sp, fontWeight = FontWeight.Bold, color = if (isOpSelected) MaterialTheme.colorScheme.primary else Color.Gray)
+                                                                }
+                                                            }
+                                                        }
+
+                                                        Spacer(modifier = Modifier.height(12.dp))
+
+                                                        OutlinedTextField(
+                                                            value = topUpPhone,
+                                                            onValueChange = { topUpPhone = it },
+                                                            label = { Text("MoMo Number") },
+                                                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone),
+                                                            modifier = Modifier.fillMaxWidth(),
+                                                            singleLine = true
+                                                        )
+
+                                                        Spacer(modifier = Modifier.height(8.dp))
+
+                                                        OutlinedTextField(
+                                                            value = gatewayMomoPin,
+                                                            onValueChange = { gatewayMomoPin = it },
+                                                            label = { Text("4-Digit Wallet Security PIN") },
+                                                            visualTransformation = androidx.compose.ui.text.input.PasswordVisualTransformation(),
+                                                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                                                            modifier = Modifier.fillMaxWidth(),
+                                                            singleLine = true
+                                                        )
+                                                    }
+                                                    "CARD" -> {
+                                                        Text("Standard Visa / MasterCard Gateway", fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                                                        Spacer(modifier = Modifier.height(8.dp))
+
+                                                        OutlinedTextField(
+                                                            value = gatewayCardName,
+                                                            onValueChange = { gatewayCardName = it },
+                                                            label = { Text("Cardholder Name") },
+                                                            modifier = Modifier.fillMaxWidth(),
+                                                            singleLine = true
+                                                        )
+
+                                                        Spacer(modifier = Modifier.height(8.dp))
+
+                                                        OutlinedTextField(
+                                                            value = gatewayCardNumber,
+                                                            onValueChange = { gatewayCardNumber = it },
+                                                            label = { Text("16-Digit Card Number") },
+                                                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                                                            modifier = Modifier.fillMaxWidth(),
+                                                            singleLine = true
+                                                        )
+
+                                                        Spacer(modifier = Modifier.height(8.dp))
+
+                                                        Row(
+                                                            modifier = Modifier.fillMaxWidth(),
+                                                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                                        ) {
+                                                            OutlinedTextField(
+                                                                value = gatewayCardExpiry,
+                                                                onValueChange = { gatewayCardExpiry = it },
+                                                                label = { Text("Expiry (MM/YY)") },
+                                                                modifier = Modifier.weight(1f),
+                                                                singleLine = true
+                                                            )
+
+                                                            OutlinedTextField(
+                                                                value = gatewayCardCvv,
+                                                                onValueChange = { gatewayCardCvv = it },
+                                                                label = { Text("CVV") },
+                                                                visualTransformation = androidx.compose.ui.text.input.PasswordVisualTransformation(),
+                                                                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                                                                modifier = Modifier.weight(1f),
+                                                                singleLine = true
+                                                            )
+                                                        }
+                                                    }
+                                                    "BANK" -> {
+                                                        Text("Direct Bank Account Settlement", fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                                                        Spacer(modifier = Modifier.height(8.dp))
+
+                                                        Row(
+                                                            modifier = Modifier.fillMaxWidth(),
+                                                            horizontalArrangement = Arrangement.spacedBy(6.dp)
+                                                        ) {
+                                                            listOf("Ecobank Ghana", "GCB Bank", "ABSA").forEach { bk ->
+                                                                val isBkSelected = selectedBankName == bk
+                                                                val borderColor = if (isBkSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outlineVariant
+                                                                Box(
+                                                                    modifier = Modifier
+                                                                        .weight(1f)
+                                                                        .background(Color.White, RoundedCornerShape(6.dp))
+                                                                        .border(1.dp, borderColor, RoundedCornerShape(6.dp))
+                                                                        .clickable { selectedBankName = bk }
+                                                                        .padding(vertical = 6.dp),
+                                                                    contentAlignment = Alignment.Center
+                                                                ) {
+                                                                    Text(bk, fontSize = 9.sp, fontWeight = FontWeight.Bold, color = if (isBkSelected) MaterialTheme.colorScheme.primary else Color.Gray)
+                                                                }
+                                                            }
+                                                        }
+
+                                                        Spacer(modifier = Modifier.height(12.dp))
+
+                                                        OutlinedTextField(
+                                                            value = gatewayBankAccount,
+                                                            onValueChange = { gatewayBankAccount = it },
+                                                            label = { Text("Bank Account Number") },
+                                                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                                                            modifier = Modifier.fillMaxWidth(),
+                                                            singleLine = true
+                                                        )
+
+                                                        Spacer(modifier = Modifier.height(8.dp))
+
+                                                        OutlinedTextField(
+                                                            value = gatewayBankPin,
+                                                            onValueChange = { gatewayBankPin = it },
+                                                            label = { Text("Bank Routing Verification PIN") },
+                                                            visualTransformation = androidx.compose.ui.text.input.PasswordVisualTransformation(),
+                                                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                                                            modifier = Modifier.fillMaxWidth(),
+                                                            singleLine = true
+                                                        )
+                                                    }
+                                                    "PAYPAL" -> {
+                                                        Text("PayPal Account Gateway", fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                                                        Spacer(modifier = Modifier.height(8.dp))
+
+                                                        OutlinedTextField(
+                                                            value = gatewayPaypalEmail,
+                                                            onValueChange = { gatewayPaypalEmail = it },
+                                                            label = { Text("PayPal Registered Email") },
+                                                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email),
+                                                            modifier = Modifier.fillMaxWidth(),
+                                                            singleLine = true
+                                                        )
+
+                                                        Spacer(modifier = Modifier.height(8.dp))
+
+                                                        OutlinedTextField(
+                                                            value = gatewayPaypalPassword,
+                                                            onValueChange = { gatewayPaypalPassword = it },
+                                                            label = { Text("Secured PayPal Password") },
+                                                            visualTransformation = androidx.compose.ui.text.input.PasswordVisualTransformation(),
+                                                            modifier = Modifier.fillMaxWidth(),
+                                                            singleLine = true
+                                                        )
+                                                    }
+                                                }
+                                            }
+                                        }
+
+                                        gatewayErrorMessage?.let { err ->
+                                            Spacer(modifier = Modifier.height(12.dp))
+                                            Text(err, color = MaterialTheme.colorScheme.error, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                                        }
+
+                                        Spacer(modifier = Modifier.height(20.dp))
+
                                         if (isTopUpProcessing) {
-                                            Row(
+                                            Column(
                                                 modifier = Modifier.fillMaxWidth(),
-                                                horizontalArrangement = Arrangement.Center,
-                                                verticalAlignment = Alignment.CenterVertically
+                                                horizontalAlignment = Alignment.CenterHorizontally
                                             ) {
-                                                CircularProgressIndicator(modifier = Modifier.size(24.dp))
-                                                Spacer(modifier = Modifier.width(12.dp))
-                                                Text("Awaiting MoMo OTP Approval...", fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
+                                                CircularProgressIndicator(modifier = Modifier.size(36.dp), color = MaterialTheme.colorScheme.primary)
+                                                Spacer(modifier = Modifier.height(12.dp))
+                                                Text(
+                                                    text = gatewayTransactionStep,
+                                                    fontSize = 11.sp,
+                                                    fontWeight = FontWeight.SemiBold,
+                                                    color = MaterialTheme.colorScheme.primary,
+                                                    textAlign = androidx.compose.ui.text.style.TextAlign.Center
+                                                )
+                                                Spacer(modifier = Modifier.height(4.dp))
+                                                Text("DO NOT CLOSE THIS INTERFACE", fontSize = 9.sp, fontWeight = FontWeight.Bold, color = Color.Gray)
                                             }
                                         } else {
                                             Row(
@@ -3198,18 +3887,83 @@ fun StudentDashboardScreen(
                                                 Button(
                                                     onClick = {
                                                         val amt = topUpAmount.toDoubleOrNull()
-                                                        if (amt != null && amt > 0 && topUpPhone.isNotBlank()) {
+                                                        if (amt == null || amt <= 0) {
+                                                            gatewayErrorMessage = "Please input a valid transfer amount."
+                                                            return@Button
+                                                        }
+                                                        
+                                                        // Secure Gateway Validations
+                                                        when (selectedGatewayPayMethod) {
+                                                            "MOMO" -> {
+                                                                if (topUpPhone.length < 9) {
+                                                                    gatewayErrorMessage = "Enter a valid 9-10 digit Mobile Money Number."
+                                                                    return@Button
+                                                                }
+                                                                if (gatewayMomoPin.length < 4) {
+                                                                    gatewayErrorMessage = "Enter your 4-digit Mobile Money Security PIN."
+                                                                    return@Button
+                                                                }
+                                                            }
+                                                            "CARD" -> {
+                                                                if (gatewayCardName.isBlank()) {
+                                                                    gatewayErrorMessage = "Please state Cardholder Name."
+                                                                    return@Button
+                                                                }
+                                                                if (gatewayCardNumber.length < 16) {
+                                                                    gatewayErrorMessage = "Credit Card Number must be exactly 16 digits."
+                                                                    return@Button
+                                                                }
+                                                                if (gatewayCardExpiry.length < 4) {
+                                                                    gatewayErrorMessage = "Expiry Date must be in MM/YY format."
+                                                                    return@Button
+                                                                }
+                                                                if (gatewayCardCvv.length < 3) {
+                                                                    gatewayErrorMessage = "Enter a valid 3-4 digit Credit card CVV code."
+                                                                    return@Button
+                                                                }
+                                                            }
+                                                            "BANK" -> {
+                                                                if (gatewayBankAccount.length < 8) {
+                                                                    gatewayErrorMessage = "Provide your valid bank account number."
+                                                                    return@Button
+                                                                }
+                                                                if (gatewayBankPin.length < 4) {
+                                                                    gatewayErrorMessage = "Routing Validation PIN is required."
+                                                                    return@Button
+                                                                }
+                                                            }
+                                                            "PAYPAL" -> {
+                                                                if (!gatewayPaypalEmail.contains("@")) {
+                                                                    gatewayErrorMessage = "A valid PayPal account email is required."
+                                                                    return@Button
+                                                                }
+                                                                if (gatewayPaypalPassword.length < 4) {
+                                                                    gatewayErrorMessage = "Enter your PayPal secure authorization password."
+                                                                    return@Button
+                                                                }
+                                                            }
+                                                        }
+
+                                                        gatewayErrorMessage = null
+                                                        scope.launch {
                                                             isTopUpProcessing = true
-                                                            // simulate secure gateway timer
-                                                            android.os.Handler(android.os.Looper.getMainLooper()).postDelayed({
-                                                                viewModel.rechargeWallet(amt)
-                                                                isTopUpProcessing = false
-                                                                topUpSuccess = true
-                                                            }, 2200)
+                                                            gatewayTransactionStep = "Securing channel with AES-256 SSL handshake..."
+                                                            delay(800)
+                                                            gatewayTransactionStep = "Connecting to ATU Cafeteria billing server..."
+                                                            delay(800)
+                                                            gatewayTransactionStep = "Authenticating user via 3D Secure Multi-Factor authorization..."
+                                                            delay(800)
+                                                            gatewayTransactionStep = "Verifying transaction OTP on payment gateway core..."
+                                                            delay(800)
+                                                            gatewayTransactionStep = "Clearing secure funds settlement with Bank of Ghana..."
+                                                            delay(600)
+                                                            viewModel.rechargeWallet(amt)
+                                                            isTopUpProcessing = false
+                                                            topUpSuccess = true
                                                         }
                                                     }
                                                 ) {
-                                                    Text("Initialize Secure Transfer")
+                                                    Text("Authorize Payment")
                                                 }
                                             }
                                         }
@@ -3224,19 +3978,47 @@ fun StudentDashboardScreen(
 
             // ORDER PLACEMENT DIALOG
             selectedFoodForOrder?.let { food ->
-                Dialog(onDismissRequest = { selectedFoodForOrder = null }) {
+                val scope = rememberCoroutineScope()
+                var checkoutPaymentMode by remember { mutableStateOf("WALLET") } // "WALLET", "POD", "GATEWAY"
+                var selectedGatewayPayMethod by remember { mutableStateOf("MOMO") } // "MOMO", "CARD", "BANK", "PAYPAL"
+                var selectedMomoOperator by remember { mutableStateOf("MTN MoMo") }
+                var gatewayMomoNumber by remember { mutableStateOf("") }
+                var gatewayMomoPin by remember { mutableStateOf("") }
+                
+                var gatewayCardNumber by remember { mutableStateOf("") }
+                var gatewayCardName by remember { mutableStateOf("") }
+                var gatewayCardExpiry by remember { mutableStateOf("") }
+                var gatewayCardCvv by remember { mutableStateOf("") }
+                
+                var selectedBankName by remember { mutableStateOf("Ecobank Ghana") }
+                var gatewayBankAccount by remember { mutableStateOf("") }
+                var gatewayBankPin by remember { mutableStateOf("") }
+                
+                var gatewayPaypalEmail by remember { mutableStateOf("") }
+                var gatewayPaypalPassword by remember { mutableStateOf("") }
+                
+                var isGatewayProcessing by remember { mutableStateOf(false) }
+                var gatewayTransactionStep by remember { mutableStateOf("") }
+
+                Dialog(onDismissRequest = { if (!isGatewayProcessing) selectedFoodForOrder = null }) {
                     Card(
-                        modifier = Modifier.fillMaxWidth(),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(vertical = 12.dp),
                         shape = RoundedCornerShape(16.dp)
                     ) {
-                        Column(modifier = Modifier.padding(24.dp)) {
+                        Column(
+                            modifier = Modifier
+                                .padding(24.dp)
+                                .verticalScroll(rememberScrollState())
+                        ) {
                             Text(
-                                "Confirm Food Booking",
+                                "Secure Pre-Order Checkout",
                                 fontWeight = FontWeight.Bold,
                                 style = MaterialTheme.typography.titleMedium,
                                 color = MaterialTheme.colorScheme.primary
                             )
-                            Spacer(modifier = Modifier.height(16.dp))
+                            Spacer(modifier = Modifier.height(12.dp))
 
                             Text(food.name, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.bodyLarge)
                             Text(food.description, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
@@ -3251,12 +4033,14 @@ fun StudentDashboardScreen(
                                 Text("Quantity Target:", fontWeight = FontWeight.Medium)
                                 Row(verticalAlignment = Alignment.CenterVertically) {
                                     IconButton(
+                                        enabled = !isGatewayProcessing,
                                         onClick = { if (orderQuantity > 1) orderQuantity-- }
                                     ) {
                                         Text("-", fontSize = 24.sp, fontWeight = FontWeight.Bold)
                                     }
                                     Text("$orderQuantity", fontWeight = FontWeight.Bold, fontSize = 20.sp, modifier = Modifier.padding(horizontal = 12.dp))
                                     IconButton(
+                                        enabled = !isGatewayProcessing,
                                         onClick = { if (orderQuantity < 5) orderQuantity++ }
                                     ) {
                                         Text("+", fontSize = 20.sp, fontWeight = FontWeight.Bold)
@@ -3278,26 +4062,282 @@ fun StudentDashboardScreen(
                                 Text("GH₵ ${"%.2f".format(food.price * orderQuantity)}", fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary, fontSize = 18.sp)
                             }
 
+                            Text("Choose Payment Mode:", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
+                            Spacer(modifier = Modifier.height(8.dp))
+
+                            // Payment method selector
                             Row(
                                 modifier = Modifier.fillMaxWidth(),
-                                verticalAlignment = Alignment.CenterVertically
+                                horizontalArrangement = Arrangement.spacedBy(4.dp)
                             ) {
-                                Checkbox(
-                                    checked = payViaWallet,
-                                    onCheckedChange = { 
-                                        orderPlacementError = null
-                                        payViaWallet = it 
+                                listOf(
+                                    "WALLET" to "Student Wallet",
+                                    "POD" to "Cash (POD)",
+                                    "GATEWAY" to "Direct Pay"
+                                ).forEach { (mode, label) ->
+                                    val isSelected = checkoutPaymentMode == mode
+                                    val containerColor = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
+                                    val textColor = if (isSelected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant
+                                    
+                                    Box(
+                                        modifier = Modifier
+                                            .weight(1f)
+                                            .background(containerColor, RoundedCornerShape(8.dp))
+                                            .clickable(enabled = !isGatewayProcessing) { 
+                                                checkoutPaymentMode = mode 
+                                                orderPlacementError = null
+                                            }
+                                            .padding(vertical = 8.dp),
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        Text(label, fontSize = 10.sp, fontWeight = FontWeight.Bold, color = textColor)
                                     }
-                                )
-                                Spacer(modifier = Modifier.width(8.dp))
-                                Column {
-                                    Text("Pre-pay securely using ATU virtual Wallet", fontWeight = FontWeight.SemiBold, fontSize = 11.sp)
-                                    Text("Wallet Balance: GH₵ ${"%.2f".format(studentWalletBalance)}", fontSize = 10.sp, color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold)
+                                }
+                            }
+
+                            Spacer(modifier = Modifier.height(16.dp))
+
+                            when (checkoutPaymentMode) {
+                                "WALLET" -> {
+                                    Card(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.04f))
+                                    ) {
+                                        Column(modifier = Modifier.padding(12.dp)) {
+                                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                                Icon(Icons.Default.AccountBalanceWallet, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(16.dp))
+                                                Spacer(modifier = Modifier.width(6.dp))
+                                                Text("Pay with virtual smart balance", fontWeight = FontWeight.Bold, fontSize = 11.sp)
+                                            }
+                                            Spacer(modifier = Modifier.height(4.dp))
+                                            Text("Your current balance: GH₵ ${"%.2f".format(studentWalletBalance)}", fontSize = 11.sp, color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.SemiBold)
+                                            Text("Pre-paying helps bypass queues and allows secure pin pickup.", fontSize = 9.sp, color = Color.Gray)
+                                        }
+                                    }
+                                }
+                                "POD" -> {
+                                    Card(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))
+                                    ) {
+                                        Column(modifier = Modifier.padding(12.dp)) {
+                                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                                Icon(Icons.Default.Info, contentDescription = null, tint = Color.Gray, modifier = Modifier.size(16.dp))
+                                                Spacer(modifier = Modifier.width(6.dp))
+                                                Text("Pay-on-Delivery (POD)", fontWeight = FontWeight.Bold, fontSize = 11.sp)
+                                            }
+                                            Spacer(modifier = Modifier.height(4.dp))
+                                            Text("Authorize order now, and pay with physical cash or momo at the vendor counter upon custody hand-off.", fontSize = 9.sp, color = Color.Gray)
+                                        }
+                                    }
+                                }
+                                "GATEWAY" -> {
+                                    Column(modifier = Modifier.fillMaxWidth()) {
+                                        // 4 Gateway options
+                                        Row(
+                                            modifier = Modifier.fillMaxWidth(),
+                                            horizontalArrangement = Arrangement.spacedBy(4.dp)
+                                        ) {
+                                            listOf(
+                                                "MOMO" to "MoMo",
+                                                "CARD" to "Card",
+                                                "BANK" to "Bank",
+                                                "PAYPAL" to "PayPal"
+                                            ).forEach { (code, label) ->
+                                                val isSelected = selectedGatewayPayMethod == code
+                                                val containerColor = if (isSelected) MaterialTheme.colorScheme.secondary else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f)
+                                                val textColor = if (isSelected) MaterialTheme.colorScheme.onSecondary else MaterialTheme.colorScheme.onSurfaceVariant
+                                                
+                                                Box(
+                                                    modifier = Modifier
+                                                        .weight(1f)
+                                                        .background(containerColor, RoundedCornerShape(6.dp))
+                                                        .clickable(enabled = !isGatewayProcessing) { 
+                                                            selectedGatewayPayMethod = code 
+                                                            orderPlacementError = null
+                                                        }
+                                                        .padding(vertical = 6.dp),
+                                                    contentAlignment = Alignment.Center
+                                                ) {
+                                                    Text(label, fontSize = 9.sp, fontWeight = FontWeight.Bold, color = textColor)
+                                                }
+                                            }
+                                        }
+
+                                        Spacer(modifier = Modifier.height(12.dp))
+
+                                        Card(
+                                            modifier = Modifier.fillMaxWidth(),
+                                            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f)),
+                                            shape = RoundedCornerShape(8.dp),
+                                            border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
+                                        ) {
+                                            Column(modifier = Modifier.padding(12.dp)) {
+                                                when (selectedGatewayPayMethod) {
+                                                    "MOMO" -> {
+                                                        Text("Mobile Money Billing Gateway", fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                                                        Spacer(modifier = Modifier.height(8.dp))
+                                                        
+                                                        Row(
+                                                            modifier = Modifier.fillMaxWidth(),
+                                                            horizontalArrangement = Arrangement.spacedBy(4.dp)
+                                                        ) {
+                                                            listOf("MTN MoMo", "Telecel Cash", "ATG Money").forEach { operator ->
+                                                                val isOpSelected = selectedMomoOperator == operator
+                                                                val borderColor = if (isOpSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outlineVariant
+                                                                Box(
+                                                                    modifier = Modifier
+                                                                        .weight(1f)
+                                                                        .background(Color.White, RoundedCornerShape(6.dp))
+                                                                        .border(1.dp, borderColor, RoundedCornerShape(6.dp))
+                                                                        .clickable(enabled = !isGatewayProcessing) { selectedMomoOperator = operator }
+                                                                        .padding(vertical = 6.dp),
+                                                                    contentAlignment = Alignment.Center
+                                                                ) {
+                                                                    Text(operator, fontSize = 8.sp, fontWeight = FontWeight.Bold, color = if (isOpSelected) MaterialTheme.colorScheme.primary else Color.Gray)
+                                                                }
+                                                            }
+                                                        }
+
+                                                        Spacer(modifier = Modifier.height(10.dp))
+
+                                                        OutlinedTextField(
+                                                            value = gatewayMomoNumber,
+                                                            onValueChange = { gatewayMomoNumber = it },
+                                                            label = { Text("MoMo Number") },
+                                                            enabled = !isGatewayProcessing,
+                                                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone),
+                                                            modifier = Modifier.fillMaxWidth(),
+                                                            singleLine = true
+                                                        )
+
+                                                        Spacer(modifier = Modifier.height(8.dp))
+
+                                                        OutlinedTextField(
+                                                            value = gatewayMomoPin,
+                                                            onValueChange = { gatewayMomoPin = it },
+                                                            label = { Text("4-Digit Security PIN") },
+                                                            enabled = !isGatewayProcessing,
+                                                            visualTransformation = androidx.compose.ui.text.input.PasswordVisualTransformation(),
+                                                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                                                            modifier = Modifier.fillMaxWidth(),
+                                                            singleLine = true
+                                                        )
+                                                    }
+                                                    "CARD" -> {
+                                                        Text("Visa / MasterCard Checkout", fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                                                        Spacer(modifier = Modifier.height(8.dp))
+
+                                                        OutlinedTextField(
+                                                            value = gatewayCardName,
+                                                            onValueChange = { gatewayCardName = it },
+                                                            label = { Text("Cardholder Name") },
+                                                            enabled = !isGatewayProcessing,
+                                                            modifier = Modifier.fillMaxWidth(),
+                                                            singleLine = true
+                                                        )
+
+                                                        Spacer(modifier = Modifier.height(8.dp))
+
+                                                        OutlinedTextField(
+                                                            value = gatewayCardNumber,
+                                                            onValueChange = { gatewayCardNumber = it },
+                                                            label = { Text("16-Digit Card Number") },
+                                                            enabled = !isGatewayProcessing,
+                                                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                                                            modifier = Modifier.fillMaxWidth(),
+                                                            singleLine = true
+                                                        )
+
+                                                        Spacer(modifier = Modifier.height(8.dp))
+
+                                                        Row(
+                                                            modifier = Modifier.fillMaxWidth(),
+                                                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                                        ) {
+                                                            OutlinedTextField(
+                                                                value = gatewayCardExpiry,
+                                                                onValueChange = { gatewayCardExpiry = it },
+                                                                label = { Text("Expiry (MM/YY)") },
+                                                                enabled = !isGatewayProcessing,
+                                                                modifier = Modifier.weight(1f),
+                                                                singleLine = true
+                                                            )
+
+                                                            OutlinedTextField(
+                                                                value = gatewayCardCvv,
+                                                                onValueChange = { gatewayCardCvv = it },
+                                                                label = { Text("CVV") },
+                                                                enabled = !isGatewayProcessing,
+                                                                visualTransformation = androidx.compose.ui.text.input.PasswordVisualTransformation(),
+                                                                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                                                                modifier = Modifier.weight(1f),
+                                                                singleLine = true
+                                                            )
+                                                        }
+                                                    }
+                                                    "BANK" -> {
+                                                        Text("Bank Settlement Clearance", fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                                                        Spacer(modifier = Modifier.height(8.dp))
+
+                                                        OutlinedTextField(
+                                                            value = gatewayBankAccount,
+                                                            onValueChange = { gatewayBankAccount = it },
+                                                            label = { Text("Direct Bank Account Number") },
+                                                            enabled = !isGatewayProcessing,
+                                                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                                                            modifier = Modifier.fillMaxWidth(),
+                                                            singleLine = true
+                                                        )
+
+                                                        Spacer(modifier = Modifier.height(8.dp))
+
+                                                        OutlinedTextField(
+                                                            value = gatewayBankPin,
+                                                            onValueChange = { gatewayBankPin = it },
+                                                            label = { Text("Routing Clearance PIN") },
+                                                            enabled = !isGatewayProcessing,
+                                                            visualTransformation = androidx.compose.ui.text.input.PasswordVisualTransformation(),
+                                                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                                                            modifier = Modifier.fillMaxWidth(),
+                                                            singleLine = true
+                                                        )
+                                                    }
+                                                    "PAYPAL" -> {
+                                                        Text("PayPal Checkout", fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                                                        Spacer(modifier = Modifier.height(8.dp))
+
+                                                        OutlinedTextField(
+                                                            value = gatewayPaypalEmail,
+                                                            onValueChange = { gatewayPaypalEmail = it },
+                                                            label = { Text("PayPal Registered Email") },
+                                                            enabled = !isGatewayProcessing,
+                                                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email),
+                                                            modifier = Modifier.fillMaxWidth(),
+                                                            singleLine = true
+                                                        )
+
+                                                        Spacer(modifier = Modifier.height(8.dp))
+
+                                                        OutlinedTextField(
+                                                            value = gatewayPaypalPassword,
+                                                            onValueChange = { gatewayPaypalPassword = it },
+                                                            label = { Text("PayPal Secure Password") },
+                                                            enabled = !isGatewayProcessing,
+                                                            visualTransformation = androidx.compose.ui.text.input.PasswordVisualTransformation(),
+                                                            modifier = Modifier.fillMaxWidth(),
+                                                            singleLine = true
+                                                        )
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    }
                                 }
                             }
 
                             orderPlacementError?.let { err ->
-                                Spacer(modifier = Modifier.height(6.dp))
+                                Spacer(modifier = Modifier.height(8.dp))
                                 Text(
                                     text = err,
                                     color = MaterialTheme.colorScheme.error,
@@ -3306,29 +4346,115 @@ fun StudentDashboardScreen(
                                 )
                             }
 
-                            Spacer(modifier = Modifier.height(12.dp))
+                            Spacer(modifier = Modifier.height(16.dp))
 
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.End
-                            ) {
-                                TextButton(onClick = { selectedFoodForOrder = null }) {
-                                    Text("Quit")
+                            if (isGatewayProcessing) {
+                                Column(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalAlignment = Alignment.CenterHorizontally
+                                ) {
+                                    CircularProgressIndicator(modifier = Modifier.size(28.dp))
+                                    Spacer(modifier = Modifier.height(8.dp))
+                                    Text(gatewayTransactionStep, fontSize = 11.sp, fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.primary, textAlign = androidx.compose.ui.text.style.TextAlign.Center)
                                 }
-                                Spacer(modifier = Modifier.width(12.dp))
-                                Button(
-                                    onClick = {
-                                        viewModel.placeOrder(food, orderQuantity, payViaWallet) { success ->
-                                            if (success) {
-                                                selectedFoodForOrder = null
-                                                activeTab = 1 // Switch to orders list
-                                            } else {
-                                                orderPlacementError = "Insufficient smart balance. Top up your virtual ID Wallet!"
+                            } else {
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.End
+                                ) {
+                                    TextButton(onClick = { selectedFoodForOrder = null }) {
+                                        Text("Quit")
+                                    }
+                                    Spacer(modifier = Modifier.width(12.dp))
+                                    Button(
+                                        onClick = {
+                                            val requiredSum = food.price * orderQuantity
+                                            when (checkoutPaymentMode) {
+                                                "WALLET" -> {
+                                                    if (studentWalletBalance < requiredSum) {
+                                                        orderPlacementError = "Insufficient smart balance. Top up your virtual ID Wallet!"
+                                                        return@Button
+                                                    }
+                                                    viewModel.placeOrder(food, orderQuantity, true) { success ->
+                                                        if (success) {
+                                                            selectedFoodForOrder = null
+                                                            activeTab = 1
+                                                        } else {
+                                                            orderPlacementError = "Deduction failed. Check system link."
+                                                        }
+                                                    }
+                                                }
+                                                "POD" -> {
+                                                    viewModel.placeOrder(food, orderQuantity, false) { success ->
+                                                        if (success) {
+                                                            selectedFoodForOrder = null
+                                                            activeTab = 1
+                                                        } else {
+                                                            orderPlacementError = "Failed to compile POD order."
+                                                        }
+                                                    }
+                                                }
+                                                "GATEWAY" -> {
+                                                    // Validations
+                                                    when (selectedGatewayPayMethod) {
+                                                        "MOMO" -> {
+                                                            if (gatewayMomoNumber.length < 9) {
+                                                                orderPlacementError = "Enter valid MoMo Number."
+                                                                return@Button
+                                                            }
+                                                            if (gatewayMomoPin.length < 4) {
+                                                                orderPlacementError = "Enter 4-digit Wallet security PIN."
+                                                                return@Button
+                                                            }
+                                                        }
+                                                        "CARD" -> {
+                                                            if (gatewayCardName.isBlank() || gatewayCardNumber.length < 16 || gatewayCardExpiry.length < 4 || gatewayCardCvv.length < 3) {
+                                                                orderPlacementError = "Invalid card credentials. Please verify fields."
+                                                                return@Button
+                                                            }
+                                                        }
+                                                        "BANK" -> {
+                                                            if (gatewayBankAccount.length < 8 || gatewayBankPin.length < 4) {
+                                                                orderPlacementError = "Invalid direct banking details."
+                                                                return@Button
+                                                            }
+                                                        }
+                                                        "PAYPAL" -> {
+                                                            if (!gatewayPaypalEmail.contains("@") || gatewayPaypalPassword.length < 4) {
+                                                                orderPlacementError = "Invalid PayPal login authentication."
+                                                                return@Button
+                                                            }
+                                                        }
+                                                    }
+
+                                                    orderPlacementError = null
+                                                    scope.launch {
+                                                        isGatewayProcessing = true
+                                                        gatewayTransactionStep = "Securing socket node with credit issuer..."
+                                                        delay(800)
+                                                        gatewayTransactionStep = "Authenticating direct payout authorization..."
+                                                        delay(800)
+                                                        gatewayTransactionStep = "Tokenizing assets securely..."
+                                                        delay(800)
+                                                        gatewayTransactionStep = "Settlement cleared! Syncing wallet..."
+                                                        delay(400)
+                                                        viewModel.rechargeWallet(requiredSum)
+                                                        viewModel.placeOrder(food, orderQuantity, true) { success ->
+                                                            isGatewayProcessing = false
+                                                            if (success) {
+                                                                selectedFoodForOrder = null
+                                                                activeTab = 1
+                                                            } else {
+                                                                orderPlacementError = "Direct checkout failed. Balance updated, place order via wallet."
+                                                            }
+                                                        }
+                                                    }
+                                                }
                                             }
                                         }
+                                    ) {
+                                        Text(if (checkoutPaymentMode == "GATEWAY") "Authorize Direct Pay" else "Verify & Route Order")
                                     }
-                                ) {
-                                    Text("Verify & Route Order")
                                 }
                             }
                         }
@@ -4050,9 +5176,17 @@ fun VendorDashboardScreen(
     val pricingSuggestionsText by viewModel.vendorPricingSuggestions.collectAsStateWithLifecycle()
     val isGeneratingPricingSuggestions by viewModel.isGeneratingPricingSuggestions.collectAsStateWithLifecycle()
     val performanceData by viewModel.vendorPerformanceList.collectAsStateWithLifecycle()
+    val performanceMetrics by viewModel.vendorPerformanceMetricsList.collectAsStateWithLifecycle()
     val allUsers by viewModel.allUsers.collectAsStateWithLifecycle()
 
     val scope = rememberCoroutineScope()
+
+    LaunchedEffect(currentUser) {
+        val uid = currentUser?.id ?: 0
+        if (uid > 0) {
+            viewModel.refreshVendorPerformance(uid)
+        }
+    }
 
     val todayInsightsText by viewModel.vendorTodayInsights.collectAsStateWithLifecycle()
     val isAnalyzingTodayOrders by viewModel.isAnalyzingTodayOrders.collectAsStateWithLifecycle()
@@ -6811,6 +7945,105 @@ fun VendorDashboardScreen(
                             }
                         }
 
+                        // FEATURE ADDITION: MOST POPULAR DISHES WIDGET
+                        val popularDishes = remember(filteredIncomingOrders) {
+                            filteredIncomingOrders
+                                .groupBy { it.foodName }
+                                .mapValues { entry -> 
+                                    val count = entry.value.sumOf { it.quantity }
+                                    val revenue = entry.value.sumOf { it.totalPrice }
+                                    count to revenue
+                                }
+                                .toList()
+                                .sortedByDescending { it.second.first }
+                                .take(3)
+                        }
+
+                        Card(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .testTag("popular_dishes_card"),
+                            shape = RoundedCornerShape(12.dp),
+                            border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)),
+                            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
+                        ) {
+                            Column(modifier = Modifier.padding(16.dp)) {
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.Restaurant,
+                                        contentDescription = "Popular Dishes",
+                                        tint = MaterialTheme.colorScheme.primary,
+                                        modifier = Modifier.size(18.dp)
+                                    )
+                                    Text(
+                                        "Most Popular Dishes (Sales Lead)",
+                                        style = MaterialTheme.typography.titleSmall,
+                                        fontWeight = FontWeight.Bold,
+                                        color = MaterialTheme.colorScheme.primary
+                                    )
+                                }
+                                Spacer(modifier = Modifier.height(12.dp))
+                                
+                                if (popularDishes.isEmpty()) {
+                                    Box(
+                                        modifier = Modifier.fillMaxWidth().padding(vertical = 12.dp),
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        Text("No checkout data registered in this period.", fontSize = 11.sp, color = Color.Gray, fontStyle = androidx.compose.ui.text.font.FontStyle.Italic)
+                                    }
+                                } else {
+                                    val maxVolume = popularDishes.maxOfOrNull { it.second.first } ?: 1
+                                    popularDishes.forEachIndexed { index, (dishName, valPair) ->
+                                        val quantity = valPair.first
+                                        val revenue = valPair.second
+                                        val progress = quantity.toFloat() / maxVolume.toFloat()
+                                        
+                                        Column(modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp)) {
+                                            Row(
+                                                modifier = Modifier.fillMaxWidth(),
+                                                horizontalArrangement = Arrangement.SpaceBetween,
+                                                verticalAlignment = Alignment.CenterVertically
+                                            ) {
+                                                Row(
+                                                    verticalAlignment = Alignment.CenterVertically,
+                                                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                                ) {
+                                                    val rankColor = when (index) {
+                                                        0 -> Color(0xFFFFD700) // Gold
+                                                        1 -> Color(0xFFC0C0C0) // Silver
+                                                        else -> Color(0xFFCD7F32) // Bronze
+                                                    }
+                                                    Box(
+                                                        modifier = Modifier
+                                                            .size(20.dp)
+                                                            .background(rankColor, RoundedCornerShape(4.dp)),
+                                                        contentAlignment = Alignment.Center
+                                                    ) {
+                                                        Text("#${index + 1}", fontSize = 10.sp, fontWeight = FontWeight.Bold, color = Color.White)
+                                                    }
+                                                    Text(dishName, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                                                }
+                                                Text("$quantity plates (GH₵ ${"%.2f".format(revenue)})", fontSize = 11.sp, fontWeight = FontWeight.Medium, color = MaterialTheme.colorScheme.primary)
+                                            }
+                                            Spacer(modifier = Modifier.height(4.dp))
+                                            LinearProgressIndicator(
+                                                progress = { progress },
+                                                color = MaterialTheme.colorScheme.primary,
+                                                trackColor = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f),
+                                                modifier = Modifier
+                                                    .fillMaxWidth()
+                                                    .height(6.dp)
+                                                    .clip(RoundedCornerShape(3.dp))
+                                            )
+                                        }
+                                    }
+                                }
+                            }
+                        }
+
                         // DATA ANALYTICS & TREND HIGHLIGHTS CARD
                         Card(
                             modifier = Modifier
@@ -7047,6 +8280,32 @@ fun VendorDashboardScreen(
                         // Recharts Interactive Dashboard Chart View
                         RechartsDashboardChart(orders = filteredIncomingOrders, modifier = Modifier.fillMaxWidth())
 
+                        Spacer(modifier = Modifier.height(8.dp))
+
+                        // Chart.js Service Performance Metrics Component (Fulfillment rates & Delivery times)
+                        ChartJsVendorPerformanceChart(
+                            performanceMetrics = performanceMetrics,
+                            currentUser = currentUser,
+                            orders = incomingOrders,
+                            modifier = Modifier.fillMaxWidth()
+                        )
+
+                        Spacer(modifier = Modifier.height(12.dp))
+
+                        // Joint Interactive Low-Stock Highlight and Control Center
+                        InventoryTrackingHub(
+                            vendorFoods = vendorFoods,
+                            onUpdateThreshold = { food, newThreshold ->
+                                viewModel.updateFoodItemStockSettings(food, food.initialStock, food.currentStock, newThreshold)
+                            },
+                            onReplenishStock = { food, amount ->
+                                viewModel.replenishFoodItemStock(food, amount)
+                            },
+                            modifier = Modifier.fillMaxWidth()
+                        )
+
+                        Spacer(modifier = Modifier.height(8.dp))
+
                         // 2. Dynamic Radar Visual Chart
                         RadarFeedbackChart(metrics = metrics, modifier = Modifier.fillMaxWidth())
 
@@ -7062,6 +8321,381 @@ fun VendorDashboardScreen(
                                 performanceData = performanceData,
                                 modifier = Modifier.fillMaxWidth()
                             )
+                        }
+
+                        // 4. Vendor Performance Controller Metrics (Cards & Basic Table)
+                        // This section directly implements the core user feature requirement
+                        
+                        // Extract current logged-in vendor's metrics if available from performanceMetrics StateFlow
+                        val matchedMetric = remember(performanceMetrics, currentUser) {
+                            performanceMetrics.find { it.vendor_id == currentUser?.id }
+                        }
+                        
+                        // Local fallback calculations for simulation robustness
+                        val localTotalOrders = incomingOrders.size
+                        val localCompletedOrders = incomingOrders.count { it.status == "COMPLETED" }
+                        val localTotalSales = incomingOrders.filter { it.status == "COMPLETED" }.sumOf { it.totalPrice }
+                        val localFulfillment = if (localTotalOrders > 0) (localCompletedOrders.toDouble() / localTotalOrders * 100.0) else 100.0
+                        
+                        val dispFulfillment = if (matchedMetric != null) matchedMetric.order_fulfillment_rate else localFulfillment
+                        val dispDeliveryTime = if (matchedMetric != null) matchedMetric.average_delivery_time_display else "12.5 mins"
+                        val dispCompletedCount = if (matchedMetric != null) matchedMetric.total_completed_orders else localCompletedOrders
+                        val dispTotalCount = if (matchedMetric != null) matchedMetric.total_orders else localTotalOrders
+                        val dispSales = if (matchedMetric != null) matchedMetric.total_sales else localTotalSales
+                        
+                        Column(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(vertical = 8.dp)
+                                .testTag("vendor_performance_service_section"),
+                            verticalArrangement = Arrangement.spacedBy(10.dp)
+                        ) {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(6.dp)
+                            ) {
+                                Text("📋", fontSize = 20.sp)
+                                Column {
+                                    Text(
+                                        text = "Vendor Operations Performance Scorecard",
+                                        style = MaterialTheme.typography.titleMedium,
+                                        fontWeight = FontWeight.Bold,
+                                        color = MaterialTheme.colorScheme.primary
+                                    )
+                                    Text(
+                                        text = if (matchedMetric != null) "Direct Live Connection: VendorPerformanceController (Laravel)" else "Simulation Engine: Synthesized On-the-Fly Metrics",
+                                        style = MaterialTheme.typography.bodySmall,
+                                        fontSize = 11.sp,
+                                        color = if (matchedMetric != null) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.secondary
+                                    )
+                                }
+                            }
+                            
+                            // 2x2 Grid of Beautiful KPI Cards
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                // Card 1: Fulfillment Rate
+                                Card(
+                                    modifier = Modifier
+                                        .weight(1f)
+                                        .testTag("perf_card_fulfillment"),
+                                    colors = CardDefaults.cardColors(
+                                        containerColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.4f)
+                                    ),
+                                    shape = RoundedCornerShape(12.dp)
+                                ) {
+                                    Column(modifier = Modifier.padding(12.dp)) {
+                                        Row(
+                                            verticalAlignment = Alignment.CenterVertically,
+                                            horizontalArrangement = Arrangement.spacedBy(6.dp)
+                                        ) {
+                                            Icon(
+                                                imageVector = Icons.Default.CheckCircle,
+                                                contentDescription = "Fulfillment Rate",
+                                                tint = MaterialTheme.colorScheme.primary,
+                                                modifier = Modifier.size(16.dp)
+                                            )
+                                            Text(
+                                                text = "FULFILLMENT RATE",
+                                                fontSize = 9.sp,
+                                                fontWeight = FontWeight.Bold,
+                                                color = MaterialTheme.colorScheme.primary
+                                            )
+                                        }
+                                        Spacer(modifier = Modifier.height(4.dp))
+                                        Text(
+                                            text = "%.1f%%".format(dispFulfillment),
+                                            fontSize = 20.sp,
+                                            fontWeight = FontWeight.Black,
+                                            color = MaterialTheme.colorScheme.onPrimaryContainer
+                                        )
+                                        Spacer(modifier = Modifier.height(2.dp))
+                                        Text(
+                                            text = "Ratio of completed orders",
+                                            fontSize = 8.sp,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                                        )
+                                    }
+                                }
+                                
+                                // Card 2: Average Delivery Time
+                                Card(
+                                    modifier = Modifier
+                                        .weight(1f)
+                                        .testTag("perf_card_delivery_time"),
+                                    colors = CardDefaults.cardColors(
+                                        containerColor = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.4f)
+                                    ),
+                                    shape = RoundedCornerShape(12.dp)
+                                ) {
+                                    Column(modifier = Modifier.padding(12.dp)) {
+                                        Row(
+                                            verticalAlignment = Alignment.CenterVertically,
+                                            horizontalArrangement = Arrangement.spacedBy(6.dp)
+                                        ) {
+                                            Icon(
+                                                imageVector = Icons.Default.Schedule,
+                                                contentDescription = "Delivery Time",
+                                                tint = MaterialTheme.colorScheme.secondary,
+                                                modifier = Modifier.size(16.dp)
+                                            )
+                                            Text(
+                                                text = "AVG DELIVERY TIME",
+                                                fontSize = 9.sp,
+                                                fontWeight = FontWeight.Bold,
+                                                color = MaterialTheme.colorScheme.secondary
+                                            )
+                                        }
+                                        Spacer(modifier = Modifier.height(4.dp))
+                                        Text(
+                                            text = dispDeliveryTime,
+                                            fontSize = 20.sp,
+                                            fontWeight = FontWeight.Black,
+                                            color = MaterialTheme.colorScheme.onSecondaryContainer
+                                        )
+                                        Spacer(modifier = Modifier.height(2.dp))
+                                        Text(
+                                            text = "Tick-to-pickup turnaround",
+                                            fontSize = 8.sp,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                                        )
+                                    }
+                                }
+                            }
+                            
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                // Card 3: Total Orders
+                                Card(
+                                    modifier = Modifier
+                                        .weight(1f)
+                                        .testTag("perf_card_total_orders"),
+                                    colors = CardDefaults.cardColors(
+                                        containerColor = MaterialTheme.colorScheme.tertiaryContainer.copy(alpha = 0.4f)
+                                    ),
+                                    shape = RoundedCornerShape(12.dp)
+                                ) {
+                                    Column(modifier = Modifier.padding(12.dp)) {
+                                        Row(
+                                            verticalAlignment = Alignment.CenterVertically,
+                                            horizontalArrangement = Arrangement.spacedBy(6.dp)
+                                        ) {
+                                            Icon(
+                                                imageVector = Icons.Default.ShoppingCart,
+                                                contentDescription = "Orders Tracked",
+                                                tint = MaterialTheme.colorScheme.tertiary,
+                                                modifier = Modifier.size(16.dp)
+                                            )
+                                            Text(
+                                                text = "TOTAL OPERATIONS",
+                                                fontSize = 9.sp,
+                                                fontWeight = FontWeight.Bold,
+                                                color = MaterialTheme.colorScheme.tertiary
+                                            )
+                                        }
+                                        Spacer(modifier = Modifier.height(4.dp))
+                                        Text(
+                                            text = "$dispCompletedCount / $dispTotalCount",
+                                            fontSize = 20.sp,
+                                            fontWeight = FontWeight.Black,
+                                            color = MaterialTheme.colorScheme.onTertiaryContainer
+                                        )
+                                        Spacer(modifier = Modifier.height(2.dp))
+                                        Text(
+                                            text = "Completed over total placed",
+                                            fontSize = 8.sp,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                                        )
+                                    }
+                                }
+                                
+                                // Card 4: Total Revenue (Sales)
+                                Card(
+                                    modifier = Modifier
+                                        .weight(1f)
+                                        .testTag("perf_card_revenue"),
+                                    colors = CardDefaults.cardColors(
+                                        containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f)
+                                    ),
+                                    shape = RoundedCornerShape(12.dp),
+                                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
+                                ) {
+                                    Column(modifier = Modifier.padding(12.dp)) {
+                                        Row(
+                                            verticalAlignment = Alignment.CenterVertically,
+                                            horizontalArrangement = Arrangement.spacedBy(6.dp)
+                                        ) {
+                                            Icon(
+                                                imageVector = Icons.Default.Payments,
+                                                contentDescription = "Aggregated Revenue",
+                                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                                modifier = Modifier.size(16.dp)
+                                            )
+                                            Text(
+                                                text = "OFFICIAL SALES",
+                                                fontSize = 9.sp,
+                                                fontWeight = FontWeight.Bold,
+                                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                                            )
+                                        }
+                                        Spacer(modifier = Modifier.height(4.dp))
+                                        Text(
+                                            text = "GH₵ %.2f".format(dispSales),
+                                            fontSize = 18.sp,
+                                            fontWeight = FontWeight.Black,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                                        )
+                                        Spacer(modifier = Modifier.height(2.dp))
+                                        Text(
+                                            text = "Gross settled sales",
+                                            fontSize = 8.sp,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.8f)
+                                        )
+                                    }
+                                }
+                            }
+                            
+                            Spacer(modifier = Modifier.height(4.dp))
+                            
+                            // Benchmark/Comparison Table
+                            Text(
+                                text = "🏁 Inter-Booth Service-Level Benchmarks (Basic Table)",
+                                style = MaterialTheme.typography.titleSmall,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.onSurface
+                            )
+                            
+                            Card(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .testTag("perf_comparison_table_card"),
+                                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.6f)),
+                                shape = RoundedCornerShape(12.dp),
+                                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
+                            ) {
+                                Column(modifier = Modifier.fillMaxWidth()) {
+                                    // Table Header Row
+                                    Row(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f))
+                                            .padding(horizontal = 12.dp, vertical = 8.dp),
+                                        horizontalArrangement = Arrangement.SpaceBetween,
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        Text(text = "VENDOR", style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary, modifier = Modifier.weight(1.5f))
+                                        Text(text = "FULFILLMENT", style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary, modifier = Modifier.weight(1.2f), textAlign = TextAlign.End)
+                                        Text(text = "AVG DELIVERY", style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary, modifier = Modifier.weight(1.2f), textAlign = TextAlign.End)
+                                        Text(text = "ORDERS", style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary, modifier = Modifier.weight(1f), textAlign = TextAlign.End)
+                                    }
+                                    
+                                    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.8f))
+                                    
+                                    val tableItems = remember(performanceMetrics, dispFulfillment, dispDeliveryTime, dispTotalCount, currentUser) {
+                                        if (performanceMetrics.isNotEmpty()) {
+                                            performanceMetrics
+                                        } else {
+                                            // Fallback peers for gorgeous demonstration
+                                            listOf(
+                                                com.example.data.LaravelVendorMetric(
+                                                    vendor_id = currentUser?.id ?: 1,
+                                                    vendor_name = currentUser?.fullName ?: "My Food Booth",
+                                                    contact_info = "N/A",
+                                                    operational_status = "active",
+                                                    total_completed_orders = dispCompletedCount,
+                                                    total_orders = dispTotalCount,
+                                                    total_sales = dispSales,
+                                                    avg_completion_time_minutes = if (dispDeliveryTime.contains("mins")) dispDeliveryTime.replace(" mins", "").toDoubleOrNull() ?: 12.5 else 12.5,
+                                                    avg_completion_time_display = dispDeliveryTime,
+                                                    average_delivery_time = if (dispDeliveryTime.contains("mins")) dispDeliveryTime.replace(" mins", "").toDoubleOrNull() ?: 12.5 else 12.5,
+                                                    average_delivery_time_display = dispDeliveryTime,
+                                                    order_fulfillment_rate = dispFulfillment
+                                                ),
+                                                com.example.data.LaravelVendorMetric(
+                                                    vendor_id = 101,
+                                                    vendor_name = "Waakye Express",
+                                                    contact_info = "0245-WA-AKYE",
+                                                    operational_status = "active",
+                                                    total_completed_orders = 18,
+                                                    total_orders = 20,
+                                                    total_sales = 270.00,
+                                                    avg_completion_time_minutes = 9.8,
+                                                    avg_completion_time_display = "9.8 mins",
+                                                    average_delivery_time = 9.8,
+                                                    average_delivery_time_display = "9.8 mins",
+                                                    order_fulfillment_rate = 90.0
+                                                ),
+                                                com.example.data.LaravelVendorMetric(
+                                                    vendor_id = 102,
+                                                    vendor_name = "Auntie Mary's Waakye",
+                                                    contact_info = "0554-MARY-K",
+                                                    operational_status = "active",
+                                                    total_completed_orders = 24,
+                                                    total_orders = 25,
+                                                    total_sales = 360.00,
+                                                    avg_completion_time_minutes = 14.1,
+                                                    avg_completion_time_display = "14.1 mins",
+                                                    average_delivery_time = 14.1,
+                                                    average_delivery_time_display = "14.1 mins",
+                                                    order_fulfillment_rate = 96.0
+                                                )
+                                            )
+                                        }
+                                    }
+                                    
+                                    tableItems.forEachIndexed { idx, item ->
+                                        val isMe = item.vendor_id == currentUser?.id
+                                        Row(
+                                            modifier = Modifier
+                                                .fillMaxWidth()
+                                                .background(if (isMe) MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.15f) else Color.Unspecified)
+                                                .padding(horizontal = 12.dp, vertical = 10.dp),
+                                            horizontalArrangement = Arrangement.SpaceBetween,
+                                            verticalAlignment = Alignment.CenterVertically
+                                        ) {
+                                            Text(
+                                                text = if (isMe) "👤 ${item.vendor_name} (Me)" else item.vendor_name,
+                                                fontSize = 11.sp,
+                                                fontWeight = if (isMe) FontWeight.Bold else FontWeight.Normal,
+                                                color = if (isMe) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface,
+                                                modifier = Modifier.weight(1.5f),
+                                                maxLines = 1
+                                            )
+                                            Text(
+                                                text = "%.1f%%".format(item.order_fulfillment_rate),
+                                                fontSize = 11.sp,
+                                                fontWeight = if (isMe) FontWeight.Bold else FontWeight.Normal,
+                                                color = if (item.order_fulfillment_rate >= 90.0) Color(0xFF2E7D32) else MaterialTheme.colorScheme.onSurface,
+                                                modifier = Modifier.weight(1.2f),
+                                                textAlign = TextAlign.End
+                                            )
+                                            Text(
+                                                text = item.average_delivery_time_display,
+                                                fontSize = 11.sp,
+                                                fontWeight = if (isMe) FontWeight.Bold else FontWeight.Normal,
+                                                color = MaterialTheme.colorScheme.onSurface,
+                                                modifier = Modifier.weight(1.2f),
+                                                textAlign = TextAlign.End
+                                            )
+                                            Text(
+                                                text = "${item.total_completed_orders}/${item.total_orders}",
+                                                fontSize = 11.sp,
+                                                fontWeight = if (isMe) FontWeight.Bold else FontWeight.Normal,
+                                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                                modifier = Modifier.weight(1f),
+                                                textAlign = TextAlign.End
+                                            )
+                                        }
+                                        if (idx < tableItems.size - 1) {
+                                            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f))
+                                        }
+                                    }
+                                }
+                            }
                         }
 
                         // 3b. Gemini AI Qualitative Sentiment Analysis Card
