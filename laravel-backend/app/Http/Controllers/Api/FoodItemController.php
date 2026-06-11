@@ -5,6 +5,8 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Models\FoodItem;
 use App\Models\AuditLog;
+use App\Http\Requests\StoreFoodItemRequest;
+use App\Http\Requests\UpdateFoodItemRequest;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Facades\DB;
@@ -32,23 +34,16 @@ class FoodItemController extends Controller
     /**
      * Store a newly created menu dish.
      */
-    public function store(Request $request)
+    public function store(StoreFoodItemRequest $request)
     {
-        $validator = Validator::make($request->all(), [
-            'vendor_id' => 'required|integer|exists:users,id',
-            'name' => 'required|string|max:255',
-            'price' => 'required|numeric|min:0',
-            'category' => 'required|string',
-            'description' => 'nullable|string',
-            'image_url' => 'nullable|string',
-        ]);
+        $user = $request->user();
+        $vendorId = $request->input('vendor_id');
 
-        if ($validator->fails()) {
+        if ($vendorId != $user->id && strtoupper($user->role) !== 'ADMIN') {
             return response()->json([
                 'success' => false,
-                'message' => 'Input validations failed.',
-                'errors' => $validator->errors()
-            ], 400);
+                'message' => 'Unauthorized. You cannot create food items for another vendor.'
+            ], 403);
         }
 
         $food = DB::transaction(function () use ($request) {
@@ -79,7 +74,7 @@ class FoodItemController extends Controller
     /**
      * Update the details/availability of a single food item.
      */
-    public function update(Request $request, $id)
+    public function update(UpdateFoodItemRequest $request, $id)
     {
         $food = FoodItem::find($id);
         if (!$food) {
@@ -87,6 +82,14 @@ class FoodItemController extends Controller
                 'success' => false,
                 'message' => 'Food item not found.'
             ], 404);
+        }
+
+        $user = $request->user();
+        if ($food->vendor_id !== $user->id && strtoupper($user->role) !== 'ADMIN') {
+            return response()->json([
+                'success' => false,
+                'message' => 'Unauthorized. You do not own this food item.'
+            ], 403);
         }
 
         $updatedFood = DB::transaction(function () use ($food, $request) {
@@ -119,6 +122,14 @@ class FoodItemController extends Controller
                 'success' => false,
                 'message' => 'Food item not found.'
             ], 404);
+        }
+
+        $user = request()->user();
+        if ($food->vendor_id !== $user->id && strtoupper($user->role) !== 'ADMIN') {
+            return response()->json([
+                'success' => false,
+                'message' => 'Unauthorized. You do not own this food item.'
+            ], 403);
         }
 
         $vendorId = $food->vendor_id;

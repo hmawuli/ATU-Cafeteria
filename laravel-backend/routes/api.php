@@ -16,6 +16,7 @@ use App\Http\Controllers\Api\VendorPerformanceController;
 use App\Http\Controllers\Api\MenuController;
 use App\Http\Controllers\Api\ChatController;
 use App\Http\Controllers\Api\PaystackPaymentController;
+use App\Http\Controllers\Api\VendorSpecificController;
 
 // Register explicit listeners for OrderStatusCompleted event
 Event::listen(
@@ -90,6 +91,12 @@ Route::middleware(function ($request, $next) {
     Route::get('/vendor/performance', [VendorPerformanceController::class, 'getPerformance']);
     Route::get('/vendor/recharts-sales', [VendorPerformanceController::class, 'exportSalesForRecharts']);
     Route::post('/vendor/toggle-status', [VendorController::class, 'toggleStatus']);
+
+    // Vendor Specific endpoints
+    Route::put('/vendor/menu/availability', [VendorSpecificController::class, 'updateMenuAvailability']);
+    Route::get('/vendor/orders/summary', [VendorSpecificController::class, 'getOrderSummary']);
+    Route::post('/vendor/menu/bulk-update', [VendorSpecificController::class, 'bulkUpdateMenu']);
+    Route::post('/vendor/menu/bulk-upload', [VendorSpecificController::class, 'bulkUpdateMenu']);
 
     // Digital Wallet & Core Transactions Subsystem
     Route::get('/wallet/balance', [WalletController::class, 'getBalance']);

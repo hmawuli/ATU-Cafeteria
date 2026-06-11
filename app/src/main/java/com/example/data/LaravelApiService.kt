@@ -37,7 +37,9 @@ data class LaravelFoodItem(
     val category: String,
     val image_url: String?,
     val description: String?,
-    val is_available: Boolean
+    val is_available: Boolean,
+    val calories: Int? = null,
+    val allergens: String? = null
 )
 
 @JsonClass(generateAdapter = true)
@@ -337,6 +339,86 @@ data class LaravelPaystackVerifyResponse(
     val purpose: String
 )
 
+@JsonClass(generateAdapter = true)
+data class LaravelUpdateMenuAvailabilityRequest(
+    val item_id: Int,
+    val item_type: String,
+    val is_available: Boolean,
+    val day_of_week: String? = null,
+    val start_time: String? = null,
+    val end_time: String? = null
+)
+
+@JsonClass(generateAdapter = true)
+data class LaravelUpdateMenuAvailabilityResponse(
+    val success: Boolean,
+    val message: String,
+    val item_id: Int,
+    val item_type: String,
+    val is_available: Boolean
+)
+
+@JsonClass(generateAdapter = true)
+data class LaravelTodayStatusBreakdown(
+    val PENDING: Int = 0,
+    val PREPARING: Int = 0,
+    val READY: Int = 0,
+    val COMPLETED: Int = 0,
+    val CANCELLED: Int = 0,
+    val DECLINED: Int = 0
+)
+
+@JsonClass(generateAdapter = true)
+data class LaravelOrderSummaryMetrics(
+    val today_orders_count: Int,
+    val today_revenue: Double,
+    val historic_revenue: Double,
+    val average_rating: Double,
+    val today_status_breakdown: LaravelTodayStatusBreakdown
+)
+
+@JsonClass(generateAdapter = true)
+data class LaravelSummaryNotifications(
+    val unresolved_pending_count: Int,
+    val active_preparing_count: Int,
+    val ready_pickup_count: Int
+)
+
+@JsonClass(generateAdapter = true)
+data class LaravelLowStockWarningItem(
+    val id: Int,
+    val name: String,
+    val price: Double,
+    val description: String?
+)
+
+@JsonClass(generateAdapter = true)
+data class LaravelOrderSummaryResponse(
+    val success: Boolean,
+    val message: String,
+    val summary_date: String,
+    val cached_summary_id: Int,
+    val metrics: LaravelOrderSummaryMetrics,
+    val notifications: LaravelSummaryNotifications,
+    val low_stock_warnings: List<LaravelLowStockWarningItem>
+)
+
+@JsonClass(generateAdapter = true)
+data class LaravelBulkUpdateItem(
+    val id: Int,
+    val price: Double? = null,
+    val is_available: Boolean? = null
+)
+
+@JsonClass(generateAdapter = true)
+data class LaravelBulkUpdateResponse(
+    val success: Boolean,
+    val message: String,
+    val updated_count: Int,
+    val errors: List<String>?,
+    val updates_log: List<String>?
+)
+
 // ==========================================
 // 2. RETROFIT API SERVICE INTERFACE
 // ==========================================
@@ -446,6 +528,15 @@ interface LaravelApiService {
 
     @GET("api/paystack/verify/{reference}")
     suspend fun verifyPaystack(@Path("reference") reference: String, @Query("amount") amount: Double, @Query("purpose") purpose: String): LaravelPaystackVerifyResponse
+
+    @PUT("api/vendor/menu/availability")
+    suspend fun updateMenuAvailability(@Body request: LaravelUpdateMenuAvailabilityRequest): LaravelUpdateMenuAvailabilityResponse
+
+    @GET("api/vendor/orders/summary")
+    suspend fun getOrderSummary(): LaravelOrderSummaryResponse
+
+    @POST("api/vendor/menu/bulk-update")
+    suspend fun bulkUpdateMenu(@Body request: List<LaravelBulkUpdateItem>): LaravelBulkUpdateResponse
 }
 
 // ==========================================
@@ -519,7 +610,9 @@ object LaravelClientManager {
             category = l.category,
             imageUrl = l.image_url ?: "",
             description = l.description ?: "",
-            isAvailable = l.is_available
+            isAvailable = l.is_available,
+            calories = l.calories ?: 180,
+            allergens = l.allergens ?: "None"
         )
     }
 

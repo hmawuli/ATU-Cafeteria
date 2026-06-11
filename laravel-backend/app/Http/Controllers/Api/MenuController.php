@@ -6,6 +6,8 @@ use App\Http\Controllers\Controller;
 use App\Models\Menu;
 use App\Models\MenuItem;
 use App\Models\AuditLog;
+use App\Http\Requests\StoreMenuRequest;
+use App\Http\Requests\UpdateMenuRequest;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Facades\DB;
@@ -43,22 +45,24 @@ class MenuController extends Controller
     /**
      * Store/link a FoodItem to a Vendor Menu.
      */
-    public function store(Request $request)
+    public function store(StoreMenuRequest $request)
     {
-        $validator = Validator::make($request->all(), [
-            'vendor_id' => 'required|integer',
-            'food_item_id' => 'required|integer|exists:food_items,id',
-            'price' => 'required|numeric|min:0',
-            'description' => 'nullable|string',
-            'is_available' => 'nullable|boolean',
-        ]);
+        $user = $request->user();
+        $vendorId = $request->input('vendor_id');
 
-        if ($validator->fails()) {
+        if ($vendorId != $user->id && strtoupper($user->role) !== 'ADMIN') {
             return response()->json([
                 'success' => false,
-                'message' => 'Validation error.',
-                'errors' => $validator->errors()
-            ], 400);
+                'message' => 'Unauthorized. You cannot register menu items for another vendor.'
+            ], 403);
+        }
+
+        $foodItem = \App\Models\FoodItem::find($request->input('food_item_id'));
+        if (!$foodItem || ($foodItem->vendor_id !== $user->id && strtoupper($user->role) !== 'ADMIN')) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Unauthorized. This food item does not belong to you.'
+            ], 403);
         }
 
         $menu = DB::transaction(function () use ($request) {
@@ -97,7 +101,7 @@ class MenuController extends Controller
     /**
      * Update an existing vendor menu entry.
      */
-    public function update(Request $request, $id)
+    public function update(UpdateMenuRequest $request, $id)
     {
         $menu = Menu::find($id);
         if (!$menu) {
@@ -107,17 +111,12 @@ class MenuController extends Controller
             ], 404);
         }
 
-        $validator = Validator::make($request->all(), [
-            'price' => 'nullable|numeric|min:0',
-            'description' => 'nullable|string',
-            'is_available' => 'nullable|boolean',
-        ]);
-
-        if ($validator->fails()) {
+        $user = $request->user();
+        if ($menu->vendor_id !== $user->id && strtoupper($user->role) !== 'ADMIN') {
             return response()->json([
                 'success' => false,
-                'errors' => $validator->errors()
-            ], 400);
+                'message' => 'Unauthorized. You do not own this menu entry.'
+            ], 403);
         }
 
         $menu = DB::transaction(function () use ($menu, $request) {
@@ -152,6 +151,14 @@ class MenuController extends Controller
                 'success' => false,
                 'message' => 'Menu entry not found.'
             ], 404);
+        }
+
+        $user = request()->user();
+        if ($menu->vendor_id !== $user->id && strtoupper($user->role) !== 'ADMIN') {
+            return response()->json([
+                'success' => false,
+                'message' => 'Unauthorized. You do not own this menu entry.'
+            ], 403);
         }
 
         DB::transaction(function () use ($menu) {
@@ -205,6 +212,16 @@ class MenuController extends Controller
      */
     public function storeMenuItem(Request $request)
     {
+        $user = $request->user();
+        $vendorId = $request->input('vendor_id');
+
+        if ($vendorId != $user->id && strtoupper($user->role) !== 'ADMIN') {
+            return response()->json([
+                'success' => false,
+                'message' => 'Unauthorized. You cannot create standalone menu items for another vendor.'
+            ], 403);
+        }
+
         $validator = Validator::make($request->all(), [
             'vendor_id' => 'required|integer|exists:users,id',
             'name' => 'required|string|max:255',

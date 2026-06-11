@@ -29,6 +29,16 @@ data class MockPushNotification(
     val timestamp: Long = System.currentTimeMillis()
 )
 
+data class VendorInventoryNotification(
+    val id: String,
+    val foodItemId: Int,
+    val foodName: String,
+    val type: String, // "LOW_STOCK", "OUT_OF_STOCK", "UNAVAILABLE"
+    val message: String,
+    val timestamp: Long = System.currentTimeMillis(),
+    val isRead: Boolean = false
+)
+
 class CafeteriaViewModel(application: Application) : AndroidViewModel(application) {
 
     private val db = AppDatabase.getDatabase(application)
@@ -185,6 +195,18 @@ class CafeteriaViewModel(application: Application) : AndroidViewModel(applicatio
     private val _newOrderAlerts = MutableStateFlow<List<Order>>(emptyList())
     val newOrderAlerts: StateFlow<List<Order>> = _newOrderAlerts.asStateFlow()
 
+    private val _vendorInventoryNotifications = MutableStateFlow<List<VendorInventoryNotification>>(emptyList())
+    val vendorInventoryNotifications: StateFlow<List<VendorInventoryNotification>> = _vendorInventoryNotifications.asStateFlow()
+    val globalLowStockThreshold = MutableStateFlow(15)
+    val redeemedLoyaltyPoints = MutableStateFlow(0)
+
+    private val dismissedNotificationKeys = java.util.Collections.synchronizedSet(mutableSetOf<String>())
+    private val readNotificationKeys = java.util.Collections.synchronizedSet(mutableSetOf<String>())
+    private var previousVendorNotificationKeys = setOf<String>()
+
+    private val _realTimeEventsLogs = MutableStateFlow<List<String>>(emptyList())
+    val realTimeEventsLogs: StateFlow<List<String>> = _realTimeEventsLogs.asStateFlow()
+
     private val seenOrderIds = java.util.Collections.synchronizedSet(mutableSetOf<Int>())
     private var isFirstOrderLoad = true
 
@@ -243,6 +265,10 @@ class CafeteriaViewModel(application: Application) : AndroidViewModel(applicatio
                 if (activeUser != null && activeUser.role == "VENDOR" && event.vendorId == activeUser.id) {
                     processIncomingWebSocketOrder(event)
                 }
+                // Log event for the live terminal display
+                val timeStr = java.text.SimpleDateFormat("HH:mm:ss", java.util.Locale.getDefault()).format(java.util.Date(event.timestamp))
+                val logMsg = "[$timeStr] Packet: ID #${event.orderId} containing '${event.foodName}' (QTY: ${event.qty}) on channel orders-vendor-${event.vendorId}"
+                _realTimeEventsLogs.value = (listOf(logMsg) + _realTimeEventsLogs.value).take(50)
             }
         }
 
@@ -311,6 +337,104 @@ class CafeteriaViewModel(application: Application) : AndroidViewModel(applicatio
                         }
                     }
                 }
+            }
+        }
+        
+        viewModelScope.launch {
+            combine(vendorFoodItems, globalLowStockThreshold) { foods, threshold ->
+                Pair(foods, threshold)
+            }.collect { (foods, threshold) ->
+                if (foods.isEmpty()) {
+                    _vendorInventoryNotifications.value = emptyList()
+                    return@collect
+                }
+                
+                val currentTime = System.currentTimeMillis()
+                val activeList = mutableListOf<VendorInventoryNotification>()
+                val activeKeys = mutableSetOf<String>()
+                
+                foods.forEach { food ->
+                    val isUnavailable = !food.isAvailable
+                    val isDepleted = food.currentStock == 0
+                    val isLowStock = food.currentStock > 0 && food.currentStock <= food.lowStockThreshold
+                    val isGlobalLowStock = food.currentStock > 0 && food.currentStock <= threshold
+                    
+                    if (!isUnavailable) {
+                        val k = "${food.id}_UNAVAILABLE"
+                        dismissedNotificationKeys.remove(k)
+                        readNotificationKeys.remove(k)
+                    }
+                    if (food.currentStock > food.lowStockThreshold && food.currentStock > threshold) {
+                        val kl = "${food.id}_LOW_STOCK"
+                        val kd = "${food.id}_OUT_OF_STOCK"
+                        dismissedNotificationKeys.remove(kl)
+                        dismissedNotificationKeys.remove(kd)
+                        readNotificationKeys.remove(kl)
+                        readNotificationKeys.remove(kd)
+                    }
+                    
+                    if (isUnavailable) {
+                        val key = "${food.id}_UNAVAILABLE"
+                        activeKeys.add(key)
+                        if (!dismissedNotificationKeys.contains(key)) {
+                            activeList.add(
+                                VendorInventoryNotification(
+                                    id = key,
+                                    foodItemId = food.id,
+                                    foodName = food.name,
+                                    type = "UNAVAILABLE",
+                                    message = "Cuisine '${food.name}' has been marked unavailable in your menu offerings.",
+                                    timestamp = currentTime,
+                                    isRead = readNotificationKeys.contains(key)
+                                )
+                            )
+                        }
+                    }
+                    if (isDepleted) {
+                        val key = "${food.id}_OUT_OF_STOCK"
+                        activeKeys.add(key)
+                        if (!dismissedNotificationKeys.contains(key)) {
+                            activeList.add(
+                                VendorInventoryNotification(
+                                    id = key,
+                                    foodItemId = food.id,
+                                    foodName = food.name,
+                                    type = "OUT_OF_STOCK",
+                                    message = "CRITICAL: '${food.name}' is completely depleted (0 stock remaining)!",
+                                    timestamp = currentTime,
+                                    isRead = readNotificationKeys.contains(key)
+                                )
+                            )
+                        }
+                    } else if (isLowStock || isGlobalLowStock) {
+                        val key = "${food.id}_LOW_STOCK"
+                        activeKeys.add(key)
+                        if (!dismissedNotificationKeys.contains(key)) {
+                            val activeLimit = if (isLowStock) food.lowStockThreshold else threshold
+                            activeList.add(
+                                VendorInventoryNotification(
+                                    id = key,
+                                    foodItemId = food.id,
+                                    foodName = food.name,
+                                    type = "LOW_STOCK",
+                                    message = "Warning: '${food.name}' is running low (Stock: ${food.currentStock}/${food.initialStock}, safety limit is $activeLimit).",
+                                    timestamp = currentTime,
+                                    isRead = readNotificationKeys.contains(key)
+                                )
+                            )
+                        }
+                    }
+                }
+                
+                val newAddedKeys = activeKeys.filter { k -> 
+                    !previousVendorNotificationKeys.contains(k) && !dismissedNotificationKeys.contains(k)
+                }
+                if (newAddedKeys.isNotEmpty()) {
+                    playSoundNotification()
+                }
+                previousVendorNotificationKeys = activeKeys
+                
+                _vendorInventoryNotifications.value = activeList
             }
         }
         
@@ -670,6 +794,33 @@ class CafeteriaViewModel(application: Application) : AndroidViewModel(applicatio
         }
     }
 
+    fun redeemLoyaltyPoints(pointsToRedeem: Int) {
+        val user = _currentUser.value ?: return
+        val currentTotalPoints = customerOrders.value.sumOf { order ->
+            if (order.status.uppercase() == "COMPLETED") 25 else 10
+        }
+        val availablePoints = currentTotalPoints - redeemedLoyaltyPoints.value
+        if (availablePoints >= pointsToRedeem && pointsToRedeem > 0) {
+            val cashValue = (pointsToRedeem / 100.0) * 5.0 // 100 points = 5 GH₵
+            redeemedLoyaltyPoints.value += pointsToRedeem
+            
+            viewModelScope.launch {
+                val ref = "LOYALTY-" + (100000..999999).random()
+                repository.insertWalletTransaction(user.id, "DEPOSIT", cashValue, ref, "Loyalty Point Redemption ($pointsToRedeem points)")
+                repository.insertAuditLog(
+                    user.id,
+                    "LOYALTY_REDEMPTION",
+                    "Redeemed $pointsToRedeem loyalty points for GH₵ ${"%.2f".format(cashValue)} smart credit. Ref: $ref"
+                )
+                
+                val refreshed = repository.userDao.getUserSync(user.id)
+                if (refreshed != null) {
+                    _currentUser.value = refreshed
+                }
+            }
+        }
+    }
+
     fun placeOrder(foodItem: FoodItem, quantity: Int, useWallet: Boolean = false, onComplete: (Boolean) -> Unit) {
         viewModelScope.launch {
             val user = _currentUser.value
@@ -809,11 +960,11 @@ class CafeteriaViewModel(application: Application) : AndroidViewModel(applicatio
         }
     }
 
-    fun addVendorFoodItem(name: String, price: Double, category: String, description: String, imageUrl: String, initialStock: Int = 100, threshold: Int = 15) {
+    fun addVendorFoodItem(name: String, price: Double, category: String, description: String, imageUrl: String, initialStock: Int = 100, threshold: Int = 15, calories: Int = 180, allergens: String = "None") {
         viewModelScope.launch {
             val vendor = _currentUser.value ?: return@launch
             if (name.isNotBlank() && price > 0) {
-                repository.addMenuFoodItem(vendor.id, name, price, category, description, imageUrl, initialStock, threshold)
+                repository.addMenuFoodItem(vendor.id, name, price, category, description, imageUrl, initialStock, threshold, calories, allergens)
             }
         }
     }
@@ -848,7 +999,9 @@ class CafeteriaViewModel(application: Application) : AndroidViewModel(applicatio
         description: String,
         initialStock: Int,
         currentStock: Int,
-        threshold: Int
+        threshold: Int,
+        calories: Int = 180,
+        allergens: String = "None"
     ) {
         viewModelScope.launch {
             val updated = foodItem.copy(
@@ -858,10 +1011,19 @@ class CafeteriaViewModel(application: Application) : AndroidViewModel(applicatio
                 description = description,
                 initialStock = initialStock,
                 currentStock = currentStock,
-                lowStockThreshold = threshold
+                lowStockThreshold = threshold,
+                calories = calories,
+                allergens = allergens
             )
             repository.updateMenuFoodItem(updated)
-            repository.insertAuditLog(foodItem.vendorId, "MENU_ITEM_UPDATED", "Updated item '${foodItem.name}' (ID: ${foodItem.id}): Name=$name, Price=GH₵$price, Category=$category, Description=$description.")
+            repository.insertAuditLog(foodItem.vendorId, "MENU_ITEM_UPDATED", "Updated item '${foodItem.name}' (ID: ${foodItem.id}): Name=$name, Price=GH₵$price, Calories=$calories kcal, Allergens=$allergens, Category=$category, Description=$description.")
+        }
+    }
+
+    fun bulkUpdateVendorMenu(vendorId: Int, updates: List<com.example.data.LaravelBulkUpdateItem>, onResult: (Boolean, String) -> Unit) {
+        viewModelScope.launch {
+            val result = repository.bulkUpdateVendorMenu(vendorId, updates)
+            onResult(result.first, result.second)
         }
     }
 
@@ -927,6 +1089,24 @@ class CafeteriaViewModel(application: Application) : AndroidViewModel(applicatio
         viewModelScope.launch {
             val vendor = _currentUser.value ?: return@launch
             repository.updateOrderStatus(vendor.id, orderId, newStatus, estimatedTime)
+        }
+    }
+
+    fun simulateAdvanceOrderStatus(orderId: Int) {
+        viewModelScope.launch {
+            val order = repository.orderDao.getOrderById(orderId) ?: return@launch
+            val nextStatus = when (order.status.uppercase()) {
+                "PENDING" -> "PREPARING"
+                "PREPARING" -> "READY"
+                "READY" -> "COMPLETED"
+                else -> "PENDING"
+            }
+            repository.updateOrderStatus(order.vendorId, orderId, nextStatus, if (nextStatus == "PREPARING") "10-15 Min" else null)
+            
+            // If completed, register a log in the audit log
+            if (nextStatus == "COMPLETED") {
+                repository.insertAuditLog(order.customerId, "CUSTOMER_PICKED_UP", "Completed pickup for Order #${orderId} of ${order.foodName}")
+            }
         }
     }
 
@@ -1053,6 +1233,34 @@ class CafeteriaViewModel(application: Application) : AndroidViewModel(applicatio
                 orders = filteredOrders
             )
             _isAnalyzingTodayOrders.value = false
+        }
+    }
+
+    fun triggerSimulatedRealTimeOrder() {
+        val activeUser = _currentUser.value ?: return
+        if (activeUser.role != "VENDOR") return
+        
+        viewModelScope.launch {
+            val foodName = listOf(
+                "Spiced Jollof with Grilled Chicken",
+                "Gari Fortor with Fried Fish",
+                "Assorted Waakye with Egg & Shito",
+                "Boiled Yam with Palava Sauce",
+                "Delicious Red Red & Sweet Plantains"
+            ).random()
+            
+            val orderId = (1001..9999).random()
+            val qty = (1..3).random()
+            val pricePerItem = 15.0 + (10..35).random() / 10.0
+            val totalPrice = qty * pricePerItem
+            
+            LaravelEchoWebSocketManager.broadcastOrderPlacedLocally(
+                orderId = orderId,
+                vendorId = activeUser.id,
+                foodName = foodName,
+                qty = qty,
+                totalPrice = totalPrice
+            )
         }
     }
 
@@ -1363,6 +1571,92 @@ class CafeteriaViewModel(application: Application) : AndroidViewModel(applicatio
                 Log.e("CafeteriaViewModel", "Paystack payment verification failed", e)
                 onResult(false)
             }
+        }
+    }
+
+    fun updateGlobalLowStockThreshold(newThreshold: Int) {
+        globalLowStockThreshold.value = newThreshold.coerceAtLeast(0)
+    }
+
+    fun dismissVendorNotification(id: String) {
+        dismissedNotificationKeys.add(id)
+        triggerInventoryCheck()
+    }
+
+    fun markVendorNotificationRead(id: String) {
+        readNotificationKeys.add(id)
+        triggerInventoryCheck()
+    }
+
+    fun triggerInventoryCheck() {
+        viewModelScope.launch {
+            val foods = vendorFoodItems.value
+            val threshold = globalLowStockThreshold.value
+            
+            val currentTime = System.currentTimeMillis()
+            val activeList = mutableListOf<VendorInventoryNotification>()
+            val activeKeys = mutableSetOf<String>()
+            
+            foods.forEach { food ->
+                val isUnavailable = !food.isAvailable
+                val isDepleted = food.currentStock == 0
+                val isLowStock = food.currentStock > 0 && food.currentStock <= food.lowStockThreshold
+                val isGlobalLowStock = food.currentStock > 0 && food.currentStock <= threshold
+                
+                if (isUnavailable) {
+                    val key = "${food.id}_UNAVAILABLE"
+                    activeKeys.add(key)
+                    if (!dismissedNotificationKeys.contains(key)) {
+                        activeList.add(
+                            VendorInventoryNotification(
+                                id = key,
+                                foodItemId = food.id,
+                                foodName = food.name,
+                                type = "UNAVAILABLE",
+                                message = "Cuisine '${food.name}' has been marked unavailable in your menu offerings.",
+                                timestamp = currentTime,
+                                isRead = readNotificationKeys.contains(key)
+                            )
+                        )
+                    }
+                }
+                if (isDepleted) {
+                    val key = "${food.id}_OUT_OF_STOCK"
+                    activeKeys.add(key)
+                    if (!dismissedNotificationKeys.contains(key)) {
+                        activeList.add(
+                            VendorInventoryNotification(
+                                id = key,
+                                foodItemId = food.id,
+                                foodName = food.name,
+                                type = "OUT_OF_STOCK",
+                                message = "CRITICAL: '${food.name}' is completely depleted (0 stock remaining)!",
+                                timestamp = currentTime,
+                                isRead = readNotificationKeys.contains(key)
+                            )
+                        )
+                    }
+                } else if (isLowStock || isGlobalLowStock) {
+                    val key = "${food.id}_LOW_STOCK"
+                    activeKeys.add(key)
+                    if (!dismissedNotificationKeys.contains(key)) {
+                        val activeLimit = if (isLowStock) food.lowStockThreshold else threshold
+                        activeList.add(
+                            VendorInventoryNotification(
+                                id = key,
+                                foodItemId = food.id,
+                                foodName = food.name,
+                                type = "LOW_STOCK",
+                                message = "Warning: '${food.name}' is running low (Stock: ${food.currentStock}/${food.initialStock}, safety limit is $activeLimit).",
+                                timestamp = currentTime,
+                                isRead = readNotificationKeys.contains(key)
+                            )
+                        )
+                    }
+                }
+            }
+            previousVendorNotificationKeys = activeKeys
+            _vendorInventoryNotifications.value = activeList
         }
     }
 

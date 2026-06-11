@@ -50,7 +50,9 @@ data class FoodItem(
     val isAvailable: Boolean = true,
     val initialStock: Int = 100,
     val currentStock: Int = 100,
-    val lowStockThreshold: Int = 15
+    val lowStockThreshold: Int = 15,
+    val calories: Int = 180,
+    val allergens: String = "None"
 )
 
 @Entity(
@@ -163,6 +165,51 @@ data class FoodItemFeedback(
     val rating: Int, // 1 to 5
     val comment: String,
     val timestamp: Long = System.currentTimeMillis()
+)
+
+@Entity(
+    tableName = "vendor_menu_availabilities",
+    foreignKeys = [
+        ForeignKey(
+            entity = User::class,
+            parentColumns = ["id"],
+            childColumns = ["vendorId"],
+            onDelete = ForeignKey.CASCADE
+        )
+    ],
+    indices = [Index(value = ["vendorId"])]
+)
+data class VendorMenuAvailability(
+    @PrimaryKey(autoGenerate = true) val id: Int = 0,
+    val vendorId: Int,
+    val menuItemId: Int,
+    val dayOfWeek: String, // monday, tuesday, etc.
+    val startTime: String?,
+    val endTime: String?,
+    val isActive: Boolean = true
+)
+
+@Entity(
+    tableName = "vendor_order_summaries",
+    foreignKeys = [
+        ForeignKey(
+            entity = User::class,
+            parentColumns = ["id"],
+            childColumns = ["vendorId"],
+            onDelete = ForeignKey.CASCADE
+        )
+    ],
+    indices = [Index(value = ["vendorId"]), Index(value = ["vendorId", "summaryDate"], unique = true)]
+)
+data class VendorOrderSummary(
+    @PrimaryKey(autoGenerate = true) val id: Int = 0,
+    val vendorId: Int,
+    val summaryDate: String,
+    val totalOrders: Int = 0,
+    val completedOrders: Int = 0,
+    val pendingOrders: Int = 0,
+    val totalRevenue: Double = 0.0,
+    val averageRating: Double = 5.0
 )
 
 // ==========================================
@@ -292,6 +339,27 @@ interface FoodItemFeedbackDao {
     suspend fun insertFoodFeedback(feedback: FoodItemFeedback): Long
 }
 
+@Dao
+interface VendorMenuAvailabilityDao {
+    @Query("SELECT * FROM vendor_menu_availabilities WHERE vendorId = :vendorId")
+    fun getAvailabilitiesForVendor(vendorId: Int): Flow<List<VendorMenuAvailability>>
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertAvailability(availability: VendorMenuAvailability): Long
+
+    @Query("DELETE FROM vendor_menu_availabilities WHERE id = :id")
+    suspend fun deleteAvailability(id: Int)
+}
+
+@Dao
+interface VendorOrderSummaryDao {
+    @Query("SELECT * FROM vendor_order_summaries WHERE vendorId = :vendorId ORDER BY summaryDate DESC")
+    fun getSummariesForVendor(vendorId: Int): Flow<List<VendorOrderSummary>>
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertSummary(summary: VendorOrderSummary): Long
+}
+
 // ==========================================
 // 3. APPDATABASE HOLDER
 // ==========================================
@@ -304,9 +372,11 @@ interface FoodItemFeedbackDao {
         Feedback::class,
         AuditLog::class,
         WalletTransaction::class,
-        FoodItemFeedback::class
+        FoodItemFeedback::class,
+        VendorMenuAvailability::class,
+        VendorOrderSummary::class
     ],
-    version = 7,
+    version = 9,
     exportSchema = false
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -317,6 +387,8 @@ abstract class AppDatabase : RoomDatabase() {
     abstract fun auditLogDao(): AuditLogDao
     abstract fun walletTransactionDao(): WalletTransactionDao
     abstract fun foodItemFeedbackDao(): FoodItemFeedbackDao
+    abstract fun vendorMenuAvailabilityDao(): VendorMenuAvailabilityDao
+    abstract fun vendorOrderSummaryDao(): VendorOrderSummaryDao
 
     companion object {
         @Volatile

@@ -43,9 +43,52 @@ class GeminiPerformanceReportService
             ->select('food_name', DB::raw('COUNT(*) as order_count'), DB::raw('SUM(quantity) as total_qty'))
             ->groupBy('food_name')
             ->orderBy('order_count', 'desc')
-            ->limit(3)
+            ->limit(5)
             ->get()
             ->toArray();
+
+        // Weekly comparative statistics for orders (Last 7 days vs previous 7 days)
+        $sevenDaysAgoMs = (time() - 7 * 24 * 60 * 60) * 1000;
+        $fourteenDaysAgoMs = (time() - 14 * 24 * 60 * 60) * 1000;
+
+        $ordersLast7Days = Order::where('vendor_id', $vendorId)
+            ->where('status', 'COMPLETED')
+            ->where('order_timestamp', '>=', $sevenDaysAgoMs)
+            ->count();
+
+        $ordersPrev7Days = Order::where('vendor_id', $vendorId)
+            ->where('status', 'COMPLETED')
+            ->where('order_timestamp', '>=', $fourteenDaysAgoMs)
+            ->where('order_timestamp', '<', $sevenDaysAgoMs)
+            ->count();
+
+        // Hourly peak distribution metrics
+        $hourlyDistribution = [
+            'Breakfast (6am - 10:59am)' => 0,
+            'Lunch Peak (11am - 2:59pm)' => 0,
+            'Afternoon Off-Peak (3pm - 5:59pm)' => 0,
+            'Evening/Night (6pm onwards)' => 0,
+        ];
+
+        $completedOrdersAllTime = Order::where('vendor_id', $vendorId)
+            ->where('status', 'COMPLETED')
+            ->get();
+
+        foreach ($completedOrdersAllTime as $co) {
+            if ($co->order_timestamp) {
+                $epochSec = round($co->order_timestamp / 1000);
+                $hr = intval(date('G', $epochSec));
+                if ($hr >= 6 && $hr < 11) {
+                    $hourlyDistribution['Breakfast (6am - 10:59am)']++;
+                } elseif ($hr >= 11 && $hr < 15) {
+                    $hourlyDistribution['Lunch Peak (11am - 2:59pm)']++;
+                } elseif ($hr >= 15 && $hr < 18) {
+                    $hourlyDistribution['Afternoon Off-Peak (3pm - 5:59pm)']++;
+                } else {
+                    $hourlyDistribution['Evening/Night (6pm onwards)']++;
+                }
+            }
+        }
 
         // Calculate Completion Rate
         $denominator = $totalOrders - $declinedOrdersCount;
@@ -92,6 +135,11 @@ class GeminiPerformanceReportService
                 'completion_rate_percent' => $completionRate,
                 'total_revenue_ghs' => round($totalRevenue, 2),
                 'top_dishes' => $topDishes,
+                'weekly_comparison' => [
+                    'last_7_days' => $ordersLast7Days,
+                    'prev_7_days' => $ordersPrev7Days,
+                ],
+                'hourly_distribution' => $hourlyDistribution,
             ],
             'ratings' => [
                 'food_quality_avg' => $avgFoodQuality,
@@ -212,6 +260,14 @@ class GeminiPerformanceReportService
             $topDishesStr .= "- {$dish['food_name']} (Orders count: {$dish['order_count']}, Total Quantity items sold: {$dish['total_qty']})\n";
         }
 
+        $hourlyDistributionStr = '';
+        foreach ($data['metrics']['hourly_distribution'] ?? [] as $period => $count) {
+            $hourlyDistributionStr .= "- {$period}: {$count} completed order(s)\n";
+        }
+
+        $weeklyComparisonStr = "- Past 7 Days Completed Orders: " . ($data['metrics']['weekly_comparison']['last_7_days'] ?? 0) . "\n" .
+                              "- Previous 7 Days Completed Orders: " . ($data['metrics']['weekly_comparison']['prev_7_days'] ?? 0) . "\n";
+
         $commentsStr = '';
         foreach ($data['recent_comments'] as $comment) {
             $commentsStr .= "- \"{$comment}\"\n";
@@ -227,8 +283,15 @@ Please analyze the following historical metrics and customer feedback for cafete
 - Canceled/Declined Orders: {$data['metrics']['declined_orders']}
 - Order Completion Success Rate: {$data['metrics']['completion_rate_percent']}%
 - Cumulative Sales Volume: GH₵" . number_format($data['metrics']['total_revenue_ghs'], 2) . "
-- Top Selling Menu Dishes:
+
+--- POPULAR ITEM TRENDS (Top Dishes) ---
 {$topDishesStr}
+
+--- RECENT WEEK-OVER-WEEK ACTIVITY ---
+{$weeklyComparisonStr}
+
+--- PEAK SERVICE INTERVALS (Hourly Distribution) ---
+{$hourlyDistributionStr}
 
 --- AVERAGE RATINGS (Scale: 1-5 Stars) ---
 - Food Taste & Culinary Quality: {$data['ratings']['food_quality_avg']} / 5.0
@@ -244,9 +307,9 @@ Please analyze the following historical metrics and customer feedback for cafete
 Based on this historical dataset, generate an incredibly detailed, highly professional, Actionable Vendor Performance Analysis Report. Your tone must be constructive, objective, encouraging yet precise about failure points. Recommended sections:
 
 1. **Executive Performance Rating**: Summarize their status in 2-3 sentences. Grade them (A+, B, etc.) based strictly on the metrics.
-2. **Key Strengths (Backed by Data)**: Point out their biggest advantages. Highlight specific scores or comments.
+2. **Key Strengths (Backed by Data)**: Point out their biggest advantages. Highlight specific scores, popular item trends, or comments.
 3. **Core Performance Bottlenecks & Operational Constraints**: Identify why orders are being declined, delayed, or what negative reviews are saying (e.g., cleanliness, price concern, slow prep times during rush hour).
-4. **Strategic Action Roadmap (Next 30 Days)**: Give exactly 3 highly specific, creative, and realistic business recommendations for the vendor to implement to maximize revenue, improve operations, and handle Accra Technical University student traffic more efficiently.
+4. **Strategic Action Roadmap (Next 30 Days)**: Give exactly 3 highly specific, creative, and realistic business recommendations for the vendor to implement to maximize revenue, improve operations based on the hourly peak distribution, and handle Accra Technical University student traffic more efficiently.
 
 Make sure to format using clean Markdown with distinct sections, neat bold text, lists, and spacing. Include a professional closing line.";
     }
@@ -257,16 +320,25 @@ Make sure to format using clean Markdown with distinct sections, neat bold text,
     private function getMockReportMarkdown(array $data): string
     {
         $topDish = $data['metrics']['top_dishes'][0]['food_name'] ?? 'Local Specialty Meals';
+        $secondDish = $data['metrics']['top_dishes'][1]['food_name'] ?? 'Assorted Stews';
+        
+        $last7Days = $data['metrics']['weekly_comparison']['last_7_days'] ?? 0;
+        $prev7Days = $data['metrics']['weekly_comparison']['prev_7_days'] ?? 0;
+        $diff = $last7Days - $prev7Days;
+        $trendText = $diff >= 0 ? "up by +{$diff} orders" : "down by " . abs($diff) . " orders";
+
+        $lunchCount = $data['metrics']['hourly_distribution']['Lunch Peak (11am - 2:59pm)'] ?? 0;
+
         return "# 🖨️ ATU Cafeteria Performance Report: **{$data['vendor_name']}**
 *(Local Fallback Report — Gemini AI Connection Dormant or Offline)*
 
 ### 1. Executive Performance Rating: **Grade B**
-**{$data['vendor_name']}** shows consistent campus popularity, managing a total database intake of **{$data['metrics']['total_orders']}** orders with a completion success rate of **{$data['metrics']['completion_rate_percent']}%**. Their cumulative sales volume of **GH₵" . number_format($data['metrics']['total_revenue_ghs'], 2) . "** demonstrates heavy transaction velocity.
+**{$data['vendor_name']}** shows consistent campus popularity, managing a total database intake of **{$data['metrics']['total_orders']}** orders with a completion success rate of **{$data['metrics']['completion_rate_percent']}%**. Their cumulative sales volume of **GH₵" . number_format($data['metrics']['total_revenue_ghs'], 2) . "** demonstrates heavy transaction velocity. Weekly activity shows they are **{$trendText}** compared to the previous week.
 
 ---
 
-### 2. Key Strengths (Backed by Data)
-- **High Popularity**: Solid footprint on campus, particularly driven by high volume dishes like **{$topDish}**.
+### 2. Key Strengths & Popular Item Trends
+- **High Popularity**: Solid footprint on campus, particularly driven by high volume dishes like **{$topDish}** and **{$secondDish}**.
 - **Culinary Quality Satisfaction**: Average food taste rating of **{$data['ratings']['food_quality_avg']} / 5.0** suggests students highly appreciate the flavor profile of the meals.
 - **Economic Value**: Portions are graded at **{$data['ratings']['price_value_avg']} / 5.0**, marking this stall as pricing-friendly for the student demographic.
 
@@ -274,7 +346,7 @@ Make sure to format using clean Markdown with distinct sections, neat bold text,
 
 ### 3. Core Performance Bottlenecks & Operational Constraints
 - **Unfulfilled Orders**: There are **{$data['metrics']['declined_orders']} declined orders**, leading to leaked sales opportunity and customer disappointment.
-- **Service Speed Constraints**: Current speed index stands at **{$data['ratings']['service_speed_avg']} / 5.0**. This indicates bottlenecking during peak university lecture breaks, common for manual kitchen prep.
+- **Peak Hour Congestion**: With **{$lunchCount}** orders concentrated during the Lunch Peak (11am - 3pm), current speed index stands at **{$data['ratings']['service_speed_avg']} / 5.0**. This indicates bottlenecking during peak university lecture breaks, common for manual kitchen prep.
 - **Sanitation Feedback**: Maintenance and prep station sanitization score of **{$data['ratings']['cleanliness_avg']} / 5.0** reveals minor student concerns regarding eating surface hygiene.
 
 ---

@@ -203,7 +203,7 @@ class CafeteriaRepository(private val db: AppDatabase) {
     }
 
     // Menu Management
-    suspend fun addMenuFoodItem(vendorId: Int, name: String, price: Double, category: String, description: String, imageUrl: String, initialStock: Int = 100, threshold: Int = 15) = withContext(Dispatchers.IO) {
+    suspend fun addMenuFoodItem(vendorId: Int, name: String, price: Double, category: String, description: String, imageUrl: String, initialStock: Int = 100, threshold: Int = 15, calories: Int = 180, allergens: String = "None") = withContext(Dispatchers.IO) {
         if (LaravelClientManager.isLaravelEnabled) {
             try {
                 val service = LaravelClientManager.getService()
@@ -218,7 +218,7 @@ class CafeteriaRepository(private val db: AppDatabase) {
                     )
                 )
                 val roomItem = LaravelClientManager.toRoomFoodItem(lItem)
-                foodItemDao.insertFoodItem(roomItem.copy(initialStock = initialStock, currentStock = initialStock, lowStockThreshold = threshold))
+                foodItemDao.insertFoodItem(roomItem.copy(initialStock = initialStock, currentStock = initialStock, lowStockThreshold = threshold, calories = calories, allergens = allergens))
                 return@withContext
             } catch (e: Exception) {
                 Log.e("CafeteriaRepository", "Laravel createFoodItem failed - falling back to local", e)
@@ -234,10 +234,12 @@ class CafeteriaRepository(private val db: AppDatabase) {
             isAvailable = true,
             initialStock = initialStock,
             currentStock = initialStock,
-            lowStockThreshold = threshold
+            lowStockThreshold = threshold,
+            calories = calories,
+            allergens = allergens
         )
         foodItemDao.insertFoodItem(item)
-        insertAuditLog(vendorId, "MENU_ITEM_CREATED", "Added menu item: ${name} to category ${category} with initial stock of ${initialStock}.")
+        insertAuditLog(vendorId, "MENU_ITEM_CREATED", "Added menu item: ${name} (Calories: ${calories} kcal, Allergens: ${allergens}) to category ${category} with initial stock of ${initialStock}.")
     }
 
     suspend fun updateMenuFoodItem(item: FoodItem) = withContext(Dispatchers.IO) {
@@ -277,6 +279,52 @@ class CafeteriaRepository(private val db: AppDatabase) {
         }
         foodItemDao.deleteFoodItem(item)
         insertAuditLog(item.vendorId, "MENU_ITEM_DELETED", "Deleted item: '${item.name}' from vendor menu.")
+    }
+
+    suspend fun bulkUpdateVendorMenu(vendorId: Int, updates: List<LaravelBulkUpdateItem>): Pair<Boolean, String> = withContext(Dispatchers.IO) {
+        if (LaravelClientManager.isLaravelEnabled) {
+            try {
+                val service = LaravelClientManager.getService()
+                val response = service.bulkUpdateMenu(updates)
+                if (response.success) {
+                    updates.forEach { update ->
+                        val localItem = foodItemDao.getFoodItemById(update.id)
+                        if (localItem != null) {
+                            var price = localItem.price
+                            var isAvailable = localItem.isAvailable
+                            if (update.price != null) { price = update.price }
+                            if (update.is_available != null) { isAvailable = update.is_available }
+                            foodItemDao.updateFoodItem(localItem.copy(price = price, isAvailable = isAvailable))
+                        }
+                    }
+                    insertAuditLog(vendorId, "BULK_MENU_UPLOAD", "Bulk updated ${response.updated_count} menu items via Laravel API in a single request.")
+                    return@withContext Pair(true, response.message)
+                } else {
+                    return@withContext Pair(false, response.message)
+                }
+            } catch (e: Exception) {
+                Log.e("CafeteriaRepository", "Laravel bulkUpdateVendorMenu failed - falling back to local simulation", e)
+            }
+        }
+
+        var updatedCount = 0
+        try {
+            updates.forEach { update ->
+                val localItem = foodItemDao.getFoodItemById(update.id)
+                if (localItem != null && localItem.vendorId == vendorId) {
+                    var price = localItem.price
+                    var isAvailable = localItem.isAvailable
+                    if (update.price != null) { price = update.price }
+                    if (update.is_available != null) { isAvailable = update.is_available }
+                    foodItemDao.updateFoodItem(localItem.copy(price = price, isAvailable = isAvailable))
+                    updatedCount++
+                }
+            }
+            insertAuditLog(vendorId, "BULK_MENU_UPLOAD", "Bulk updated $updatedCount menu items (Offline/Local State Simulation) via JSON parser.")
+            return@withContext Pair(true, "Successfully processed updates. Updated $updatedCount menu item(s) in local cache.")
+        } catch (e: Exception) {
+            return@withContext Pair(false, "Offline update failed: ${e.message}")
+        }
     }
 
     // Transactions
@@ -778,17 +826,17 @@ class CafeteriaRepository(private val db: AppDatabase) {
             // Seed FoodItems
             val foods = listOf(
                 // Mary Joint
-                FoodItem(id = 101, vendorId = v1.id, name = "ATU Chicken Jollof Rice", price = 25.0, category = "Lunch Specials", imageUrl = "", description = "Classic aromatic rice stewed with authentic Ghanaian tomato sauce, served with seasoned fried chicken salad & shito."),
-                FoodItem(id = 102, vendorId = v1.id, name = "Zesty Ginger Sobolo", price = 10.0, category = "Drinks", imageUrl = "", description = "Refreshing chilled local hibiscus flower drink brewed with fresh ginger, pineapple peels, and sweetener."),
-                FoodItem(id = 103, vendorId = v1.id, name = "Red-Red Beans Stew", price = 20.0, category = "Lunch Specials", imageUrl = "", description = "Stewed tender cowpea bean hash in palm palm oil, accompanied by fried ripe sugar-plantain dices."),
+                FoodItem(id = 101, vendorId = v1.id, name = "ATU Chicken Jollof Rice", price = 25.0, category = "Lunch Specials", imageUrl = "", description = "Classic aromatic rice stewed with authentic Ghanaian tomato sauce, served with seasoned fried chicken salad & shito.", calories = 650, allergens = "Fish, Soy (shito)"),
+                FoodItem(id = 102, vendorId = v1.id, name = "Zesty Ginger Sobolo", price = 10.0, category = "Drinks", imageUrl = "", description = "Refreshing chilled local hibiscus flower drink brewed with fresh ginger, pineapple peels, and sweetener.", calories = 120, allergens = "None"),
+                FoodItem(id = 103, vendorId = v1.id, name = "Red-Red Beans Stew", price = 20.0, category = "Lunch Specials", imageUrl = "", description = "Stewed tender cowpea bean hash in palm palm oil, accompanied by fried ripe sugar-plantain dices.", calories = 580, allergens = "None"),
 
                 // Kofi Kitchen
-                FoodItem(id = 201, vendorId = v2.id, name = "Waakye Supreme", price = 30.0, category = "Traditional", imageUrl = "", description = "A student favorite! Local black-eyed peas boiled with rice and millet stalks. Accompanying boiled egg, spiced gari, talia, and hot wele shito."),
-                FoodItem(id = 202, vendorId = v2.id, name = "Fufu & Goat Light Soup", price = 35.0, category = "Traditional", imageUrl = "", description = "Rich Ghanaian fufu pounded from fresh cassava and green plantains, submerged in aromatic goat meat soup."),
+                FoodItem(id = 201, vendorId = v2.id, name = "Waakye Supreme", price = 30.0, category = "Traditional", imageUrl = "", description = "A student favorite! Local black-eyed peas boiled with rice and millet stalks. Accompanying boiled egg, spiced gari, talia, and hot wele shito.", calories = 750, allergens = "Egg, Fish (shito)"),
+                FoodItem(id = 202, vendorId = v2.id, name = "Fufu & Goat Light Soup", price = 35.0, category = "Traditional", imageUrl = "", description = "Rich Ghanaian fufu pounded from fresh cassava and green plantains, submerged in aromatic goat meat soup.", calories = 820, allergens = "Goat Meat"),
 
                 // Bakery Corner
-                FoodItem(id = 301, vendorId = v3.id, name = "Savoury Meat Pie", price = 15.0, category = "Snacks", imageUrl = "", description = "Crispy, flaky puff pastry loaded with moist, cooked mince beef seasoning."),
-                FoodItem(id = 302, vendorId = v3.id, name = "Chilled Coca-Cola", price = 8.0, category = "Drinks", imageUrl = "", description = "330ml Ice-cold Coca-Cola can for dynamic pairing.")
+                FoodItem(id = 301, vendorId = v3.id, name = "Savoury Meat Pie", price = 15.0, category = "Snacks", imageUrl = "", description = "Crispy, flaky puff pastry loaded with moist, cooked mince beef seasoning.", calories = 380, allergens = "Gluten (Wheat), Dairy"),
+                FoodItem(id = 302, vendorId = v3.id, name = "Chilled Coca-Cola", price = 8.0, category = "Drinks", imageUrl = "", description = "330ml Ice-cold Coca-Cola can for dynamic pairing.", calories = 140, allergens = "None")
             )
             for (f in foods) {
                 foodItemDao.insertFoodItem(f)
