@@ -123,6 +123,98 @@ class _StudentDashboardScreenState extends State<StudentDashboardScreen> {
           ),
         ),
 
+        // Live stock alerts feed widget
+        if (provider.liveAlerts.isNotEmpty)
+          Container(
+            margin: const EdgeInsets.only(left: 12, right: 12, top: 10),
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+            decoration: BoxDecoration(
+              color: Colors.red[50]?.withOpacity(0.4) ?? Colors.amber[50]?.withOpacity(0.4),
+              borderRadius: BorderRadius.circular(10),
+              border: Border.all(color: Colors.red[100] ?? Colors.amber[100]!),
+            ),
+            child: Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                  decoration: BoxDecoration(
+                    color: Colors.redAccent,
+                    borderRadius: BorderRadius.circular(4),
+                  ),
+                  child: const Text(
+                    "LIVE ALERT",
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 8,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    provider.liveAlerts.first,
+                    style: const TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w600,
+                      color: Colors.black87,
+                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+                if (provider.liveAlerts.length > 1) ...[
+                  const SizedBox(width: 4),
+                  InkWell(
+                    onTap: () {
+                      showDialog(
+                        context: context,
+                        builder: (context) => AlertDialog(
+                          title: Row(
+                            children: const [
+                              Icon(Icons.radar, color: Colors.blueAccent),
+                              SizedBox(width: 8),
+                              Text("Real-Time Stock Stream"),
+                            ],
+                          ),
+                          content: SizedBox(
+                            width: double.maxFinite,
+                            child: ListView.builder(
+                              shrinkWrap: true,
+                              itemCount: provider.liveAlerts.length,
+                              itemBuilder: (context, idx) => ListTile(
+                                leading: const Icon(Icons.info_outline, size: 18),
+                                title: Text(
+                                  provider.liveAlerts[idx],
+                                  style: const TextStyle(fontSize: 13),
+                                ),
+                              ),
+                            ),
+                          ),
+                          actions: [
+                            TextButton(
+                              onPressed: () => Navigator.pop(context),
+                              child: const Text("CLOSE"),
+                            )
+                          ],
+                        ),
+                      );
+                    },
+                    child: Text(
+                      "+${provider.liveAlerts.length - 1} more",
+                      style: const TextStyle(
+                        fontSize: 9,
+                        color: Colors.blueAccent,
+                        fontWeight: FontWeight.bold,
+                        decoration: TextDecoration.underline,
+                      ),
+                    ),
+                  )
+                ]
+              ],
+            ),
+          ),
+
         // Categories selector
         Padding(
           padding: const EdgeInsets.symmetric(vertical: 12.0),
@@ -297,6 +389,8 @@ class _StudentDashboardScreenState extends State<StudentDashboardScreen> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     const Divider(),
+                    _buildTrackingStepper(order.status),
+                    const SizedBox(height: 8),
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
@@ -715,16 +809,170 @@ class _StudentDashboardScreenState extends State<StudentDashboardScreen> {
 
   Color _statusColor(String status) {
     switch (status) {
-      case 'COMPLETED':
+      case 'Order Placed':
+      case 'PENDING':
         return Colors.green;
-      case 'READY':
-        return Colors.orange;
+      case 'Preparing':
       case 'PREPARING':
         return Colors.blue;
+      case 'Out for Delivery':
+      case 'OUT_FOR_DELIVERY':
+      case 'READY':
+        return Colors.orange;
+      case 'Delivered':
+      case 'COMPLETED':
+        return Colors.teal;
       case 'DECLINED':
+      case 'Declined':
         return Colors.red;
       default:
         return Colors.grey;
     }
+  }
+
+  int _getStageIndex(String status) {
+    switch (status) {
+      case 'Order Placed':
+      case 'PENDING':
+        return 0;
+      case 'Preparing':
+      case 'PREPARING':
+        return 1;
+      case 'Out for Delivery':
+      case 'OUT_FOR_DELIVERY':
+      case 'READY':
+        return 2;
+      case 'Delivered':
+      case 'COMPLETED':
+        return 3;
+      default:
+        return -1; // Cancellation or declination
+    }
+  }
+
+  Widget _buildTrackingStepper(String status) {
+    final currentStage = _getStageIndex(status);
+
+    if (currentStage == -1) {
+      return Container(
+        margin: const EdgeInsets.symmetric(vertical: 8),
+        padding: const EdgeInsets.all(10),
+        decoration: BoxDecoration(
+          color: Colors.red[50],
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(color: Colors.red[200]!),
+        ),
+        child: Row(
+          children: [
+            const Icon(Icons.cancel, color: Colors.red, size: 18),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Text(
+                "Order is currently: $status.",
+                style: const TextStyle(color: Colors.red, fontWeight: FontWeight.bold, fontSize: 13),
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
+    final stages = [
+      {'label': 'Placed', 'icon': Icons.assignment_turned_in},
+      {'label': 'Preparing', 'icon': Icons.soup_kitchen},
+      {'label': 'Out for Delivery', 'icon': Icons.delivery_dining},
+      {'label': 'Delivered', 'icon': Icons.check_circle},
+    ];
+
+    return Container(
+      margin: const EdgeInsets.symmetric(vertical: 8),
+      padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 8),
+      decoration: BoxDecoration(
+        color: Colors.blue[50]?.withOpacity(0.3),
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: Colors.blue[100]!),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: const [
+              Icon(Icons.radar, color: Colors.blueAccent, size: 14),
+              SizedBox(width: 6),
+              Text(
+                "REAL-TIME ORDER TRACKING STREAMS",
+                style: TextStyle(
+                  fontWeight: FontWeight.bold,
+                  fontSize: 10,
+                  color: Colors.blueAccent,
+                  letterSpacing: 0.8,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: List.generate(stages.length, (idx) {
+              final stage = stages[idx];
+              final isPassed = idx <= currentStage;
+              final isActive = idx == currentStage;
+              final label = stage['label'] as String;
+              final icon = stage['icon'] as IconData;
+
+              final Color color = isActive 
+                  ? Colors.blueAccent 
+                  : (isPassed ? Colors.green : Colors.grey[400]!);
+
+              return Expanded(
+                child: Column(
+                  children: [
+                    Row(
+                      children: [
+                        Expanded(
+                          child: Container(
+                            height: 2,
+                            color: idx == 0 
+                                ? Colors.transparent 
+                                : (idx <= currentStage ? Colors.green : Colors.grey[300]),
+                          ),
+                        ),
+                        Container(
+                          padding: const EdgeInsets.all(6),
+                          decoration: BoxDecoration(
+                            color: isActive ? Colors.blue[100] : (isPassed ? Colors.green[50] : Colors.grey[100]),
+                            shape: BoxShape.circle,
+                            border: Border.all(color: color, width: 2),
+                          ),
+                          child: Icon(icon, color: color, size: 14),
+                        ),
+                        Expanded(
+                          child: Container(
+                            height: 2,
+                            color: idx == stages.length - 1 
+                                ? Colors.transparent 
+                                : (idx < currentStage ? Colors.green : Colors.grey[300]),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 6),
+                    Text(
+                      label,
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        fontSize: 9,
+                        fontWeight: isActive ? FontWeight.bold : FontWeight.normal,
+                        color: isActive ? Colors.blueAccent : (isPassed ? Colors.green : Colors.grey[600]),
+                      ),
+                    ),
+                  ],
+                ),
+              );
+            }),
+          ),
+        ],
+      ),
+    );
   }
 }

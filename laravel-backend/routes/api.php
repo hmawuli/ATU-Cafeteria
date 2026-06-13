@@ -18,6 +18,7 @@ use App\Http\Controllers\Api\ChatController;
 use App\Http\Controllers\Api\PaystackPaymentController;
 use App\Http\Controllers\Api\VendorSpecificController;
 use App\Http\Controllers\Api\PassportAuthController;
+use App\Http\Controllers\Api\DailyRevenueController;
 
 // Register explicit listeners for OrderStatusCompleted event
 Event::listen(
@@ -98,6 +99,7 @@ Route::middleware(function ($request, $next) {
     Route::get('/vendor/performance-metrics', [VendorPerformanceController::class, 'getVendorPerformanceMetrics']);
     Route::get('/vendor/performance', [VendorPerformanceController::class, 'getPerformance']);
     Route::get('/vendor/recharts-sales', [VendorPerformanceController::class, 'exportSalesForRecharts']);
+    Route::get('/vendor/daily-revenue', [DailyRevenueController::class, 'getDailyRevenue']);
     Route::post('/vendor/toggle-status', [VendorController::class, 'toggleStatus']);
 
     // Vendor Specific endpoints

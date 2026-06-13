@@ -74,6 +74,9 @@ class CafeteriaViewModel(application: Application) : AndroidViewModel(applicatio
     private val _vendorPerformanceMetricsList = MutableStateFlow<List<com.example.data.LaravelVendorMetric>>(emptyList())
     val vendorPerformanceMetricsList: StateFlow<List<com.example.data.LaravelVendorMetric>> = _vendorPerformanceMetricsList.asStateFlow()
 
+    private val _vendorDailyRevenueResponse = MutableStateFlow<com.example.data.LaravelDailyRevenueResponse?>(null)
+    val vendorDailyRevenueResponse: StateFlow<com.example.data.LaravelDailyRevenueResponse?> = _vendorDailyRevenueResponse.asStateFlow()
+
     // 2. Room Reactive Streams
     val allVendors: StateFlow<List<User>> = repository.allVendors
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
@@ -254,7 +257,10 @@ class CafeteriaViewModel(application: Application) : AndroidViewModel(applicatio
                         _isStoreClosed.value = !user.isOpen
                         refreshVendorPerformance(user.id)
                         // Trigger Laravel Echo socket connection pipeline
-                        LaravelEchoWebSocketManager.startListening(user.id)
+                        LaravelEchoWebSocketManager.startListening(user.id, "VENDOR")
+                    } else if (user.role == "STUDENT") {
+                        // Trigger Laravel Echo socket pipeline for student channels
+                        LaravelEchoWebSocketManager.startListening(user.id, "STUDENT")
                     } else {
                         LaravelEchoWebSocketManager.stopListening()
                     }
@@ -274,6 +280,68 @@ class CafeteriaViewModel(application: Application) : AndroidViewModel(applicatio
                 // Log event for the live terminal display
                 val timeStr = java.text.SimpleDateFormat("HH:mm:ss", java.util.Locale.getDefault()).format(java.util.Date(event.timestamp))
                 val logMsg = "[$timeStr] Packet: ID #${event.orderId} containing '${event.foodName}' (QTY: ${event.qty}) on channel orders-vendor-${event.vendorId}"
+                _realTimeEventsLogs.value = (listOf(logMsg) + _realTimeEventsLogs.value).take(50)
+            }
+        }
+
+        // Listen to Student WebSocket / Pusher notifications
+        viewModelScope.launch {
+            LaravelEchoWebSocketManager.realTimeStudentNotificationFlow.collect { event ->
+                val activeUser = _currentUser.value
+                if (activeUser != null && activeUser.role == "STUDENT" && activeUser.id == event.vendorId) { // vendorId contains target student ID in some systems or is student ID
+                    // Display floating alert immediately & play audio cue!
+                    val fabricatedNotif = com.example.data.LaravelDatabaseNotification(
+                        id = event.notificationId,
+                        type = "App\\Notifications\\OrderStatusChangedNotification",
+                        notifiable_type = "App\\Models\\User",
+                        notifiable_id = activeUser.id,
+                        data = com.example.data.LaravelNotificationData(
+                            order_id = event.orderId,
+                            vendor_id = event.vendorId,
+                            total_price = 0.0,
+                            old_status = event.oldStatus,
+                            new_status = event.newStatus,
+                            message = event.message,
+                            time = java.text.SimpleDateFormat("yyyy-MM-dd HH:mm:ss", java.util.Locale.getDefault()).format(java.util.Date(event.timestamp))
+                        ),
+                        read_at = null,
+                        created_at = null,
+                        updated_at = null
+                    )
+                    _activeStudentAlerts.value = _activeStudentAlerts.value + fabricatedNotif
+                    _studentNotifications.value = listOf(fabricatedNotif) + _studentNotifications.value
+                    playSoundNotification()
+                } else if (activeUser != null && activeUser.role == "STUDENT") {
+                    // Check if notification belongs to this student
+                    val order = repository.orderDao.getOrderById(event.orderId)
+                    if (order != null && order.customerId == activeUser.id) {
+                        val fabricatedNotif = com.example.data.LaravelDatabaseNotification(
+                            id = event.notificationId,
+                            type = "App\\Notifications\\OrderStatusChangedNotification",
+                            notifiable_type = "App\\Models\\User",
+                            notifiable_id = activeUser.id,
+                            data = com.example.data.LaravelNotificationData(
+                                order_id = event.orderId,
+                                vendor_id = order.vendorId,
+                                total_price = order.totalPrice,
+                                old_status = event.oldStatus,
+                                new_status = event.newStatus,
+                                message = event.message,
+                                time = java.text.SimpleDateFormat("yyyy-MM-dd HH:mm:ss", java.util.Locale.getDefault()).format(java.util.Date(event.timestamp))
+                            ),
+                            read_at = null,
+                            created_at = null,
+                            updated_at = null
+                        )
+                        _activeStudentAlerts.value = _activeStudentAlerts.value + fabricatedNotif
+                        _studentNotifications.value = listOf(fabricatedNotif) + _studentNotifications.value
+                        playSoundNotification()
+                    }
+                }
+                
+                // Log event for the live terminal logs
+                val timeStr = java.text.SimpleDateFormat("HH:mm:ss", java.util.Locale.getDefault()).format(java.util.Date(event.timestamp))
+                val logMsg = "[$timeStr] Echo Notification: Order #${event.orderId} moved ${event.oldStatus} -> ${event.newStatus}"
                 _realTimeEventsLogs.value = (listOf(logMsg) + _realTimeEventsLogs.value).take(50)
             }
         }
@@ -918,6 +986,10 @@ class CafeteriaViewModel(application: Application) : AndroidViewModel(applicatio
                     
                     val metrics = repository.getVendorPerformanceMetrics()
                     _vendorPerformanceMetricsList.value = metrics
+
+                    // Fetch custom daily revenue totals by vendor and date
+                    val dailyRev = repository.getDailyRevenue(id)
+                    _vendorDailyRevenueResponse.value = dailyRev
                 } catch (e: Exception) {
                     Log.e("CafeteriaViewModel", "refreshVendorPerformance failed", e)
                 }

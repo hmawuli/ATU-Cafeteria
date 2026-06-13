@@ -15,6 +15,7 @@ import java.util.concurrent.TimeUnit
  * 1. Live WebSocket client connecting to remote Laravel socket servers (Pusher/Soketi/Laravel-WebSockets).
  * 2. Instant intra-app loopback WebSocket pipeline to stream order-created events directly across student-vendor roles.
  * 3. Graceful automated simulation fallback that delivers realistic campus orders periodically to keep KPIs alive.
+ * 4. Dual channel management: Handles both VENDOR (orders-vendor-$id) and STUDENT (orders-student-$id) feeds.
  */
 object LaravelEchoWebSocketManager {
     private const val TAG = "LaravelEchoWSManager"
@@ -30,9 +31,17 @@ object LaravelEchoWebSocketManager {
     private var isConnecting = false
     private var reconnectJob: Job? = null
     
+    // Store current registration metrics for secure reconnections
+    private var activeUserId: Int? = null
+    private var activeUserRole: String? = null
+
     // Shared flow emitting direct real-time order creation event signals
     private val _realTimeOrderFlow = MutableSharedFlow<OrderBroadcastEvent>(extraBufferCapacity = 64)
     val realTimeOrderFlow: SharedFlow<OrderBroadcastEvent> = _realTimeOrderFlow.asSharedFlow()
+
+    // Shared flow emitting direct real-time student notification event signals
+    private val _realTimeStudentNotificationFlow = MutableSharedFlow<StudentNotificationEvent>(extraBufferCapacity = 64)
+    val realTimeStudentNotificationFlow: SharedFlow<StudentNotificationEvent> = _realTimeStudentNotificationFlow.asSharedFlow()
 
     data class OrderBroadcastEvent(
         val orderId: Int,
@@ -44,14 +53,30 @@ object LaravelEchoWebSocketManager {
         val message: String
     )
 
+    data class StudentNotificationEvent(
+        val notificationId: String,
+        val orderId: Int,
+        val vendorId: Int,
+        val oldStatus: String,
+        val newStatus: String,
+        val message: String,
+        val timestamp: Long
+    )
+
     /**
      * Initializes connection to the Laravel WebSocket or Pusher channel.
      * Rewrites http/https BaseUrl dynamically into ws/wss stream.
      */
-    fun startListening(vendorId: Int) {
+    fun startListening(userId: Int, role: String) {
+        val normalizedRole = role.uppercase()
+        activeUserId = userId
+        activeUserRole = normalizedRole
+
         if (!LaravelClientManager.isLaravelEnabled) {
-            Log.d(TAG, "Laravel sync is disabled. Starting mock loopback WebSocket channel instead.")
-            startSimulationLoop(vendorId)
+            Log.d(TAG, "Laravel sync is disabled. Starting mock loopback WebSocket channel instead for $normalizedRole.")
+            if (normalizedRole == "VENDOR") {
+                startSimulationLoop(userId)
+            }
             return
         }
 
@@ -78,7 +103,7 @@ object LaravelEchoWebSocketManager {
                 isConnecting = false
                 Log.i(TAG, "Laravel Echo WebSocket subscription pipe connected successfully.")
                 // Send standard Pusher/Echo subscribe message
-                subscribeToOrdersChannel(webSocket, vendorId)
+                subscribeToRoleChannel(webSocket, userId, normalizedRole)
             }
 
             override fun onMessage(webSocket: WebSocket, text: String) {
@@ -92,27 +117,31 @@ object LaravelEchoWebSocketManager {
 
             override fun onClosed(webSocket: WebSocket, code: Int, reason: String) {
                 Log.w(TAG, "WebSocket closed (Code: $code)")
-                scheduleReconnect(vendorId)
+                scheduleReconnect(userId, normalizedRole)
             }
 
             override fun onFailure(webSocket: WebSocket, t: Throwable, response: Response?) {
                 Log.e(TAG, "WebSocket failure, proceeding with auto-reconnection fallback: ${t.message}")
-                scheduleReconnect(vendorId)
+                scheduleReconnect(userId, normalizedRole)
             }
         })
     }
 
-    private fun subscribeToOrdersChannel(ws: WebSocket, vendorId: Int) {
+    private fun subscribeToRoleChannel(ws: WebSocket, userId: Int, role: String) {
         try {
-            // Subscribe to private vendor operations channel or simple public orders broadcast channel
+            val channelName = if (role == "VENDOR") {
+                "orders-vendor-$userId"
+            } else {
+                "orders-student-$userId"
+            }
             val subMsg = JSONObject().apply {
                 put("event", "pusher:subscribe")
                 put("data", JSONObject().apply {
-                    put("channel", "orders-vendor-$vendorId")
+                    put("channel", channelName)
                 })
             }
             ws.send(subMsg.toString())
-            Log.d(TAG, "Subscribed successfully to channel 'orders-vendor-$vendorId'")
+            Log.d(TAG, "Subscribed successfully to channel '$channelName'")
         } catch (e: Exception) {
             Log.e(TAG, "Failed sending subscription frame", e)
         }
@@ -122,6 +151,8 @@ object LaravelEchoWebSocketManager {
         try {
             val json = JSONObject(jsontext)
             val eventName = json.optString("event")
+            
+            // Handle order notifications for Vendor Screen
             if (eventName == "OrderPlaced" || eventName == "App\\Events\\OrderPlaced") {
                 val dataObj = json.optJSONObject("data") ?: JSONObject(json.optString("data", "{}"))
                 val orderId = dataObj.optInt("order_id", dataObj.optInt("id", 0))
@@ -143,20 +174,45 @@ object LaravelEchoWebSocketManager {
                         )
                     )
                 }
+            } 
+            // Handle status notifications for Student Screen (Pusher/Echo Broadcaster)
+            else if (eventName.contains("BroadcastNotificationCreated") || eventName.contains("OrderStatusChanged")) {
+                val dataObj = json.optJSONObject("data") ?: JSONObject(json.optString("data", "{}"))
+                val nestedData = dataObj.optJSONObject("data") ?: dataObj
+                val notificationId = dataObj.optString("id", java.util.UUID.randomUUID().toString())
+                val orderId = nestedData.optInt("order_id", 0)
+                val vendorId = nestedData.optInt("vendor_id", 0)
+                val oldStatus = nestedData.optString("old_status", "PENDING")
+                val newStatus = nestedData.optString("new_status", "PREPARING")
+                val msg = nestedData.optString("message", "Your order status has changed.")
+                
+                scope.launch {
+                    _realTimeStudentNotificationFlow.emit(
+                        StudentNotificationEvent(
+                            notificationId = notificationId,
+                            orderId = orderId,
+                            vendorId = vendorId,
+                            oldStatus = oldStatus,
+                            newStatus = newStatus,
+                            message = msg,
+                            timestamp = System.currentTimeMillis()
+                        )
+                    )
+                }
             }
         } catch (e: Exception) {
             Log.e(TAG, "Error decoding event package", e)
         }
     }
 
-    private fun scheduleReconnect(vendorId: Int) {
+    private fun scheduleReconnect(userId: Int, role: String) {
         webSocket = null
         isConnecting = false
         reconnectJob?.cancel()
         reconnectJob = scope.launch {
             delay(5000)
             Log.i(TAG, "Initiating socket reconnection attempt...")
-            startListening(vendorId)
+            startListening(userId, role)
         }
     }
 
@@ -175,6 +231,33 @@ object LaravelEchoWebSocketManager {
                     totalPrice = totalPrice,
                     timestamp = System.currentTimeMillis(),
                     message = "Live local pre-order submitted!"
+                )
+            )
+        }
+    }
+
+    /**
+     * Streams an instant manual student notification locally to update the status banner of on-screen students immediately.
+     */
+    fun broadcastStudentNotificationLocally(
+        notificationId: String,
+        orderId: Int,
+        vendorId: Int,
+        oldStatus: String,
+        newStatus: String,
+        message: String
+    ) {
+        scope.launch {
+            Log.i(TAG, "Broadcasting local student status change notification to listeners. ID: $orderId")
+            _realTimeStudentNotificationFlow.emit(
+                StudentNotificationEvent(
+                    notificationId = notificationId,
+                    orderId = orderId,
+                    vendorId = vendorId,
+                    oldStatus = oldStatus,
+                    newStatus = newStatus,
+                    message = message,
+                    timestamp = System.currentTimeMillis()
                 )
             )
         }

@@ -224,6 +224,22 @@ data class LaravelVendorPerformanceMetricsResponse(
 )
 
 @JsonClass(generateAdapter = true)
+data class LaravelDailyRevenueItem(
+    val date: String,
+    val orders_count: Int,
+    val revenue: Double
+)
+
+@JsonClass(generateAdapter = true)
+data class LaravelDailyRevenueResponse(
+    val success: Boolean,
+    val vendor_id: Int,
+    val vendor_name: String,
+    val data: List<LaravelDailyRevenueItem>,
+    val generated_at: String
+)
+
+@JsonClass(generateAdapter = true)
 data class LaravelNotificationData(
     val order_id: Int,
     val vendor_id: Int,
@@ -515,6 +531,11 @@ interface LaravelApiService {
 
     @GET("api/vendor/performance-metrics")
     suspend fun getVendorPerformanceMetrics(): LaravelVendorPerformanceMetricsResponse
+
+    @GET("api/vendor/daily-revenue")
+    suspend fun getDailyRevenue(
+        @Query("vendor_id") vendorId: Int? = null
+    ): LaravelDailyRevenueResponse
 
     @GET("api/vendor/analytics/gemini-order-insights")
     suspend fun getMyGeminiOrderInsights(): LaravelGeminiInsightResponse

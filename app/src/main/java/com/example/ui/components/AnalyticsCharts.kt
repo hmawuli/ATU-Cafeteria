@@ -27,6 +27,7 @@ import androidx.compose.material.icons.filled.Remove
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.LinearProgressIndicator
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.OutlinedButton
@@ -1185,6 +1186,397 @@ fun WeeklyRevenueTrendLineChart(
             ) {
                 Text(
                     text = "💡 Tap or drag across the line graph above to inspect exact daily performance stats.",
+                    fontSize = 9.sp,
+                    color = labelColor.copy(alpha = 0.5f),
+                    fontWeight = FontWeight.Medium
+                )
+            }
+        }
+    }
+}
+
+@Composable
+fun LaravelDailyRevenueTrendChart(
+    dailyRevenueResponse: com.example.data.LaravelDailyRevenueResponse?,
+    modifier: Modifier = Modifier
+) {
+    if (dailyRevenueResponse == null) {
+        Card(
+            modifier = modifier
+                .fillMaxWidth()
+                .padding(vertical = 8.dp)
+                .height(150.dp)
+                .testTag("laravel_daily_revenue_trend_empty_card"),
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.25f)),
+            shape = RoundedCornerShape(16.dp),
+            border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
+        ) {
+            Box(
+                modifier = Modifier.fillMaxSize(),
+                contentAlignment = Alignment.Center
+            ) {
+                CircularProgressIndicator(modifier = Modifier.size(24.dp))
+                Spacer(modifier = Modifier.height(12.dp))
+                Text(
+                    text = "Loading daily revenue trends from Laravel...",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+        }
+        return
+    }
+
+    val dailyData = dailyRevenueResponse.data
+    val primaryColor = MaterialTheme.colorScheme.primary
+    val secondaryColor = MaterialTheme.colorScheme.secondary
+    val gridColor = MaterialTheme.colorScheme.outlineVariant
+    val labelColor = MaterialTheme.colorScheme.onSurface
+    val cardBg = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.25f)
+
+    if (dailyData.isEmpty()) {
+        Card(
+            modifier = modifier
+                .fillMaxWidth()
+                .padding(vertical = 8.dp)
+                .height(150.dp)
+                .testTag("laravel_daily_revenue_trend_no_data"),
+            colors = CardDefaults.cardColors(containerColor = cardBg),
+            shape = RoundedCornerShape(16.dp),
+            border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
+        ) {
+            Box(
+                modifier = Modifier.fillMaxSize(),
+                contentAlignment = Alignment.Center
+            ) {
+                Text(
+                    text = "No recorded completed sales from Laravel database for this vendor yet.",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = labelColor.copy(alpha = 0.6f),
+                    textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+                    modifier = Modifier.padding(16.dp)
+                )
+            }
+        }
+        return
+    }
+
+    val maxRevenue = remember(dailyData) {
+        dailyData.maxOfOrNull { it.revenue }?.toFloat()?.coerceAtLeast(10f) ?: 10f
+    }
+
+    var selectedIndex by remember { mutableStateOf<Int?>(null) }
+
+    Column(
+        modifier = modifier
+            .fillMaxWidth()
+            .background(cardBg, RoundedCornerShape(16.dp))
+            .border(1.dp, MaterialTheme.colorScheme.outlineVariant, RoundedCornerShape(16.dp))
+            .padding(16.dp)
+            .testTag("laravel_daily_revenue_trend_chart")
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth().padding(bottom = 12.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Column {
+                Text(
+                    text = "Laravel Daily Revenue Trends",
+                    style = MaterialTheme.typography.titleSmall,
+                    fontWeight = FontWeight.Bold,
+                    color = labelColor
+                )
+                Text(
+                    text = "Direct server-aggregated sales from completed pre-orders",
+                    style = MaterialTheme.typography.bodySmall,
+                    fontSize = 11.sp,
+                    color = labelColor.copy(alpha = 0.6f)
+                )
+            }
+
+            Box(
+                modifier = Modifier
+                    .background(MaterialTheme.colorScheme.primaryContainer, RoundedCornerShape(8.dp))
+                    .padding(horizontal = 8.dp, vertical = 4.dp)
+            ) {
+                Text(
+                    text = "Laravel Live API",
+                    fontSize = 10.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onPrimaryContainer
+                )
+            }
+        }
+
+        Spacer(modifier = Modifier.height(8.dp))
+
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(180.dp)
+        ) {
+            Canvas(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .pointerInput(dailyData) {
+                        detectTapGestures(
+                            onPress = { offset ->
+                                val paddingLeft = 45.dp.toPx()
+                                val paddingBottom = 20.dp.toPx()
+                                val chartWidth = size.width - paddingLeft
+                                val spaceBetween = if (dailyData.size > 1) chartWidth / (dailyData.size - 1) else chartWidth
+
+                                val rawIdx = if (dailyData.size > 1) {
+                                    ((offset.x - paddingLeft) / spaceBetween).roundToInt()
+                                } else {
+                                    0
+                                }
+                                selectedIndex = rawIdx.coerceIn(0, dailyData.size - 1)
+                            }
+                        )
+                    }
+                    .pointerInput(dailyData) {
+                        detectDragGestures(
+                            onDragEnd = { selectedIndex = null },
+                            onDragCancel = { selectedIndex = null },
+                            onDrag = { change, _ ->
+                                val paddingLeft = 45.dp.toPx()
+                                val paddingBottom = 20.dp.toPx()
+                                val chartWidth = size.width - paddingLeft
+                                val spaceBetween = if (dailyData.size > 1) chartWidth / (dailyData.size - 1) else chartWidth
+
+                                val rawIdx = if (dailyData.size > 1) {
+                                    ((change.position.x - paddingLeft) / spaceBetween).roundToInt()
+                                } else {
+                                    0
+                                }
+                                selectedIndex = rawIdx.coerceIn(0, dailyData.size - 1)
+                            }
+                        )
+                    }
+            ) {
+                val paddingLeft = 45.dp.toPx()
+                val paddingBottom = 20.dp.toPx()
+                val chartWidth = size.width - paddingLeft
+                val chartHeight = size.height - paddingBottom
+
+                // Grids
+                val gridLinesCount = 3
+                for (i in 0..gridLinesCount) {
+                    val y = chartHeight * (i / gridLinesCount.toFloat())
+                    drawLine(
+                        color = gridColor.copy(alpha = 0.3f),
+                        start = Offset(paddingLeft, y),
+                        end = Offset(size.width, y),
+                        strokeWidth = 1.dp.toPx()
+                    )
+                }
+
+                // Coordinate Frame Axes
+                drawLine(
+                    color = gridColor,
+                    start = Offset(paddingLeft, 0f),
+                    end = Offset(paddingLeft, chartHeight),
+                    strokeWidth = 1.dp.toPx()
+                )
+                drawLine(
+                    color = gridColor,
+                    start = Offset(paddingLeft, chartHeight),
+                    end = Offset(size.width, chartHeight),
+                    strokeWidth = 1.dp.toPx()
+                )
+
+                if (dailyData.isNotEmpty()) {
+                    val segmentWidth = if (dailyData.size > 1) chartWidth / (dailyData.size - 1) else chartWidth
+                    val linePath = Path()
+                    val fillPath = Path()
+
+                    dailyData.forEachIndexed { idx, pt ->
+                        val cx = paddingLeft + (idx * segmentWidth)
+                        val cy = chartHeight - (pt.revenue.toFloat() / maxRevenue) * chartHeight
+
+                        if (idx == 0) {
+                            linePath.moveTo(cx, cy)
+                            fillPath.moveTo(cx, chartHeight)
+                            fillPath.lineTo(cx, cy)
+                        } else {
+                            val prevPt = dailyData[idx - 1]
+                            val prevX = paddingLeft + ((idx - 1) * segmentWidth)
+                            val prevY = chartHeight - (prevPt.revenue.toFloat() / maxRevenue) * chartHeight
+
+                            // Cubic bezier spline interpolation representing elegant Recharts trend curve
+                            linePath.cubicTo(
+                                (prevX + cx) / 2f, prevY,
+                                (prevX + cx) / 2f, cy,
+                                cx, cy
+                            )
+                            fillPath.cubicTo(
+                                (prevX + cx) / 2f, prevY,
+                                (prevX + cx) / 2f, cy,
+                                cx, cy
+                            )
+                        }
+
+                        if (idx == dailyData.size - 1) {
+                            fillPath.lineTo(cx, chartHeight)
+                            fillPath.lineTo(paddingLeft, chartHeight)
+                            fillPath.close()
+                        }
+                    }
+
+                    // Draw translucent underlay gradient representation of Recharts AreaChart
+                    drawPath(
+                        path = fillPath,
+                        brush = androidx.compose.ui.graphics.Brush.verticalGradient(
+                            colors = listOf(
+                                primaryColor.copy(alpha = 0.25f),
+                                Color.Transparent
+                            )
+                        )
+                    )
+
+                    // Draw spline curve stroke line
+                    drawPath(
+                        path = linePath,
+                        color = primaryColor,
+                        style = Stroke(
+                            width = 3.dp.toPx(),
+                            cap = StrokeCap.Round
+                        )
+                    )
+
+                    // Optional Guideline for selection
+                    selectedIndex?.let { hoverIdx ->
+                        if (hoverIdx in dailyData.indices) {
+                            val hx = paddingLeft + (hoverIdx * segmentWidth)
+                            val hy = chartHeight - (dailyData[hoverIdx].revenue.toFloat() / maxRevenue) * chartHeight
+
+                            // Vertical dotted reference line
+                            drawLine(
+                                color = secondaryColor.copy(alpha = 0.7f),
+                                start = Offset(hx, 0f),
+                                end = Offset(hx, chartHeight),
+                                strokeWidth = 1.dp.toPx(),
+                                pathEffect = androidx.compose.ui.graphics.PathEffect.dashPathEffect(floatArrayOf(10f, 10f), 0f)
+                            )
+
+                            // Draw focus intersection anchor point
+                            drawCircle(
+                                color = secondaryColor,
+                                radius = 6.dp.toPx(),
+                                center = Offset(hx, hy)
+                            )
+                            drawCircle(
+                                color = Color.White,
+                                radius = 3.dp.toPx(),
+                                center = Offset(hx, hy)
+                            )
+                        }
+                    }
+
+                    // Normal point anchors
+                    dailyData.forEachIndexed { idx, pt ->
+                        val cx = paddingLeft + (idx * segmentWidth)
+                        val cy = chartHeight - (pt.revenue.toFloat() / maxRevenue) * chartHeight
+
+                        drawCircle(
+                            color = primaryColor,
+                            radius = 4.dp.toPx(),
+                            center = Offset(cx, cy)
+                        )
+                        drawCircle(
+                            color = Color.White,
+                            radius = 1.5.dp.toPx(),
+                            center = Offset(cx, cy)
+                        )
+                    }
+                }
+            }
+
+            // High Precision Axis Indicators
+            Text(
+                text = "GH₵ ${"%.1f".format(maxRevenue)}",
+                fontSize = 8.sp,
+                fontWeight = FontWeight.Bold,
+                color = labelColor.copy(alpha = 0.7f),
+                modifier = Modifier
+                    .align(Alignment.TopStart)
+                    .padding(start = 2.dp)
+            )
+
+            Text(
+                text = "0",
+                fontSize = 8.sp,
+                color = labelColor.copy(alpha = 0.5f),
+                modifier = Modifier
+                    .align(Alignment.BottomStart)
+                    .padding(start = 2.dp, bottom = 22.dp)
+            )
+
+            // Horizontal Date labels
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(start = 45.dp)
+                    .align(Alignment.BottomStart)
+                    .height(18.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                if (dailyData.isNotEmpty()) {
+                    Text(text = dailyData[0].date, fontSize = 7.5.sp, fontWeight = FontWeight.Bold, color = labelColor.copy(alpha = 0.6f))
+                    if (dailyData.size > 3) {
+                        Text(text = dailyData[dailyData.size / 2].date, fontSize = 7.5.sp, fontWeight = FontWeight.Bold, color = labelColor.copy(alpha = 0.6f))
+                    }
+                    if (dailyData.size > 1) {
+                        Text(text = dailyData[dailyData.size - 1].date, fontSize = 7.5.sp, fontWeight = FontWeight.Bold, color = labelColor.copy(alpha = 0.6f))
+                    }
+                }
+            }
+        }
+
+        // Selected interactive point hover card feedback ("Tooltip")
+        selectedIndex?.let { idx ->
+            if (idx in dailyData.indices) {
+                val dataPoint = dailyData[idx]
+                Card(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(top = 12.dp)
+                        .testTag("laravel_daily_chart_tooltip"),
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.9f)),
+                    shape = RoundedCornerShape(8.dp)
+                ) {
+                    Row(
+                        modifier = Modifier.padding(10.dp).fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Column {
+                            Text("Reporting Date:", fontSize = 8.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.secondary)
+                            Text(dataPoint.date, fontWeight = FontWeight.SemiBold, fontSize = 11.sp, color = MaterialTheme.colorScheme.onSecondaryContainer)
+                        }
+                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                            Text("Total Orders:", fontSize = 8.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.secondary)
+                            Text("${dataPoint.orders_count} ords", fontWeight = FontWeight.Bold, fontSize = 11.sp, color = MaterialTheme.colorScheme.onSecondaryContainer)
+                        }
+                        Column(horizontalAlignment = Alignment.End) {
+                            Text("Day Earnings:", fontSize = 8.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.secondary)
+                            Text("GH₵ ${"%.2f".format(dataPoint.revenue)}", fontWeight = FontWeight.ExtraBold, fontSize = 12.sp, color = MaterialTheme.colorScheme.onSecondaryContainer)
+                        }
+                    }
+                }
+            }
+        } ?: run {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(top = 8.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                Text(
+                    text = "💡 Tap or swipe the line chart to examine precise date-by-date order and revenue analytics.",
                     fontSize = 9.sp,
                     color = labelColor.copy(alpha = 0.5f),
                     fontWeight = FontWeight.Medium

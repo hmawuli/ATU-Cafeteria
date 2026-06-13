@@ -440,6 +440,24 @@ class CafeteriaRepository(private val db: AppDatabase) {
             estimatedPickupTime = estimatedTime ?: o.estimatedPickupTime
         )
         orderDao.updateOrder(updated)
+        
+        val oldStat = o.status
+        val calculatedMsg = when (newStatus.uppercase()) {
+            "PREPARING" -> "Chef is preparing your order #${orderId} ('${o.foodName}')! It will be ready soon."
+            "READY" -> "Good news! Your order #${orderId} ('${o.foodName}') is READY for pickup. Secure Hand-off PIN: ${o.pickupPin}."
+            "COMPLETED" -> "Hurray! Your order #${orderId} has been picked up & marked as completed."
+            "CANCELLED" -> "Order #${orderId} ('${o.foodName}') has been cancelled/voided."
+            else -> "Your order #${orderId} ('${o.foodName}') status has been updated to $newStatus."
+        }
+        com.example.data.LaravelEchoWebSocketManager.broadcastStudentNotificationLocally(
+            notificationId = java.util.UUID.randomUUID().toString(),
+            orderId = orderId,
+            vendorId = vendorId,
+            oldStatus = oldStat,
+            newStatus = newStatus,
+            message = calculatedMsg
+        )
+
         insertAuditLog(vendorId, "ORDER_STATUS_CHANGED", "Order #${orderId} transitioned to: ${newStatus} (${estimatedTime ?: "No change to estimate"})")
     }
 
@@ -665,6 +683,18 @@ class CafeteriaRepository(private val db: AppDatabase) {
             }
         }
         return@withContext emptyList()
+    }
+
+    suspend fun getDailyRevenue(vendorId: Int? = null): LaravelDailyRevenueResponse? = withContext(Dispatchers.IO) {
+        if (LaravelClientManager.isLaravelEnabled) {
+            try {
+                val service = LaravelClientManager.getService()
+                return@withContext service.getDailyRevenue(vendorId)
+            } catch (e: Exception) {
+                Log.e("CafeteriaRepository", "Laravel getDailyRevenue failed", e)
+            }
+        }
+        return@withContext null
     }
 
     // Wallet repository interactions

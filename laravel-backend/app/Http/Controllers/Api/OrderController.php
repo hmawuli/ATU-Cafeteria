@@ -204,7 +204,7 @@ class OrderController extends Controller
                 'unit_price' => $request->input('unit_price'),
                 'total_price' => $request->input('total_price'),
                 'order_timestamp' => time() * 1000,
-                'status' => 'PENDING',
+                'status' => 'ORDER_PLACED',
                 'pickup_pin' => $securePin,
                 'estimated_pickup_time' => 'Calculating...',
             ]);
@@ -288,8 +288,12 @@ class OrderController extends Controller
                 $statusInput = 'READY';
             } elseif ($normalized === 'PREPARING') {
                 $statusInput = 'PREPARING';
-            } elseif ($normalized === 'PENDING') {
-                $statusInput = 'PENDING';
+            } elseif ($normalized === 'PENDING' || $normalized === 'ORDER PLACED' || $normalized === 'ORDER_PLACED') {
+                $statusInput = 'ORDER_PLACED';
+            } elseif ($normalized === 'OUT FOR DELIVERY' || $normalized === 'OUT_FOR_DELIVERY') {
+                $statusInput = 'OUT_FOR_DELIVERY';
+            } elseif ($normalized === 'DELIVERED') {
+                $statusInput = 'DELIVERED';
             } elseif ($normalized === 'COMPLETED') {
                 $statusInput = 'COMPLETED';
             } elseif ($normalized === 'DECLINED') {
@@ -301,7 +305,7 @@ class OrderController extends Controller
         }
 
         $validator = Validator::make($request->all(), [
-            'status' => 'required|string|in:PENDING,PREPARING,READY,COMPLETED,DECLINED,CANCELLED',
+            'status' => 'required|string|in:PENDING,ORDER_PLACED,PREPARING,READY,OUT_FOR_DELIVERY,DELIVERED,COMPLETED,DECLINED,CANCELLED',
             'estimated_pickup_time' => 'nullable|string',
         ]);
 
@@ -313,7 +317,7 @@ class OrderController extends Controller
             ], 400);
         }
 
-        // Student can only cancel PENDING orders
+        // Student can only cancel PENDING/ORDER_PLACED orders
         if ($role === 'STUDENT' && $request->input('status') !== 'CANCELLED') {
             return response()->json([
                 'success' => false,
@@ -321,7 +325,7 @@ class OrderController extends Controller
             ], 403);
         }
 
-        if ($role === 'STUDENT' && $order->status !== 'PENDING' && $request->input('status') === 'CANCELLED') {
+        if ($role === 'STUDENT' && $order->status !== 'PENDING' && $order->status !== 'ORDER_PLACED' && $request->input('status') === 'CANCELLED') {
             return response()->json([
                 'success' => false,
                 'message' => 'Completed or active orders cannot be cancelled.'

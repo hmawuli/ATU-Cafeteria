@@ -29,6 +29,11 @@ class CafeteriaProvider extends ChangeNotifier {
   bool _isStoreClosed = false;
   bool get isStoreClosed => _isStoreClosed;
 
+  List<String> _liveAlerts = [
+    "🟢 Welcome to ATU Cafeteria. All storefront culinary channels are online."
+  ];
+  List<String> get liveAlerts => _liveAlerts;
+
   // List Cache / Reactive Repositories
   List<User> _allVendors = [];
   List<User> get allVendors => _allVendors;
@@ -575,7 +580,7 @@ class CafeteriaProvider extends ChangeNotifier {
       unitPrice: foodItem.price,
       totalPrice: requiredSum,
       orderTimestamp: DateTime.now().millisecondsSinceEpoch,
-      status: "PENDING",
+      status: "Order Placed",
       pickupPin: pickupPin,
     );
 
@@ -587,8 +592,32 @@ class CafeteriaProvider extends ChangeNotifier {
       timestamp: DateTime.now().millisecondsSinceEpoch,
     ));
 
+    _startRealTimeTrackingSimulation(orderId);
+
     await refreshAllData();
     return true;
+  }
+
+  void _startRealTimeTrackingSimulation(int orderId) {
+    Stream.periodic(const Duration(seconds: 8)).take(3).listen((_) async {
+      final orderList = await _db.getAllOrders();
+      try {
+        final order = orderList.firstWhere((o) => o.id == orderId);
+        String nextStatus;
+        if (order.status == 'Order Placed') {
+          nextStatus = 'Preparing';
+        } else if (order.status == 'Preparing') {
+          nextStatus = 'Out for Delivery';
+        } else if (order.status == 'Out for Delivery') {
+          nextStatus = 'Delivered';
+        } else {
+          return; // Already completed or cancelled
+        }
+        await updateOrderStatus(orderId, nextStatus);
+      } catch (e) {
+        // Order deleted or not found
+      }
+    });
   }
 
   Future<void> submitOrderFeedback({
@@ -644,6 +673,17 @@ class CafeteriaProvider extends ChangeNotifier {
   Future<void> updateFoodAvailability(FoodItem item, bool isAvailable) async {
     final updated = item.copyWith(isAvailable: isAvailable);
     await _db.updateFoodItem(updated);
+
+    final now = DateTime.now();
+    final timeStr = "${now.hour.toString().padLeft(2, '0')}:${now.minute.toString().padLeft(2, '0')}";
+    final alertMsg = isAvailable 
+        ? "🟢 '${item.name}' is now BACK IN STOCK!" 
+        : "🔴 '${item.name}' is TEMPORARILY SOLD OUT!";
+    _liveAlerts.insert(0, "[$timeStr] $alertMsg");
+    if (_liveAlerts.length > 5) {
+      _liveAlerts.removeLast();
+    }
+    
     await refreshAllData();
   }
 
@@ -695,7 +735,7 @@ class CafeteriaProvider extends ChangeNotifier {
     final targetOrder = orders.firstWhere((o) => o.id == orderId);
 
     if (targetOrder.pickupPin == enteredPin) {
-      await _db.updateOrderStatus(orderId, "COMPLETED");
+      await _db.updateOrderStatus(orderId, "Delivered");
       await _db.insertAuditLog(AuditLog(
         userId: _currentUser!.id!,
         action: "SECURE_PICKUP_VALIDATED",

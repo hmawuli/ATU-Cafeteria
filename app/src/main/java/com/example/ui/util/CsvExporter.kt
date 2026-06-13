@@ -12,6 +12,7 @@ import android.content.ClipboardManager
 import android.content.ClipData
 import com.example.data.Order
 import com.example.data.User
+import com.example.data.Feedback
 import java.text.SimpleDateFormat
 import java.util.*
 
@@ -104,6 +105,68 @@ object CsvExporter {
               .append(String.format(Locale.US, "%.2f", totalRevenue)).append(",")
               .append(String.format(Locale.US, "%.2f", averageOrderValue)).append("\n")
         }
+        return sb.toString()
+    }
+
+    /**
+     * Generates a CSV representation of the vendor performance and quality metrics report.
+     */
+    fun generatePerformanceReportCsv(
+        vendorId: Int,
+        vendorName: String,
+        orders: List<Order>,
+        feedbacks: List<Feedback>
+    ): String {
+        val sb = StringBuilder()
+        sb.append("Vendor Performance Audit Report\n")
+        sb.append("Vendor Name,ATU-$vendorId - $vendorName\n")
+        sb.append("Generated On,${dateFormatter.format(Date())}\n\n")
+
+        val completedOrders = orders.filter { it.status.uppercase() == "COMPLETED" }
+        val totalRevenue = completedOrders.sumOf { it.totalPrice }
+        
+        // Calculate average ratings from feedbacks
+        val avgFoodQuality = if (feedbacks.isNotEmpty()) feedbacks.map { it.ratingFoodQuality }.average() else 0.0
+        val avgCleanliness = if (feedbacks.isNotEmpty()) feedbacks.map { it.ratingCleanliness }.average() else 0.0
+        val avgSpeed = if (feedbacks.isNotEmpty()) feedbacks.map { it.ratingServiceSpeed }.average() else 0.0
+        val avgValue = if (feedbacks.isNotEmpty()) feedbacks.map { it.ratingPriceValue }.average() else 0.0
+        val avgOverall = if (feedbacks.isNotEmpty()) {
+            feedbacks.map { (it.ratingFoodQuality + it.ratingCleanliness + it.ratingServiceSpeed + it.ratingPriceValue) / 4.0 }.average()
+        } else 0.0
+
+        sb.append("=== SUMMARY METRICS ===\n")
+        sb.append("Indicator,Value\n")
+        sb.append("Total Orders Placed,${orders.size}\n")
+        sb.append("Total Fulfillments Completed,${completedOrders.size}\n")
+        sb.append("Fulfillment Rate (%),${if (orders.isNotEmpty()) "%.1f".format(completedOrders.size.toDouble() / orders.size * 100.0) else "0.0"}\n")
+        sb.append("Total Revenue Generated (GH\u20B5),${"%.2f".format(totalRevenue)}\n")
+        sb.append("Food Quality Score (Out of 5),${"%.2f".format(avgFoodQuality)}\n")
+        sb.append("Cleanliness Score (Out of 5),${"%.2f".format(avgCleanliness)}\n")
+        sb.append("Service Speed Score (Out of 5),${"%.2f".format(avgSpeed)}\n")
+        sb.append("Price Value Score (Out of 5),${"%.2f".format(avgValue)}\n")
+        sb.append("Overall Satisfactory Index (Out of 5),${"%.2f".format(avgOverall)}\n\n")
+
+        sb.append("=== DETAILED ORDER CONTRIBUTIONS ===\n")
+        sb.append("Order ID,Food Item,Quantity,Total Sales (GH\u20B5),Status,Time\n")
+        orders.sortedByDescending { o -> o.orderTimestamp }.forEach { o ->
+            sb.append(escapeCsv(o.id)).append(",")
+              .append(escapeCsv(o.foodName)).append(",")
+              .append(escapeCsv(o.quantity)).append(",")
+              .append(String.format(Locale.US, "%.2f", o.totalPrice)).append(",")
+              .append(escapeCsv(o.status)).append(",")
+              .append(escapeCsv(dateFormatter.format(Date(o.orderTimestamp)))).append("\n")
+        }
+        sb.append("\n=== CUSTOMER REVIEWS TRANSCRIPT ===\n")
+        sb.append("Review ID,Food Quality Stars,Cleanliness Stars,Service Speed Stars,Price Value Stars,Comment\n")
+        feedbacks.sortedByDescending { f -> f.id }.forEach { f ->
+            sb.append(escapeCsv(f.id)).append(",")
+              .append(escapeCsv(f.ratingFoodQuality)).append(",")
+              .append(escapeCsv(f.ratingCleanliness)).append(",")
+              .append(escapeCsv(f.ratingServiceSpeed)).append(",")
+              .append(escapeCsv(f.ratingPriceValue)).append(",")
+              .append(escapeCsv(f.comment)).append("\n")
+        }
+
         return sb.toString()
     }
 

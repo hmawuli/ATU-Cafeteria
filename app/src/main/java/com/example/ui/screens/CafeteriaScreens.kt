@@ -52,6 +52,7 @@ import com.example.ui.components.RadarFeedbackChart
 import com.example.ui.components.StudentTrendsLineChart
 import com.example.ui.components.VendorPerformanceTrendChart
 import com.example.ui.components.WeeklyRevenueTrendLineChart
+import com.example.ui.components.LaravelDailyRevenueTrendChart
 import com.example.ui.viewmodel.CafeteriaViewModel
 
 // ==========================================
@@ -4291,6 +4292,92 @@ fun StudentDashboardScreen(
                             }
                         }
 
+                        // 1c. Detailed Loyalty Points Earning History Breakdown
+                        item {
+                            Card(
+                                modifier = Modifier.fillMaxWidth().testTag("loyalty_points_history_card"),
+                                shape = RoundedCornerShape(12.dp),
+                                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
+                            ) {
+                                Column(modifier = Modifier.padding(16.dp)) {
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        horizontalArrangement = Arrangement.SpaceBetween,
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        Text(
+                                            "Loyalty Points Earning History",
+                                            fontWeight = FontWeight.Bold,
+                                            style = MaterialTheme.typography.titleSmall,
+                                            color = MaterialTheme.colorScheme.primary
+                                        )
+                                        Box(
+                                            modifier = Modifier
+                                                .background(
+                                                    color = MaterialTheme.colorScheme.primaryContainer,
+                                                    shape = RoundedCornerShape(8.dp)
+                                                )
+                                                .padding(horizontal = 6.dp, vertical = 2.dp)
+                                        ) {
+                                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                                Icon(
+                                                    Icons.Default.Star,
+                                                    contentDescription = null,
+                                                    tint = MaterialTheme.colorScheme.primary,
+                                                    modifier = Modifier.size(12.dp)
+                                                )
+                                                Spacer(modifier = Modifier.width(2.dp))
+                                                Text(
+                                                    text = "Breakdown",
+                                                    fontSize = 9.sp,
+                                                    fontWeight = FontWeight.Bold,
+                                                    color = MaterialTheme.colorScheme.onPrimaryContainer
+                                                )
+                                            }
+                                        }
+                                    }
+                                    Spacer(modifier = Modifier.height(10.dp))
+                                    
+                                    val completedOrders = studentOrders.filter { it.status.uppercase() == "COMPLETED" }
+                                    if (completedOrders.isEmpty()) {
+                                        Box(
+                                            modifier = Modifier.fillMaxWidth().padding(vertical = 16.dp),
+                                            contentAlignment = Alignment.Center
+                                        ) {
+                                            Text(
+                                                "No completed orders yet. Complete an order to earn 25 pts!",
+                                                fontSize = 11.sp,
+                                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                                            )
+                                        }
+                                    } else {
+                                        completedOrders.forEach { order ->
+                                            Row(
+                                                modifier = Modifier.fillMaxWidth().padding(vertical = 6.dp),
+                                                horizontalArrangement = Arrangement.SpaceBetween,
+                                                verticalAlignment = Alignment.CenterVertically
+                                            ) {
+                                                Column(modifier = Modifier.weight(1f)) {
+                                                    Text("Order #${order.id} • ${order.foodName}", fontSize = 11.sp, fontWeight = FontWeight.SemiBold)
+                                                    Text(
+                                                        text = java.text.SimpleDateFormat("dd MMM, hh:mm a", java.util.Locale.US).format(java.util.Date(order.orderTimestamp)),
+                                                        fontSize = 9.sp,
+                                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                                    )
+                                                }
+                                                Column(horizontalAlignment = Alignment.End) {
+                                                    Text("+25 PTS", fontWeight = FontWeight.Bold, fontSize = 11.sp, color = MaterialTheme.colorScheme.tertiary)
+                                                    Text("Completed", fontSize = 9.sp, color = androidx.compose.ui.graphics.Color(0xFF2E7D32))
+                                                }
+                                            }
+                                            HorizontalDivider(modifier = Modifier.padding(vertical = 4.dp), color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
+                                        }
+                                    }
+                                }
+                            }
+                        }
+
                         // 2. Interactive Digital Smart Card Wallet
                         item {
                             Card(
@@ -6549,6 +6636,7 @@ fun VendorDashboardScreen(
     val isGeneratingPricingSuggestions by viewModel.isGeneratingPricingSuggestions.collectAsStateWithLifecycle()
     val performanceData by viewModel.vendorPerformanceList.collectAsStateWithLifecycle()
     val performanceMetrics by viewModel.vendorPerformanceMetricsList.collectAsStateWithLifecycle()
+    val dailyRevenueResponse by viewModel.vendorDailyRevenueResponse.collectAsStateWithLifecycle()
     val allUsers by viewModel.allUsers.collectAsStateWithLifecycle()
 
     val scope = rememberCoroutineScope()
@@ -10257,6 +10345,11 @@ fun VendorDashboardScreen(
                                 performanceData = performanceData,
                                 modifier = Modifier.fillMaxWidth()
                             )
+                            Spacer(modifier = Modifier.height(8.dp))
+                            LaravelDailyRevenueTrendChart(
+                                dailyRevenueResponse = dailyRevenueResponse,
+                                modifier = Modifier.fillMaxWidth()
+                            )
                         }
 
                         // 4. Vendor Performance Controller Metrics (Cards & Basic Table)
@@ -11681,7 +11774,7 @@ fun VendorDashboardScreen(
 
                                 Row(
                                     modifier = Modifier.fillMaxWidth(),
-                                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                                    horizontalArrangement = Arrangement.spacedBy(6.dp)
                                 ) {
                                     Card(
                                         modifier = Modifier
@@ -11700,13 +11793,13 @@ fun VendorDashboardScreen(
                                         )
                                     ) {
                                         Column(
-                                            modifier = Modifier.padding(10.dp),
+                                            modifier = Modifier.padding(8.dp),
                                             horizontalAlignment = Alignment.CenterHorizontally
                                         ) {
-                                            Text("📋", fontSize = 18.sp)
+                                            Text("📋", fontSize = 16.sp)
                                             Spacer(modifier = Modifier.height(4.dp))
-                                            Text("Order History Log", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = if (selectedExportType == "ORDERS") MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurfaceVariant)
-                                            Text("${filteredOrders.size} records match range", fontSize = 9.sp, color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.8f))
+                                            Text("Order Log", fontSize = 10.sp, fontWeight = FontWeight.Bold, color = if (selectedExportType == "ORDERS") MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurfaceVariant)
+                                            Text("${filteredOrders.size} orders", fontSize = 8.sp, color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.8f))
                                         }
                                     }
 
@@ -11727,13 +11820,40 @@ fun VendorDashboardScreen(
                                         )
                                     ) {
                                         Column(
-                                            modifier = Modifier.padding(10.dp),
+                                            modifier = Modifier.padding(8.dp),
                                             horizontalAlignment = Alignment.CenterHorizontally
                                         ) {
-                                            Text("📈", fontSize = 18.sp)
+                                            Text("📈", fontSize = 16.sp)
                                             Spacer(modifier = Modifier.height(4.dp))
-                                            Text("Weekly Revenue Trend", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = if (selectedExportType == "REVENUE") MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurfaceVariant)
-                                            Text("Based on selected range", fontSize = 9.sp, color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.8f))
+                                            Text("Revenue Trend", fontSize = 10.sp, fontWeight = FontWeight.Bold, color = if (selectedExportType == "REVENUE") MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurfaceVariant)
+                                            Text(selectedPeriod.replace("Past ", ""), fontSize = 8.sp, color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.8f))
+                                        }
+                                    }
+
+                                    Card(
+                                        modifier = Modifier
+                                            .weight(1f)
+                                            .clickable { selectedExportType = "PERFORMANCE" }
+                                            .testTag("export_type_performance"),
+                                        colors = CardDefaults.cardColors(
+                                            containerColor = if (selectedExportType == "PERFORMANCE") 
+                                                MaterialTheme.colorScheme.primaryContainer 
+                                            else 
+                                                MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f)
+                                        ),
+                                        border = androidx.compose.foundation.BorderStroke(
+                                            1.dp,
+                                            if (selectedExportType == "PERFORMANCE") MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outlineVariant
+                                        )
+                                    ) {
+                                        Column(
+                                            modifier = Modifier.padding(8.dp),
+                                            horizontalAlignment = Alignment.CenterHorizontally
+                                        ) {
+                                            Text("⭐", fontSize = 16.sp)
+                                            Spacer(modifier = Modifier.height(4.dp))
+                                            Text("Performance", fontSize = 10.sp, fontWeight = FontWeight.Bold, color = if (selectedExportType == "PERFORMANCE") MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurfaceVariant)
+                                            Text("${vendorFeedbackList.size} reviews", fontSize = 8.sp, color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.8f))
                                         }
                                     }
                                 }
@@ -11859,21 +11979,31 @@ fun VendorDashboardScreen(
                                 ) {
                                     Button(
                                         onClick = {
-                                            val csvData = if (selectedExportType == "ORDERS") {
-                                                com.example.ui.util.CsvExporter.generateOrdersCsv(incomingOrders, allUsers)
-                                            } else {
-                                                com.example.ui.util.CsvExporter.generateRevenueReportCsv(incomingOrders)
+                                            val vendorName = currentUser?.fullName ?: "Official Vendor"
+                                            val vendorId = currentUser?.id ?: 0
+                                            val prefix = when (selectedExportType) {
+                                                "ORDERS" -> "ATU_Order_History"
+                                                "REVENUE" -> "ATU_Weekly_Revenue"
+                                                else -> "ATU_Performance_Audit"
                                             }
-                                            val prefix = if (selectedExportType == "ORDERS") "ATU_Order_History" else "ATU_Weekly_Revenue"
                                             val finalFileName = "${prefix}_Export_${System.currentTimeMillis()}.csv"
-                                             val vendorName = currentUser?.fullName ?: "Official Vendor"
-                                             if (selectedFormat == "PDF") {
-                                                 val pdfFileName = if (selectedExportType == "ORDERS") {
-                                                     "ATU_Order_History_Segment_${System.currentTimeMillis()}.pdf"
-                                                 } else {
-                                                     "ATU_Revenue_Report_${System.currentTimeMillis()}.pdf"
-                                                 }
-                                                 com.example.ui.util.CsvExporter.exportOrdersPdf(context, pdfFileName, vendorName, selectedPeriod, filteredOrders)
+
+                                            if (selectedFormat == "PDF") {
+                                                val pdfFileName = "${prefix}_Report_${System.currentTimeMillis()}.pdf"
+                                                if (selectedExportType == "PERFORMANCE") {
+                                                    viewModel.exportAnalyticsReport(
+                                                        format = "PDF",
+                                                        vendorId = vendorId,
+                                                        vendorName = vendorName,
+                                                        orders = filteredOrders,
+                                                        feedbacks = vendorFeedbackList,
+                                                        dateRangeScope = selectedPeriod
+                                                    ) { success, msg ->
+                                                        android.widget.Toast.makeText(context, msg, android.widget.Toast.LENGTH_SHORT).show()
+                                                    }
+                                                } else {
+                                                    com.example.ui.util.CsvExporter.exportOrdersPdf(context, pdfFileName, vendorName, selectedPeriod, filteredOrders)
+                                                }
                                                  scope.launch {
                                                      viewModel.repository.insertAuditLog(
                                                          currentUser?.id ?: 0,
@@ -11882,10 +12012,10 @@ fun VendorDashboardScreen(
                                                      )
                                                  }
                                              } else {
-                                                 val actualCsv = if (selectedExportType == "ORDERS") {
-                                                     com.example.ui.util.CsvExporter.generateOrdersCsv(filteredOrders, allUsers)
-                                                 } else {
-                                                     com.example.ui.util.CsvExporter.generateRevenueReportCsv(filteredOrders)
+                                                 val actualCsv = when (selectedExportType) {
+                                                     "ORDERS" -> com.example.ui.util.CsvExporter.generateOrdersCsv(filteredOrders, allUsers)
+                                                     "REVENUE" -> com.example.ui.util.CsvExporter.generateRevenueReportCsv(filteredOrders)
+                                                     else -> com.example.ui.util.CsvExporter.generatePerformanceReportCsv(vendorId, vendorName, filteredOrders, vendorFeedbackList)
                                                  }
                                                  com.example.ui.util.CsvExporter.saveCsvToDownloads(context, finalFileName, actualCsv)
                                                  scope.launch {
@@ -11896,19 +12026,11 @@ fun VendorDashboardScreen(
                                                      )
                                                  }
                                              }
-                                             // Already declared csvData in outer scope
-                                             val bypassedSave = true
-                                             if (!bypassedSave)
+
                                             
-                                            com.example.ui.util.CsvExporter.saveCsvToDownloads(context, finalFileName, csvData)
+
                                             
-                                            scope.launch {
-                                                viewModel.repository.insertAuditLog(
-                                                    currentUser?.id ?: 0,
-                                                    "CSV_EXPORTER",
-                                                    "Downloaded CSV spreadsheet ($selectedExportType) to Downloads folder."
-                                                )
-                                            }
+
                                         },
                                         modifier = Modifier.weight(1.2f).testTag("action_csv_save"),
                                         shape = RoundedCornerShape(8.dp)
@@ -11925,11 +12047,15 @@ fun VendorDashboardScreen(
                                             } else {
                                                 com.example.ui.util.CsvExporter.generateRevenueReportCsv(incomingOrders)
                                             }
-                                            val subjectName = if (selectedExportType == "ORDERS") "ATU Order History Report" else "ATU Weekly Revenue Report"
-                                            val csvDataShared = if (selectedExportType == "ORDERS") {
-                                                com.example.ui.util.CsvExporter.generateOrdersCsv(filteredOrders, allUsers)
-                                            } else {
-                                                com.example.ui.util.CsvExporter.generateRevenueReportCsv(filteredOrders)
+                                            val subjectName = when (selectedExportType) {
+                                                "ORDERS" -> "ATU Order History Report"
+                                                "REVENUE" -> "ATU Weekly Revenue Report"
+                                                else -> "ATU Vendor Performance Report"
+                                            }
+                                            val csvDataShared = when (selectedExportType) {
+                                                "ORDERS" -> com.example.ui.util.CsvExporter.generateOrdersCsv(filteredOrders, allUsers)
+                                                "REVENUE" -> com.example.ui.util.CsvExporter.generateRevenueReportCsv(filteredOrders)
+                                                else -> com.example.ui.util.CsvExporter.generatePerformanceReportCsv(currentUser?.id ?: 0, currentUser?.fullName ?: "Vendor", filteredOrders, vendorFeedbackList)
                                             }
                                             val sharedContent = if (selectedFormat == "PDF") {
                                                 val completedOrders = filteredOrders.filter { it.status == "COMPLETED" }
@@ -11972,10 +12098,10 @@ fun VendorDashboardScreen(
                                             if (selectedFormat == "PDF") {
                                                 android.widget.Toast.makeText(context, "Direct clipboard copy not supported for binary PDFs. Please use 'Save to Downloads' or 'Share'.", android.widget.Toast.LENGTH_SHORT).show()
                                             } else {
-                                                val csvDataCopied = if (selectedExportType == "ORDERS") {
-                                                    com.example.ui.util.CsvExporter.generateOrdersCsv(filteredOrders, allUsers)
-                                                } else {
-                                                    com.example.ui.util.CsvExporter.generateRevenueReportCsv(filteredOrders)
+                                                val csvDataCopied = when (selectedExportType) {
+                                                    "ORDERS" -> com.example.ui.util.CsvExporter.generateOrdersCsv(filteredOrders, allUsers)
+                                                    "REVENUE" -> com.example.ui.util.CsvExporter.generateRevenueReportCsv(filteredOrders)
+                                                    else -> com.example.ui.util.CsvExporter.generatePerformanceReportCsv(currentUser?.id ?: 0, currentUser?.fullName ?: "Vendor", filteredOrders, vendorFeedbackList)
                                                 }
                                                 com.example.ui.util.CsvExporter.copyToClipboard(context, "ATU_CSV_Data", csvDataCopied)
                                             }

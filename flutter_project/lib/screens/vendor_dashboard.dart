@@ -113,7 +113,14 @@ class _VendorDashboardScreenState extends State<VendorDashboardScreen> {
   // TAB 1: INCOMING ORDERS
   // ==========================================
   Widget _buildIncomingOrders(BuildContext context, CafeteriaProvider provider) {
-    final activeOrders = provider.vendorOrders.where((o) => o.status != 'COMPLETED' && o.status != 'DECLINED').toList();
+    final activeOrders = provider.vendorOrders.where((o) => 
+      o.status != 'COMPLETED' && 
+      o.status != 'Delivered' && 
+      o.status != 'DECLINED' && 
+      o.status != 'Declined' &&
+      o.status != 'CANCELLED' &&
+      o.status != 'Cancelled'
+    ).toList();
 
     if (activeOrders.isEmpty) {
       return const Center(child: Text("No incoming culinary streams. Storefront operating at idle."));
@@ -125,7 +132,25 @@ class _VendorDashboardScreenState extends State<VendorDashboardScreen> {
       itemBuilder: (context, index) {
         final order = activeOrders[index];
         final timeStr = DateFormat('jm - d MMM').format(DateTime.fromMillisecondsSinceEpoch(order.orderTimestamp));
-        final stateColor = order.status == 'PENDING' ? Colors.redAccent : Colors.orange;
+        
+        Color stateColor;
+        switch (order.status) {
+          case 'Order Placed':
+          case 'PENDING':
+            stateColor = Colors.green;
+            break;
+          case 'Preparing':
+          case 'PREPARING':
+            stateColor = Colors.blue;
+            break;
+          case 'Out for Delivery':
+          case 'OUT_FOR_DELIVERY':
+          case 'READY':
+            stateColor = Colors.orange;
+            break;
+          default:
+            stateColor = Colors.grey;
+        }
 
         return Card(
           elevation: 3,
@@ -168,12 +193,12 @@ class _VendorDashboardScreenState extends State<VendorDashboardScreen> {
                 ),
                 const Divider(height: 24),
                 // Action options
-                if (order.status == 'PENDING') ...[
+                if (order.status == 'Order Placed' || order.status == 'PENDING') ...[
                   Row(
                     children: [
                       Expanded(
                         child: OutlinedButton(
-                          onPressed: () => provider.updateOrderStatus(order.id!, "DECLINED"),
+                          onPressed: () => provider.updateOrderStatus(order.id!, "Declined"),
                           style: OutlinedButton.styleFrom(foregroundColor: Colors.red),
                           child: const Text("DECLINE ORDER"),
                         ),
@@ -181,19 +206,19 @@ class _VendorDashboardScreenState extends State<VendorDashboardScreen> {
                       const SizedBox(width: 12),
                       Expanded(
                         child: ElevatedButton(
-                          onPressed: () => provider.updateOrderStatus(order.id!, "PREPARING"),
+                          onPressed: () => provider.updateOrderStatus(order.id!, "Preparing"),
                           child: const Text("START COOKING"),
                         ),
                       ),
                     ],
                   )
-                ] else if (order.status == 'PREPARING') ...[
+                ] else if (order.status == 'Preparing' || order.status == 'PREPARING') ...[
                   ElevatedButton(
-                    onPressed: () => provider.updateOrderStatus(order.id!, "READY"),
-                    style: ElevatedButton.styleFrom(backgroundColor: Colors.orange),
-                    child: const Text("CLASSIFY AS READY FOR PICKUP"),
+                    onPressed: () => provider.updateOrderStatus(order.id!, "Out for Delivery"),
+                    style: ElevatedButton.styleFrom(backgroundColor: Colors.orange, foregroundColor: Colors.white),
+                    child: const Text("DISPATCH / OUT FOR DELIVERY"),
                   )
-                ] else if (order.status == 'READY') ...[
+                ] else if (order.status == 'Out for Delivery' || order.status == 'READY' || order.status == 'OUT_FOR_DELIVERY') ...[
                   ElevatedButton.icon(
                     icon: const Icon(Icons.qr_code_scanner),
                     label: const Text("VERIFY CONSUMER SECURITY PIN"),
