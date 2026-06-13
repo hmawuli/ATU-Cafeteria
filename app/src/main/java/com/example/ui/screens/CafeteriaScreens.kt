@@ -44,6 +44,7 @@ import androidx.navigation.NavController
 import com.example.data.*
 import com.example.ui.components.D3DashboardChart
 import com.example.ui.components.RechartsDashboardChart
+import com.example.ui.components.RechartsFeedbackDashboardChart
 import com.example.ui.components.ChartJsVendorPerformanceChart
 import com.example.ui.components.InventoryTrackingHub
 import com.example.ui.components.DailyRevenueBarChart
@@ -6562,6 +6563,9 @@ fun VendorDashboardScreen(
     val todayInsightsText by viewModel.vendorTodayInsights.collectAsStateWithLifecycle()
     val isAnalyzingTodayOrders by viewModel.isAnalyzingTodayOrders.collectAsStateWithLifecycle()
 
+    val historicalInsightsText by viewModel.vendorHistoricalInsights.collectAsStateWithLifecycle()
+    val isAnalyzingHistoricalOrders by viewModel.isAnalyzingHistoricalOrders.collectAsStateWithLifecycle()
+
     val todayOrders = remember(incomingOrders) {
         val cal = java.util.Calendar.getInstance().apply {
             set(java.util.Calendar.HOUR_OF_DAY, 0)
@@ -10203,6 +10207,15 @@ fun VendorDashboardScreen(
                         // Recharts Interactive Dashboard Chart View
                         RechartsDashboardChart(orders = filteredIncomingOrders, modifier = Modifier.fillMaxWidth())
 
+                        Spacer(modifier = Modifier.height(10.dp))
+
+                        // Recharts Interactive 30-Day Average Ratings & Order Volumes Feedback Chart View
+                        RechartsFeedbackDashboardChart(
+                            orders = filteredIncomingOrders,
+                            feedbacks = filteredFeedbackList,
+                            modifier = Modifier.fillMaxWidth()
+                        )
+
                         Spacer(modifier = Modifier.height(8.dp))
 
                         // Chart.js Service Performance Metrics Component (Fulfillment rates & Delivery times)
@@ -11004,6 +11017,136 @@ fun VendorDashboardScreen(
                                         Spacer(modifier = Modifier.width(6.dp))
                                         Text(
                                             text = if (pricingSuggestionsText == null) "Suggest Pricing & Specials" else "Re-optimize Pricing Plans",
+                                            fontSize = 11.sp,
+                                            fontWeight = FontWeight.Bold
+                                        )
+                                    }
+                                }
+                            }
+                        }
+
+                        // 3e. Gemini AI Historical Demand & Busiest Hour Advisor Card (NEW)
+                        Card(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(vertical = 4.dp)
+                                .testTag("historical_demand_insights_card"),
+                            colors = CardDefaults.cardColors(
+                                containerColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.12f)
+                            ),
+                            shape = RoundedCornerShape(16.dp),
+                            border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.25f))
+                        ) {
+                            Column(modifier = Modifier.padding(16.dp)) {
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.AutoAwesome,
+                                        contentDescription = "Historical Insights",
+                                        tint = MaterialTheme.colorScheme.primary
+                                    )
+                                    Text(
+                                        text = "Gemini Demand & Busiest Hour Advisor",
+                                        fontWeight = FontWeight.Bold,
+                                        style = MaterialTheme.typography.titleMedium,
+                                        color = MaterialTheme.colorScheme.primary
+                                    )
+                                }
+                                
+                                Spacer(modifier = Modifier.height(4.dp))
+                                
+                                Text(
+                                    text = "Deploy Google Gemini to crawl your complete historical order database. Generates insights on popular food items, identifies peak crowding slots, and predicts prep schedules.",
+                                    fontSize = 11.sp,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+
+                                Spacer(modifier = Modifier.height(12.dp))
+
+                                if (isAnalyzingHistoricalOrders) {
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth().padding(vertical = 12.dp),
+                                        horizontalArrangement = Arrangement.Center,
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        CircularProgressIndicator(modifier = Modifier.size(20.dp), color = MaterialTheme.colorScheme.primary)
+                                        Spacer(modifier = Modifier.width(12.dp))
+                                        Text(
+                                            text = "Mining historical order databases & timeslots...",
+                                            fontSize = 12.sp,
+                                            fontWeight = FontWeight.SemiBold,
+                                            color = MaterialTheme.colorScheme.primary
+                                        )
+                                    }
+                                } else {
+                                    historicalInsightsText?.let { insightReport ->
+                                        Box(
+                                            modifier = Modifier
+                                                .fillMaxWidth()
+                                                .background(
+                                                    MaterialTheme.colorScheme.surface.copy(alpha = 0.9f),
+                                                    RoundedCornerShape(12.dp)
+                                                )
+                                                .border(androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant))
+                                                .padding(14.dp)
+                                        ) {
+                                            Column {
+                                                Row(
+                                                    verticalAlignment = Alignment.CenterVertically,
+                                                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                                                    modifier = Modifier.padding(bottom = 8.dp)
+                                                ) {
+                                                    Box(
+                                                        modifier = Modifier
+                                                            .background(MaterialTheme.colorScheme.primaryContainer, RoundedCornerShape(4.dp))
+                                                            .padding(horizontal = 6.dp, vertical = 2.dp)
+                                                    ) {
+                                                        Text(
+                                                            "GEMINI HISTORICAL DEMAND SYNTHESIS",
+                                                            color = MaterialTheme.colorScheme.onPrimaryContainer,
+                                                            fontSize = 9.sp,
+                                                            fontWeight = FontWeight.Bold
+                                                        )
+                                                    }
+                                                }
+                                                Text(
+                                                    text = insightReport,
+                                                    fontSize = 12.sp,
+                                                    lineHeight = 18.sp,
+                                                    color = MaterialTheme.colorScheme.onSurface
+                                                )
+                                            }
+                                        }
+                                        Spacer(modifier = Modifier.height(12.dp))
+                                    }
+
+                                    Button(
+                                        onClick = {
+                                            viewModel.runVendorHistoricalInsights(
+                                                vendorId = currentUser?.id ?: 0,
+                                                vendorName = currentUser?.fullName ?: "Vendor",
+                                                allOrders = incomingOrders
+                                            )
+                                        },
+                                        colors = ButtonDefaults.buttonColors(
+                                            containerColor = MaterialTheme.colorScheme.primary,
+                                            contentColor = MaterialTheme.colorScheme.onPrimary
+                                        ),
+                                        shape = RoundedCornerShape(8.dp),
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .testTag("generate_historical_insights_button")
+                                    ) {
+                                        Icon(
+                                            Icons.Default.AutoAwesome,
+                                            contentDescription = null,
+                                            modifier = Modifier.size(16.dp)
+                                        )
+                                        Spacer(modifier = Modifier.width(6.dp))
+                                        Text(
+                                            text = if (historicalInsightsText == null) "Analyze Historical Demand Patterns" else "Regenerate Campus Demand Insights",
                                             fontSize = 11.sp,
                                             fontWeight = FontWeight.Bold
                                         )

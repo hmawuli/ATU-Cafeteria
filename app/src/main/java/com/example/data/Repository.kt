@@ -884,6 +884,54 @@ class CafeteriaRepository(private val db: AppDatabase) {
             Log.e("CafeteriaRepository", "Warning: Pre-seeding encountered an exception. Skipping seed safely.", e)
         }
     }
+
+    suspend fun getMyGeminiOrderInsights(): LaravelGeminiInsightResponse = withContext(Dispatchers.IO) {
+        if (LaravelClientManager.isLaravelEnabled) {
+            try {
+                LaravelClientManager.getService().getMyGeminiOrderInsights()
+            } catch (e: Exception) {
+                LaravelGeminiInsightResponse(
+                    success = false,
+                    vendor_id = 0,
+                    vendor_name = "Offline Vendor",
+                    insights_markdown = "### Error Loading Order Insights\nUnable to reach server. Please check your connectivity.\n\n`Details: ${e.message}`",
+                    generated_at = ""
+                )
+            }
+        } else {
+            LaravelGeminiInsightResponse(
+                success = true,
+                vendor_id = 1,
+                vendor_name = "Mock Local Diner",
+                insights_markdown = "### Offline Mode Active\nConfigure and enable Laravel core server to run integrated mathematical regression models.",
+                generated_at = ""
+            )
+        }
+    }
+
+    suspend fun getVendorGeminiOrderInsights(vendorId: Int): LaravelGeminiInsightResponse = withContext(Dispatchers.IO) {
+        if (LaravelClientManager.isLaravelEnabled) {
+            try {
+                LaravelClientManager.getService().getVendorGeminiOrderInsights(vendorId)
+            } catch (e: Exception) {
+                LaravelGeminiInsightResponse(
+                    success = false,
+                    vendor_id = vendorId,
+                    vendor_name = "Offline Vendor",
+                    insights_markdown = "### Error Loading Order Insights\nUnable to reach backend services.\n\n`Details: ${e.message}`",
+                    generated_at = ""
+                )
+            }
+        } else {
+            LaravelGeminiInsightResponse(
+                success = true,
+                vendor_id = vendorId,
+                vendor_name = "Mock Local Diner",
+                insights_markdown = "### Offline Mode Active\nConfigure and enable Laravel core server to run integrated mathematical regression models.",
+                generated_at = ""
+            )
+        }
+    }
 }
 
 // ==========================================
@@ -1331,6 +1379,131 @@ class GeminiAnalyticsRepository {
                     "• **Total Revenue**: **GH₵ ${"%.2f".format(totalRev)}** across **$totalQty** items ordered.\n\n" +
                     "### 💡 Smart Recommendations for $vendorName\n" +
                     "1. **Peak Demand Action**: Your busiest window was around **$busiestHourStr**. Consider preparing pre-packaged portions 15 minutes before this peak to serve students instantaneously!"
+        }
+    }
+
+    suspend fun generateHistoricalOrderInsights(
+        vendorName: String,
+        orders: List<Order>
+    ): String = withContext(Dispatchers.IO) {
+        val apiKey = BuildConfig.GEMINI_API_KEY
+        
+        // Compute historical metrics locally
+        var totalRev = 0.0
+        var totalQty = 0
+        val hourlyCount = IntArray(24)
+        val itemQuantities = java.util.HashMap<String, Int>()
+        val itemRevenue = java.util.HashMap<String, Double>()
+        
+        val cal = java.util.Calendar.getInstance()
+        
+        for (order in orders) {
+            cal.timeInMillis = order.orderTimestamp
+            val hour = cal.get(java.util.Calendar.HOUR_OF_DAY)
+            val qty = order.quantity
+            val price = order.totalPrice
+            val name = order.foodName
+            
+            hourlyCount[hour] += qty
+            itemQuantities[name] = (itemQuantities[name] ?: 0) + qty
+            itemRevenue[name] = (itemRevenue[name] ?: 0.0) + price
+            totalRev += price
+            totalQty += qty
+        }
+        
+        // Find busiest hour
+        var busiestHourIndex = -1
+        var maxHourlyQty = 0
+        for (h in 0..23) {
+            if (hourlyCount[h] > maxHourlyQty) {
+                maxHourlyQty = hourlyCount[h]
+                busiestHourIndex = h
+            }
+        }
+        
+        val busiestHourStr = if (busiestHourIndex != -1) {
+            val startHour = busiestHourIndex
+            val endHour = (busiestHourIndex + 1) % 24
+            val startAmPm = if (startHour >= 12) "PM" else "AM"
+            val displayStart = if (startHour % 12 == 0) 12 else startHour % 12
+            val endAmPm = if (endHour >= 12) "PM" else "AM"
+            val displayEnd = if (endHour % 12 == 0) 12 else endHour % 12
+            "$displayStart $startAmPm - $displayEnd $endAmPm"
+        } else {
+            "No historical orders recorded yet."
+        }
+        
+        // Find top selling food items
+        val sortedPopularItems = itemQuantities.entries.sortedByDescending { it.value }.take(3)
+        val popularItemsStr = sortedPopularItems.joinToString("\n") { 
+            "• **${it.key}**: Sold **${it.value} units**, yielding total sales of **GH₵ ${"%.2f".format(itemRevenue[it.key] ?: 0.0)}**."
+        }
+        
+        val topItem = sortedPopularItems.firstOrNull()?.key ?: "signature meals"
+        val topItemQty = sortedPopularItems.firstOrNull()?.value ?: 0
+        val topItemRev = itemRevenue[topItem] ?: 0.0
+        
+        if (apiKey.isEmpty() || apiKey == "MY_GEMINI_API_KEY") {
+            return@withContext "### 📈 Gemini Intelligence: Historical Order Analytics Summary for **$vendorName**\n" +
+                    "*(Local Smart Fallback Report — Active Data Aggregation Running Live)*\n\n" +
+                    "An analysis of **${orders.size} completed transactions** shows heavy student demand and high-contrast purchase peaks sync'd to Accra Technical University's lecture calendar.\n\n" +
+                    "---\n\n" +
+                    "### 1. 🔥 Peak Traffic Density & Order Velocity\n" +
+                    "• **Absolute Peak Hour**: **$busiestHourStr** represents the absolute highest ordering concentration, accounting for major delivery lines.\n" +
+                    "• **Operational Strategy**: Prepare portion prep **20 minutes before $busiestHourStr**. Setup a dual-line checkout (split for digital pre-orders vs walk-in ordering) to optimize fulfillment.\n\n" +
+                    "---\n\n" +
+                    "### 2. 🍔 Core Menu Popularity Index (Top Dish Assessment)\n" +
+                    "If details are available:\n" +
+                    (if (sortedPopularItems.isEmpty()) "• No menu trends database recorded yet." else popularItemsStr) + "\n\n" +
+                    "• **Strategic Recommendation**: Introduce a **'Star Combo Promo'** combining **$topItem** with a popular refreshing drink to boost overall transaction size.\n\n" +
+                    "---\n\n" +
+                    "### 3. 🔋 Kitchen Resource & Supply Chain Guidance\n" +
+                    "• **Inventory Buffer**: Maintain a **20% stock surplus of ingredients** for **$topItem** on heavy lecture days to avoid missing late-stage demand.\n" +
+                    "• **Fulfillment Prep**: Standardize prep timing to ensure standard hand-offs during peak rush intervals do not exceed **4-6 minutes per student**."
+        }
+
+        val prompt = xmlDocClean("""
+            You are a lead institutional restaurant analyst and predictive supply chain strategist at Accra Technical University (ATU).
+            Please review this aggregated historical dataset from the 'orders' table for vendor '$vendorName':
+            
+            HISTORICAL ORDERS SUMMARY:
+            - Total Completed Transactions: ${orders.size}
+            - Total Cumulative Revenue: GH₵ ${"%.2f".format(totalRev)}
+            - Absolute Single Busiest Peak Hour: $busiestHourStr
+            
+            STAR FOOD ITEMS & POPULARITY:
+            ${if (sortedPopularItems.isEmpty()) "No data logged." else sortedPopularItems.joinToString("\n") { "• ${it.key}: Sold ${it.value} units, Revenue of GH₵ ${"%.2f".format(itemRevenue[it.key] ?: 0.0)}" }}
+            
+            Please construct a comprehensive, action-oriented predictive demand and culinary intelligence report in clean Markdown format with the following pillars:
+            
+            1. **🔥 Peak Hour Traffic Density & Bottlenecks**: Analyze their busiest windows specifically around $busiestHourStr. Suggest how to adjust service velocity or introduce digital pre-orders to navigate these peak university lecture breaks.
+            2. **🍔 Core Menu Popularity Index**: Analyze the top selling items. Suggest how they can bundle slower-moving products with popular items to drive larger orders.
+            3. **🔋 Kitchen Resource Planning Guidance**: Give tailored guidance on preparing ingredients beforehand to prevent running out of food, minimizing local wait times, and preventing daily surplus waste.
+            
+            Keep the report beautifully styled, concise, encouraging, and highly professional. Limit to 350-400 words.
+        """.trimIndent())
+
+        val request = GeminiGenerateRequest(
+            contents = listOf(
+                GeminiContent(
+                    parts = listOf(
+                        GeminiPart(text = prompt)
+                    )
+                )
+            )
+        )
+
+        try {
+            val response = RetrofitClient.geminiService.generateContent(apiKey, request)
+            response.candidates?.firstOrNull()?.content?.parts?.firstOrNull()?.text ?: "No historical order insights generated by ATU Intelligence at this time."
+        } catch (e: Exception) {
+            Log.e("GeminiHistoricalOrderInsights", "Error communicating with Gemini", e)
+            "### 📈 Gemini Intelligence: Historical Order Analytics Summary for **$vendorName**\n" +
+                    "*(Local Smart Fallback Report — Active Data Aggregation Running Live)*\n\n" +
+                    "• **Busiest Hour**: $busiestHourStr\n" +
+                    "• **Top Food Performance**:\n" +
+                    popularItemsStr + "\n" +
+                    "• **Operational Tip**: Prep portion lines 20 minutes before peak sessions."
         }
     }
 

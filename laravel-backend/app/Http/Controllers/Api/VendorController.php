@@ -109,6 +109,37 @@ class VendorController extends Controller
     }
 
     /**
+     * Generate detailed Gemini AI Insights about popular food items and peak ordering times from historical logs.
+     */
+    public function getMyGeminiOrderInsights(Request $request)
+    {
+        $user = $request->user();
+
+        if (strtoupper($user->role) !== 'VENDOR' && strtoupper($user->role) !== 'ADMIN') {
+            return response()->json([
+                'success' => false,
+                'message' => 'Unauthorized. This resource requires VENDOR or ADMIN privileges.'
+            ], 403);
+        }
+
+        $service = new \App\Services\GeminiOrderInsightService();
+        $insights = $service->analyzeHistoricalOrders($user->id);
+
+        return response()->json($insights, 200);
+    }
+
+    /**
+     * Generate detailed Gemini AI Insights about popular food items and peak ordering times for any specific vendor (ADMIN overview).
+     */
+    public function getVendorGeminiOrderInsights(Request $request, $vendorId)
+    {
+        $service = new \App\Services\GeminiOrderInsightService();
+        $insights = $service->analyzeHistoricalOrders(intval($vendorId));
+
+        return response()->json($insights, 200);
+    }
+
+    /**
      * Toggle or explicitly set the authenticated vendor's open status (is_open).
      */
     public function toggleStatus(Request $request)

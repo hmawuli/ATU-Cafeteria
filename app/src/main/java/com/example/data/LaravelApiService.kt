@@ -419,6 +419,16 @@ data class LaravelBulkUpdateResponse(
     val updates_log: List<String>?
 )
 
+@JsonClass(generateAdapter = true)
+data class LaravelGeminiInsightResponse(
+    val success: Boolean,
+    val vendor_id: Int,
+    val vendor_name: String,
+    val insights_markdown: String,
+    val note: String? = null,
+    val generated_at: String
+)
+
 // ==========================================
 // 2. RETROFIT API SERVICE INTERFACE
 // ==========================================
@@ -505,6 +515,12 @@ interface LaravelApiService {
 
     @GET("api/vendor/performance-metrics")
     suspend fun getVendorPerformanceMetrics(): LaravelVendorPerformanceMetricsResponse
+
+    @GET("api/vendor/analytics/gemini-order-insights")
+    suspend fun getMyGeminiOrderInsights(): LaravelGeminiInsightResponse
+
+    @GET("api/vendor/{vendorId}/gemini-order-insights")
+    suspend fun getVendorGeminiOrderInsights(@Path("vendorId") vendorId: Int): LaravelGeminiInsightResponse
 
     @GET("api/notifications")
     suspend fun getDatabaseNotifications(): LaravelNotificationsResponse

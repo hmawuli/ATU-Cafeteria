@@ -191,6 +191,12 @@ class CafeteriaViewModel(application: Application) : AndroidViewModel(applicatio
     private val _isAnalyzingTodayOrders = MutableStateFlow(false)
     val isAnalyzingTodayOrders: StateFlow<Boolean> = _isAnalyzingTodayOrders.asStateFlow()
 
+    private val _vendorHistoricalInsights = MutableStateFlow<String?>(null)
+    val vendorHistoricalInsights: StateFlow<String?> = _vendorHistoricalInsights.asStateFlow()
+
+    private val _isAnalyzingHistoricalOrders = MutableStateFlow(false)
+    val isAnalyzingHistoricalOrders: StateFlow<Boolean> = _isAnalyzingHistoricalOrders.asStateFlow()
+
     // 5. In-App Real-time Order Notifications
     private val _newOrderAlerts = MutableStateFlow<List<Order>>(emptyList())
     val newOrderAlerts: StateFlow<List<Order>> = _newOrderAlerts.asStateFlow()
@@ -1233,6 +1239,40 @@ class CafeteriaViewModel(application: Application) : AndroidViewModel(applicatio
                 orders = filteredOrders
             )
             _isAnalyzingTodayOrders.value = false
+        }
+    }
+
+    fun runVendorHistoricalInsights(vendorId: Int, vendorName: String, allOrders: List<Order>) {
+        viewModelScope.launch {
+            _isAnalyzingHistoricalOrders.value = true
+            _vendorHistoricalInsights.value = null
+
+            val filteredOrders = allOrders.filter { it.vendorId == vendorId && it.status == "COMPLETED" }
+
+            if (LaravelClientManager.isLaravelEnabled) {
+                try {
+                    val response = repository.getVendorGeminiOrderInsights(vendorId)
+                    if (response.success) {
+                        _vendorHistoricalInsights.value = response.insights_markdown
+                    } else {
+                        _vendorHistoricalInsights.value = geminiRepository.generateHistoricalOrderInsights(
+                            vendorName = vendorName,
+                            orders = filteredOrders
+                        )
+                    }
+                } catch (e: Exception) {
+                    _vendorHistoricalInsights.value = geminiRepository.generateHistoricalOrderInsights(
+                        vendorName = vendorName,
+                        orders = filteredOrders
+                    )
+                }
+            } else {
+                _vendorHistoricalInsights.value = geminiRepository.generateHistoricalOrderInsights(
+                    vendorName = vendorName,
+                    orders = filteredOrders
+                )
+            }
+            _isAnalyzingHistoricalOrders.value = false
         }
     }
 

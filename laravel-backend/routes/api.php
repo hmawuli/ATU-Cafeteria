@@ -17,6 +17,7 @@ use App\Http\Controllers\Api\MenuController;
 use App\Http\Controllers\Api\ChatController;
 use App\Http\Controllers\Api\PaystackPaymentController;
 use App\Http\Controllers\Api\VendorSpecificController;
+use App\Http\Controllers\Api\PassportAuthController;
 
 // Register explicit listeners for OrderStatusCompleted event
 Event::listen(
@@ -42,6 +43,11 @@ Route::post('/student/login', [StudentAuthController::class, 'login']);
 // Specialized Vendor Sanctum Auth Endpoints
 Route::post('/vendor/register', [VendorAuthController::class, 'register']);
 Route::post('/vendor/login', [VendorAuthController::class, 'login']);
+
+// Explicit Laravel Breeze & Passport OAuth2 endpoints
+Route::post('/oauth/token', [PassportAuthController::class, 'issueOAuthToken']);
+Route::post('/breeze/student/register', [PassportAuthController::class, 'registerStudent']);
+Route::post('/breeze/vendor/register', [PassportAuthController::class, 'registerVendor']);
 
 // Protected Authenticated Endpoints - Supports both Sanctum and Secure JWT Auth
 Route::middleware(function ($request, $next) {
@@ -87,6 +93,8 @@ Route::middleware(function ($request, $next) {
     Route::get('/vendor/analytics/comparative', [VendorController::class, 'getComparativeAnalytics']);
     Route::get('/vendor/analytics/gemini-report', [VendorController::class, 'getMyGeminiReport']);
     Route::get('/vendor/{vendorId}/gemini-report', [VendorController::class, 'getVendorGeminiReport']);
+    Route::get('/vendor/analytics/gemini-order-insights', [VendorController::class, 'getMyGeminiOrderInsights']);
+    Route::get('/vendor/{vendorId}/gemini-order-insights', [VendorController::class, 'getVendorGeminiOrderInsights']);
     Route::get('/vendor/performance-metrics', [VendorPerformanceController::class, 'getVendorPerformanceMetrics']);
     Route::get('/vendor/performance', [VendorPerformanceController::class, 'getPerformance']);
     Route::get('/vendor/recharts-sales', [VendorPerformanceController::class, 'exportSalesForRecharts']);

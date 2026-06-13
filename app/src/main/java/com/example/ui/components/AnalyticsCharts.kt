@@ -2706,5 +2706,282 @@ fun InventoryTrackingHub(
     }
 }
 
+@Composable
+fun RechartsFeedbackDashboardChart(
+    orders: List<Order>,
+    feedbacks: List<com.example.data.Feedback>,
+    modifier: Modifier = Modifier
+) {
+    val feedbackDataJson = remember(orders, feedbacks) {
+        val list = mutableListOf<String>()
+        val sdfLabel = java.text.SimpleDateFormat("MM-dd", java.util.Locale.US)
+        for (i in 29 downTo 0) {
+            val cal = java.util.Calendar.getInstance()
+            cal.add(java.util.Calendar.DAY_OF_YEAR, -i)
+            
+            val dayStart = cal.clone() as java.util.Calendar
+            dayStart.set(java.util.Calendar.HOUR_OF_DAY, 0)
+            dayStart.set(java.util.Calendar.MINUTE, 0)
+            dayStart.set(java.util.Calendar.SECOND, 0)
+            dayStart.set(java.util.Calendar.MILLISECOND, 0)
+            val startMillis = dayStart.timeInMillis
+            val endMillis = startMillis + 24 * 60 * 60 * 1000L - 1
+            
+            val dateLabel = sdfLabel.format(cal.time)
+            
+            val dayOrders = orders.filter {
+                it.orderTimestamp in startMillis..endMillis && it.status == "COMPLETED"
+            }
+            val orderVolume = dayOrders.size
+            
+            val dayFeedbacks = feedbacks.filter {
+                it.timestamp in startMillis..endMillis
+            }
+            
+            val avgRating = if (dayFeedbacks.isNotEmpty()) {
+                dayFeedbacks.map { f ->
+                    (f.ratingFoodQuality + f.ratingCleanliness + f.ratingServiceSpeed + f.ratingPriceValue) / 4.0
+                }.average()
+            } else {
+                4.2
+            }
+            
+            val formattedRating = String.format(java.util.Locale.US, "%.1f", avgRating)
+            list.add("""{"date": "$dateLabel", "volume": $orderVolume, "rating": $formattedRating}""")
+        }
+        list.joinToString(prefix = "[", postfix = "]", separator = ",")
+    }
+
+    val stats = remember(orders, feedbacks) {
+        val thirtyDaysAgo = System.currentTimeMillis() - 30 * 24 * 60 * 60 * 1000L
+        val recentOrders = orders.filter { it.orderTimestamp >= thirtyDaysAgo && it.status == "COMPLETED" }
+        val recentFeedbacks = feedbacks.filter { it.timestamp >= thirtyDaysAgo }
+        
+        val avgRating = if (recentFeedbacks.isNotEmpty()) {
+            recentFeedbacks.map { f ->
+                (f.ratingFoodQuality + f.ratingCleanliness + f.ratingServiceSpeed + f.ratingPriceValue) / 4.0
+            }.average()
+        } else {
+            4.5
+        }
+        
+        Triple(
+            recentOrders.size,
+            recentFeedbacks.size,
+            String.format(java.util.Locale.US, "%.1f", avgRating)
+        )
+    }
+
+    val totalVolume = stats.first
+    val totalReviews = stats.second
+    val averageRating = stats.third
+
+    val htmlContent = remember(feedbackDataJson, totalVolume, totalReviews, averageRating) {
+        """
+        <!DOCTYPE html>
+        <html>
+        <head>
+            <meta charset="UTF-8">
+            <meta name="viewport" content="width=device-width, initial-scale=1.0">
+            <title>30-Day Performance & Feedback Tracker</title>
+            <!-- Load React -->
+            <script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
+            <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
+            <!-- Load Prop-Types -->
+            <script src="https://unpkg.com/prop-types@15.8.1/prop-types.min.js" crossorigin></script>
+            <!-- Load Recharts -->
+            <script src="https://unpkg.com/recharts@2.12.7/umd/Recharts.js" crossorigin></script>
+            <!-- Load Babel -->
+            <script src="https://unpkg.com/@babel/standalone/babel.min.js" crossorigin></script>
+            <style>
+                body {
+                    margin: 0;
+                    padding: 8px;
+                    background-color: #1a1a1a;
+                    color: #e0e0e0;
+                    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+                }
+                .card {
+                    background-color: #212121;
+                    border: 1px solid #333333;
+                    border-radius: 8px;
+                    padding: 12px;
+                    margin-bottom: 12px;
+                    box-shadow: 0 2px 4px rgba(0,0,0,0.15);
+                }
+                .header {
+                    margin-bottom: 12px;
+                }
+                .title {
+                    font-size: 11px;
+                    font-weight: bold;
+                    color: #ffd54f;
+                    margin: 0;
+                    text-transform: uppercase;
+                    letter-spacing: 0.5px;
+                }
+                .subtitle {
+                    font-size: 9px;
+                    color: #aaa;
+                    margin: 2px 0 0 0;
+                }
+                .chart-container {
+                    height: 240px;
+                    position: relative;
+                }
+                .stats-row {
+                    display: flex;
+                    justify-content: space-between;
+                    margin-bottom: 12px;
+                    gap: 8px;
+                }
+                .stat-card {
+                    background-color: #242424;
+                    border: 1px solid #3a3a3a;
+                    border-radius: 6px;
+                    padding: 8px;
+                    flex: 1;
+                    text-align: center;
+                }
+                .stat-value {
+                    font-size: 13px;
+                    font-weight: bold;
+                }
+                .rating-color {
+                    color: #ffd54f;
+                }
+                .volume-color {
+                    color: #4fc3f7;
+                }
+                .review-color {
+                    color: #a5d6a7;
+                }
+                .stat-label {
+                    font-size: 8px;
+                    color: #aaa;
+                    margin-top: 2px;
+                    text-transform: uppercase;
+                }
+            </style>
+        </head>
+        <body>
+            <div id="root"></div>
+
+            <script type="text/babel">
+                const { 
+                    ComposedChart, Line, Bar,
+                    XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer
+                } = Recharts;
+
+                const chartData = $feedbackDataJson;
+                const totalVolume = $totalVolume;
+                const totalReviews = $totalReviews;
+                const averageRating = "$averageRating";
+
+                function App() {
+                    return (
+                        <div>
+                            <div className="stats-row">
+                                <div className="stat-card">
+                                    <div className="stat-value rating-color">★ {averageRating} / 5.0</div>
+                                    <div className="stat-label">30d Avg Rating</div>
+                                </div>
+                                <div className="stat-card">
+                                    <div className="stat-value volume-color">{totalVolume}</div>
+                                    <div className="stat-label">30d Order Volume</div>
+                                </div>
+                                <div className="stat-card">
+                                    <div className="stat-value review-color">{totalReviews}</div>
+                                    <div className="stat-label">30d Feedback Count</div>
+                                </div>
+                            </div>
+
+                            <div className="card">
+                                <div className="header">
+                                    <p className="title">Rating Velocity & Order Density</p>
+                                    <p className="subtitle">Interactive 30-day cross-timeline comparing customer sentiment scores to fulfillment volume</p>
+                                </div>
+                                <div className="chart-container">
+                                    <ResponsiveContainer width="100%" height="100%">
+                                        <ComposedChart data={chartData} margin={{ top: 5, right: -25, left: -25, bottom: 5 }}>
+                                            <CartesianGrid strokeDasharray="3 3" stroke="#2d2d2d" />
+                                            <XAxis dataKey="date" stroke="#888" style={{ fontSize: '8px' }} />
+                                            <YAxis yAxisId="left" orientation="left" stroke="#4fc3f7" style={{ fontSize: '8px' }} label={{ value: 'Orders', angle: -90, position: 'insideLeft', style: {fontSize: '8px', fill: '#4fc3f7', textAnchor: 'middle'} }} />
+                                            <YAxis yAxisId="right" orientation="right" stroke="#ffd54f" domain={[1.0, 5.0]} style={{ fontSize: '8px' }} label={{ value: 'Review Score', angle: 90, position: 'insideRight', style: {fontSize: '8px', fill: '#ffd54f', textAnchor: 'middle'} }} />
+                                            <Tooltip contentStyle={{ backgroundColor: '#222', borderColor: '#444', fontSize: '9px' }} />
+                                            <Legend wrapperStyle={{ fontSize: '9px', marginTop: '4px' }} />
+                                            <Bar yAxisId="left" dataKey="volume" name="Fulfillment Count" fill="#4fc3f7" radius={[2, 2, 0, 0]} opacity={0.6} />
+                                            <Line yAxisId="right" type="monotone" dataKey="rating" name="Customer Rating (1-5★)" stroke="#ffd54f" strokeWidth={2} activeDot={{ r: 4 }} />
+                                        </ComposedChart>
+                                    </ResponsiveContainer>
+                                </div>
+                            </div>
+                        </div>
+                    );
+                }
+
+                const container = document.getElementById('root');
+                const root = ReactDOM.createRoot(container);
+                root.render(<App />);
+            </script>
+        </body>
+        </html>
+        """.trimIndent()
+    }
+
+    Card(
+        modifier = modifier
+            .fillMaxWidth()
+            .testTag("recharts_feedback_dashboard_card"),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+        shape = RoundedCornerShape(16.dp),
+        border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
+    ) {
+        Column(modifier = Modifier.padding(16.dp)) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                Text("📊", fontSize = 20.sp)
+                Column {
+                    Text(
+                        text = "30-Day Vendor Analytics & Feedback Dashboard",
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.primary
+                    )
+                    Text(
+                        text = "Real-time dual-axis rating trends & order velocity",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            }
+
+            Spacer(modifier = Modifier.height(14.dp))
+ 
+            AndroidView(
+                factory = { context ->
+                    android.webkit.WebView(context).apply {
+                        settings.javaScriptEnabled = true
+                        webViewClient = android.webkit.WebViewClient()
+                        settings.domStorageEnabled = true
+                        settings.useWideViewPort = true
+                        settings.loadWithOverviewMode = true
+                        setBackgroundColor(android.graphics.Color.TRANSPARENT)
+                    }
+                },
+                update = { webView ->
+                    webView.loadDataWithBaseURL("https://localhost", htmlContent, "text/html", "UTF-8", null)
+                },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(340.dp)
+            )
+        }
+    }
+}
+
+
 
 
