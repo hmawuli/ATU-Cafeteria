@@ -552,9 +552,9 @@ class CafeteriaRepository(private val db: AppDatabase) {
         }
         val o = orderDao.getOrderById(orderId) ?: return@withContext false
         if (o.vendorId == vendorId && o.pickupPin == pin) {
-            val updated = o.copy(status = "COMPLETED")
+            val updated = o.copy(status = "DELIVERED")
             orderDao.updateOrder(updated)
-            insertAuditLog(vendorId, "PICKUP_VALIDATED", "Order #${orderId} secure pin verified successfully and marked Completed.")
+            insertAuditLog(vendorId, "PICKUP_VALIDATED_QR", "Order #${orderId} secure QR/PIN verified successfully and marked Delivered.")
             return@withContext true
         } else {
             insertAuditLog(vendorId, "PICKUP_FAIL", "Order #${orderId} verification failed with bad PIN: '$pin'")

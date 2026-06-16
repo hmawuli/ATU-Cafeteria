@@ -216,6 +216,19 @@ class CafeteriaViewModel(application: Application) : AndroidViewModel(applicatio
     private val _realTimeEventsLogs = MutableStateFlow<List<String>>(emptyList())
     val realTimeEventsLogs: StateFlow<List<String>> = _realTimeEventsLogs.asStateFlow()
 
+    // 1-Click Favorites State & Methods
+    private val _favoriteFoodIds = MutableStateFlow<Set<Int>>(emptySet())
+    val favoriteFoodIds: StateFlow<Set<Int>> = _favoriteFoodIds.asStateFlow()
+
+    fun toggleFavoriteFood(foodItemId: Int) {
+        val current = _favoriteFoodIds.value
+        _favoriteFoodIds.value = if (current.contains(foodItemId)) {
+            current - foodItemId
+        } else {
+            current + foodItemId
+        }
+    }
+
     private val seenOrderIds = java.util.Collections.synchronizedSet(mutableSetOf<Int>())
     private var isFirstOrderLoad = true
 
@@ -351,6 +364,13 @@ class CafeteriaViewModel(application: Application) : AndroidViewModel(applicatio
             var isFirstCollection = true
             customerOrders.collect { currentOrders ->
                 if (currentOrders.isEmpty()) return@collect
+                
+                if (_favoriteFoodIds.value.isEmpty()) {
+                    val initialFavs = currentOrders.map { it.foodItemId }.toSet()
+                    if (initialFavs.isNotEmpty()) {
+                        _favoriteFoodIds.value = initialFavs
+                    }
+                }
                 
                 if (isFirstCollection) {
                     currentOrders.forEach { order ->

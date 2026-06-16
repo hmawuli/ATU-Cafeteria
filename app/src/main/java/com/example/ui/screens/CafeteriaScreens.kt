@@ -634,6 +634,7 @@ fun StudentDashboardScreen(
     val vendorAnnouncement by viewModel.vendorAnnouncement.collectAsStateWithLifecycle()
     val isAdminActing by viewModel.isAdminActing.collectAsStateWithLifecycle()
     val redeemedPoints by viewModel.redeemedLoyaltyPoints.collectAsStateWithLifecycle()
+    val allOrdersSnapshot by viewModel.allOrdersSnapshot.collectAsStateWithLifecycle()
     val currentTotalPoints = remember(studentOrders) {
         studentOrders.sumOf { order ->
             if (order.status.uppercase() == "COMPLETED") 25 else 10
@@ -642,9 +643,10 @@ fun StudentDashboardScreen(
     val availablePoints = currentTotalPoints - redeemedPoints
 
     val acknowledgedOrders = remember { mutableStateListOf<Int>() }
+    var showQrForOrder by remember { mutableStateOf<Order?>(null) }
 
     var activeTab by remember { mutableIntStateOf(0) } // 0: Browse Food, 1: Orders Hub, 2: Nutrition, 3: Prep Reserves, 4: Smart Wallet & ID
-    var ordersSubTab by remember { mutableIntStateOf(0) } // 0: Live Tracker, 1: Dining History
+    var ordersSubTab by remember { mutableIntStateOf(0) } // 0: Live Tracker, 1: Dining History, 2: Favorites
 
     val browseScrollState = rememberLazyListState()
     val activeOrdersScrollState = rememberLazyListState()
@@ -653,10 +655,18 @@ fun StudentDashboardScreen(
     val prepScrollState = rememberLazyListState()
     val walletScrollState = rememberLazyListState()
 
+    val favoritesScrollState = rememberLazyListState()
+
     val currentActiveScrollState = remember(activeTab, ordersSubTab) {
         when (activeTab) {
             0 -> browseScrollState
-            1 -> if (ordersSubTab == 0) activeOrdersScrollState else pastOrdersScrollState
+            1 -> {
+                when (ordersSubTab) {
+                    0 -> activeOrdersScrollState
+                    1 -> pastOrdersScrollState
+                    else -> favoritesScrollState
+                }
+            }
             2 -> nutritionScrollState
             3 -> prepScrollState
             4 -> walletScrollState
@@ -991,10 +1001,64 @@ fun StudentDashboardScreen(
                         }
 
                         item {
-                            // Intelligent AI Recommendations Section
-                            val recommendationsList = remember(allFoodItems) {
-                                allFoodItems.shuffled().take(3)
+                            // Intelligent AI Recommendations Section (Recommendation Engine)
+                            data class RecommendedFood(val foodItem: FoodItem, val reason: String)
+                            val recommendationsList = remember(allFoodItems, studentOrders, allOrdersSnapshot) {
+                                if (allFoodItems.isEmpty()) {
+                                    emptyList()
+                                } else if (studentOrders.isEmpty()) {
+                                    // New User algorithm: recommend based on system-wide order popularity
+                                    val orderCounts = allOrdersSnapshot.groupBy { it.foodItemId }.mapValues { it.value.sumOf { o -> o.quantity } }
+                                    allFoodItems
+                                        .sortedByDescending { orderCounts[it.id] ?: 0 }
+                                        .take(4)
+                                        .map { item ->
+                                            val qtySold = orderCounts[item.id] ?: 0
+                                            val reason = if (qtySold > 0) "Popular choice among ATU students ($qtySold portions sold)" else "Highly rated campus local specialty"
+                                            RecommendedFood(item, reason)
+                                        }
+                                } else {
+                                    // Retrospective existing user algorithm: calculate category affinity & frequency
+                                    val userItemCounts = studentOrders.groupBy { it.foodItemId }.mapValues { it.value.sumOf { o -> o.quantity } }
+                                    val userCategoryCounts = studentOrders.groupBy { o -> 
+                                        allFoodItems.find { it.id == o.foodItemId }?.category ?: "Local Dish"
+                                    }.mapValues { it.value.size }
+                                    
+                                    val favoriteCategory = userCategoryCounts.maxByOrNull { it.value }?.key ?: "Local Dish"
+                                    val recommended = mutableListOf<RecommendedFood>()
+
+                                    // 1. Re-purchase items (highly ordered items)
+                                    val highlyOrderedIds = userItemCounts.filter { it.value > 1 }.keys
+                                    allFoodItems.filter { it.id in highlyOrderedIds }.take(2).forEach { item ->
+                                        recommended.add(RecommendedFood(item, "You ordered this ${userItemCounts[item.id]}x recently"))
+                                    }
+
+                                    // 2. Cross-promote popular in favorite category (which user hasn't ordered yet)
+                                    val orderedIds = studentOrders.map { it.foodItemId }.toSet()
+                                    allFoodItems
+                                        .filter { it.category == favoriteCategory && it.id !in orderedIds && it.isAvailable }
+                                        .take(2)
+                                        .forEach { item ->
+                                            recommended.add(RecommendedFood(item, "Special recipe in your favorite category: ${item.category}"))
+                                        }
+
+                                    // 3. Fallback: general trending popular items that are not ordered yet
+                                    if (recommended.size < 4) {
+                                        val orderCounts = allOrdersSnapshot.groupBy { it.foodItemId }.mapValues { it.value.sumOf { o -> o.quantity } }
+                                        allFoodItems
+                                            .filter { it.id !in orderedIds && it.isAvailable }
+                                            .sortedByDescending { orderCounts[it.id] ?: 0 }
+                                            .take(4 - recommended.size)
+                                            .forEach { item ->
+                                                val qty = orderCounts[item.id] ?: 0
+                                                val reason = if (qty > 0) "Trending high in cafeteria ($qty portions sold)" else "Highly rated campus local specialty"
+                                                recommended.add(RecommendedFood(item, reason))
+                                            }
+                                    }
+                                    recommended.distinctBy { it.foodItem.id }.take(4)
+                                }
                             }
+
                             if (recommendationsList.isNotEmpty()) {
                                 Column(modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp).testTag("ai_food_recommendations_section")) {
                                     Row(
@@ -1030,13 +1094,15 @@ fun StudentDashboardScreen(
                                         horizontalArrangement = Arrangement.spacedBy(10.dp),
                                         modifier = Modifier.fillMaxWidth()
                                     ) {
-                                        items(recommendationsList) { foodItem ->
+                                        items(recommendationsList) { rec ->
+                                            val foodItem = rec.foodItem
+                                            val reason = rec.reason
                                             val profile = getNutritionalProfile(foodItem)
                                             val kcal = profile.first * 4f + profile.second * 4f + profile.third * 9f
                                             
                                             Card(
                                                 modifier = Modifier
-                                                    .width(220.dp)
+                                                    .width(225.dp)
                                                     .clickable { 
                                                         selectedFoodForOrder = foodItem
                                                         orderQuantity = 1
@@ -1084,6 +1150,24 @@ fun StudentDashboardScreen(
                                                         lineHeight = 11.sp,
                                                         modifier = Modifier.height(22.dp)
                                                     )
+
+                                                    Spacer(modifier = Modifier.height(4.dp))
+                                                    // Recommendation Reason Badge
+                                                    Box(
+                                                        modifier = Modifier
+                                                            .fillMaxWidth()
+                                                            .clip(RoundedCornerShape(4.dp))
+                                                            .background(MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.5f))
+                                                            .padding(horizontal = 6.dp, vertical = 3.dp)
+                                                    ) {
+                                                        Text(
+                                                            text = reason,
+                                                            fontSize = 8.sp,
+                                                            color = MaterialTheme.colorScheme.onSecondaryContainer,
+                                                            fontWeight = FontWeight.Bold,
+                                                            maxLines = 1
+                                                        )
+                                                    }
                                                     
                                                     Spacer(modifier = Modifier.height(8.dp))
                                                     Row(
@@ -1991,10 +2075,16 @@ fun StudentDashboardScreen(
                                 text = { Text("Historical Dishes", fontWeight = FontWeight.Bold, fontSize = 12.sp) },
                                 icon = { Icon(Icons.Default.History, contentDescription = null, modifier = Modifier.size(18.dp)) }
                             )
+                            Tab(
+                                selected = ordersSubTab == 2,
+                                onClick = { ordersSubTab = 2 },
+                                text = { Text("1-Click Favorites", fontWeight = FontWeight.Bold, fontSize = 12.sp) },
+                                icon = { Icon(Icons.Default.Favorite, contentDescription = null, modifier = Modifier.size(18.dp)) }
+                            )
                         }
                         
                         if (ordersSubTab == 0) {
-                            val activeOrders = studentOrders.filter { it.status == "PENDING" || it.status == "PREPARING" || it.status == "READY" || it.status == "COMPLETED" }.sortedByDescending { it.id }
+                            val activeOrders = studentOrders.filter { it.status == "PENDING" || it.status == "PREPARING" || it.status == "READY" || it.status == "COMPLETED" || it.status == "DELIVERED" }.sortedByDescending { it.id }
                             
                             LazyColumn(
                                 state = activeOrdersScrollState,
@@ -2444,6 +2534,28 @@ fun StudentDashboardScreen(
                                                                  Column(horizontalAlignment = Alignment.End) {
                                                                      Text("SECRET PASS PIN", color = Color.White.copy(alpha = 0.5f), fontSize = 7.sp, fontWeight = FontWeight.Bold)
                                                                      Text(order.pickupPin, color = Color(0xFF00E676), fontSize = 12.sp, fontWeight = FontWeight.ExtraBold)
+                                                                }
+                                                            }
+                                                            Spacer(modifier = Modifier.height(10.dp))
+                                                            Button(
+                                                                onClick = { showQrForOrder = order },
+                                                                colors = ButtonDefaults.buttonColors(
+                                                                    containerColor = Color(0xFF00E676).copy(alpha = 0.2f),
+                                                                    contentColor = Color(0xFF00E676)
+                                                                ),
+                                                                shape = RoundedCornerShape(8.dp),
+                                                                modifier = Modifier.fillMaxWidth().height(36.dp).testTag("student_generate_qr_btn_${order.id}")
+                                                              ) {
+                                                                  Icon(
+                                                                      imageVector = Icons.Default.QrCode,
+                                                                      contentDescription = "Show Claim QR",
+                                                                      modifier = Modifier.size(16.dp)
+                                                                  )
+                                                                  Spacer(modifier = Modifier.width(6.dp))
+                                                                  Text("TAP FOR QR CLAIM CODE", fontSize = 10.sp, fontWeight = FontWeight.Bold)
+                                                              }
+                                                              Column(horizontalAlignment = Alignment.End) {
+                                                                  Text("", modifier = Modifier.size(0.dp))
                                                                  }
                                                              }
 
@@ -2652,15 +2764,14 @@ fun StudentDashboardScreen(
                                                  }
                                              }
                                          }
-                                    }
-                                }
-                            }
-                        }
-                    }
-                } else {
-                            val completedOrCanceledOrders = studentOrders.filter { it.status == "COMPLETED" || it.status == "DECLINED" || it.status == "CANCELLED" }
-                            val totalSpend = completedOrCanceledOrders.filter { it.status == "COMPLETED" }.sumOf { it.totalPrice }
-                            val orderCount = completedOrCanceledOrders.filter { it.status == "COMPLETED" }.size
+                                      }
+                                  }
+                              }
+                          }
+                        } else if (ordersSubTab == 1) {
+                            val completedOrCanceledOrders = studentOrders.filter { it.status == "COMPLETED" || it.status == "DELIVERED" || it.status == "DECLINED" || it.status == "CANCELLED" }
+                            val totalSpend = completedOrCanceledOrders.filter { it.status == "COMPLETED" || it.status == "DELIVERED" }.sumOf { it.totalPrice }
+                            val orderCount = completedOrCanceledOrders.filter { it.status == "COMPLETED" || it.status == "DELIVERED" }.size
                             
                             val pastVendors = remember(completedOrCanceledOrders, allVendors) {
                                 val vendorIds = completedOrCanceledOrders.map { it.vendorId }.distinct()
@@ -3027,9 +3138,29 @@ fun StudentDashboardScreen(
                                                     horizontalArrangement = Arrangement.SpaceBetween,
                                                     verticalAlignment = Alignment.CenterVertically
                                                 ) {
-                                                    Column(modifier = Modifier.weight(1f)) {
-                                                        Text(order.foodName, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleSmall)
-                                                        Text("Booth: ${vendorInfo?.fullName ?: "Cafeteria Vendor"}", fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                                    Row(
+                                                        modifier = Modifier.weight(1f),
+                                                        verticalAlignment = Alignment.CenterVertically,
+                                                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                                    ) {
+                                                        Column(modifier = Modifier.weight(1f)) {
+                                                            Text(order.foodName, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleSmall)
+                                                            Text("Booth: ${vendorInfo?.fullName ?: "Cafeteria Vendor"}", fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                                        }
+                                                        
+                                                        val favoriteFoodIds by viewModel.favoriteFoodIds.collectAsStateWithLifecycle()
+                                                        val isFav = favoriteFoodIds.contains(order.foodItemId)
+                                                        IconButton(
+                                                            onClick = { viewModel.toggleFavoriteFood(order.foodItemId) },
+                                                            modifier = Modifier.size(36.dp).testTag("favorite_toggle_${order.foodItemId}")
+                                                        ) {
+                                                            Icon(
+                                                                imageVector = if (isFav) Icons.Default.Favorite else Icons.Default.FavoriteBorder,
+                                                                contentDescription = if (isFav) "Remove Favorite" else "Add Favorite",
+                                                                tint = if (isFav) Color.Red else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f),
+                                                                modifier = Modifier.size(20.dp)
+                                                            )
+                                                        }
                                                     }
 
                                                     Column(horizontalAlignment = Alignment.End) {
@@ -5431,6 +5562,159 @@ fun StudentDashboardScreen(
             }
         }
 
+            // STUDENT QR CLAIM CODE DIALOG
+            showQrForOrder?.let { order ->
+                val vendor = allVendors.find { it.id == order.vendorId }
+                Dialog(onDismissRequest = { showQrForOrder = null }) {
+                    Card(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(16.dp)
+                            .testTag("student_qr_claim_dialog"),
+                        shape = RoundedCornerShape(24.dp),
+                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
+                    ) {
+                        Column(
+                            modifier = Modifier
+                                .padding(24.dp)
+                                .fillMaxWidth(),
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            verticalArrangement = Arrangement.spacedBy(16.dp)
+                        ) {
+                            Text(
+                                "Secure Claim Ticket",
+                                style = MaterialTheme.typography.titleMedium,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.primary
+                            )
+
+                            Text(
+                                "Show this QR code at the counter of ${vendor?.fullName ?: "Vendor"} to scan and claim your dish.",
+                                fontSize = 11.sp,
+                                textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+
+                            Box(
+                                modifier = Modifier
+                                    .size(180.dp)
+                                    .clip(RoundedCornerShape(12.dp))
+                                    .background(Color.White)
+                                    .padding(12.dp),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                androidx.compose.foundation.Canvas(modifier = Modifier.fillMaxSize()) {
+                                    val sizePx = size.width
+                                    val finderSize = sizePx * 7f / 21f
+
+                                    fun drawFinder(x: Float, y: Float, fSize: Float) {
+                                        val strokeW = fSize / 7f
+                                        drawRect(
+                                            color = Color.Black,
+                                            topLeft = androidx.compose.ui.geometry.Offset(x, y),
+                                            size = androidx.compose.ui.geometry.Size(fSize, fSize)
+                                        )
+                                        drawRect(
+                                            color = Color.White,
+                                            topLeft = androidx.compose.ui.geometry.Offset(x + strokeW, y + strokeW),
+                                            size = androidx.compose.ui.geometry.Size(fSize - strokeW * 2f, fSize - strokeW * 2f)
+                                        )
+                                        drawRect(
+                                            color = Color.Black,
+                                            topLeft = androidx.compose.ui.geometry.Offset(x + strokeW * 2f, y + strokeW * 2f),
+                                            size = androidx.compose.ui.geometry.Size(fSize - strokeW * 4f, fSize - strokeW * 4f)
+                                        )
+                                    }
+
+                                    drawFinder(0f, 0f, finderSize)
+                                    drawFinder(sizePx - finderSize, 0f, finderSize)
+                                    drawFinder(0f, sizePx - finderSize, finderSize)
+
+                                    val gridCount = 21
+                                    val cellSize = sizePx / gridCount
+                                    val seed = (order.id.toString() + order.pickupPin).hashCode()
+                                    val random = java.util.Random(seed.toLong())
+
+                                    for (row in 0 until gridCount) {
+                                        for (col in 0 until gridCount) {
+                                            val inTopLeft = row < 8 && col < 8
+                                            val inTopRight = row < 8 && col >= gridCount - 8
+                                            val inBottomLeft = row >= gridCount - 8 && col < 8
+
+                                            if (!inTopLeft && !inTopRight && !inBottomLeft) {
+                                                if (random.nextBoolean()) {
+                                                    drawRect(
+                                                        color = Color.Black,
+                                                        topLeft = androidx.compose.ui.geometry.Offset(col * cellSize, row * cellSize),
+                                                        size = androidx.compose.ui.geometry.Size(cellSize, cellSize)
+                                                    )
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+
+                            Card(
+                                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)),
+                                shape = RoundedCornerShape(12.dp),
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                Column(
+                                    modifier = Modifier.padding(12.dp),
+                                    horizontalAlignment = Alignment.CenterHorizontally,
+                                    verticalArrangement = Arrangement.spacedBy(4.dp)
+                                ) {
+                                    Text(
+                                        "ORDER REFERENCE CODE",
+                                        fontSize = 8.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                    Text(
+                                        "ATU-TKT-${order.id}",
+                                        fontSize = 14.sp,
+                                        fontWeight = FontWeight.Black,
+                                        color = MaterialTheme.colorScheme.onSurface
+                                    )
+                                    Row(
+                                        horizontalArrangement = Arrangement.spacedBy(16.dp),
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        Text(
+                                            "PIN: ${order.pickupPin}",
+                                            fontSize = 11.sp,
+                                            fontWeight = FontWeight.ExtraBold,
+                                            color = MaterialTheme.colorScheme.primary
+                                        )
+                                        Text(
+                                            "Qty: ${order.quantity}",
+                                            fontSize = 11.sp,
+                                            fontWeight = FontWeight.SemiBold,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                                        )
+                                        Text(
+                                            "Amt: GH₵ ${"%.2f".format(order.totalPrice)}",
+                                            fontSize = 11.sp,
+                                            fontWeight = FontWeight.SemiBold,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                                        )
+                                    }
+                                }
+                            }
+
+                            Button(
+                                onClick = { showQrForOrder = null },
+                                shape = RoundedCornerShape(12.dp),
+                                modifier = Modifier.fillMaxWidth().testTag("student_qr_dismiss_btn")
+                            ) {
+                                Text("Close Claim Code", fontWeight = FontWeight.Bold)
+                            }
+                        }
+                    }
+                }
+            }
+
             // ORDER PLACEMENT DIALOG
             selectedFoodForOrder?.let { food ->
                 val scope = rememberCoroutineScope()
@@ -7618,8 +7902,8 @@ fun VendorDashboardScreen(
                         val now = System.currentTimeMillis()
                         incomingOrders.filter { order ->
                             val statusMatches = when (orderStatusFilter) {
-                                "Active Orders" -> order.status != "COMPLETED" && order.status != "DECLINED" && order.status != "CANCELLED"
-                                "Completed" -> order.status == "COMPLETED"
+                                "Active Orders" -> order.status != "COMPLETED" && order.status != "DELIVERED" && order.status != "DECLINED" && order.status != "CANCELLED"
+                                "Completed" -> order.status == "COMPLETED" || order.status == "DELIVERED"
                                 else -> true
                             }
                             val timeMatches = when (orderTimeFilter) {
@@ -7642,7 +7926,7 @@ fun VendorDashboardScreen(
                     }
 
                     val todayCompletedOrders = remember(todayOrders) {
-                        todayOrders.filter { it.status == "COMPLETED" }
+                        todayOrders.filter { it.status == "COMPLETED" || it.status == "DELIVERED" }
                     }
                     val todayTotalEarnings = remember(todayCompletedOrders) {
                         todayCompletedOrders.sumOf { it.totalPrice }
@@ -7651,7 +7935,7 @@ fun VendorDashboardScreen(
                         if (todayCompletedOrders.isNotEmpty()) todayTotalEarnings / todayCompletedOrders.size else 0.0
                     }
                     val todayActiveOrders = remember(todayOrders) {
-                        todayOrders.filter { it.status != "COMPLETED" && it.status != "DECLINED" && it.status != "CANCELLED" }
+                        todayOrders.filter { it.status != "COMPLETED" && it.status != "DELIVERED" && it.status != "DECLINED" && it.status != "CANCELLED" }
                     }
                     val potentialActiveEarnings = remember(todayActiveOrders) {
                         todayActiveOrders.sumOf { it.totalPrice }
@@ -12491,9 +12775,10 @@ fun VendorDashboardScreen(
 
             // PIN CODE PICKUP VERIFICATION SHEET
             verifyTargetOrder?.let { order ->
+                var scanTabSelected by remember { mutableStateOf(true) }
                 Dialog(onDismissRequest = { verifyTargetOrder = null }) {
                     Card(
-                        modifier = Modifier.fillMaxWidth(),
+                        modifier = Modifier.fillMaxWidth().testTag("vendor_qr_verification_dialog"),
                         shape = RoundedCornerShape(16.dp)
                     ) {
                         Column(
@@ -12508,39 +12793,128 @@ fun VendorDashboardScreen(
                             )
                             Text("Receipt Order ID: #${order.id} • Item: ${order.foodName}", fontSize = 12.sp)
 
-                            OutlinedTextField(
-                                value = enteredTicketPin,
-                                onValueChange = { enteredTicketPin = it },
-                                label = { Text("Enter student 4-Digit PIN code") },
-                                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.NumberPassword),
-                                modifier = Modifier.fillMaxWidth(),
-                                singleLine = true
-                            )
-
-                            pinVerificationError?.let {
-                                Text(it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.Bold)
+                            TabRow(selectedTabIndex = if (scanTabSelected) 0 else 1) {
+                                Tab(
+                                    selected = scanTabSelected,
+                                    onClick = { scanTabSelected = true },
+                                    text = { Text("Scan QR Ticket", fontSize = 11.sp, fontWeight = FontWeight.Bold) },
+                                    icon = { Icon(Icons.Default.QrCodeScanner, contentDescription = null, modifier = Modifier.size(16.dp)) }
+                                )
+                                Tab(
+                                    selected = !scanTabSelected,
+                                    onClick = { scanTabSelected = false },
+                                    text = { Text("Manual PIN", fontSize = 11.sp, fontWeight = FontWeight.Bold) },
+                                    icon = { Icon(Icons.Default.Lock, contentDescription = null, modifier = Modifier.size(16.dp)) }
+                                )
                             }
 
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.End
-                            ) {
-                                TextButton(onClick = { verifyTargetOrder = null }) {
-                                    Text("Quit")
+                            if (scanTabSelected) {
+                                var isScanning by remember { mutableStateOf(false) }
+                                Box(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .height(180.dp)
+                                        .clip(RoundedCornerShape(12.dp))
+                                        .background(Color.Black)
+                                        .padding(8.dp),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Column(
+                                        horizontalAlignment = Alignment.CenterHorizontally,
+                                        verticalArrangement = Arrangement.Center
+                                    ) {
+                                        Icon(
+                                            Icons.Default.QrCodeScanner,
+                                            contentDescription = null,
+                                            tint = if (isScanning) Color(0xFF00E676) else Color.White.copy(alpha = 0.5f),
+                                            modifier = Modifier.size(48.dp)
+                                        )
+                                        Spacer(modifier = Modifier.height(8.dp))
+                                        Text(
+                                            if (isScanning) "HANDSHAKE: PROCESSING CODE..." else "CAMERA RESOLVING: SCANNING STREAMS",
+                                            fontSize = 9.sp,
+                                            fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace,
+                                            color = if (isScanning) Color(0xFF00E676) else Color.White.copy(alpha = 0.7f)
+                                        )
+                                    }
+                                    
+                                    val infiniteTransition = androidx.compose.animation.core.rememberInfiniteTransition(label = "laser")
+                                    val laserYOffset by infiniteTransition.animateFloat(
+                                        initialValue = 0f,
+                                        targetValue = 160f,
+                                        animationSpec = androidx.compose.animation.core.infiniteRepeatable(
+                                            animation = androidx.compose.animation.core.tween(2000, easing = androidx.compose.animation.core.LinearEasing),
+                                            repeatMode = androidx.compose.animation.core.RepeatMode.Reverse
+                                        ),
+                                        label = "laser_y"
+                                    )
+                                    Box(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .offset(y = laserYOffset.dp)
+                                            .height(2.dp)
+                                            .background(Color(0xFF00E676))
+                                    )
                                 }
-                                Spacer(modifier = Modifier.width(12.dp))
+                                
                                 Button(
                                     onClick = {
-                                        viewModel.verifySecurePickup(order.id, enteredTicketPin) { success ->
-                                            if (success) {
-                                                verifyTargetOrder = null
-                                            } else {
-                                                pinVerificationError = "Bad verification Token. Intercept halted."
+                                        isScanning = true
+                                        scope.launch {
+                                            kotlinx.coroutines.delay(1000)
+                                            viewModel.verifySecurePickup(order.id, order.pickupPin) { success ->
+                                                isScanning = false
+                                                if (success) {
+                                                    verifyTargetOrder = null
+                                                } else {
+                                                    pinVerificationError = "QR Code validation failed."
+                                                }
                                             }
                                         }
-                                    }
+                                    },
+                                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary),
+                                    modifier = Modifier.fillMaxWidth().testTag("simulate_qr_scanner_hit"),
+                                    shape = RoundedCornerShape(8.dp)
                                 ) {
-                                    Text("Unlock & Validate")
+                                    Icon(Icons.Default.QrCodeScanner, contentDescription = null, modifier = Modifier.size(16.dp))
+                                    Spacer(modifier = Modifier.width(6.dp))
+                                    Text("Instant QR Handshake (Simulate Camera Scan)", fontSize = 10.sp, fontWeight = FontWeight.Bold)
+                                }
+                            } else {
+                                OutlinedTextField(
+                                    value = enteredTicketPin,
+                                    onValueChange = { enteredTicketPin = it },
+                                    label = { Text("Enter student 4-Digit PIN code") },
+                                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.NumberPassword),
+                                    modifier = Modifier.fillMaxWidth().testTag("manual_entered_pin_field"),
+                                    singleLine = true
+                                )
+
+                                pinVerificationError?.let {
+                                    Text(it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.Bold)
+                                }
+
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.End
+                                ) {
+                                    TextButton(onClick = { verifyTargetOrder = null }) {
+                                        Text("Quit")
+                                    }
+                                    Spacer(modifier = Modifier.width(12.dp))
+                                    Button(
+                                        onClick = {
+                                            viewModel.verifySecurePickup(order.id, enteredTicketPin) { success ->
+                                                if (success) {
+                                                    verifyTargetOrder = null
+                                                } else {
+                                                    pinVerificationError = "Bad verification Token. Intercept halted."
+                                                }
+                                            }
+                                        }
+                                    ) {
+                                        Text("Unlock & Validate")
+                                    }
                                 }
                             }
                         }
@@ -13519,6 +13893,7 @@ fun AdminDashboardScreen(
                                     items(allVendors) { vendor ->
                                         val metrics = viewModel.getVendorMetrics(vendor.id, allFeedback)
                                         val ordersForThisVendor = allOrdersSnapshot.filter { it.vendorId == vendor.id }
+                                        var showReviewsAndDetails by remember { mutableStateOf(false) }
 
                                         Card(
                                             modifier = Modifier.fillMaxWidth(),
@@ -13567,6 +13942,140 @@ fun AdminDashboardScreen(
                                                 }
 
                                                 Spacer(modifier = Modifier.height(16.dp))
+                                                Spacer(modifier = Modifier.height(12.dp))
+
+                                                val totalCompletedOrders = ordersForThisVendor.filter { it.status.uppercase() == "COMPLETED" || it.status.uppercase() == "DELIVERED" }
+                                                val totalSalesRevenue = totalCompletedOrders.sumOf { it.totalPrice }
+
+                                                // Sales and Orders Stats Section
+                                                Row(
+                                                    modifier = Modifier
+                                                        .fillMaxWidth()
+                                                        .clip(RoundedCornerShape(8.dp))
+                                                        .background(MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.3f))
+                                                        .padding(10.dp),
+                                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                                    verticalAlignment = Alignment.CenterVertically
+                                                ) {
+                                                    Column {
+                                                        Text("TOTAL REVENUE", fontSize = 8.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
+                                                        Text("GH₵ ${"%.2f".format(totalSalesRevenue)}", fontSize = 15.sp, fontWeight = FontWeight.ExtraBold, color = MaterialTheme.colorScheme.primary)
+                                                    }
+                                                    Column(horizontalAlignment = Alignment.End) {
+                                                        Text("COMPLETED PRE-ORDERS", fontSize = 8.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                                        Text("${totalCompletedOrders.size} portions", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface)
+                                                    }
+                                                }
+
+                                                Spacer(modifier = Modifier.height(8.dp))
+                                                
+                                                Row(
+                                                    modifier = Modifier.fillMaxWidth(),
+                                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                                    verticalAlignment = Alignment.CenterVertically
+                                                ) {
+                                                    Text(
+                                                        text = "Orders: Pnd:${ordersForThisVendor.count { it.status.uppercase() == "PENDING" }} • Prep:${ordersForThisVendor.count { it.status.uppercase() == "PREPARING" }} • Rdy:${ordersForThisVendor.count { it.status.uppercase() == "READY" }} • Dec:${ordersForThisVendor.count { it.status.uppercase() == "DECLINED" }}",
+                                                        fontSize = 10.sp,
+                                                        fontWeight = FontWeight.Medium,
+                                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                                    )
+
+                                                    TextButton(
+                                                        onClick = { showReviewsAndDetails = !showReviewsAndDetails },
+                                                        contentPadding = PaddingValues(horizontal = 8.dp, vertical = 2.dp)
+                                                    ) {
+                                                        Text(
+                                                            text = if (showReviewsAndDetails) "Hide Reviews ▲" else "View Reviews ▼",
+                                                            fontSize = 11.sp,
+                                                            fontWeight = FontWeight.Bold
+                                                        )
+                                                    }
+                                                }
+
+                                                if (showReviewsAndDetails) {
+                                                    val vendorFeedbackList = allFeedback.filter { it.vendorId == vendor.id }
+                                                    
+                                                    Column(
+                                                        modifier = Modifier
+                                                            .fillMaxWidth()
+                                                            .padding(top = 8.dp, bottom = 4.dp),
+                                                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                                                     ) {
+                                                         Text(
+                                                             "Customer Review Log (${vendorFeedbackList.size})",
+                                                             fontSize = 12.sp,
+                                                             fontWeight = FontWeight.Bold,
+                                                             color = MaterialTheme.colorScheme.secondary
+                                                         )
+
+                                                         if (vendorFeedbackList.isEmpty()) {
+                                                             Text(
+                                                                 "No written customer reviews recorded yet.",
+                                                                 fontSize = 11.sp,
+                                                                 color = Color.Gray,
+                                                                 modifier = Modifier.padding(vertical = 4.dp)
+                                                             )
+                                                         } else {
+                                                             vendorFeedbackList.forEach { fb ->
+                                                                 val reviewer = allUsers.find { it.id == fb.customerId }
+                                                                 val reviewerName = reviewer?.fullName ?: "ATU Student"
+                                                                 val reviewerId = reviewer?.info ?: "UID: ${fb.customerId}"
+                                                                 val averageRating = (fb.ratingFoodQuality + fb.ratingCleanliness + fb.ratingServiceSpeed + fb.ratingPriceValue) / 4f
+
+                                                                 Card(
+                                                                     modifier = Modifier.fillMaxWidth(),
+                                                                     colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f)),
+                                                                     shape = RoundedCornerShape(10.dp)
+                                                                 ) {
+                                                                     Column(modifier = Modifier.padding(10.dp)) {
+                                                                         Row(
+                                                                             modifier = Modifier.fillMaxWidth(),
+                                                                             horizontalArrangement = Arrangement.SpaceBetween,
+                                                                             verticalAlignment = Alignment.CenterVertically
+                                                                         ) {
+                                                                             Column {
+                                                                                 Text(
+                                                                                     reviewerName,
+                                                                                     fontWeight = FontWeight.Bold,
+                                                                                     fontSize = 11.sp
+                                                                                 )
+                                                                                 Text(
+                                                                                     reviewerId,
+                                                                                     fontSize = 9.sp,
+                                                                                     color = MaterialTheme.colorScheme.onSurfaceVariant
+                                                                                 )
+                                                                             }
+                                                                             Row(verticalAlignment = Alignment.CenterVertically) {
+                                                                                 Icon(
+                                                                                     Icons.Default.Star,
+                                                                                     contentDescription = null,
+                                                                                     tint = Color(0xFFF9A825),
+                                                                                     modifier = Modifier.size(12.dp)
+                                                                                 )
+                                                                                 Text(
+                                                                                     text = "${"%.1f".format(averageRating)}★",
+                                                                                     fontSize = 11.sp,
+                                                                                     fontWeight = FontWeight.Bold,
+                                                                                     modifier = Modifier.padding(start = 2.dp)
+                                                                                 )
+                                                                             }
+                                                                         }
+                                                                         Spacer(modifier = Modifier.height(6.dp))
+                                                                         Text(
+                                                                             text = "\"${fb.comment}\"",
+                                                                             fontSize = 11.sp,
+                                                                             fontStyle = androidx.compose.ui.text.font.FontStyle.Italic,
+                                                                             color = MaterialTheme.colorScheme.onSurface
+                                                                         )
+                                                                     }
+                                                                 }
+                                                             }
+                                                         }
+                                                     }
+                                                 }
+
+                                                 Spacer(modifier = Modifier.height(8.dp))
                                                 Divider(color = MaterialTheme.colorScheme.outlineVariant)
                                                 Spacer(modifier = Modifier.height(12.dp))
 
