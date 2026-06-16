@@ -187,6 +187,28 @@ class CafeteriaRepository(private val db: AppDatabase) {
         }
     }
 
+    suspend fun authenticateOrRegisterSocialUser(username: String, fullName: String, provider: String, logoUrl: String?): User = withContext(Dispatchers.IO) {
+        val existing = userDao.getUserByUsername(username)
+        if (existing != null) {
+            insertAuditLog(existing.id, "USER_AUTHENTICATION", "Successfully logged in via $provider.")
+            return@withContext existing
+        }
+        val newUser = User(
+            username = username,
+            passwordHash = sha256("sso-secure-pin"),
+            role = "STUDENT",
+            fullName = fullName,
+            info = "ATU-${(100000..999999).random()}",
+            balance = 100.0,
+            student_staff_id = "ATU-" + (100000..999999).random(),
+            logoUrl = logoUrl
+        )
+        val id = userDao.insertUser(newUser)
+        val insertedUser = newUser.copy(id = id.toInt())
+        insertAuditLog(insertedUser.id, "USER_REGISTRATION", "Registered ${newUser.fullName} as STUDENT via $provider")
+        return@withContext insertedUser
+    }
+
     suspend fun updateUser(user: User) = withContext(Dispatchers.IO) {
         userDao.updateUser(user)
     }

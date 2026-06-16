@@ -742,6 +742,26 @@ class CafeteriaViewModel(application: Application) : AndroidViewModel(applicatio
         }
     }
 
+    fun loginWithSocial(username: String, fullName: String, provider: String, logoUrl: String?, onComplete: (Boolean) -> Unit) {
+        viewModelScope.launch {
+            _isLoading.value = true
+            _loginError.value = null
+            try {
+                val authenticated = repository.authenticateOrRegisterSocialUser(username, fullName, provider, logoUrl)
+                _currentUser.value = authenticated
+                if (LaravelClientManager.isLaravelEnabled) {
+                    repository.syncAllFromLaravel()
+                }
+                _isLoading.value = false
+                onComplete(true)
+            } catch (e: Exception) {
+                _loginError.value = "Failed to authenticate with $provider: ${e.localizedMessage}"
+                _isLoading.value = false
+                onComplete(false)
+            }
+        }
+    }
+
     fun registerUser(username: String, pinCode: String, role: String, fullName: String, info: String) {
         viewModelScope.launch {
             _isLoading.value = true
