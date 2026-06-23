@@ -17,9 +17,13 @@ class MenuController extends Controller
     /**
      * List all custom menu assignments.
      */
-    public function index()
+    public function index(Request $request)
     {
-        $menus = Menu::with(['vendor', 'foodItem'])->get();
+        $query = Menu::with(['vendor', 'foodItem']);
+        if ($request->has('vendor_id')) {
+            $query->where('vendor_id', $request->query('vendor_id'));
+        }
+        $menus = $query->get();
         return response()->json([
             'success' => true,
             'menus' => $menus
@@ -185,9 +189,13 @@ class MenuController extends Controller
     /**
      * List all items from the standalone menu_items table.
      */
-    public function listMenuItems()
+    public function listMenuItems(Request $request)
     {
-        $items = MenuItem::with('vendor')->get();
+        $query = MenuItem::with('vendor');
+        if ($request->has('vendor_id')) {
+            $query->where('vendor_id', $request->query('vendor_id'));
+        }
+        $items = $query->get();
         return response()->json([
             'success' => true,
             'menu_items' => $items

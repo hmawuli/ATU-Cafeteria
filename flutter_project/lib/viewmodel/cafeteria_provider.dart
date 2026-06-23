@@ -1,4 +1,6 @@
 import 'dart:convert';
+import 'dart:io';
+import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:google_generative_ai/google_generative_ai.dart';
 import '../models/models.dart';
@@ -598,7 +600,56 @@ class CafeteriaProvider extends ChangeNotifier {
     return true;
   }
 
+  // Standard Backend connection base URL (default loopback of standard android emulator)
+  String _laravelBaseUrl = "http://10.0.2.2:8000";
+  String get laravelBaseUrl => _laravelBaseUrl;
+
+  void updateLaravelBaseUrl(String url) {
+    _laravelBaseUrl = url;
+    notifyListeners();
+  }
+
   void _startRealTimeTrackingSimulation(int orderId) {
+    final sseUrl = Uri.parse("$_laravelBaseUrl/api/orders/$orderId/tracking?stream=1");
+    
+    // Attempt real-time SSE stream connection to the Laravel backend
+    HttpClient().getUrl(sseUrl).then((HttpClientRequest request) {
+      request.headers.add("Accept", "text/event-stream");
+      request.headers.add("X-Requested-With", "XMLHttpRequest");
+      return request.close();
+    }).then((HttpClientResponse response) {
+      if (response.statusCode == 200) {
+        debugPrint("Successfully connected to ATU Laravel real-time SSE stream for Order #$orderId");
+        
+        response.transform(utf8.decoder)
+            .transform(const LineSplitter())
+            .listen((line) async {
+          if (line.startsWith("data:")) {
+            try {
+              final jsonStr = line.substring(5).trim();
+              final data = json.decode(jsonStr);
+              final String newStatus = data['status'];
+              debugPrint("Real-time stream update from Laravel for Order #$orderId: $newStatus");
+              await updateOrderStatus(orderId, newStatus);
+            } catch (e) {
+              debugPrint("Error parsing real-time stream data: $e");
+            }
+          }
+        }, onError: (err) {
+          debugPrint("Real-time stream error: $err. Falling back to local simulation.");
+          _runOfflineFallbackSimulation(orderId);
+        });
+      } else {
+        debugPrint("Laravel response code is ${response.statusCode}. Falling back to simulation.");
+        _runOfflineFallbackSimulation(orderId);
+      }
+    }).catchError((e) {
+      debugPrint("Could not connect to Laravel backend ($e). Running local real-time simulator.");
+      _runOfflineFallbackSimulation(orderId);
+    });
+  }
+
+  void _runOfflineFallbackSimulation(int orderId) {
     Stream.periodic(const Duration(seconds: 8)).take(3).listen((_) async {
       final orderList = await _db.getAllOrders();
       try {

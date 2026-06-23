@@ -182,20 +182,45 @@ class VendorSpecificController extends Controller
                 ]
             );
 
-            // 2. Identify items that are running low on stock (from our Room/local equivalent logic cache metrics)
-            // For general Laravel consistency, collect food items with low inventory
-            $lowStockItems = FoodItem::where('vendor_id', $user->id)
+            // 2. Identify items that are running low on stock based on actual order frequency
+            $lowStockItems = [];
+            $foodItems = FoodItem::where('vendor_id', $user->id)
                 ->where('is_available', true)
-                ->get()
-                ->map(function ($item) {
-                    // Simulating a threshold check (usually 15)
-                    return [
+                ->get();
+
+            foreach ($foodItems as $item) {
+                // Calculate order frequency in the last 24 hours
+                $timestamp24hAgo = (time() - 24 * 60 * 60) * 1000;
+                $orderFrequency24h = (int) Order::where('food_item_id', $item->id)
+                    ->whereNotIn(DB::raw('UPPER(status)'), ['CANCELLED', 'DECLINED'])
+                    ->where('order_timestamp', '>=', $timestamp24hAgo)
+                    ->sum('quantity');
+
+                // Simulate realistic standard stock limit (default 35 portions per item per day) subtract orders
+                $totalTodaySum = (int) Order::where('food_item_id', $item->id)
+                    ->whereNotIn(DB::raw('UPPER(status)'), ['CANCELLED', 'DECLINED'])
+                    ->where('order_timestamp', '>=', (time() - 12 * 60 * 60) * 1000)
+                    ->sum('quantity');
+
+                $startingLimit = 35;
+                $remainingStock = max(0, $startingLimit - $totalTodaySum);
+                
+                // Dynamic threshold
+                $lowStockThreshold = max(4, (int) round($orderFrequency24h * 0.40));
+
+                if ($remainingStock <= $lowStockThreshold) {
+                    $lowStockItems[] = [
                         'id' => $item->id,
                         'name' => $item->name,
                         'price' => $item->price,
-                        'description' => $item->description
+                        'description' => $item->description,
+                        'remaining_stock' => $remainingStock,
+                        'order_frequency_24h' => $orderFrequency24h,
+                        'threshold' => $lowStockThreshold,
+                        'warning' => $remainingStock === 0 ? 'SOLD_OUT' : 'LOW_STOCK'
                     ];
-                });
+                }
+            }
 
             return response()->json([
                 'success' => true,

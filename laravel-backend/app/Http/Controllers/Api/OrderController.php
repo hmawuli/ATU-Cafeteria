@@ -161,9 +161,9 @@ class OrderController extends Controller
             'student_id' => 'required|integer|exists:users,id',
             'vendor_id' => 'required|integer|exists:users,id',
             'food_item_id' => 'nullable|integer',
-            'menu_item_id' => 'nullable|integer|exists:menu_items,id',
+            'menu_item_id' => 'required|integer|exists:menu_items,id',
             'food_name' => 'required|string|min:2',
-            'quantity' => 'required|integer|min:1|max:100',
+            'quantity' => 'required|integer|min:1',
             'unit_price' => 'required|numeric|min:0.01',
             'total_price' => 'required|numeric|min:0.01',
         ]);
@@ -338,6 +338,7 @@ class OrderController extends Controller
 
         $updatedOrder = DB::transaction(function () use ($order, $request, $vendorId, $oldStatus, $newStatus) {
             $order->status = $newStatus;
+            $order->order_status = $newStatus;
             if ($request->has('estimated_pickup_time')) {
                 $order->estimated_pickup_time = $request->input('estimated_pickup_time');
             }
@@ -369,6 +370,10 @@ class OrderController extends Controller
 
         if (strtoupper($oldStatus) === 'PENDING' && strtoupper($newStatus) === 'COMPLETED') {
             event(new OrderStatusCompleted($updatedOrder));
+        }
+
+        if ((strtoupper($oldStatus) === 'PENDING' || strtoupper($oldStatus) === 'ORDER_PLACED') && strtoupper($newStatus) === 'READY') {
+            event(new \App\Events\OrderStatusReady($updatedOrder));
         }
 
         return response()->json($updatedOrder, 200);
@@ -495,9 +500,9 @@ class OrderController extends Controller
         $validator = Validator::make($request->all(), [
             'vendor_id' => 'required|integer|exists:users,id',
             'food_item_id' => 'nullable|integer',
-            'menu_item_id' => 'nullable|integer|exists:menu_items,id',
+            'menu_item_id' => 'required|integer|exists:menu_items,id',
             'food_name' => 'required|string|min:2',
-            'quantity' => 'required|integer|min:1|max:100',
+            'quantity' => 'required|integer|min:1',
             'unit_price' => 'required|numeric|min:0.01',
             'total_price' => 'required|numeric|min:0.01',
         ]);
@@ -602,5 +607,194 @@ class OrderController extends Controller
                 'error' => $e->getMessage()
             ], 500);
         }
+    }
+
+    /**
+     * Cancel an order.
+     * Users can only cancel orders if the current status is 'PENDING' or 'ORDER_PLACED'.
+     */
+    public function cancel(Request $request, $id)
+    {
+        $order = Order::find($id);
+        if (!$order) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Order not found.'
+            ], 404);
+        }
+
+        $user = $request->user();
+        if (!$user) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Unauthenticated.'
+            ], 401);
+        }
+
+        $role = strtoupper($user->role);
+        
+        // Security check: Only the owning student, admin, or the assigned vendor can cancel.
+        if ($role === 'STUDENT' && $order->customer_id !== $user->id && $order->user_id !== $user->id) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Unauthorized. You can only cancel your own orders.'
+            ], 403);
+        }
+
+        if ($role === 'VENDOR' && $order->vendor_id !== $user->id) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Unauthorized. You do not own this order.'
+            ], 403);
+        }
+
+        // Validate current order status (only pending / order_placed is cancellable)
+        $currentStatus = strtoupper($order->status);
+        if ($currentStatus !== 'PENDING' && $currentStatus !== 'ORDER_PLACED') {
+            return response()->json([
+                'success' => false,
+                'message' => 'Orders can only be cancelled if the current status is pending.'
+            ], 400);
+        }
+
+        // Perform cancellation in transaction
+        $updatedOrder = DB::transaction(function () use ($order) {
+            $order->status = 'CANCELLED';
+            $order->order_status = 'CANCELLED';
+            $order->save();
+
+            // Register Audit Log
+            AuditLog::create([
+                'user_id' => $order->customer_id,
+                'timestamp' => time() * 1000,
+                'action' => 'ORDER_CANCELLED',
+                'details' => "Order #{$order->id} was cancelled. Status updated to CANCELLED.",
+            ]);
+
+            return $order;
+        });
+
+        // Notify matching recipient via system notification triggers
+        try {
+            $studentId = $order->user_id ?: $order->customer_id;
+            $student = User::find($studentId);
+            if ($student && $role !== 'STUDENT') {
+                $student->notify(new \App\Notifications\OrderStatusChangedNotification($updatedOrder, $currentStatus, 'CANCELLED'));
+            }
+        } catch (\Exception $e) {
+            // Ignore notification fallback errors
+        }
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Order cancelled successfully.',
+            'order' => $updatedOrder
+        ], 200);
+    }
+
+    /**
+     * Real-time order status tracking with SSE (Server-Sent Events) and JSON fallback.
+     */
+    public function trackOrderRealTime(Request $request, $id)
+    {
+        $order = Order::find($id);
+        if (!$order) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Order not found.'
+            ], 404);
+        }
+
+        // If client requests text/event-stream or sets stream parameter of 1, stream in real-time
+        if ($request->header('Accept') === 'text/event-stream' || $request->input('stream') == 1) {
+            return response()->stream(function () use ($id) {
+                $lastStatus = '';
+                // Periodically check for updates for up to 15 cycles (~30 seconds)
+                for ($i = 0; $i < 15; $i++) {
+                    $order = Order::find($id);
+                    if (!$order) {
+                        echo "event: error\n";
+                        echo "data: " . json_encode(['message' => 'Order deleted']) . "\n\n";
+                        ob_flush();
+                        flush();
+                        break;
+                    }
+
+                    $currentStatus = $order->status;
+                    $stages = $this->getTrackingStages($currentStatus);
+
+                    if ($currentStatus !== $lastStatus) {
+                        echo "event: status_update\n";
+                        echo "data: " . json_encode([
+                            'id' => $order->id,
+                            'status' => $currentStatus,
+                            'estimated_pickup_time' => $order->estimated_pickup_time,
+                            'stages' => $stages,
+                            'updated_at' => $order->updated_at ? $order->updated_at->toIso8601String() : null
+                        ]) . "\n\n";
+                        ob_flush();
+                        flush();
+                        $lastStatus = $currentStatus;
+                    }
+
+                    if (in_array(strtoupper($currentStatus), ['DELIVERED', 'COMPLETED', 'CANCELLED', 'DECLINED'])) {
+                        break;
+                    }
+
+                    sleep(2);
+                }
+            }, 200, [
+                'Content-Type' => 'text/event-stream',
+                'Cache-Control' => 'no-cache',
+                'Connection' => 'keep-alive',
+                'X-Accel-Buffering' => 'no'
+            ]);
+        }
+
+        // Return direct single JSON snapshot
+        return response()->json([
+            'success' => true,
+            'id' => $order->id,
+            'status' => $order->status,
+            'estimated_pickup_time' => $order->estimated_pickup_time,
+            'stages' => $this->getTrackingStages($order->status)
+        ]);
+    }
+
+    /**
+     * Map order status to dynamic tracking stages.
+     */
+    private function getTrackingStages($status)
+    {
+        $statusUpper = strtoupper($status);
+        
+        $stages = [
+            ['name' => 'Received', 'completed' => false, 'active' => false],
+            ['name' => 'Preparing', 'completed' => false, 'active' => false],
+            ['name' => 'Out for Delivery', 'completed' => false, 'active' => false],
+            ['name' => 'Delivered', 'completed' => false, 'active' => false],
+        ];
+
+        $index = -1;
+        if ($statusUpper === 'PENDING' || $statusUpper === 'ORDER_PLACED' || $statusUpper === 'RECEIVED') {
+            $index = 0;
+        } elseif ($statusUpper === 'PREPARING') {
+            $index = 1;
+        } elseif ($statusUpper === 'OUT_FOR_DELIVERY' || $statusUpper === 'READY' || $statusUpper === 'OUT FOR DELIVERY') {
+            $index = 2;
+        } elseif ($statusUpper === 'DELIVERED' || $statusUpper === 'COMPLETED') {
+            $index = 3;
+        }
+
+        for ($i = 0; $i < 4; $i++) {
+            if ($i < $index) {
+                $stages[$i]['completed'] = true;
+            } elseif ($i === $index) {
+                $stages[$i]['active'] = true;
+                $stages[$i]['completed'] = true;
+            }
+        }
+
+        return $stages;
     }
 }

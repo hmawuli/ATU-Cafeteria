@@ -19,11 +19,19 @@ use App\Http\Controllers\Api\PaystackPaymentController;
 use App\Http\Controllers\Api\VendorSpecificController;
 use App\Http\Controllers\Api\PassportAuthController;
 use App\Http\Controllers\Api\DailyRevenueController;
+use App\Http\Controllers\Api\MenuItemController;
+use App\Http\Controllers\Api\InventoryCronController;
 
 // Register explicit listeners for OrderStatusCompleted event
 Event::listen(
     \App\Events\OrderStatusCompleted::class,
     \App\Listeners\SendOrderCompletedNotification::class
+);
+
+// Register explicit listeners for OrderStatusReady event
+Event::listen(
+    \App\Events\OrderStatusReady::class,
+    \App\Listeners\SendOrderReadyNotification::class
 );
 
 /*
@@ -50,6 +58,65 @@ Route::post('/oauth/token', [PassportAuthController::class, 'issueOAuthToken']);
 Route::post('/breeze/student/register', [PassportAuthController::class, 'registerStudent']);
 Route::post('/breeze/vendor/register', [PassportAuthController::class, 'registerVendor']);
 
+// Define role checks for Student vs Vendor
+$checkStudent = function ($request, $next) {
+    $user = $request->user();
+    if (!$user) {
+        return response()->json([
+            'success' => false,
+            'message' => 'Unauthenticated.'
+        ], 401);
+    }
+    
+    // Check role column
+    $role = strtoupper($user->role);
+    if ($role !== 'STUDENT' && $role !== 'ADMIN') {
+        return response()->json([
+            'success' => false,
+            'message' => 'Unauthorized. This endpoint is for students only.'
+        ], 403);
+    }
+    
+    // Verify Sanctum ability if using Sanctum tokens
+    if (method_exists($user, 'tokenCan') && $user->currentAccessToken() && !$user->tokenCan('student') && $role === 'STUDENT') {
+        return response()->json([
+            'success' => false,
+            'message' => 'Unauthorized token ability for student.'
+        ], 403);
+    }
+    
+    return $next($request);
+};
+
+$checkVendor = function ($request, $next) {
+    $user = $request->user();
+    if (!$user) {
+        return response()->json([
+            'success' => false,
+            'message' => 'Unauthenticated.'
+        ], 401);
+    }
+    
+    // Check role column
+    $role = strtoupper($user->role);
+    if ($role !== 'VENDOR' && $role !== 'ADMIN') {
+        return response()->json([
+            'success' => false,
+            'message' => 'Unauthorized. This endpoint is for vendors only.'
+        ], 403);
+    }
+    
+    // Verify Sanctum ability if using Sanctum tokens
+    if (method_exists($user, 'tokenCan') && $user->currentAccessToken() && !$user->tokenCan('vendor') && $role === 'VENDOR') {
+        return response()->json([
+            'success' => false,
+            'message' => 'Unauthorized token ability for vendor.'
+        ], 403);
+    }
+    
+    return $next($request);
+};
+
 // Protected Authenticated Endpoints - Supports both Sanctum and Secure JWT Auth
 Route::middleware(function ($request, $next) {
     $authHeader = $request->header('Authorization') ?: $request->header('X-Auth-Token');
@@ -74,40 +141,65 @@ Route::middleware(function ($request, $next) {
     return app(\Illuminate\Auth\Middleware\Authenticate::class)->handle($request, function ($req) use ($next) {
         return $next($req);
     }, 'sanctum');
-})->group(function () {
+})->group(function () use ($checkStudent, $checkVendor) {
     Route::post('/logout', [AuthController::class, 'logout']);
+    Route::post('/user/profile', [AuthController::class, 'updateProfile']);
     Route::delete('/users/{id}', [AuthController::class, 'deleteUser']);
+    Route::post('/orders/{id}/cancel', [OrderController::class, 'cancel']);
+    Route::get('/orders/{id}/tracking', [OrderController::class, 'trackOrderRealTime']);
 
-    // Protected Vendor Menu & Food Items Endpoints
-    Route::post('/food-items', [FoodItemController::class, 'store']);
-    Route::put('/food-items/{id}', [FoodItemController::class, 'update']);
-    Route::delete('/food-items/{id}', [FoodItemController::class, 'destroy']);
+    // --- Student-Only Routes ---
+    Route::middleware($checkStudent)->group(function () {
+        // Authenticated Student Orders Endpoints
+        Route::get('/student/orders', [OrderController::class, 'getAuthenticatedStudentOrders']);
+        Route::post('/student/orders', [OrderController::class, 'storeAuthenticatedStudentOrder']);
+    });
 
-    // Protected Vendor Pre-Orders & Hand-offs
-    Route::put('/orders/{id}/status', [OrderController::class, 'updateStatus']);
-    Route::post('/orders/{id}/verify-pickup', [OrderController::class, 'verifyAndCompletePickup']);
+    // --- Vendor-Only Routes ---
+    Route::middleware($checkVendor)->group(function () {
+        // Protected Vendor Menu & Food Items Endpoints
+        Route::post('/food-items', [FoodItemController::class, 'store']);
+        Route::put('/food-items/{id}', [FoodItemController::class, 'update']);
+        Route::delete('/food-items/{id}', [FoodItemController::class, 'destroy']);
 
-    // Authenticated Vendor Private Feeds
-    Route::get('/vendor/my-menu', [VendorController::class, 'getMyFoodItems']);
-    Route::get('/vendor/my-orders', [VendorController::class, 'getMyOrders']);
-    Route::get('/vendor/analytics', [VendorController::class, 'getMyAnalytics']);
-    Route::get('/vendor/analytics/comparative', [VendorController::class, 'getComparativeAnalytics']);
-    Route::get('/vendor/analytics/gemini-report', [VendorController::class, 'getMyGeminiReport']);
-    Route::get('/vendor/{vendorId}/gemini-report', [VendorController::class, 'getVendorGeminiReport']);
-    Route::get('/vendor/analytics/gemini-order-insights', [VendorController::class, 'getMyGeminiOrderInsights']);
-    Route::get('/vendor/{vendorId}/gemini-order-insights', [VendorController::class, 'getVendorGeminiOrderInsights']);
-    Route::get('/vendor/performance-metrics', [VendorPerformanceController::class, 'getVendorPerformanceMetrics']);
-    Route::get('/vendor/performance', [VendorPerformanceController::class, 'getPerformance']);
-    Route::get('/vendor/recharts-sales', [VendorPerformanceController::class, 'exportSalesForRecharts']);
-    Route::get('/vendor/daily-revenue', [DailyRevenueController::class, 'getDailyRevenue']);
-    Route::post('/vendor/toggle-status', [VendorController::class, 'toggleStatus']);
+        // Protected Vendor Pre-Orders & Hand-offs
+        Route::put('/orders/{id}/status', [OrderController::class, 'updateStatus']);
+        Route::post('/orders/{id}/verify-pickup', [OrderController::class, 'verifyAndCompletePickup']);
 
-    // Vendor Specific endpoints
-    Route::put('/vendor/menu/availability', [VendorSpecificController::class, 'updateMenuAvailability']);
-    Route::get('/vendor/orders/summary', [VendorSpecificController::class, 'getOrderSummary']);
-    Route::post('/vendor/menu/bulk-update', [VendorSpecificController::class, 'bulkUpdateMenu']);
-    Route::post('/vendor/menu/bulk-upload', [VendorSpecificController::class, 'bulkUpdateMenu']);
+        // Authenticated Vendor Private Feeds
+        Route::get('/vendor/my-menu', [VendorController::class, 'getMyFoodItems']);
+        Route::get('/vendor/my-orders', [VendorController::class, 'getMyOrders']);
+        Route::get('/vendor/analytics', [VendorController::class, 'getMyAnalytics']);
+        Route::get('/vendor/analytics/comparative', [VendorController::class, 'getComparativeAnalytics']);
+        Route::get('/vendor/analytics/gemini-report', [VendorController::class, 'getMyGeminiReport']);
+        Route::get('/vendor/{vendorId}/gemini-report', [VendorController::class, 'getVendorGeminiReport']);
+        Route::get('/vendor/analytics/gemini-order-insights', [VendorController::class, 'getMyGeminiOrderInsights']);
+        Route::get('/vendor/{vendorId}/gemini-order-insights', [VendorController::class, 'getVendorGeminiOrderInsights']);
+        Route::get('/vendor/performance-metrics', [VendorPerformanceController::class, 'getVendorPerformanceMetrics']);
+        Route::get('/vendor/performance', [VendorPerformanceController::class, 'getPerformance']);
+        Route::get('/vendor/recharts-sales', [VendorPerformanceController::class, 'exportSalesForRecharts']);
+        Route::get('/vendor/daily-revenue', [DailyRevenueController::class, 'getDailyRevenue']);
+        Route::post('/vendor/toggle-status', [VendorController::class, 'toggleStatus']);
 
+        // Vendor Specific endpoints
+        Route::put('/vendor/menu/availability', [VendorSpecificController::class, 'updateMenuAvailability']);
+        Route::get('/vendor/orders/summary', [VendorSpecificController::class, 'getOrderSummary']);
+        Route::post('/vendor/menu/bulk-update', [VendorSpecificController::class, 'bulkUpdateMenu']);
+        Route::post('/vendor/menu/bulk-upload', [VendorSpecificController::class, 'bulkUpdateMenu']);
+
+        // Vendor Menu Management Protected Endpoints
+        Route::post('/menus', [MenuController::class, 'store']);
+        Route::put('/menus/{id}', [MenuController::class, 'update']);
+        Route::delete('/menus/{id}', [MenuController::class, 'destroy']);
+        Route::post('/menu-items', [MenuController::class, 'storeMenuItem']);
+        
+        // Dedicated CRUD endpoints for Menu Items
+        Route::post('/vendors/menu-items', [MenuItemController::class, 'store']);
+        Route::put('/vendors/menu-items/{id}', [MenuItemController::class, 'update']);
+        Route::delete('/vendors/menu-items/{id}', [MenuItemController::class, 'destroy']);
+    });
+
+    // --- Common Authenticated Routes ---
     // Digital Wallet & Core Transactions Subsystem
     Route::get('/wallet/balance', [WalletController::class, 'getBalance']);
     Route::get('/wallet/transactions', [WalletController::class, 'getTransactions']);
@@ -130,12 +222,6 @@ Route::middleware(function ($request, $next) {
         ]);
     });
 
-    // Vendor Menu Management Protected Endpoints
-    Route::post('/menus', [MenuController::class, 'store']);
-    Route::put('/menus/{id}', [MenuController::class, 'update']);
-    Route::delete('/menus/{id}', [MenuController::class, 'destroy']);
-    Route::post('/menu-items', [MenuController::class, 'storeMenuItem']);
-
     // Chat Conversation Protected Endpoints
     Route::get('/chats/conversation/{otherUserId}', [ChatController::class, 'getConversation']);
     Route::post('/chats/send', [ChatController::class, 'sendMessage']);
@@ -144,11 +230,10 @@ Route::middleware(function ($request, $next) {
     // Paystack Payment Integration Protected Endpoints
     Route::post('/paystack/initialize', [PaystackPaymentController::class, 'initialize']);
     Route::get('/paystack/verify/{reference}', [PaystackPaymentController::class, 'verify']);
-
-    // Authenticated Student Orders Endpoints
-    Route::get('/student/orders', [OrderController::class, 'getAuthenticatedStudentOrders']);
-    Route::post('/student/orders', [OrderController::class, 'storeAuthenticatedStudentOrder']);
 });
+
+// Automated Inventory & Availability Cron Checker routes
+Route::match(['get', 'post'], '/cron/check-availability', [InventoryCronController::class, 'checkAndNotify']);
 
 // Menu, Standalone Menu Items, & Food Items Endpoints (Public Reads)
 Route::get('/menus', [MenuController::class, 'index']);
@@ -171,6 +256,7 @@ Route::post('/orders', [OrderController::class, 'store']);
 Route::get('/vendor/performance-analytics', [VendorPerformanceController::class, 'getVendorPerformanceMetrics']);
 Route::get('/vendor/performance-metrics', [VendorPerformanceController::class, 'getVendorPerformanceMetrics']);
 Route::get('/vendor/performance-recharts', [VendorPerformanceController::class, 'exportSalesForRecharts']);
+Route::get('/vendor/statistics', [VendorPerformanceController::class, 'getAggregatedStatistics']);
 
 // Customer Compliance & Feedback Endpoints
 Route::get('/feedback', [FeedbackController::class, 'index']);

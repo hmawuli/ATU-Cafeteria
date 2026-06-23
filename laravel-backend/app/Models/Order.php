@@ -4,10 +4,11 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\SoftDeletes;
 
 class Order extends Model
 {
-    use HasFactory;
+    use HasFactory, SoftDeletes;
 
     protected $table = 'orders';
 
@@ -24,6 +25,7 @@ class Order extends Model
         'total_price',
         'order_timestamp',
         'status',          // PENDING, PREPARING, READY, COMPLETED, DECLINED, CANCELLED
+        'order_status',    // Alias/Explicit field
         'pickup_pin',       // 4 digit code e.g. "4932"
         'estimated_pickup_time',
     ];
@@ -39,7 +41,22 @@ class Order extends Model
         'unit_price' => 'double',
         'total_price' => 'double',
         'order_timestamp' => 'integer',
+        'order_status' => 'string',
     ];
+
+    /**
+     * Map order_status dynamically to status.
+     */
+    public function getOrderStatusAttribute()
+    {
+        return $this->attributes['order_status'] ?? ($this->attributes['status'] ?? null);
+    }
+
+    public function setOrderStatusAttribute($value)
+    {
+        $this->attributes['order_status'] = $value;
+        $this->attributes['status'] = $value;
+    }
 
     /**
      * Set user_id and customer_id dynamically to guarantee robust cross-compatibility.

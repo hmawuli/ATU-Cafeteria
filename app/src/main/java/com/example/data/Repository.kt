@@ -124,17 +124,43 @@ class CafeteriaRepository(private val db: AppDatabase) {
             try {
                 val service = LaravelClientManager.getService()
                 val pHash = sha256(pinCode)
-                val user = service.register(
-                    LaravelRegisterRequest(
-                        username = username,
-                        pin = pHash,
-                        role = role,
-                        fullName = fullName,
-                        info = info
+                val user = if (role.uppercase() == "STUDENT") {
+                    val resp = service.registerStudent(
+                        LaravelStudentRegisterRequest(
+                            username = username,
+                            pin = pHash,
+                            fullName = fullName,
+                            studentId = info
+                        )
                     )
-                )
+                    resp.user
+                } else if (role.uppercase() == "VENDOR") {
+                    val resp = service.registerVendor(
+                        LaravelVendorRegisterRequest(
+                            username = username,
+                            pin = pHash,
+                            fullName = fullName,
+                            boothDescription = info
+                        )
+                    )
+                    resp.user
+                } else {
+                    service.register(
+                        LaravelRegisterRequest(
+                            username = username,
+                            pin = pHash,
+                            role = role,
+                            fullName = fullName,
+                            info = info
+                        )
+                    )
+                }
                 // Cache locally
-                userDao.insertUser(user)
+                try {
+                    userDao.insertUser(user)
+                } catch (pe: Exception) {
+                    userDao.updateUser(user)
+                }
                 return@withContext user
             } catch (e: Exception) {
                 Log.e("CafeteriaRepository", "Laravel registration failed - falling back to local database", e)
@@ -170,8 +196,18 @@ class CafeteriaRepository(private val db: AppDatabase) {
                     )
                 )
                 // Cache locally
-                userDao.insertUser(user)
-                return@withContext user
+                val localUser = userDao.getUserSync(user.id)
+                val userToSave = if (localUser != null) {
+                    user.copy(balance = localUser.balance)
+                } else {
+                    user
+                }
+                try {
+                    userDao.insertUser(userToSave)
+                } catch (pe: Exception) {
+                    userDao.updateUser(userToSave)
+                }
+                return@withContext userToSave
             } catch (e: Exception) {
                 Log.e("CafeteriaRepository", "Laravel login failed - falling back to local database", e)
             }
@@ -211,6 +247,54 @@ class CafeteriaRepository(private val db: AppDatabase) {
 
     suspend fun updateUser(user: User) = withContext(Dispatchers.IO) {
         userDao.updateUser(user)
+    }
+
+    suspend fun updateUserProfile(
+        id: Int,
+        fullName: String,
+        studentStaffId: String?,
+        telephone: String?,
+        email: String?,
+        department: String?,
+        programOfStudy: String?,
+        paymentMethods: List<String>?,
+        info: String
+    ): Boolean = withContext(Dispatchers.IO) {
+        val user = userDao.getUserSync(id) ?: return@withContext false
+        val updatedUser = user.copy(
+            fullName = fullName,
+            student_staff_id = studentStaffId,
+            telephone = telephone,
+            email = email,
+            paymentMethods = paymentMethods?.joinToString(","),
+            info = info
+        )
+        userDao.updateUser(updatedUser)
+        insertAuditLog(id, "PROFILE_UPDATE", "User updated their email/phone profile settings & payment options.")
+
+        if (LaravelClientManager.isLaravelEnabled) {
+            try {
+                val service = LaravelClientManager.getService()
+                val response = service.updateProfile(
+                    LaravelUpdateProfileRequest(
+                        fullName = fullName,
+                        student_staff_id = studentStaffId,
+                        telephone = telephone,
+                        phone_number = telephone,
+                        email = email,
+                        department = department,
+                        program_of_study = programOfStudy,
+                        payment_methods = paymentMethods,
+                        info = info
+                    )
+                )
+                return@withContext response.success
+            } catch (e: Exception) {
+                e.printStackTrace()
+                return@withContext false
+            }
+        }
+        return@withContext true
     }
 
     suspend fun deleteUser(userId: Int) = withContext(Dispatchers.IO) {
@@ -750,10 +834,16 @@ class CafeteriaRepository(private val db: AppDatabase) {
             // 1. Sync Users
             val remoteUsers = service.getAllUsers()
             for (u in remoteUsers) {
+                val localUser = userDao.getUserSync(u.id)
+                val userToSave = if (localUser != null) {
+                    u.copy(balance = localUser.balance)
+                } else {
+                    u
+                }
                 try {
-                    userDao.insertUser(u)
+                    userDao.insertUser(userToSave)
                 } catch (pe: Exception) {
-                    userDao.updateUser(u)
+                    userDao.updateUser(userToSave)
                 }
             }
 

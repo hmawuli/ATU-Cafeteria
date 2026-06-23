@@ -24,7 +24,9 @@ data class User(
     val student_staff_id: String? = null,
     val telephone: String? = null,
     val logoUrl: String? = null,
-    val pictureUrl: String? = null
+    val pictureUrl: String? = null,
+    val email: String? = null,
+    val paymentMethods: String? = null
 )
 
 @Entity(
@@ -376,7 +378,7 @@ interface VendorOrderSummaryDao {
         VendorMenuAvailability::class,
         VendorOrderSummary::class
     ],
-    version = 9,
+    version = 10,
     exportSchema = false
 )
 abstract class AppDatabase : RoomDatabase() {

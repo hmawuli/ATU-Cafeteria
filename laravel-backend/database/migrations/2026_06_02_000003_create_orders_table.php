@@ -25,9 +25,11 @@ return new class extends Migration
             $table->decimal('total_price', 10, 2);
             $table->bigInteger('order_timestamp');
             $table->string('status')->default('PENDING'); // PENDING, PREPARING, READY, COMPLETED, DECLINED, CANCELLED
+            $table->string('order_status')->nullable(); // Explicit transaction status column
             $table->string('pickup_pin'); // Secure 4 digit code to protect custodial hand-offs
             $table->string('estimated_pickup_time')->default('Calculating...');
             $table->timestamps();
+            $table->softDeletes();
 
             $table->foreign('customer_id')->references('id')->on('users')->onDelete('cascade');
             $table->foreign('student_id')->references('id')->on('users')->onDelete('cascade');

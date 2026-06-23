@@ -8,6 +8,9 @@ import androidx.activity.viewModels
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.collectAsState
 import androidx.compose.ui.Modifier
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
@@ -23,6 +26,11 @@ import com.example.ui.viewmodel.CafeteriaViewModel
 class MainActivity : ComponentActivity() {
     private val viewModel: CafeteriaViewModel by viewModels()
 
+    override fun dispatchTouchEvent(ev: android.view.MotionEvent?): Boolean {
+        viewModel.updateActivity()
+        return super.dispatchTouchEvent(ev)
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
@@ -33,6 +41,19 @@ class MainActivity : ComponentActivity() {
                     color = MaterialTheme.colorScheme.background
                 ) {
                     val navController = rememberNavController()
+                    val currentUser by viewModel.currentUser.collectAsState()
+
+                    LaunchedEffect(currentUser) {
+                        if (currentUser == null) {
+                            val currentRoute = navController.currentBackStackEntry?.destination?.route
+                            if (currentRoute != "login" && currentRoute != "register") {
+                                navController.navigate("login") {
+                                    popUpTo(0) { inclusive = true }
+                                }
+                            }
+                        }
+                    }
+
                     NavHost(
                         navController = navController,
                         startDestination = "login"

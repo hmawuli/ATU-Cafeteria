@@ -14,11 +14,14 @@ return new class extends Migration
         Schema::create('menu_items', function (Blueprint $table) {
             $table->id();
             $table->unsignedBigInteger('vendor_id');
-            $table->string('name');
+            $table->string('food_name');
+            $table->string('name')->nullable();
             $table->decimal('price', 10, 2);
             $table->text('description')->nullable();
+            $table->string('category')->nullable();
             $table->boolean('is_available')->default(true);
             $table->timestamps();
+            $table->softDeletes();
 
             $table->foreign('vendor_id')->references('id')->on('users')->onDelete('cascade');
         });

@@ -67,6 +67,14 @@ class User extends Authenticatable
     }
 
     /**
+     * Direct alias for orders belonging to this user account (STUDENT or general USER)
+     */
+    public function orders()
+    {
+        return $this->hasMany(Order::class, 'user_id');
+    }
+
+    /**
      * Orders received by this vendor (applicable for VENDOR role)
      */
     public function vendorOrders()

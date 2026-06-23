@@ -62,8 +62,8 @@ class StudentAuthController extends Controller
             return $createdUser;
         });
 
-        // Generate JWT access token
-        $token = JwtService::generateToken($user);
+        // Generate Laravel Sanctum token
+        $token = $user->createToken('student_token', ['student'])->plainTextToken;
         $response = $user->toArray();
         $response['token'] = $token;
 
@@ -111,8 +111,8 @@ class StudentAuthController extends Controller
                 'details' => "Student {$user->fullName} logged in successfully via Sanctum.",
             ]);
 
-            // Secure JWT token issue
-            $token = JwtService::generateToken($user);
+            // Generate Laravel Sanctum token
+            $token = $user->createToken('student_token', ['student'])->plainTextToken;
             $responseData = $user->toArray();
             $responseData['token'] = $token;
 

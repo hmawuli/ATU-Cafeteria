@@ -178,6 +178,13 @@ class PaystackPaymentController extends Controller
             $purpose = $metadata['purpose'] ?? $request->input('purpose', 'WALLET_TOPUP');
 
             if ($purpose === 'WALLET_TOPUP') {
+                // Fetch user and lock row, then reload and update balance
+                $dbUser = User::lockForUpdate()->find($user->id);
+                if ($dbUser) {
+                    $dbUser->balance += $amountPaid;
+                    $dbUser->save();
+                }
+
                 // Fetch wallet if needed. Let's record wallet transaction.
                 // In our schema, we have users with optional balances, or we have wallet actions.
                 // Let's create wallet transaction.
@@ -185,7 +192,8 @@ class PaystackPaymentController extends Controller
                     'user_id' => $user->id,
                     'amount' => $amountPaid,
                     'type' => 'DEPOSIT',
-                    'timestamp' => time() * 1000,
+                    'status' => 'SUCCESS',
+                    'reference' => $reference,
                     'details' => "Deposited via Paystack Gateway. Ref: {$reference} ({$purpose})"
                 ]);
 

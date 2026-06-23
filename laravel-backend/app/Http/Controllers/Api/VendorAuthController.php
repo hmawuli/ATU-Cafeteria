@@ -62,8 +62,8 @@ class VendorAuthController extends Controller
             return $createdUser;
         });
 
-        // Generate JWT access token
-        $token = JwtService::generateToken($user);
+        // Generate Laravel Sanctum token
+        $token = $user->createToken('vendor_token', ['vendor'])->plainTextToken;
         $response = $user->toArray();
         $response['token'] = $token;
 
@@ -111,8 +111,8 @@ class VendorAuthController extends Controller
                 'details' => "Vendor {$user->fullName} logged in successfully via Sanctum.",
             ]);
 
-            // Secure JWT token issue
-            $token = JwtService::generateToken($user);
+            // Generate Laravel Sanctum token
+            $token = $user->createToken('vendor_token', ['vendor'])->plainTextToken;
             $responseData = $user->toArray();
             $responseData['token'] = $token;
 

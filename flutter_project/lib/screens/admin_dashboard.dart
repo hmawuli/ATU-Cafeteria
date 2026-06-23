@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 import 'package:intl/intl.dart';
 import '../models/models.dart';
 import '../viewmodel/cafeteria_provider.dart';
+import 'widgets/recharts_line_chart.dart';
 
 class AdminDashboardScreen extends StatefulWidget {
   const AdminDashboardScreen({super.key});
@@ -133,6 +134,12 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                     _barMetric("Stall Sanitation & Waste Management", avgClean),
                     _barMetric("Counter Delivery Velocity", avgSpeed),
                     _barMetric("Value Benchmark Index", avgPrice),
+                    const SizedBox(height: 16),
+
+                    RechartsLineChart(
+                      orders: provider.allOrders.where((o) => o.vendorId == vendor.id).toList(),
+                      vendorId: vendor.id ?? 1,
+                    ),
                     const SizedBox(height: 16),
 
                     ElevatedButton.icon(

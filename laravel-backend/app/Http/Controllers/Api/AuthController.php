@@ -186,4 +186,83 @@ class AuthController extends Controller
             'message' => 'No active authenticated session.'
         ], 401);
     }
+
+    /**
+     * Update the authenticated user's profile info.
+     */
+    public function updateProfile(Request $request)
+    {
+        $user = auth()->user();
+        if (!$user) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Unauthorized or no active session found.'
+            ], 401);
+        }
+
+        $validator = Validator::make($request->all(), [
+            'fullName' => 'nullable|string|max:255',
+            'student_staff_id' => 'nullable|string|max:255',
+            'phone_number' => 'nullable|string|max:255',
+            'email' => 'nullable|string|max:255',
+            'department' => 'nullable|string|max:255',
+            'program_of_study' => 'nullable|string|max:255',
+            'payment_methods' => 'nullable|array',
+            'info' => 'nullable|string',
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Profile validation failed.',
+                'errors' => $validator->errors()
+            ], 400);
+        }
+
+        // Fetch user with write-safety
+        $dbUser = User::find($user->id);
+        if (!$dbUser) {
+            return response()->json([
+                'success' => false,
+                'message' => 'User not found in system.'
+            ], 404);
+        }
+
+        if ($request->has('fullName')) {
+            $dbUser->fullName = $request->input('fullName');
+        }
+        if ($request->has('student_staff_id')) {
+            $dbUser->student_staff_id = $request->input('student_staff_id');
+        }
+        if ($request->has('info')) {
+            $dbUser->info = $request->input('info');
+        }
+
+        // Merge existing profile_info with the incoming values
+        $currentProfileInfo = is_array($dbUser->profile_info) ? $dbUser->profile_info : [];
+
+        $profileKeys = ['phone_number', 'email', 'department', 'program_of_study', 'payment_methods'];
+        foreach ($profileKeys as $key) {
+            if ($request->has($key)) {
+                $currentProfileInfo[$key] = $request->input($key);
+            }
+        }
+
+        $dbUser->profile_info = $currentProfileInfo;
+        $dbUser->save();
+
+        // Create audit log for profile update
+        AuditLog::create([
+            'user_id' => $dbUser->id,
+            'timestamp' => time() * 1000,
+            'action' => 'PROFILE_UPDATE',
+            'details' => "Updated profile information for user: {$dbUser->username}",
+        ]);
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Profile updated successfully.',
+            'user' => $dbUser
+        ], 200);
+    }
 }

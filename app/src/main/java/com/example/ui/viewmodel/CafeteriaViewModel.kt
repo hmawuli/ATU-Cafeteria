@@ -58,6 +58,23 @@ class CafeteriaViewModel(application: Application) : AndroidViewModel(applicatio
     private val _isLoading = MutableStateFlow(false)
     val isLoading: StateFlow<Boolean> = _isLoading.asStateFlow()
 
+    // Inactivity session timeout management
+    private val _lastActivityTime = MutableStateFlow(System.currentTimeMillis())
+    val lastActivityTime: StateFlow<Long> = _lastActivityTime.asStateFlow()
+
+    private val _isSessionTimedOut = MutableStateFlow(false)
+    val isSessionTimedOut: StateFlow<Boolean> = _isSessionTimedOut.asStateFlow()
+
+    fun updateActivity() {
+        if (_currentUser.value != null) {
+            _lastActivityTime.value = System.currentTimeMillis()
+        }
+    }
+
+    fun resetSessionTimeoutFlag() {
+        _isSessionTimedOut.value = false
+    }
+
     // --- Modern Pro-Suite States ---
     private val _studentWalletBalance = MutableStateFlow(185.50) // Starting digital currency seed
     val studentWalletBalance: StateFlow<Double> = _studentWalletBalance.asStateFlow()
@@ -263,8 +280,23 @@ class CafeteriaViewModel(application: Application) : AndroidViewModel(applicatio
             }
         }
         viewModelScope.launch {
+            while (true) {
+                delay(10000) // check every 10 seconds
+                val user = _currentUser.value
+                if (user != null) {
+                    val inactiveTime = System.currentTimeMillis() - _lastActivityTime.value
+                    if (inactiveTime > 30 * 60 * 1000) { // 30 minutes
+                        _isSessionTimedOut.value = true
+                        repository.insertAuditLog(user.id, "AUTO_LOGOUT_INACTIVITY", "Auto-logged out user due to 30 minutes of inactivity.")
+                        logOut()
+                    }
+                }
+            }
+        }
+        viewModelScope.launch {
             _currentUser.collect { user ->
                 if (user != null) {
+                    _lastActivityTime.value = System.currentTimeMillis()
                     _studentWalletBalance.value = user.balance
                     if (user.role == "VENDOR") {
                         _isStoreClosed.value = !user.isOpen
@@ -709,6 +741,13 @@ class CafeteriaViewModel(application: Application) : AndroidViewModel(applicatio
             _isLoading.value = true
             try {
                 repository.syncAllFromLaravel()
+                val usr = _currentUser.value
+                if (usr != null) {
+                    val refreshed = repository.userDao.getUserSync(usr.id)
+                    if (refreshed != null) {
+                        _currentUser.value = refreshed
+                    }
+                }
                 _isLoading.value = false
                 onResult(true)
             } catch (e: Exception) {
@@ -868,6 +907,40 @@ class CafeteriaViewModel(application: Application) : AndroidViewModel(applicatio
                 repository.insertAuditLog(admin.id, "VENDOR_UPDATED", "Vendor '${user.fullName}' updated by Admin.")
             }
             onResult(true)
+        }
+    }
+
+    fun updateUserProfile(
+        fullName: String,
+        studentStaffId: String?,
+        telephone: String?,
+        email: String?,
+        department: String?,
+        programOfStudy: String?,
+        paymentMethods: List<String>?,
+        info: String,
+        onResult: (Boolean) -> Unit
+    ) {
+        val user = _currentUser.value ?: return
+        viewModelScope.launch {
+            _isLoading.value = true
+            val success = repository.updateUserProfile(
+                id = user.id,
+                fullName = fullName,
+                studentStaffId = studentStaffId,
+                telephone = telephone,
+                email = email,
+                department = department,
+                programOfStudy = programOfStudy,
+                paymentMethods = paymentMethods,
+                info = info
+            )
+            val refreshed = repository.userDao.getUserSync(user.id)
+            if (refreshed != null) {
+                _currentUser.value = refreshed
+            }
+            _isLoading.value = false
+            onResult(success)
         }
     }
 
@@ -1713,6 +1786,7 @@ class CafeteriaViewModel(application: Application) : AndroidViewModel(applicatio
                 val response = service.verifyPaystack(reference, amount, purpose)
                 if (response.success) {
                     if (purpose == "WALLET_TOPUP") {
+                        rechargeWallet(amount)
                         syncAllFromLaravel { }
                     }
                     onResult(true)

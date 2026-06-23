@@ -23,6 +23,29 @@ data class LaravelRegisterRequest(
 )
 
 @JsonClass(generateAdapter = true)
+data class LaravelStudentRegisterRequest(
+    val username: String,
+    val pin: String,
+    val fullName: String,
+    val studentId: String
+)
+
+@JsonClass(generateAdapter = true)
+data class LaravelVendorRegisterRequest(
+    val username: String,
+    val pin: String,
+    val fullName: String,
+    val boothDescription: String
+)
+
+@JsonClass(generateAdapter = true)
+data class LaravelSanctumAuthResponse(
+    val success: Boolean,
+    val message: String,
+    val user: User
+)
+
+@JsonClass(generateAdapter = true)
 data class LaravelLoginRequest(
     val username: String,
     val pin: String // SHA-256 hashed PIN
@@ -456,6 +479,18 @@ interface LaravelApiService {
     @POST("api/login")
     suspend fun login(@Body request: LaravelLoginRequest): User
 
+    @POST("api/student/register")
+    suspend fun registerStudent(@Body request: LaravelStudentRegisterRequest): LaravelSanctumAuthResponse
+
+    @POST("api/student/login")
+    suspend fun loginStudent(@Body request: LaravelLoginRequest): LaravelSanctumAuthResponse
+
+    @POST("api/vendor/register")
+    suspend fun registerVendor(@Body request: LaravelVendorRegisterRequest): LaravelSanctumAuthResponse
+
+    @POST("api/vendor/login")
+    suspend fun loginVendor(@Body request: LaravelLoginRequest): LaravelSanctumAuthResponse
+
     @GET("api/users")
     suspend fun getAllUsers(): List<User>
 
@@ -574,7 +609,23 @@ interface LaravelApiService {
 
     @POST("api/vendor/menu/bulk-update")
     suspend fun bulkUpdateMenu(@Body request: List<LaravelBulkUpdateItem>): LaravelBulkUpdateResponse
+
+    @POST("api/user/profile")
+    suspend fun updateProfile(@Body request: LaravelUpdateProfileRequest): LaravelGeneralResponse
 }
+
+@JsonClass(generateAdapter = true)
+data class LaravelUpdateProfileRequest(
+    val fullName: String? = null,
+    val student_staff_id: String? = null,
+    val telephone: String? = null,
+    val phone_number: String? = null,
+    val email: String? = null,
+    val department: String? = null,
+    val program_of_study: String? = null,
+    val payment_methods: List<String>? = null,
+    val info: String? = null
+)
 
 // ==========================================
 // 3. RUNTIME DYNAMIC CLIENT MANAGER
