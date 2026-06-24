@@ -71,13 +71,20 @@ class InventoryCronController extends Controller
                             });
 
                         if (!$alreadyAlerted) {
-                            $vendor->notify(new LowStockAlertNotification(
+                            $notif = new LowStockAlertNotification(
                                 $item->name,
                                 $item->id,
                                 $remainingStock,
                                 $orderFrequency24h,
                                 'food_items'
-                            ));
+                            );
+                            $vendor->notify($notif);
+
+                            // Notify cafeteria administrators via mail & push channels
+                            $admins = User::where('role', 'ADMIN')->orWhere('role', 'admin')->get();
+                            foreach ($admins as $admin) {
+                                $admin->notify($notif);
+                            }
 
                             $alertsTriggered[] = [
                                 'item_id' => $item->id,
@@ -130,13 +137,20 @@ class InventoryCronController extends Controller
                                 });
 
                             if (!$alreadyAlerted) {
-                                $vendor->notify(new LowStockAlertNotification(
+                                $notif = new LowStockAlertNotification(
                                     $item->name,
                                     $item->id,
                                     $remainingStock,
                                     $orderFrequency24h,
                                     'vendor_menu_items'
-                                ));
+                                );
+                                $vendor->notify($notif);
+
+                                // Notify cafeteria administrators via mail & push channels
+                                $admins = User::where('role', 'ADMIN')->orWhere('role', 'admin')->get();
+                                foreach ($admins as $admin) {
+                                    $admin->notify($notif);
+                                }
 
                                 $alertsTriggered[] = [
                                     'item_id' => $item->id,

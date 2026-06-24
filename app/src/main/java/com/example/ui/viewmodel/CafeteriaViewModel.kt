@@ -223,6 +223,13 @@ class CafeteriaViewModel(application: Application) : AndroidViewModel(applicatio
 
     private val _vendorInventoryNotifications = MutableStateFlow<List<VendorInventoryNotification>>(emptyList())
     val vendorInventoryNotifications: StateFlow<List<VendorInventoryNotification>> = _vendorInventoryNotifications.asStateFlow()
+
+    private val _adminInventoryAlerts = MutableStateFlow<List<VendorInventoryNotification>>(emptyList())
+    val adminInventoryAlerts: StateFlow<List<VendorInventoryNotification>> = _adminInventoryAlerts.asStateFlow()
+
+    fun dismissAdminInventoryAlert(id: String) {
+        _adminInventoryAlerts.value = _adminInventoryAlerts.value.filter { it.id != id }
+    }
     val globalLowStockThreshold = MutableStateFlow(15)
     val redeemedLoyaltyPoints = MutableStateFlow(0)
 
@@ -306,6 +313,8 @@ class CafeteriaViewModel(application: Application) : AndroidViewModel(applicatio
                     } else if (user.role == "STUDENT") {
                         // Trigger Laravel Echo socket pipeline for student channels
                         LaravelEchoWebSocketManager.startListening(user.id, "STUDENT")
+                    } else if (user.role.equals("ADMIN", ignoreCase = true)) {
+                        LaravelEchoWebSocketManager.startListening(user.id, "ADMIN")
                     } else {
                         LaravelEchoWebSocketManager.stopListening()
                     }
@@ -325,6 +334,28 @@ class CafeteriaViewModel(application: Application) : AndroidViewModel(applicatio
                 // Log event for the live terminal display
                 val timeStr = java.text.SimpleDateFormat("HH:mm:ss", java.util.Locale.getDefault()).format(java.util.Date(event.timestamp))
                 val logMsg = "[$timeStr] Packet: ID #${event.orderId} containing '${event.foodName}' (QTY: ${event.qty}) on channel orders-vendor-${event.vendorId}"
+                _realTimeEventsLogs.value = (listOf(logMsg) + _realTimeEventsLogs.value).take(50)
+            }
+        }
+
+        // Listen to Admin WebSocket low stock inventory alerts
+        viewModelScope.launch {
+            LaravelEchoWebSocketManager.realTimeInventoryAlertFlow.collect { event ->
+                val activeUser = _currentUser.value
+                if (activeUser != null && activeUser.role.equals("ADMIN", ignoreCase = true)) {
+                    val notif = VendorInventoryNotification(
+                        id = "ADMIN_ALERT_${System.currentTimeMillis()}",
+                        foodItemId = event.itemId,
+                        foodName = event.itemName,
+                        type = "LOW_STOCK",
+                        message = "PUSH NOTIFICATION: ${event.message} (${event.remainingStock} remaining)",
+                        timestamp = event.timestamp
+                    )
+                    _adminInventoryAlerts.value = listOf(notif) + _adminInventoryAlerts.value
+                    playSoundNotification()
+                }
+                val timeStr = java.text.SimpleDateFormat("HH:mm:ss", java.util.Locale.getDefault()).format(java.util.Date(event.timestamp))
+                val logMsg = "[$timeStr] Admin Alert: '${event.itemName}' critically low (${event.remainingStock} units left)"
                 _realTimeEventsLogs.value = (listOf(logMsg) + _realTimeEventsLogs.value).take(50)
             }
         }

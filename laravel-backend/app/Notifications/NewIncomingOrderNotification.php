@@ -33,7 +33,33 @@ class NewIncomingOrderNotification extends Notification
      */
     public function via($notifiable)
     {
-        return ['database'];
+        return ['database', 'broadcast'];
+    }
+
+    /**
+     * Get the broadcastable representation of the notification.
+     *
+     * @param  mixed  $notifiable
+     * @return array
+     */
+    public function toBroadcast($notifiable)
+    {
+        return [
+            'id' => $this->id,
+            'type' => get_class($this),
+            'notifiable_id' => $notifiable->id,
+            'data' => $this->toDatabase($notifiable),
+        ];
+    }
+
+    /**
+     * Get the channels the event should broadcast on.
+     *
+     * @return array
+     */
+    public function broadcastOn()
+    {
+        return ['orders-vendor-' . $this->order->vendor_id];
     }
 
     /**

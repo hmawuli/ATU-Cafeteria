@@ -41,7 +41,27 @@ class LowStockAlertNotification extends Notification
      */
     public function via($notifiable)
     {
+        if (isset($notifiable->role) && strtoupper($notifiable->role) === 'ADMIN') {
+            return ['mail', 'database', 'broadcast'];
+        }
         return ['database', 'broadcast'];
+    }
+
+    /**
+     * Get the mail representation of the notification.
+     */
+    public function toMail($notifiable)
+    {
+        $statusStr = $this->remainingStock <= 0 ? "OUT OF STOCK" : "CRITICALLY LOW ({$this->remainingStock} left)";
+        return (new MailMessage)
+                    ->subject("INVENTORY ALERT: {$this->itemName} is {$statusStr}")
+                    ->greeting("Hello " . ($notifiable->fullName ?: 'Administrator') . ",")
+                    ->line("Automated inventory monitoring has detected critical ingredient levels in the cafeteria.")
+                    ->line("Item: {$this->itemName}")
+                    ->line("Remaining Stock: {$this->remainingStock}")
+                    ->line("24h Order Velocity: {$this->orderFrequency24h} orders")
+                    ->action('View Admin Dashboard', url('/admin/dashboard'))
+                    ->line('Please coordinate immediate replenishment with cafeteria vendors.');
     }
 
     /**
@@ -67,7 +87,11 @@ class LowStockAlertNotification extends Notification
      */
     public function broadcastOn()
     {
-        return ['orders-vendor-' . $this->itemId];
+        return [
+            'orders-vendor-' . $this->itemId,
+            'orders-admin-1',
+            'orders-admin'
+        ];
     }
 
     /**

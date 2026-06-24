@@ -6067,6 +6067,16 @@ fun StudentDashboardScreen(
                                                                      
                                                                      waitCount = 0
                                                                      while (verificationSuccess == null && waitCount < 50) {
+                                                                      delay(100)
+                                                                      waitCount++
+                                                                  }
+                                                                  if (verificationSuccess != true) {
+                                                                      gatewayErrorMessage = "Secure gateway verification failed or timed out. Please try again."
+                                                                      isTopUpProcessing = false
+                                                                      return@launch
+                                                                  }
+                                                                  // Dummy statement to absorb old delay blocks
+                                                                  if (false) {
                                                                          delay(100)
                                                                          waitCount++
                                                                      }
@@ -6774,7 +6784,40 @@ fun StudentDashboardScreen(
                                                         delay(800)
                                                         gatewayTransactionStep = "Settlement cleared! Syncing wallet..."
                                                         delay(400)
-                                                         viewModel.rechargeWallet(requiredSum)
+                                                         if (com.example.data.LaravelClientManager.isLaravelEnabled) {
+                                                             val userEmail = currentUser?.username ?: "student@atu.edu.gh"
+                                                             val emailToUse = if (userEmail.contains("@")) userEmail else "${userEmail}@atu.edu.gh"
+                                                             
+                                                             var initDetails: com.example.data.LaravelPaystackInitDetails? = null
+                                                             viewModel.initPaystackPayment(emailToUse, requiredSum, "WALLET_TOPUP") { details ->
+                                                                 initDetails = details
+                                                             }
+                                                             var waitCount = 0
+                                                             while (initDetails == null && waitCount < 30) {
+                                                                 delay(100)
+                                                                 waitCount++
+                                                             }
+                                                             
+                                                             val details = initDetails
+                                                             if (details != null) {
+                                                                 var verificationSuccess: Boolean? = null
+                                                                 viewModel.verifyPaystackPayment(details.reference, requiredSum, "WALLET_TOPUP") { success ->
+                                                                     verificationSuccess = success
+                                                                 }
+                                                                 
+                                                                 waitCount = 0
+                                                                 while (verificationSuccess == null && waitCount < 50) {
+                                                                     delay(100)
+                                                                     waitCount++
+                                                                 }
+                                                             } else {
+                                                                 orderPlacementError = "Failed to establish payment gateway channel with Paystack."
+                                                                 isGatewayProcessing = false
+                                                                 return@launch
+                                                             }
+                                                         } else {
+                                                             viewModel.rechargeWallet(requiredSum)
+                                                         }
                                                          submissionConfirmFood = food
                                                          submissionConfirmQuantity = orderQuantity
                                                          submissionConfirmPaymentMode = "GATEWAY"

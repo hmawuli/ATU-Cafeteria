@@ -43,6 +43,18 @@ object LaravelEchoWebSocketManager {
     private val _realTimeStudentNotificationFlow = MutableSharedFlow<StudentNotificationEvent>(extraBufferCapacity = 64)
     val realTimeStudentNotificationFlow: SharedFlow<StudentNotificationEvent> = _realTimeStudentNotificationFlow.asSharedFlow()
 
+    // Shared flow emitting direct real-time low stock inventory alert signals for administrators
+    private val _realTimeInventoryAlertFlow = MutableSharedFlow<InventoryAlertEvent>(extraBufferCapacity = 64)
+    val realTimeInventoryAlertFlow: SharedFlow<InventoryAlertEvent> = _realTimeInventoryAlertFlow.asSharedFlow()
+
+    data class InventoryAlertEvent(
+        val itemId: Int,
+        val itemName: String,
+        val remainingStock: Int,
+        val message: String,
+        val timestamp: Long
+    )
+
     data class OrderBroadcastEvent(
         val orderId: Int,
         val vendorId: Int,
@@ -129,10 +141,10 @@ object LaravelEchoWebSocketManager {
 
     private fun subscribeToRoleChannel(ws: WebSocket, userId: Int, role: String) {
         try {
-            val channelName = if (role == "VENDOR") {
-                "orders-vendor-$userId"
-            } else {
-                "orders-student-$userId"
+            val channelName = when (role) {
+                "VENDOR" -> "orders-vendor-$userId"
+                "ADMIN" -> "orders-admin"
+                else -> "orders-student-$userId"
             }
             val subMsg = JSONObject().apply {
                 put("event", "pusher:subscribe")
@@ -175,29 +187,68 @@ object LaravelEchoWebSocketManager {
                     )
                 }
             } 
-            // Handle status notifications for Student Screen (Pusher/Echo Broadcaster)
+            // Handle status notifications for Student Screen (Pusher/Echo Broadcaster) and Vendor Incoming Orders
             else if (eventName.contains("BroadcastNotificationCreated") || eventName.contains("OrderStatusChanged")) {
                 val dataObj = json.optJSONObject("data") ?: JSONObject(json.optString("data", "{}"))
+                val typeStr = dataObj.optString("type", "")
                 val nestedData = dataObj.optJSONObject("data") ?: dataObj
-                val notificationId = dataObj.optString("id", java.util.UUID.randomUUID().toString())
-                val orderId = nestedData.optInt("order_id", 0)
-                val vendorId = nestedData.optInt("vendor_id", 0)
-                val oldStatus = nestedData.optString("old_status", "PENDING")
-                val newStatus = nestedData.optString("new_status", "PREPARING")
-                val msg = nestedData.optString("message", "Your order status has changed.")
                 
-                scope.launch {
-                    _realTimeStudentNotificationFlow.emit(
-                        StudentNotificationEvent(
-                            notificationId = notificationId,
-                            orderId = orderId,
-                            vendorId = vendorId,
-                            oldStatus = oldStatus,
-                            newStatus = newStatus,
-                            message = msg,
-                            timestamp = System.currentTimeMillis()
+                if (typeStr.contains("NewIncomingOrderNotification")) {
+                    val orderId = nestedData.optInt("order_id", 0)
+                    val vendorId = activeUserId ?: nestedData.optInt("vendor_id", 0)
+                    val foodName = nestedData.optString("food_name", "Pre-order item")
+                    val quantity = nestedData.optInt("quantity", 1)
+                    val total = nestedData.optDouble("total_price", 0.0)
+                    scope.launch {
+                        _realTimeOrderFlow.emit(
+                            OrderBroadcastEvent(
+                                orderId = orderId,
+                                vendorId = vendorId,
+                                foodName = foodName,
+                                qty = quantity,
+                                totalPrice = total,
+                                timestamp = System.currentTimeMillis(),
+                                message = "Real-time Broadcast Pre-order received!"
+                            )
                         )
-                    )
+                    }
+                } else if (typeStr.contains("LowStockAlertNotification")) {
+                    val itemId = nestedData.optInt("item_id", 0)
+                    val itemName = nestedData.optString("item_name", "Ingredient")
+                    val remainingStock = nestedData.optInt("remaining_stock", 0)
+                    val msg = nestedData.optString("message", "Critically low ingredient stock detected!")
+                    scope.launch {
+                        _realTimeInventoryAlertFlow.emit(
+                            InventoryAlertEvent(
+                                itemId = itemId,
+                                itemName = itemName,
+                                remainingStock = remainingStock,
+                                message = msg,
+                                timestamp = System.currentTimeMillis()
+                            )
+                        )
+                    }
+                } else {
+                    val notificationId = dataObj.optString("id", java.util.UUID.randomUUID().toString())
+                    val orderId = nestedData.optInt("order_id", 0)
+                    val vendorId = nestedData.optInt("vendor_id", 0)
+                    val oldStatus = nestedData.optString("old_status", "PENDING")
+                    val newStatus = nestedData.optString("new_status", "PREPARING")
+                    val msg = nestedData.optString("message", "Your order status has changed.")
+                    
+                    scope.launch {
+                        _realTimeStudentNotificationFlow.emit(
+                            StudentNotificationEvent(
+                                notificationId = notificationId,
+                                orderId = orderId,
+                                vendorId = vendorId,
+                                oldStatus = oldStatus,
+                                newStatus = newStatus,
+                                message = msg,
+                                timestamp = System.currentTimeMillis()
+                            )
+                        )
+                    }
                 }
             }
         } catch (e: Exception) {

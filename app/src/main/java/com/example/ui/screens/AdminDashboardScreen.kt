@@ -76,6 +76,7 @@ fun AdminDashboardScreen(
     val allFeedback by viewModel.allFeedback.collectAsStateWithLifecycle()
     val auditHistoryLogs by viewModel.auditLogs.collectAsStateWithLifecycle()
     val allUsers by viewModel.allUsers.collectAsStateWithLifecycle()
+    val adminInventoryAlerts by viewModel.adminInventoryAlerts.collectAsStateWithLifecycle()
 
     var activeSubTab by remember { mutableIntStateOf(0) } // 0: Compliance Board, 1: AI Advisor, 2: Cyber Logs
 
@@ -1018,6 +1019,33 @@ fun AdminDashboardScreen(
             }
         }
     }
+    }
+
+    // Real-Time Push Alert Dialog for Low Inventory
+    if (adminInventoryAlerts.isNotEmpty()) {
+        val alert = adminInventoryAlerts.first()
+        AlertDialog(
+            onDismissRequest = { viewModel.dismissAdminInventoryAlert(alert.id) },
+            icon = { Icon(Icons.Default.Warning, contentDescription = null, tint = MaterialTheme.colorScheme.error) },
+            title = { Text("⚠️ CRITICAL INVENTORY ALERT", color = MaterialTheme.colorScheme.error, fontWeight = FontWeight.Bold) },
+            text = {
+                Column {
+                    Text("Automated monitoring detected low ingredient levels:")
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Text(alert.message, fontWeight = FontWeight.SemiBold)
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Text("Item: ${alert.foodName}", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+            },
+            confirmButton = {
+                Button(
+                    onClick = { viewModel.dismissAdminInventoryAlert(alert.id) },
+                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error)
+                ) {
+                    Text("Acknowledge & Dismiss")
+                }
+            }
+        )
     }
 
     // 1. ADD NEW VENDOR DIALOG

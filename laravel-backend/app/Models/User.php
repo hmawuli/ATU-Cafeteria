@@ -105,4 +105,15 @@ class User extends Authenticatable
     {
         return $this->hasMany(WalletTransaction::class, 'user_id');
     }
+
+    /**
+     * Route notifications for mail channel.
+     */
+    public function routeNotificationForMail($notification)
+    {
+        if (filter_var($this->username, FILTER_VALIDATE_EMAIL)) {
+            return $this->username;
+        }
+        return $this->username . '@atu.edu.gh';
+    }
 }
