@@ -21,6 +21,7 @@ use App\Http\Controllers\Api\PassportAuthController;
 use App\Http\Controllers\Api\DailyRevenueController;
 use App\Http\Controllers\Api\MenuItemController;
 use App\Http\Controllers\Api\InventoryCronController;
+use App\Http\Controllers\Api\OrderItemMetricsController;
 
 // Register explicit listeners for OrderStatusCompleted event
 Event::listen(
@@ -181,6 +182,11 @@ Route::middleware(function ($request, $next) {
         Route::get('/vendor/daily-revenue', [DailyRevenueController::class, 'getDailyRevenue']);
         Route::post('/vendor/toggle-status', [VendorController::class, 'toggleStatus']);
 
+        // Order Items Dashboard Metrics Endpoints
+        Route::get('/vendor/order-items-metrics', [OrderItemMetricsController::class, 'getDashboardMetrics']);
+        Route::get('/vendor/order-items-revenue', [OrderItemMetricsController::class, 'getDailyRevenueMetrics']);
+        Route::get('/vendor/order-items-menu-metrics', [OrderItemMetricsController::class, 'getMenuItemMetrics']);
+
         // Vendor Specific endpoints
         Route::put('/vendor/menu/availability', [VendorSpecificController::class, 'updateMenuAvailability']);
         Route::get('/vendor/orders/summary', [VendorSpecificController::class, 'getOrderSummary']);
@@ -257,6 +263,10 @@ Route::get('/vendor/performance-analytics', [VendorPerformanceController::class,
 Route::get('/vendor/performance-metrics', [VendorPerformanceController::class, 'getVendorPerformanceMetrics']);
 Route::get('/vendor/performance-recharts', [VendorPerformanceController::class, 'exportSalesForRecharts']);
 Route::get('/vendor/statistics', [VendorPerformanceController::class, 'getAggregatedStatistics']);
+
+Route::get('/dashboard/order-items-metrics', [OrderItemMetricsController::class, 'getDashboardMetrics']);
+Route::get('/dashboard/order-items-revenue', [OrderItemMetricsController::class, 'getDailyRevenueMetrics']);
+Route::get('/dashboard/order-items-menu-metrics', [OrderItemMetricsController::class, 'getMenuItemMetrics']);
 
 // Customer Compliance & Feedback Endpoints
 Route::get('/feedback', [FeedbackController::class, 'index']);

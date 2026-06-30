@@ -176,13 +176,51 @@ class OrderController extends Controller
             ], 400);
         }
 
-        // Additional business logic validation: Verify that unit_price * quantity yields total_price reasonably
-        $expectedTotalPrice = round($request->input('unit_price') * $request->input('quantity'), 2);
-        $totalPriceInput = round($request->input('total_price'), 2);
-        if (abs($expectedTotalPrice - $totalPriceInput) > 0.1) {
+        // Fetch menu item to validate availability, ownership, and calculate total price
+        $menuItem = \App\Models\MenuItem::find($request->input('menu_item_id'));
+        if (!$menuItem) {
             return response()->json([
                 'success' => false,
-                'message' => 'Validation error: total_price does not match quantity multiplied by unit_price.',
+                'message' => 'The selected menu item does not exist.'
+            ], 404);
+        }
+
+        if (!$menuItem->is_available) {
+            return response()->json([
+                'success' => false,
+                'message' => 'The selected menu item is currently unavailable.'
+            ], 400);
+        }
+
+        // Validate menu item owner matches vendor_id
+        if ($menuItem->vendor_id != $request->input('vendor_id')) {
+            return response()->json([
+                'success' => false,
+                'message' => 'The selected menu item does not belong to the specified vendor.'
+            ], 400);
+        }
+
+        // Calculate and validate order totals
+        $quantity = intval($request->input('quantity'));
+        $expectedUnitPrice = round($menuItem->price, 2);
+        $expectedTotalPrice = round($expectedUnitPrice * $quantity, 2);
+        
+        $unitPriceInput = round($request->input('unit_price'), 2);
+        $totalPriceInput = round($request->input('total_price'), 2);
+
+        if (abs($expectedUnitPrice - $unitPriceInput) > 0.01) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Validation error: unit_price does not match the actual menu item price.',
+                'expected' => $expectedUnitPrice,
+                'received' => $unitPriceInput
+            ], 400);
+        }
+
+        if (abs($expectedTotalPrice - $totalPriceInput) > 0.01) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Validation error: total_price is incorrect based on menu item price and quantity.',
                 'expected' => $expectedTotalPrice,
                 'received' => $totalPriceInput
             ], 400);
@@ -368,7 +406,7 @@ class OrderController extends Controller
             }
         }
 
-        if (strtoupper($oldStatus) === 'PENDING' && strtoupper($newStatus) === 'COMPLETED') {
+        if (strtoupper($newStatus) === 'COMPLETED') {
             event(new OrderStatusCompleted($updatedOrder));
         }
 
@@ -435,6 +473,9 @@ class OrderController extends Controller
                     }
                 }
             }
+
+            // Dispatch event for order completion
+            event(new OrderStatusCompleted($updatedOrder));
 
             return response()->json([
                 'success' => true,
@@ -515,12 +556,51 @@ class OrderController extends Controller
             ], 400);
         }
 
-        $expectedTotalPrice = round($request->input('unit_price') * $request->input('quantity'), 2);
-        $totalPriceInput = round($request->input('total_price'), 2);
-        if (abs($expectedTotalPrice - $totalPriceInput) > 0.1) {
+        // Fetch menu item to validate availability, ownership, and calculate total price
+        $menuItem = \App\Models\MenuItem::find($request->input('menu_item_id'));
+        if (!$menuItem) {
             return response()->json([
                 'success' => false,
-                'message' => 'Validation error: total_price does not match quantity multiplied by unit_price.',
+                'message' => 'The selected menu item does not exist.'
+            ], 404);
+        }
+
+        if (!$menuItem->is_available) {
+            return response()->json([
+                'success' => false,
+                'message' => 'The selected menu item is currently unavailable.'
+            ], 400);
+        }
+
+        // Validate menu item owner matches vendor_id
+        if ($menuItem->vendor_id != $request->input('vendor_id')) {
+            return response()->json([
+                'success' => false,
+                'message' => 'The selected menu item does not belong to the specified vendor.'
+            ], 400);
+        }
+
+        // Calculate and validate order totals
+        $quantity = intval($request->input('quantity'));
+        $expectedUnitPrice = round($menuItem->price, 2);
+        $expectedTotalPrice = round($expectedUnitPrice * $quantity, 2);
+        
+        $unitPriceInput = round($request->input('unit_price'), 2);
+        $totalPriceInput = round($request->input('total_price'), 2);
+
+        if (abs($expectedUnitPrice - $unitPriceInput) > 0.01) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Validation error: unit_price does not match the actual menu item price.',
+                'expected' => $expectedUnitPrice,
+                'received' => $unitPriceInput
+            ], 400);
+        }
+
+        if (abs($expectedTotalPrice - $totalPriceInput) > 0.01) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Validation error: total_price is incorrect based on menu item price and quantity.',
                 'expected' => $expectedTotalPrice,
                 'received' => $totalPriceInput
             ], 400);

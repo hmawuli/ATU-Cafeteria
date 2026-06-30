@@ -2164,6 +2164,12 @@ fun D3DashboardChart(
                         settings.useWideViewPort = true
                         settings.loadWithOverviewMode = true
                         setBackgroundColor(android.graphics.Color.TRANSPARENT)
+                        setOnTouchListener { v, event ->
+                            if (event.action == android.view.MotionEvent.ACTION_MOVE) {
+                                v.parent?.requestDisallowInterceptTouchEvent(false)
+                            }
+                            false
+                        }
                     }
                 },
                 update = { webView ->
@@ -2525,6 +2531,12 @@ fun RechartsDashboardChart(
                          settings.useWideViewPort = true
                          settings.loadWithOverviewMode = true
                          setBackgroundColor(android.graphics.Color.TRANSPARENT)
+                         setOnTouchListener { v, event ->
+                             if (event.action == android.view.MotionEvent.ACTION_MOVE) {
+                                 v.parent?.requestDisallowInterceptTouchEvent(false)
+                             }
+                             false
+                         }
                      }
                  },
                  update = { webView ->
@@ -2931,6 +2943,12 @@ fun ChartJsVendorPerformanceChart(
                         settings.useWideViewPort = true
                         settings.loadWithOverviewMode = true
                         setBackgroundColor(android.graphics.Color.TRANSPARENT)
+                        setOnTouchListener { v, event ->
+                            if (event.action == android.view.MotionEvent.ACTION_MOVE) {
+                                v.parent?.requestDisallowInterceptTouchEvent(false)
+                            }
+                            false
+                        }
                     }
                 },
                 update = { webView ->
@@ -3083,6 +3101,12 @@ fun ChartJsInventoryLevelChart(
                 settings.useWideViewPort = true
                 settings.loadWithOverviewMode = true
                 setBackgroundColor(android.graphics.Color.TRANSPARENT)
+                setOnTouchListener { v, event ->
+                    if (event.action == android.view.MotionEvent.ACTION_MOVE) {
+                        v.parent?.requestDisallowInterceptTouchEvent(false)
+                    }
+                    false
+                }
             }
         },
         update = { webView ->
@@ -3715,6 +3739,12 @@ fun RechartsFeedbackDashboardChart(
                         settings.useWideViewPort = true
                         settings.loadWithOverviewMode = true
                         setBackgroundColor(android.graphics.Color.TRANSPARENT)
+                        setOnTouchListener { v, event ->
+                            if (event.action == android.view.MotionEvent.ACTION_MOVE) {
+                                v.parent?.requestDisallowInterceptTouchEvent(false)
+                            }
+                            false
+                        }
                     }
                 },
                 update = { webView ->
@@ -4002,6 +4032,12 @@ fun RechartsFulfillmentEfficiencyChart(
                         settings.useWideViewPort = true
                         settings.loadWithOverviewMode = true
                         setBackgroundColor(android.graphics.Color.TRANSPARENT)
+                        setOnTouchListener { v, event ->
+                            if (event.action == android.view.MotionEvent.ACTION_MOVE) {
+                                v.parent?.requestDisallowInterceptTouchEvent(false)
+                            }
+                            false
+                        }
                     }
                 },
                 update = { webView ->

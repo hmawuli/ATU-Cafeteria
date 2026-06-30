@@ -775,8 +775,8 @@ class CafeteriaRepository(private val db: AppDatabase) {
     }
 
     // Multi-table sync from Laravel to Local SQLite/Room DB Cache
-    suspend fun syncAllFromLaravel() = withContext(Dispatchers.IO) {
-        if (!LaravelClientManager.isLaravelEnabled) return@withContext
+    suspend fun syncAllFromLaravel(): Boolean = withContext(Dispatchers.IO) {
+        if (!LaravelClientManager.isLaravelEnabled) return@withContext true
         try {
             Log.d("CafeteriaRepository", "Syncing all tables from Laravel API dynamically...")
             val service = LaravelClientManager.getService()
@@ -832,8 +832,10 @@ class CafeteriaRepository(private val db: AppDatabase) {
             }
 
             Log.d("CafeteriaRepository", "Sync completed successfully!")
+            true
         } catch (e: Exception) {
             Log.e("CafeteriaRepository", "Laravel synchronization failed - continuing in local mode offline", e)
+            false
         }
     }
 

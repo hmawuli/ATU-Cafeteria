@@ -1,6 +1,10 @@
 package com.example.ui.viewmodel
 
 import android.app.Application
+import android.content.Context
+import android.net.ConnectivityManager
+import android.net.NetworkCapabilities
+import android.net.NetworkRequest
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.data.*
@@ -44,6 +48,45 @@ class CafeteriaViewModel(application: Application) : AndroidViewModel(applicatio
     private val db = AppDatabase.getDatabase(application)
     val repository = CafeteriaRepository(db)
     private val geminiRepository = GeminiAnalyticsRepository()
+
+    // Connection & Caching Layer States
+    private val connectivityManager = application.getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
+    
+    private val _isOnline = MutableStateFlow(checkInitialNetworkState())
+    val isOnline: StateFlow<Boolean> = _isOnline.asStateFlow()
+
+    private val _lastSyncTime = MutableStateFlow(getSavedLastSyncTime())
+    val lastSyncTime: StateFlow<Long> = _lastSyncTime.asStateFlow()
+
+    private fun checkInitialNetworkState(): Boolean {
+        try {
+            val activeNetwork = connectivityManager.activeNetwork ?: return false
+            val capabilities = connectivityManager.getNetworkCapabilities(activeNetwork) ?: return false
+            return capabilities.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET)
+        } catch (e: Exception) {
+            return true
+        }
+    }
+
+    fun getSavedLastSyncTime(): Long {
+        val prefs = getApplication<Application>().getSharedPreferences("cafeteria_cache", Context.MODE_PRIVATE)
+        return prefs.getLong("last_menu_sync_timestamp", 0L)
+    }
+
+    fun saveLastSyncTime(timestamp: Long) {
+        val prefs = getApplication<Application>().getSharedPreferences("cafeteria_cache", Context.MODE_PRIVATE)
+        prefs.edit().putLong("last_menu_sync_timestamp", timestamp).apply()
+        _lastSyncTime.value = timestamp
+    }
+
+    private val networkCallback = object : ConnectivityManager.NetworkCallback() {
+        override fun onAvailable(network: android.net.Network) {
+            _isOnline.value = true
+        }
+        override fun onLost(network: android.net.Network) {
+            _isOnline.value = false
+        }
+    }
 
     // 1. Session State managers
     private val _currentUser = MutableStateFlow<User?>(null)
@@ -278,12 +321,30 @@ class CafeteriaViewModel(application: Application) : AndroidViewModel(applicatio
     private val seenNotificationIds = java.util.Collections.synchronizedSet(mutableSetOf<String>())
     private var isFirstNotificationLoad = true
 
+    private val completedOrderIds = java.util.Collections.synchronizedSet(mutableSetOf<Int>())
+    private var vendorMetricsPollingJob: kotlinx.coroutines.Job? = null
+
     init {
+        try {
+            val request = NetworkRequest.Builder()
+                .addCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET)
+                .build()
+            connectivityManager.registerNetworkCallback(request, networkCallback)
+        } catch (e: Exception) {
+            Log.e("CafeteriaViewModel", "Failed to register network callback", e)
+        }
+
         viewModelScope.launch {
             // Guarantee Seeding occurs on first start
             repository.seedDatabaseIfEmpty()
             if (LaravelClientManager.isLaravelEnabled) {
-                repository.syncAllFromLaravel()
+                val success = repository.syncAllFromLaravel()
+                if (success) {
+                    saveLastSyncTime(System.currentTimeMillis())
+                    _isOnline.value = true
+                } else {
+                    _isOnline.value = false
+                }
             }
         }
         viewModelScope.launch {
@@ -310,15 +371,21 @@ class CafeteriaViewModel(application: Application) : AndroidViewModel(applicatio
                         refreshVendorPerformance(user.id)
                         // Trigger Laravel Echo socket connection pipeline
                         LaravelEchoWebSocketManager.startListening(user.id, "VENDOR")
-                    } else if (user.role == "STUDENT") {
-                        // Trigger Laravel Echo socket pipeline for student channels
-                        LaravelEchoWebSocketManager.startListening(user.id, "STUDENT")
-                    } else if (user.role.equals("ADMIN", ignoreCase = true)) {
-                        LaravelEchoWebSocketManager.startListening(user.id, "ADMIN")
+                        // Start polling metrics
+                        startVendorMetricsPolling(user.id)
                     } else {
-                        LaravelEchoWebSocketManager.stopListening()
+                        stopVendorMetricsPolling()
+                        if (user.role == "STUDENT") {
+                            // Trigger Laravel Echo socket pipeline for student channels
+                            LaravelEchoWebSocketManager.startListening(user.id, "STUDENT")
+                        } else if (user.role.equals("ADMIN", ignoreCase = true)) {
+                            LaravelEchoWebSocketManager.startListening(user.id, "ADMIN")
+                        } else {
+                            LaravelEchoWebSocketManager.stopListening()
+                        }
                     }
                 } else {
+                    stopVendorMetricsPolling()
                     LaravelEchoWebSocketManager.stopListening()
                 }
             }
@@ -648,12 +715,14 @@ class CafeteriaViewModel(application: Application) : AndroidViewModel(applicatio
                 if (orders.isEmpty()) {
                     isFirstOrderLoad = true
                     seenOrderIds.clear()
+                    completedOrderIds.clear()
                     return@collect
                 }
 
                 if (isFirstOrderLoad) {
                     // Populate seen on initial load so we don't alert pre-existing historic entries
                     orders.forEach { seenOrderIds.add(it.id) }
+                    orders.filter { it.status == "COMPLETED" || it.status == "DELIVERED" }.forEach { completedOrderIds.add(it.id) }
                     isFirstOrderLoad = false
                 } else {
                     // Find any newly received PENDING orders that weren't cached in our seen order IDs set
@@ -664,6 +733,22 @@ class CafeteriaViewModel(application: Application) : AndroidViewModel(applicatio
                             playSoundNotification()
                         }
                         _newOrderAlerts.value = _newOrderAlerts.value + newPending
+                    }
+
+                    // Check for newly completed or delivered orders to trigger real-time metrics refresh
+                    val currentCompleted = orders.filter { it.status == "COMPLETED" || it.status == "DELIVERED" }
+                    var hasNewCompleted = false
+                    currentCompleted.forEach { order ->
+                        if (!completedOrderIds.contains(order.id)) {
+                            completedOrderIds.add(order.id)
+                            hasNewCompleted = true
+                        }
+                    }
+                    if (hasNewCompleted) {
+                        Log.d("CafeteriaViewModel", "Real-time event: New completed order detected. Refreshing performance/revenue KPIs.")
+                        _currentUser.value?.id?.let { uid ->
+                            refreshVendorPerformance(uid)
+                        }
                     }
                 }
             }
@@ -771,7 +856,13 @@ class CafeteriaViewModel(application: Application) : AndroidViewModel(applicatio
         viewModelScope.launch {
             _isLoading.value = true
             try {
-                repository.syncAllFromLaravel()
+                val success = repository.syncAllFromLaravel()
+                if (success) {
+                    saveLastSyncTime(System.currentTimeMillis())
+                    _isOnline.value = true
+                } else {
+                    _isOnline.value = false
+                }
                 val usr = _currentUser.value
                 if (usr != null) {
                     val refreshed = repository.userDao.getUserSync(usr.id)
@@ -780,8 +871,9 @@ class CafeteriaViewModel(application: Application) : AndroidViewModel(applicatio
                     }
                 }
                 _isLoading.value = false
-                onResult(true)
+                onResult(success)
             } catch (e: Exception) {
+                _isOnline.value = false
                 _isLoading.value = false
                 onResult(false)
             }
@@ -1917,8 +2009,31 @@ class CafeteriaViewModel(application: Application) : AndroidViewModel(applicatio
         }
     }
 
+    fun startVendorMetricsPolling(vendorId: Int) {
+        vendorMetricsPollingJob?.cancel()
+        vendorMetricsPollingJob = viewModelScope.launch {
+            while (true) {
+                delay(20000)
+                Log.d("CafeteriaViewModel", "Polling: Refreshing vendor performance metrics for vendor $vendorId")
+                refreshVendorPerformance(vendorId)
+            }
+        }
+    }
+
+    fun stopVendorMetricsPolling() {
+        vendorMetricsPollingJob?.cancel()
+        vendorMetricsPollingJob = null
+        Log.d("CafeteriaViewModel", "Polling: Vendor metrics polling stopped.")
+    }
+
     override fun onCleared() {
         super.onCleared()
+        stopVendorMetricsPolling()
         LaravelEchoWebSocketManager.stopListening()
+        try {
+            connectivityManager.unregisterNetworkCallback(networkCallback)
+        } catch (e: Exception) {
+            // Ignore
+        }
     }
 }

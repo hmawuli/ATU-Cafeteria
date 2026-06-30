@@ -3,6 +3,10 @@ import com.example.ui.util.generatePdfReceipt
 
 import androidx.compose.animation.*
 import androidx.compose.animation.core.*
+import androidx.compose.ui.composed
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsPressedAsState
+import androidx.compose.foundation.LocalIndication
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -80,6 +84,44 @@ fun RatingMetricBadge(label: String, value: Double) {
         }
     }
 }
+ 
+fun Modifier.bounceClickable(
+    enabled: Boolean = true,
+    onClick: () -> Unit
+) = composed {
+    val interactionSource = remember { MutableInteractionSource() }
+    val isPressed by interactionSource.collectIsPressedAsState()
+    val scale by animateFloatAsState(
+        targetValue = if (isPressed && enabled) 0.96f else 1f,
+        animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessLow),
+        label = "bounceScale"
+    )
+
+    this
+        .graphicsLayer {
+            scaleX = scale
+            scaleY = scale
+        }
+        .clickable(
+            interactionSource = interactionSource,
+            indication = LocalIndication.current,
+            enabled = enabled,
+            onClick = onClick
+        )
+}
+
+fun Modifier.pressScaleEffect(interactionSource: MutableInteractionSource) = composed {
+    val isPressed by interactionSource.collectIsPressedAsState()
+    val scale by animateFloatAsState(
+        targetValue = if (isPressed) 0.95f else 1f,
+        animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessLow),
+        label = "pressScale"
+    )
+    this.graphicsLayer {
+        scaleX = scale
+        scaleY = scale
+    }
+}
 
 // ==========================================
 // 3. STUDENT FOOD ORDERING & RATING PORTAL
@@ -93,6 +135,8 @@ fun StudentDashboardScreen(
     modifier: Modifier = Modifier
 ) {
     val currentUser by viewModel.currentUser.collectAsStateWithLifecycle()
+    val isOnline by viewModel.isOnline.collectAsStateWithLifecycle()
+    val lastSyncTime by viewModel.lastSyncTime.collectAsStateWithLifecycle()
     val allFoodItems by viewModel.allFoodItems.collectAsStateWithLifecycle()
     val studentOrders by viewModel.customerOrders.collectAsStateWithLifecycle()
     val allVendors by viewModel.allVendors.collectAsStateWithLifecycle()
@@ -438,7 +482,7 @@ fun StudentDashboardScreen(
                                         .height(36.dp)
                                         .clip(RoundedCornerShape(20.dp))
                                         .background(if (selected) MaterialTheme.colorScheme.primary else Color.Transparent)
-                                        .clickable { browseSelectionTab = if (tabName == "Dishes Menu") "Dishes" else "Vendors" }
+                                        .bounceClickable { browseSelectionTab = if (tabName == "Dishes Menu") "Dishes" else "Vendors" }
                                         .testTag("browse_selection_tab_${tabName.replace(" ", "_").lowercase()}"),
                                     contentAlignment = Alignment.Center
                                 ) {
@@ -447,6 +491,115 @@ fun StudentDashboardScreen(
                                         color = if (selected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant,
                                         style = MaterialTheme.typography.labelMedium,
                                         fontWeight = FontWeight.Bold
+                                    )
+                                }
+                            }
+                        }
+
+                        // Offline / Caching Layer Status Card
+                        if (!isOnline) {
+                            Card(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(horizontal = 16.dp, vertical = 6.dp)
+                                    .testTag("offline_cache_banner"),
+                                colors = CardDefaults.cardColors(
+                                    containerColor = MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.9f)
+                                ),
+                                shape = RoundedCornerShape(12.dp),
+                                border = BorderStroke(1.dp, MaterialTheme.colorScheme.error.copy(alpha = 0.5f))
+                            ) {
+                                Row(
+                                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 10.dp),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.CloudOff,
+                                        contentDescription = "Offline Cache",
+                                        tint = MaterialTheme.colorScheme.onErrorContainer,
+                                        modifier = Modifier.size(20.dp)
+                                    )
+                                    Column(modifier = Modifier.weight(1f)) {
+                                        Text(
+                                            text = "Intermittent Campus Internet Detected",
+                                            color = MaterialTheme.colorScheme.onErrorContainer,
+                                            style = MaterialTheme.typography.labelMedium,
+                                            fontWeight = FontWeight.Bold
+                                        )
+                                        if (lastSyncTime > 0L) {
+                                            val dateStr = remember(lastSyncTime) {
+                                                val sdf = java.text.SimpleDateFormat("MMM dd, yyyy 'at' hh:mm a", java.util.Locale.getDefault())
+                                                sdf.format(java.util.Date(lastSyncTime))
+                                            }
+                                            Text(
+                                                text = "Viewing cached menu from local storage ($dateStr)",
+                                                color = MaterialTheme.colorScheme.onErrorContainer.copy(alpha = 0.8f),
+                                                style = MaterialTheme.typography.bodySmall
+                                            )
+                                        } else {
+                                            Text(
+                                                text = "Viewing cached menu from offline database",
+                                                color = MaterialTheme.colorScheme.onErrorContainer.copy(alpha = 0.8f),
+                                                style = MaterialTheme.typography.bodySmall
+                                            )
+                                        }
+                                    }
+                                    // Dynamic refresh/retry button
+                                    var isRefreshingLocal by remember { mutableStateOf(false) }
+                                    IconButton(
+                                        onClick = {
+                                            isRefreshingLocal = true
+                                            viewModel.syncAllFromLaravel { success ->
+                                                isRefreshingLocal = false
+                                            }
+                                        },
+                                        modifier = Modifier.size(28.dp).testTag("offline_cache_retry_button")
+                                    ) {
+                                        if (isRefreshingLocal) {
+                                            CircularProgressIndicator(
+                                                modifier = Modifier.size(16.dp),
+                                                strokeWidth = 2.dp,
+                                                color = MaterialTheme.colorScheme.onErrorContainer
+                                            )
+                                        } else {
+                                            Icon(
+                                                imageVector = Icons.Default.Refresh,
+                                                contentDescription = "Retry Connection",
+                                                tint = MaterialTheme.colorScheme.onErrorContainer,
+                                                modifier = Modifier.size(16.dp)
+                                            )
+                                        }
+                                    }
+                                }
+                            }
+                        } else if (lastSyncTime > 0L) {
+                            // Subtle Online/Cached Sync Confirmation
+                            Card(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(horizontal = 16.dp, vertical = 6.dp)
+                                    .testTag("online_sync_banner"),
+                                colors = CardDefaults.cardColors(
+                                    containerColor = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.3f)
+                                ),
+                                shape = RoundedCornerShape(12.dp)
+                            ) {
+                                Row(
+                                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                ) {
+                                    Box(
+                                        modifier = Modifier
+                                            .size(8.dp)
+                                            .background(Color(0xFF4CAF50), shape = CircleShape)
+                                    )
+                                    Text(
+                                        text = "Connected to ATU Campus Network • Menu synced with local cache",
+                                        color = MaterialTheme.colorScheme.onSecondaryContainer,
+                                        style = MaterialTheme.typography.bodySmall,
+                                        modifier = Modifier.weight(1f)
                                     )
                                 }
                             }
@@ -1130,7 +1283,7 @@ fun StudentDashboardScreen(
                                         Card(
                                             modifier = Modifier
                                                 .width(130.dp)
-                                                .clickable { selectedVendorIdFilter = null },
+                                                .bounceClickable { selectedVendorIdFilter = null },
                                             shape = RoundedCornerShape(12.dp),
                                             colors = CardDefaults.cardColors(
                                                 containerColor = if (isSelected) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surface
@@ -1165,7 +1318,7 @@ fun StudentDashboardScreen(
                                         Card(
                                             modifier = Modifier
                                                 .width(155.dp)
-                                                .clickable { selectedVendorIdFilter = v.id },
+                                                .bounceClickable { selectedVendorIdFilter = v.id },
                                             shape = RoundedCornerShape(12.dp),
                                             colors = CardDefaults.cardColors(
                                                 containerColor = if (isSelected) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surface
@@ -1568,8 +1721,14 @@ fun StudentDashboardScreen(
                         } else {
                             items(filteredFoods) { food ->
                                 val vendor = allVendors.find { it.id == food.vendorId }
+                                val vendorIsOpen = vendor?.isOpen ?: true
                                 Card(
-                                    modifier = Modifier.fillMaxWidth(),
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .bounceClickable(enabled = vendorIsOpen) {
+                                            orderQuantity = 1
+                                            selectedFoodForOrder = food
+                                        },
                                     shape = RoundedCornerShape(12.dp),
                                     colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
                                 ) {
@@ -6848,7 +7007,7 @@ fun StudentDashboardScreen(
                                                 }
                                             }
                                     ) {
-                                        Text(if (checkoutPaymentMode == "GATEWAY") "Authorize Direct Pay" else "Verify & Route Order")
+                                        Text("Place Order")
                                     }
                                 }
                             }
