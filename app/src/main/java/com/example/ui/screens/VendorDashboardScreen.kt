@@ -3739,7 +3739,7 @@ fun VendorDashboardScreen(
                         }
 
                         // 1c. d3.js Interactive Dashboard Chart View
-                        D3DashboardChart(orders = filteredIncomingOrders, modifier = Modifier.fillMaxWidth())
+                        D3DashboardChart(orders = filteredIncomingOrders, feedbacks = filteredFeedbackList, modifier = Modifier.fillMaxWidth())
 
                         Spacer(modifier = Modifier.height(8.dp))
 
