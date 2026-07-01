@@ -2236,7 +2236,7 @@ fun StudentDashboardScreen(
                                                 "PENDING" -> Color(0xFFF9A825) // Amber
                                                 "PREPARING" -> Color(0xFF1976D2) // Blue
                                                 "READY" -> Color(0xFF2E7D32) // Green
-                                                "COMPLETED" -> Color(0xFF4CAF50) // Emerald Green
+                                                "COMPLETED", "DELIVERED" -> Color(0xFF4CAF50) // Emerald Green
                                                 else -> MaterialTheme.colorScheme.primary
                                             }
                                             Box(
@@ -2249,8 +2249,8 @@ fun StudentDashboardScreen(
                                                     text = when (order.status.uppercase()) {
                                                         "PENDING" -> "Order Received"
                                                         "PREPARING" -> "Preparing"
-                                                        "READY" -> "Ready for Pickup"
-                                                        "COMPLETED" -> "Completed"
+                                                        "READY" -> "Ready for Pickup/Delivery"
+                                                        "COMPLETED", "DELIVERED" -> "Delivered"
                                                         else -> order.status
                                                     },
                                                     color = Color.White,
@@ -2265,12 +2265,12 @@ fun StudentDashboardScreen(
                                         Spacer(modifier = Modifier.height(12.dp))
 
                                         // Stepper progress timeline helper
-                                        val steps = listOf("Received", "Preparing", "Ready", "Completed")
+                                        val steps = listOf("Order Received", "Preparing", "Ready for Pickup/Delivery", "Delivered")
                                         val activeStep = when (order.status.uppercase()) {
                                             "PENDING" -> 0
                                             "PREPARING" -> 1
                                             "READY" -> 2
-                                            "COMPLETED" -> 3
+                                            "COMPLETED", "DELIVERED" -> 3
                                             else -> 0
                                         }
 

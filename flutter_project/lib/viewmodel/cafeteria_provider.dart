@@ -582,7 +582,7 @@ class CafeteriaProvider extends ChangeNotifier {
       unitPrice: foodItem.price,
       totalPrice: requiredSum,
       orderTimestamp: DateTime.now().millisecondsSinceEpoch,
-      status: "Order Placed",
+      status: "Order Received",
       pickupPin: pickupPin,
     );
 
@@ -655,11 +655,11 @@ class CafeteriaProvider extends ChangeNotifier {
       try {
         final order = orderList.firstWhere((o) => o.id == orderId);
         String nextStatus;
-        if (order.status == 'Order Placed') {
+        if (order.status == 'Order Placed' || order.status == 'Order Received' || order.status == 'PENDING') {
           nextStatus = 'Preparing';
-        } else if (order.status == 'Preparing') {
-          nextStatus = 'Out for Delivery';
-        } else if (order.status == 'Out for Delivery') {
+        } else if (order.status == 'Preparing' || order.status == 'PREPARING') {
+          nextStatus = 'Ready for Pickup/Delivery';
+        } else if (order.status == 'Out for Delivery' || order.status == 'Ready for Pickup/Delivery' || order.status == 'READY') {
           nextStatus = 'Delivered';
         } else {
           return; // Already completed or cancelled

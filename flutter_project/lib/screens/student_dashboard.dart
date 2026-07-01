@@ -878,9 +878,9 @@ class _StudentDashboardScreenState extends State<StudentDashboardScreen> {
     }
 
     final stages = [
-      {'label': 'Received', 'icon': Icons.assignment_turned_in},
+      {'label': 'Order Received', 'icon': Icons.assignment_turned_in},
       {'label': 'Preparing', 'icon': Icons.soup_kitchen},
-      {'label': 'Out for Delivery', 'icon': Icons.delivery_dining},
+      {'label': 'Ready for Pickup/Delivery', 'icon': Icons.delivery_dining},
       {'label': 'Delivered', 'icon': Icons.check_circle},
     ];
 
