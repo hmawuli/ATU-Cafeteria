@@ -317,6 +317,8 @@ class CafeteriaViewModel(application: Application) : AndroidViewModel(applicatio
     val dispatchedPushNotifications: StateFlow<List<MockPushNotification>> = _dispatchedPushNotifications.asStateFlow()
 
     private val localSeenReadyOrderIds = java.util.Collections.synchronizedSet(mutableSetOf<Int>())
+    private val localSeenDeliveredOrderIds = java.util.Collections.synchronizedSet(mutableSetOf<Int>())
+    private val localSeenPreparingOrderIds = java.util.Collections.synchronizedSet(mutableSetOf<Int>())
 
     private val seenNotificationIds = java.util.Collections.synchronizedSet(mutableSetOf<String>())
     private var isFirstNotificationLoad = true
@@ -504,22 +506,71 @@ class CafeteriaViewModel(application: Application) : AndroidViewModel(applicatio
                 
                 if (isFirstCollection) {
                     currentOrders.forEach { order ->
+                        if (order.status.uppercase() == "PREPARING") {
+                            localSeenPreparingOrderIds.add(order.id)
+                        }
                         if (order.status.uppercase() == "READY") {
                             localSeenReadyOrderIds.add(order.id)
+                        }
+                        if (order.status.uppercase() == "DELIVERED" || order.status.uppercase() == "COMPLETED") {
+                            localSeenDeliveredOrderIds.add(order.id)
                         }
                     }
                     isFirstCollection = false
                 } else {
                     currentOrders.forEach { order ->
+                        val user = _currentUser.value
+                        val studentEmail = if (user?.username?.contains("@") == true) user.username else "${user?.username ?: "student"}@atu.edu.gh"
+                        val itemName = order.foodName
+                        val vendorName = allUsers.value.find { it.id == order.vendorId }?.fullName ?: "Vendor #${order.vendorId}"
+                        val pPin = order.pickupPin
+                        val pPrice = order.totalPrice
+
+                        if (order.status.uppercase() == "PREPARING" && !localSeenPreparingOrderIds.contains(order.id)) {
+                            localSeenPreparingOrderIds.add(order.id)
+                            
+                            // Send simulated Email Notification (Laravel Mail Channel)
+                            if (isEmailNotificationEnabled.value) {
+                                val subject = "📧 [SMTP Laravel Mailer] Order #${order.id} is Preparing!"
+                                val body = """
+                                    Hello ${user?.fullName ?: "Student"},
+                                    
+                                    Great news! Your order #${order.id} for "$itemName" from $vendorName has successfully moved to the preparation floor!
+                                    
+                                    Estimated preparation time: ${order.estimatedPickupTime}
+                                    
+                                    We will notify you immediately once it is hot & ready for retrieval!
+                                    
+                                    Warm regards,
+                                    Accra Technical University Food Court System.
+                                """.trimIndent()
+                                
+                                val emailNotif = MockEmailNotification(
+                                    id = java.util.UUID.randomUUID().toString(),
+                                    orderId = order.id,
+                                    studentEmail = studentEmail,
+                                    vendorName = vendorName,
+                                    itemName = itemName,
+                                    subject = subject,
+                                    body = body
+                                )
+                                _dispatchedEmails.value = _dispatchedEmails.value + emailNotif
+                            }
+                            
+                            // Send simulated Push Notification (Laravel FCM Push Channel)
+                            if (isPushNotificationEnabled.value) {
+                                val pushNotif = MockPushNotification(
+                                    id = java.util.UUID.randomUUID().toString(),
+                                    orderId = order.id,
+                                    title = "📱 [Laravel FCM] Order is Being Prepared!",
+                                    body = "Vendor $vendorName is now preparing your '$itemName'! Estimated: ${order.estimatedPickupTime}."
+                                )
+                                _dispatchedPushNotifications.value = _dispatchedPushNotifications.value + pushNotif
+                            }
+                        }
+
                         if (order.status.uppercase() == "READY" && !localSeenReadyOrderIds.contains(order.id)) {
                             localSeenReadyOrderIds.add(order.id)
-                            
-                            val user = _currentUser.value
-                            val studentEmail = if (user?.username?.contains("@") == true) user.username else "${user?.username ?: "student"}@atu.edu.gh"
-                            val itemName = order.foodName
-                            val vendorName = allUsers.value.find { it.id == order.vendorId }?.fullName ?: "Vendor #${order.vendorId}"
-                            val pPin = order.pickupPin
-                            val pPrice = order.totalPrice
                             
                             // Send simulated Email Notification (Laravel Mail Channel)
                             if (isEmailNotificationEnabled.value) {
@@ -555,6 +606,47 @@ class CafeteriaViewModel(application: Application) : AndroidViewModel(applicatio
                                     orderId = order.id,
                                     title = "📱 [Laravel FCM] Order Ready for Pickup!",
                                     body = "Your food '$itemName' from $vendorName is hot & ready! Use Ticket Pin: $pPin."
+                                )
+                                _dispatchedPushNotifications.value = _dispatchedPushNotifications.value + pushNotif
+                            }
+                        }
+
+                        if ((order.status.uppercase() == "DELIVERED" || order.status.uppercase() == "COMPLETED") && !localSeenDeliveredOrderIds.contains(order.id)) {
+                            localSeenDeliveredOrderIds.add(order.id)
+
+                            // Send simulated Email Notification (Laravel Mail Channel)
+                            if (isEmailNotificationEnabled.value) {
+                                val subject = "📧 [SMTP Laravel Mailer] Order #${order.id} Delivered!"
+                                val body = """
+                                    Hello ${user?.fullName ?: "Student"},
+                                    
+                                    Your order #${order.id} for "$itemName" from $vendorName has been successfully delivered and handed over.
+                                    
+                                    We value your dining experience! Please rate the vendor booth inside the app to help maintain Accra Technical food standards.
+                                    
+                                    Warm regards,
+                                    Accra Technical University Food Court System.
+                                """.trimIndent()
+                                
+                                val emailNotif = MockEmailNotification(
+                                    id = java.util.UUID.randomUUID().toString(),
+                                    orderId = order.id,
+                                    studentEmail = studentEmail,
+                                    vendorName = vendorName,
+                                    itemName = itemName,
+                                    subject = subject,
+                                    body = body
+                                )
+                                _dispatchedEmails.value = _dispatchedEmails.value + emailNotif
+                            }
+
+                            // Send simulated Push Notification (Laravel FCM Push Channel)
+                            if (isPushNotificationEnabled.value) {
+                                val pushNotif = MockPushNotification(
+                                    id = java.util.UUID.randomUUID().toString(),
+                                    orderId = order.id,
+                                    title = "📱 [Laravel FCM] Order Delivered! Rate Vendor",
+                                    body = "Your order of '$itemName' has been marked Delivered. Tap here to rate $vendorName now!"
                                 )
                                 _dispatchedPushNotifications.value = _dispatchedPushNotifications.value + pushNotif
                             }
@@ -2024,6 +2116,32 @@ class CafeteriaViewModel(application: Application) : AndroidViewModel(applicatio
         vendorMetricsPollingJob?.cancel()
         vendorMetricsPollingJob = null
         Log.d("CafeteriaViewModel", "Polling: Vendor metrics polling stopped.")
+    }
+
+    fun studentConfirmReceipt(orderId: Int) {
+        viewModelScope.launch {
+            val student = _currentUser.value ?: return@launch
+            val order = repository.orderDao.getOrderById(orderId) ?: return@launch
+            
+            // Update order status to "DELIVERED"
+            repository.updateOrderStatus(order.vendorId, orderId, "DELIVERED")
+            
+            // Log in the audit log
+            repository.insertAuditLog(student.id, "CUSTOMER_RECEIVED_ORDER", "Student ${student.fullName} confirmed receipt of Order #${orderId} (${order.foodName})")
+            
+            // Send in-app notification alert to the vendor
+            val alertMessage = "Student ${student.fullName} confirmed receipt of Order #${orderId} for '${order.foodName}'!"
+            val notif = VendorInventoryNotification(
+                id = "CONFIRM_RECEIPT_${orderId}_${System.currentTimeMillis()}",
+                foodItemId = order.foodItemId,
+                foodName = order.foodName,
+                type = "DELIVERED",
+                message = alertMessage,
+                timestamp = System.currentTimeMillis()
+            )
+            _vendorInventoryNotifications.value = listOf(notif) + _vendorInventoryNotifications.value
+            playSoundNotification()
+        }
     }
 
     override fun onCleared() {
