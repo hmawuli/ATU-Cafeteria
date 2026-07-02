@@ -24,6 +24,27 @@ class SendOrderReadyNotification
             $student = User::find($studentId);
             if ($student) {
                 $student->notify(new OrderReadyNotification($order));
+
+                // Dispatch FCM Push notification
+                $fcmToken = null;
+                if ($student->profile_info && is_array($student->profile_info)) {
+                    $fcmToken = $student->profile_info['fcm_token'] ?? null;
+                }
+
+                // Fallback token for simulation/development testing
+                if (!$fcmToken) {
+                    $fcmToken = "simulated-fcm-token-student-id-{$student->id}";
+                }
+
+                $title = "Order Ready for Pickup! 🍔";
+                $body = "Your order #{$order->id} ('{$order->food_name}') is ready! Pickup PIN: {$order->pickup_pin}.";
+                $data = [
+                    'order_id' => strval($order->id),
+                    'pickup_pin' => strval($order->pickup_pin),
+                    'status' => 'READY',
+                ];
+
+                \App\Services\FcmService::sendPush($fcmToken, $title, $body, $data);
             }
         }
     }

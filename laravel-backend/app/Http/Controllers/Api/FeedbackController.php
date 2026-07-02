@@ -82,4 +82,43 @@ class FeedbackController extends Controller
 
         return response()->json($feedback, 201);
     }
+
+    /**
+     * Remove the specified feedback from storage.
+     */
+    public function destroy($id)
+    {
+        $feedback = Feedback::find($id);
+        if (!$feedback) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Feedback record not found.'
+            ], 404);
+        }
+
+        $user = request()->user();
+        if (!$user || strtoupper($user->role) !== 'ADMIN') {
+            return response()->json([
+                'success' => false,
+                'message' => 'Unauthorized. This endpoint requires ADMIN privileges.'
+            ], 403);
+        }
+
+        DB::transaction(function () use ($feedback, $user) {
+            $feedback->delete();
+
+            // Register Audit Log
+            AuditLog::create([
+                'user_id' => $user->id,
+                'timestamp' => time() * 1000,
+                'action' => 'FEEDBACK_DELETED',
+                'details' => "Administrator deleted feedback item #{$feedback->id} (Order #{$feedback->order_id}).",
+            ]);
+        });
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Feedback record deleted successfully.'
+        ], 200);
+    }
 }

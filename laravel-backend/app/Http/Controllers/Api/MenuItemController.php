@@ -216,4 +216,42 @@ class MenuItemController extends Controller
             'message' => 'Menu item deleted successfully.'
         ], 200);
     }
+
+    /**
+     * Delete/remove an existing menu item (Admin only).
+     */
+    public function destroyAdmin(Request $request, $id)
+    {
+        $item = MenuItem::find($id);
+        if (!$item) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Menu item not found.'
+            ], 404);
+        }
+
+        $user = $request->user();
+        if (!$user || strtoupper($user->role) !== 'ADMIN') {
+            return response()->json([
+                'success' => false,
+                'message' => 'Unauthorized. Only administrative personnel can delete menu items.'
+            ], 403);
+        }
+
+        DB::transaction(function () use ($item, $user) {
+            $item->delete(); // Soft delete
+
+            AuditLog::create([
+                'user_id' => $user->id,
+                'timestamp' => time() * 1000,
+                'action' => 'MENU_ITEM_DELETED',
+                'details' => "Administrator deleted menu item ID: {$item->id} ('{$item->food_name}').",
+            ]);
+        });
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Menu item deleted successfully.'
+        ], 200);
+    }
 }

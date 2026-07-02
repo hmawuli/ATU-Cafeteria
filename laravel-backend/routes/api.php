@@ -118,6 +118,26 @@ $checkVendor = function ($request, $next) {
     return $next($request);
 };
 
+$checkAdmin = function ($request, $next) {
+    $user = $request->user();
+    if (!$user) {
+        return response()->json([
+            'success' => false,
+            'message' => 'Unauthenticated.'
+        ], 401);
+    }
+    
+    $role = strtoupper($user->role);
+    if ($role !== 'ADMIN') {
+        return response()->json([
+            'success' => false,
+            'message' => 'Unauthorized. This endpoint requires ADMIN privileges.'
+        ], 403);
+    }
+    
+    return $next($request);
+};
+
 // Protected Authenticated Endpoints - Supports both Sanctum and Secure JWT Auth
 Route::middleware(function ($request, $next) {
     $authHeader = $request->header('Authorization') ?: $request->header('X-Auth-Token');
@@ -127,27 +147,81 @@ Route::middleware(function ($request, $next) {
         $token = $authHeader;
     }
 
+    $jwtUser = null;
     if ($token) {
-        $user = \App\Services\JwtService::getUserFromToken($token);
-        if ($user) {
-            auth()->setUser($user);
-            $request->setUserResolver(function () use ($user) {
-                return $user;
+        $jwtUser = \App\Services\JwtService::getUserFromToken($token);
+        if ($jwtUser) {
+            auth()->setUser($jwtUser);
+            $request->setUserResolver(function () use ($jwtUser) {
+                return $jwtUser;
             });
-            return $next($request);
         }
     }
 
+    // Enforce Inactivity Session Timeout for Mobile App Users (STUDENT role)
+    $enforceTimeout = function ($user) {
+        if ($user && strtoupper($user->role) === 'STUDENT') {
+            $lastActivity = null;
+            if ($user->profile_info && is_array($user->profile_info)) {
+                $lastActivity = $user->profile_info['last_activity_at'] ?? null;
+            }
+
+            $timeoutDuration = 900; // 15 minutes inactivity timeout (900 seconds)
+
+            if ($lastActivity && (time() - $lastActivity) > $timeoutDuration) {
+                // Revoke current Sanctum access tokens
+                if (method_exists($user, 'tokens')) {
+                    $user->tokens()->delete();
+                }
+
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Session expired due to inactivity. Please log in again.'
+                ], 401);
+            }
+
+            // Update last activity timestamp
+            $profile = is_array($user->profile_info) ? $user->profile_info : [];
+            $profile['last_activity_at'] = time();
+            $user->profile_info = $profile;
+            $user->save();
+        }
+        return null;
+    };
+
+    if ($jwtUser) {
+        $timeoutResponse = $enforceTimeout($jwtUser);
+        if ($timeoutResponse) {
+            return $timeoutResponse;
+        }
+        return $next($request);
+    }
+
     // Pass through Sanctum if no JWT was validated
-    return app(\Illuminate\Auth\Middleware\Authenticate::class)->handle($request, function ($req) use ($next) {
+    return app(\Illuminate\Auth\Middleware\Authenticate::class)->handle($request, function ($req) use ($next, $enforceTimeout) {
+        $user = $req->user();
+        if ($user) {
+            $timeoutResponse = $enforceTimeout($user);
+            if ($timeoutResponse) {
+                return $timeoutResponse;
+            }
+        }
         return $next($req);
     }, 'sanctum');
-})->group(function () use ($checkStudent, $checkVendor) {
+})->group(function () use ($checkStudent, $checkVendor, $checkAdmin) {
     Route::post('/logout', [AuthController::class, 'logout']);
     Route::post('/user/profile', [AuthController::class, 'updateProfile']);
-    Route::delete('/users/{id}', [AuthController::class, 'deleteUser']);
     Route::post('/orders/{id}/cancel', [OrderController::class, 'cancel']);
     Route::get('/orders/{id}/tracking', [OrderController::class, 'trackOrderRealTime']);
+
+    // --- Admin-Only Data Deletion Endpoints ---
+    Route::middleware($checkAdmin)->group(function () {
+        Route::delete('/users/{id}', [AuthController::class, 'deleteUser']);
+        Route::delete('/feedback/{id}', [FeedbackController::class, 'destroy']);
+        Route::delete('/audit-logs/{id}', [AuditLogController::class, 'destroy']);
+        Route::delete('/orders/{id}', [OrderController::class, 'destroy']);
+        Route::delete('/menu-items/{id}', [MenuItemController::class, 'destroyAdmin']);
+    });
 
     // --- Student-Only Routes ---
     Route::middleware($checkStudent)->group(function () {

@@ -1033,4 +1033,42 @@ class OrderController extends Controller
             ], 500);
         }
     }
+
+    /**
+     * Remove the specified order from storage (Admin only).
+     */
+    public function destroy(Request $request, $id)
+    {
+        $order = Order::find($id);
+        if (!$order) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Order not found.'
+            ], 404);
+        }
+
+        $user = $request->user();
+        if (!$user || strtoupper($user->role) !== 'ADMIN') {
+            return response()->json([
+                'success' => false,
+                'message' => 'Unauthorized. Only administrative personnel can delete orders.'
+            ], 403);
+        }
+
+        DB::transaction(function () use ($order, $user) {
+            $order->delete(); // Soft delete
+
+            \App\Models\AuditLog::create([
+                'user_id' => $user->id,
+                'timestamp' => time() * 1000,
+                'action' => 'ORDER_DELETED',
+                'details' => "Administrator deleted order #{$order->id} ('{$order->food_name}').",
+            ]);
+        });
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Order deleted successfully.'
+        ], 200);
+    }
 }

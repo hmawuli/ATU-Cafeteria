@@ -160,6 +160,11 @@ class CafeteriaProvider extends ChangeNotifier {
   }
 
   Future<void> refreshAllData() async {
+    if (_authToken != null) {
+      await fetchAndCacheFeedback();
+      await fetchAndCacheAuditLogs();
+    }
+
     _allVendors = await _db.getAllVendors();
     _allFoodItems = await _db.getAllFoodItems();
     _allOrders = await _db.getAllOrders();
@@ -943,7 +948,53 @@ class CafeteriaProvider extends ChangeNotifier {
     );
 
     await _db.insertFeedback(feedback);
-    await _db.insertAuditLog(AuditLog(
+
+    // Sync feedback with Laravel API if authenticated
+    if (_authToken != null) {
+      try {
+        final url = Uri.parse("$_laravelBaseUrl/api/feedback");
+        final client = HttpClient();
+        client.connectionTimeout = const Duration(seconds: 4);
+        final request = await client.postUrl(url);
+        request.headers.add("Content-Type", "application/json");
+        request.headers.add("Authorization", "Bearer $_authToken");
+        request.add(utf8.encode(json.encode({
+          'order_id': orderId,
+          'vendor_id': vendorId,
+          'customer_id': _currentUser!.id,
+          'food_quality': quality,
+          'cleanliness': cleanliness,
+          'speed': speed,
+          'value': value,
+          'comment': comment,
+        })));
+        final response = await request.close();
+        if (response.statusCode == 201) {
+          final body = await response.transform(utf8.decoder).join();
+          final decoded = json.decode(body);
+          if (decoded != null && decoded['id'] != null) {
+            // Update local SQLite db with the server-generated feedback ID
+            final remoteFb = Feedback(
+              id: decoded['id'],
+              orderId: orderId,
+              vendorId: vendorId,
+              customerId: _currentUser!.id!,
+              ratingFoodQuality: quality,
+              ratingCleanliness: cleanliness,
+              ratingServiceSpeed: speed,
+              ratingPriceValue: value,
+              comment: comment,
+              timestamp: feedback.timestamp,
+            );
+            await _db.insertFeedback(remoteFb);
+          }
+        }
+      } catch (e) {
+        debugPrint("Campus network unstable: feedback saved to local SQLite cache only. Exception: $e");
+      }
+    }
+
+    await insertAuditLog(AuditLog(
       userId: _currentUser!.id!,
       action: "FEEDBACK_POSTED",
       details: "Feedback rating logged for order #$orderId.",
@@ -1173,5 +1224,144 @@ PREDICTIVE RECONSTRUCTIONS & NEXT STEPS:
 
     _isAnalyzing = false;
     notifyListeners();
+  }
+
+  Future<void> insertAuditLog(AuditLog log) async {
+    await _db.insertAuditLog(log);
+    if (_authToken != null) {
+      try {
+        final url = Uri.parse("$_laravelBaseUrl/api/audit-logs");
+        final client = HttpClient();
+        client.connectionTimeout = const Duration(seconds: 3);
+        final request = await client.postUrl(url);
+        request.headers.add("Content-Type", "application/json");
+        request.headers.add("Authorization", "Bearer $_authToken");
+        request.add(utf8.encode(json.encode({
+          'user_id': log.userId,
+          'action': log.action,
+          'details': log.details,
+        })));
+        await request.close();
+      } catch (e) {
+        debugPrint("Exception syncing audit log: $e");
+      }
+    }
+  }
+
+  Future<void> fetchAndCacheFeedback() async {
+    try {
+      final url = Uri.parse("$_laravelBaseUrl/api/feedback");
+      final client = HttpClient();
+      client.connectionTimeout = const Duration(seconds: 4);
+      final request = await client.getUrl(url);
+      request.headers.add("Authorization", "Bearer $_authToken");
+      final response = await request.close();
+      if (response.statusCode == 200) {
+        final body = await response.transform(utf8.decoder).join();
+        final List decoded = json.decode(body);
+        for (var item in decoded) {
+          final fb = Feedback(
+            id: item['id'],
+            orderId: item['order_id'],
+            vendorId: item['vendor_id'],
+            customerId: item['customer_id'],
+            ratingFoodQuality: item['rating_food_quality'],
+            ratingCleanliness: item['rating_cleanliness'],
+            ratingServiceSpeed: item['rating_service_speed'],
+            ratingPriceValue: item['rating_price_value'],
+            comment: item['comment'] ?? '',
+            timestamp: item['timestamp'] ?? DateTime.now().millisecondsSinceEpoch,
+          );
+          await _db.insertFeedback(fb);
+        }
+      }
+    } catch (e) {
+      debugPrint("Campus network unstable: cannot sync feedback from Laravel. $e");
+    }
+  }
+
+  Future<void> fetchAndCacheAuditLogs() async {
+    try {
+      final url = Uri.parse("$_laravelBaseUrl/api/audit-logs");
+      final client = HttpClient();
+      client.connectionTimeout = const Duration(seconds: 4);
+      final request = await client.getUrl(url);
+      request.headers.add("Authorization", "Bearer $_authToken");
+      final response = await request.close();
+      if (response.statusCode == 200) {
+        final body = await response.transform(utf8.decoder).join();
+        final List decoded = json.decode(body);
+        for (var item in decoded) {
+          final log = AuditLog(
+            id: item['id'],
+            userId: item['user_id'],
+            action: item['action'],
+            details: item['details'],
+            timestamp: item['timestamp'] ?? DateTime.now().millisecondsSinceEpoch,
+          );
+          await _db.insertAuditLog(log);
+        }
+      }
+    } catch (e) {
+      debugPrint("Campus network unstable: cannot sync audit logs from Laravel. $e");
+    }
+  }
+
+  Future<bool> deleteFeedback(int id) async {
+    // 1. Delete locally
+    await _db.deleteFeedback(id);
+
+    // 2. Delete remotely
+    bool remoteSuccess = false;
+    if (_authToken != null) {
+      try {
+        final url = Uri.parse("$_laravelBaseUrl/api/feedback/$id");
+        final client = HttpClient();
+        client.connectionTimeout = const Duration(seconds: 3);
+        final request = await client.deleteUrl(url);
+        request.headers.add("Authorization", "Bearer $_authToken");
+        final response = await request.close();
+        if (response.statusCode == 200) {
+          remoteSuccess = true;
+          debugPrint("Feedback deleted remotely from Laravel.");
+        } else {
+          debugPrint("Failed to delete feedback remotely. Code: ${response.statusCode}");
+        }
+      } catch (e) {
+        debugPrint("Exception deleting feedback remotely: $e");
+      }
+    }
+    
+    await refreshAllData();
+    return remoteSuccess || _authToken == null;
+  }
+
+  Future<bool> deleteAuditLog(int id) async {
+    // 1. Delete locally
+    await _db.deleteAuditLog(id);
+
+    // 2. Delete remotely
+    bool remoteSuccess = false;
+    if (_authToken != null) {
+      try {
+        final url = Uri.parse("$_laravelBaseUrl/api/audit-logs/$id");
+        final client = HttpClient();
+        client.connectionTimeout = const Duration(seconds: 3);
+        final request = await client.deleteUrl(url);
+        request.headers.add("Authorization", "Bearer $_authToken");
+        final response = await request.close();
+        if (response.statusCode == 200) {
+          remoteSuccess = true;
+          debugPrint("Audit log deleted remotely from Laravel.");
+        } else {
+          debugPrint("Failed to delete audit log remotely. Code: ${response.statusCode}");
+        }
+      } catch (e) {
+        debugPrint("Exception deleting audit log remotely: $e");
+      }
+    }
+    
+    await refreshAllData();
+    return remoteSuccess || _authToken == null;
   }
 }

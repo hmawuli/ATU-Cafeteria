@@ -46,4 +46,33 @@ class AuditLogController extends Controller
 
         return response()->json($log, 201);
     }
+
+    /**
+     * Remove the specified audit log from storage.
+     */
+    public function destroy($id)
+    {
+        $log = AuditLog::find($id);
+        if (!$log) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Audit log record not found.'
+            ], 404);
+        }
+
+        $user = request()->user();
+        if (!$user || strtoupper($user->role) !== 'ADMIN') {
+            return response()->json([
+                'success' => false,
+                'message' => 'Unauthorized. This endpoint requires ADMIN privileges.'
+            ], 403);
+        }
+
+        $log->delete();
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Audit log record deleted successfully.'
+        ], 200);
+    }
 }

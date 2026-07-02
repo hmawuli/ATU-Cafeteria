@@ -16,6 +16,7 @@ dependencies:
   google_generative_ai: ^0.2.0 # Incorporating real Gemini AI capabilities!
   shared_preferences: ^2.2.2
   crypto: ^3.0.3
+  webview_flutter: ^4.4.2
 
 dev_dependencies:
   flutter_test:

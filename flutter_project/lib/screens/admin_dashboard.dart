@@ -4,6 +4,7 @@ import 'package:intl/intl.dart';
 import '../models/models.dart';
 import '../viewmodel/cafeteria_provider.dart';
 import 'widgets/recharts_line_chart.dart';
+import 'widgets/d3_sentiment_chart.dart';
 
 class AdminDashboardScreen extends StatefulWidget {
   const AdminDashboardScreen({super.key});
@@ -141,6 +142,67 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                       vendorId: vendor.id ?? 1,
                     ),
                     const SizedBox(height: 16),
+
+                    const Divider(),
+                    const Text(
+                      "SCHOLAR REVIEW COMMENTS",
+                      style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Colors.blueGrey, letterSpacing: 0.5),
+                    ),
+                    const SizedBox(height: 8),
+                    vendorFeedback.isEmpty
+                        ? const Padding(
+                            padding: EdgeInsets.symmetric(vertical: 8.0),
+                            child: Text(
+                              "No student review comments logged for this vendor.",
+                              style: TextStyle(fontSize: 12, color: Colors.black54, fontStyle: FontStyle.italic),
+                            ),
+                          )
+                        : ListView.builder(
+                            shrinkWrap: true,
+                            physics: const NeverScrollableScrollPhysics(),
+                            itemCount: vendorFeedback.length,
+                            itemBuilder: (context, fbIndex) {
+                              final fb = vendorFeedback[fbIndex];
+                              final score = (fb.ratingFoodQuality + fb.ratingCleanliness + fb.ratingServiceSpeed + fb.ratingPriceValue) / 4.0;
+                              final dateStr = DateFormat('jm - d MMM yyyy').format(DateTime.fromMillisecondsSinceEpoch(fb.timestamp));
+
+                              return Card(
+                                elevation: 0.5,
+                                color: Colors.grey[50],
+                                margin: const EdgeInsets.only(bottom: 6),
+                                shape: RoundedRectangleBorder(
+                                  side: BorderSide(color: Colors.grey[200]!),
+                                  borderRadius: BorderRadius.circular(8),
+                                ),
+                                child: ListTile(
+                                  dense: true,
+                                  leading: CircleAvatar(
+                                    radius: 16,
+                                    backgroundColor: Colors.amberAccent[100],
+                                    child: Text(
+                                      score.toStringAsFixed(1),
+                                      style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Colors.black87),
+                                    ),
+                                  ),
+                                  title: Text(
+                                    fb.comment.isNotEmpty ? fb.comment : "No comments left.",
+                                    style: const TextStyle(fontSize: 12, fontStyle: FontStyle.italic),
+                                  ),
+                                  subtitle: Text(
+                                    "Posted: $dateStr",
+                                    style: const TextStyle(fontSize: 9, color: Colors.grey),
+                                  ),
+                                  trailing: IconButton(
+                                    icon: const Icon(Icons.delete_outline, color: Colors.redAccent, size: 18),
+                                    tooltip: "Delete Review",
+                                    onPressed: () => _confirmDeleteFeedback(context, provider, fb),
+                                  ),
+                                ),
+                              );
+                            },
+                          ),
+                    const Divider(),
+                    const SizedBox(height: 12),
 
                     ElevatedButton.icon(
                       icon: provider.isAnalyzing
@@ -551,6 +613,74 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
     );
   }
 
+  void _confirmDeleteFeedback(BuildContext context, CafeteriaProvider provider, Feedback fb) {
+    showDialog(
+      context: context,
+      builder: (ctx) {
+        return AlertDialog(
+          title: const Text("DELETE STUDENT REVIEW"),
+          content: Text("Are you sure you want to delete this review comment?\n\n\"${fb.comment}\""),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: const Text("CANCEL"),
+            ),
+            ElevatedButton(
+              style: ElevatedButton.styleFrom(backgroundColor: Colors.red, foregroundColor: Colors.white),
+              onPressed: () async {
+                final success = await provider.deleteFeedback(fb.id!);
+                if (mounted) {
+                  Navigator.pop(ctx);
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text(success ? "Review comment deleted." : "Failed to delete review."),
+                      backgroundColor: success ? Colors.green : Colors.red,
+                    ),
+                  );
+                }
+              },
+              child: const Text("DELETE"),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  void _confirmDeleteAuditLog(BuildContext context, CafeteriaProvider provider, AuditLog log) {
+    showDialog(
+      context: context,
+      builder: (ctx) {
+        return AlertDialog(
+          title: const Text("PURGE AUDIT LOG RECORD"),
+          content: Text("Are you sure you want to permanently delete this audit log record?\n\nAction: ${log.action}\nDetails: ${log.details}"),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: const Text("CANCEL"),
+            ),
+            ElevatedButton(
+              style: ElevatedButton.styleFrom(backgroundColor: Colors.red, foregroundColor: Colors.white),
+              onPressed: () async {
+                final success = await provider.deleteAuditLog(log.id!);
+                if (mounted) {
+                  Navigator.pop(ctx);
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text(success ? "Audit record purged." : "Failed to purge record."),
+                      backgroundColor: success ? Colors.green : Colors.red,
+                    ),
+                  );
+                }
+              },
+              child: const Text("PURGE"),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
   // ==========================================
   // TAB 3: AUDIT LEDGER LOGS
   // ==========================================
@@ -606,6 +736,11 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                 Text(timeStr, style: const TextStyle(fontSize: 9, color: Colors.grey)),
               ],
             ),
+            trailing: IconButton(
+              icon: const Icon(Icons.delete_outline, color: Colors.redAccent),
+              tooltip: "Purge Audit Log",
+              onPressed: () => _confirmDeleteAuditLog(context, provider, log),
+            ),
           ),
         );
       },
@@ -639,6 +774,13 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
           _statGridTile("Completed Orders Processed", totalOrders.toString(), Icons.receipt, Colors.green),
           const SizedBox(height: 12),
           _statGridTile("Complaints / Reviews Logged", feedbackCount.toString(), Icons.rate_review, Colors.blue),
+          const SizedBox(height: 24),
+          const Text(
+            "CUSTOMER SATISFACTION SENTIMENT (D3.JS)",
+            style: TextStyle(fontWeight: FontWeight.bold, fontSize: 11, color: Colors.grey, letterSpacing: 0.8),
+          ),
+          const SizedBox(height: 12),
+          D3SentimentChart(feedbackList: provider.allFeedback),
           const SizedBox(height: 24),
           Card(
             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),

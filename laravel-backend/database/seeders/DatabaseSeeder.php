@@ -336,5 +336,7 @@ class DatabaseSeeder extends Seeder
             'action' => 'SYSTEM_INIT',
             'details' => 'Laravel SQL pre-loader successfully built with authentic ATU students and food joints.',
         ]);
+
+        $this->call(MenuCategoryAndVendorSeeder::class);
     }
 }

@@ -262,7 +262,11 @@ class DbHelper {
   // ==========================================
   Future<int> insertFeedback(Feedback feedback) async {
     final db = await instance.database;
-    return await db.insert('feedback', feedback.toMap());
+    return await db.insert(
+      'feedback',
+      feedback.toMap(),
+      conflictAlgorithm: ConflictAlgorithm.replace,
+    );
   }
 
   Future<List<Feedback>> getAllFeedback() async {
@@ -282,18 +286,40 @@ class DbHelper {
     return result.map((json) => Feedback.fromMap(json)).toList();
   }
 
+  Future<int> deleteFeedback(int id) async {
+    final db = await instance.database;
+    return await db.delete(
+      'feedback',
+      where: 'id = ?',
+      whereArgs: [id],
+    );
+  }
+
   // ==========================================
   // AUDIT LOG OPERATIONS
   // ==========================================
   Future<int> insertAuditLog(AuditLog log) async {
     final db = await instance.database;
-    return await db.insert('audit_logs', log.toMap());
+    return await db.insert(
+      'audit_logs',
+      log.toMap(),
+      conflictAlgorithm: ConflictAlgorithm.replace,
+    );
   }
 
   Future<List<AuditLog>> getAllLogs() async {
     final db = await instance.database;
     final result = await db.query('audit_logs', orderBy: 'timestamp DESC');
     return result.map((json) => AuditLog.fromMap(json)).toList();
+  }
+
+  Future<int> deleteAuditLog(int id) async {
+    final db = await instance.database;
+    return await db.delete(
+      'audit_logs',
+      where: 'id = ?',
+      whereArgs: [id],
+    );
   }
 
   Future close() async {
