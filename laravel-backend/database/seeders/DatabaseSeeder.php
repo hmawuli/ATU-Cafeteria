@@ -199,6 +199,16 @@ class DatabaseSeeder extends Seeder
 
         foreach ($foods as $f) {
             FoodItem::create($f);
+            \App\Models\MenuItem::create([
+                'id' => $f['id'],
+                'vendor_id' => $f['vendor_id'],
+                'food_name' => $f['name'],
+                'name' => $f['name'],
+                'price' => $f['price'],
+                'category' => $f['category'],
+                'description' => $f['description'],
+                'is_available' => $f['is_available'] ?? true,
+            ]);
         }
 
         // 4. Create Historical Orders

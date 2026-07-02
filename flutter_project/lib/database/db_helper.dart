@@ -212,7 +212,11 @@ class DbHelper {
   // ==========================================
   Future<int> insertOrder(Order order) async {
     final db = await instance.database;
-    return await db.insert('orders', order.toMap());
+    return await db.insert(
+      'orders',
+      order.toMap(),
+      conflictAlgorithm: ConflictAlgorithm.replace,
+    );
   }
 
   Future<List<Order>> getAllOrders() async {

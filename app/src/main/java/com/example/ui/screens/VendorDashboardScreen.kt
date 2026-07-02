@@ -33,6 +33,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.style.TextAlign
@@ -5337,6 +5338,95 @@ fun VendorDashboardScreen(
                                     fontSize = 9.sp,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
                                 )
+                            }
+                        }
+
+                        // 2c. Automated Weekly Email Report Settings
+                        val isWeeklyReportEnabled by viewModel.isWeeklyVendorReportEnabled.collectAsStateWithLifecycle()
+                        val lastReportTime by viewModel.lastWeeklyReportTimestamp.collectAsStateWithLifecycle()
+                        
+                        Card(
+                            modifier = Modifier.fillMaxWidth().testTag("weekly_email_report_settings_card"),
+                            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                            border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.2f))
+                        ) {
+                            Column(modifier = Modifier.padding(16.dp)) {
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Column(modifier = Modifier.weight(1f)) {
+                                        Text(
+                                            "📊 Automated Weekly Performance Digest",
+                                            fontWeight = FontWeight.Bold,
+                                            style = MaterialTheme.typography.titleSmall,
+                                            color = MaterialTheme.colorScheme.primary
+                                        )
+                                        Spacer(modifier = Modifier.height(2.dp))
+                                        Text(
+                                            "Simulate automated weekly reports summarizing your top-selling dishes, peak order hours, customer feedback average, and sales volume.",
+                                            fontSize = 10.sp,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                                        )
+                                    }
+                                }
+                                
+                                Spacer(modifier = Modifier.height(12.dp))
+                                HorizontalDivider(color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.08f))
+                                Spacer(modifier = Modifier.height(12.dp))
+                                
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Column(modifier = Modifier.weight(1f)) {
+                                        Text("Automated Email Reporting", fontWeight = FontWeight.SemiBold, fontSize = 12.sp)
+                                        Text("Send weekly report digest to ${currentUser?.email ?: "vendor@atu.edu.gh"}", fontSize = 9.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                    }
+                                    Switch(
+                                        checked = isWeeklyReportEnabled,
+                                        onCheckedChange = { viewModel.isWeeklyVendorReportEnabled.value = it },
+                                        modifier = Modifier.testTag("weekly_report_toggle")
+                                    )
+                                }
+                                
+                                Spacer(modifier = Modifier.height(12.dp))
+                                
+                                Button(
+                                    onClick = {
+                                        currentUser?.let {
+                                            viewModel.generateAndSendWeeklyVendorReport(it, force = true)
+                                        }
+                                    },
+                                    modifier = Modifier.fillMaxWidth().testTag("trigger_weekly_report_button"),
+                                    shape = RoundedCornerShape(8.dp),
+                                    colors = ButtonDefaults.buttonColors(
+                                        containerColor = MaterialTheme.colorScheme.primaryContainer,
+                                        contentColor = MaterialTheme.colorScheme.onPrimaryContainer
+                                    )
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.Email,
+                                        contentDescription = "Trigger Email Report",
+                                        modifier = Modifier.size(16.dp)
+                                    )
+                                    Spacer(modifier = Modifier.width(6.dp))
+                                    Text("Compile & Email Weekly Report Now", fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                                }
+                                
+                                lastReportTime?.let { timestamp ->
+                                    Spacer(modifier = Modifier.height(8.dp))
+                                    val formattedTime = java.text.SimpleDateFormat("hh:mm a, dd MMM yyyy", java.util.Locale.getDefault()).format(java.util.Date(timestamp))
+                                    Text(
+                                        text = "Last report compiled at: $formattedTime",
+                                        fontSize = 9.sp,
+                                        fontStyle = FontStyle.Italic,
+                                        color = MaterialTheme.colorScheme.secondary,
+                                        modifier = Modifier.align(Alignment.CenterHorizontally)
+                                    )
+                                }
                             }
                         }
 

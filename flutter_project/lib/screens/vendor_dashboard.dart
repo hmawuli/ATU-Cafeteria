@@ -86,7 +86,12 @@ class _VendorDashboardScreenState extends State<VendorDashboardScreen> {
       ),
       bottomNavigationBar: NavigationBar(
         selectedIndex: _activeTab,
-        onDestinationSelected: (value) => setState(() => _activeTab = value),
+        onDestinationSelected: (value) {
+          setState(() => _activeTab = value);
+          if (value == 2) {
+            provider.fetchVendorPerformanceMetrics(user.id!);
+          }
+        },
         destinations: const [
           NavigationDestination(icon: Icon(Icons.receipt), label: 'Incoming Orders'),
           NavigationDestination(icon: Icon(Icons.breakfast_dining), label: 'Menu Catalog'),
@@ -291,80 +296,97 @@ class _VendorDashboardScreenState extends State<VendorDashboardScreen> {
   // ==========================================
   Widget _buildAnalyticsAndAi(BuildContext context, CafeteriaProvider provider, User vendor) {
     final reviews = provider.vendorFeedback;
+    final hasRemote = provider.remoteVendorMetrics != null;
+    final remote = provider.remoteVendorMetrics;
 
     // Compile customer satisfaction metrics with high fidelity fallbacks
-    double avgQuality = 4.5;
-    double avgCleanliness = 4.2;
-    double avgSpeed = 4.3;
-    double avgPriceVal = 4.6;
-    if (reviews.isNotEmpty) {
-      avgQuality = reviews.map((r) => r.ratingFoodQuality).average();
-      avgCleanliness = reviews.map((r) => r.ratingCleanliness).average();
-      avgSpeed = reviews.map((r) => r.ratingServiceSpeed).average();
-      avgPriceVal = reviews.map((r) => r.ratingPriceValue).average();
-    } else {
-      // Seed based on vendor properties so different booths look unique
-      avgQuality = roundToOnes(4.0 + ((vendor.id ?? 3) % 5 * 0.2) + ((vendor.id ?? 3) % 2 * 0.1));
-      avgCleanliness = roundToOnes(3.8 + ((vendor.id ?? 3) % 4 * 0.3));
-      avgSpeed = roundToOnes(3.9 + ((vendor.id ?? 3) % 3 * 0.4));
-      avgPriceVal = roundToOnes(4.1 + ((vendor.id ?? 3) % 6 * 0.1));
+    double avgQuality = hasRemote ? (remote!['rating_food_quality'] as num).toDouble() : 4.5;
+    double avgCleanliness = hasRemote ? (remote!['rating_cleanliness'] as num).toDouble() : 4.2;
+    double avgSpeed = hasRemote ? (remote!['rating_service_speed'] as num).toDouble() : 4.3;
+    double avgPriceVal = hasRemote ? (remote!['rating_price_value'] as num).toDouble() : 4.6;
+
+    if (!hasRemote) {
+      if (reviews.isNotEmpty) {
+        avgQuality = reviews.map((r) => r.ratingFoodQuality).average();
+        avgCleanliness = reviews.map((r) => r.ratingCleanliness).average();
+        avgSpeed = reviews.map((r) => r.ratingServiceSpeed).average();
+        avgPriceVal = reviews.map((r) => r.ratingPriceValue).average();
+      } else {
+        avgQuality = roundToOnes(4.0 + ((vendor.id ?? 3) % 5 * 0.2) + ((vendor.id ?? 3) % 2 * 0.1));
+        avgCleanliness = roundToOnes(3.8 + ((vendor.id ?? 3) % 4 * 0.3));
+        avgSpeed = roundToOnes(3.9 + ((vendor.id ?? 3) % 3 * 0.4));
+        avgPriceVal = roundToOnes(4.1 + ((vendor.id ?? 3) % 6 * 0.1));
+      }
     }
-    double overallAvg = (avgQuality + avgCleanliness + avgSpeed + avgPriceVal) / 4.0;
+    double overallAvg = hasRemote ? (remote!['rating_overall'] as num).toDouble() : (avgQuality + avgCleanliness + avgSpeed + avgPriceVal) / 4.0;
 
     // Compute operational metrics with realistic seeds for non-empty screens
-    int totalOrders = provider.vendorOrders.length;
-    int completedOrdersCount = provider.vendorOrders.where((o) => o.status.toUpperCase() == 'COMPLETED' || o.status.toUpperCase() == 'READY').length;
+    int totalOrders = hasRemote ? (remote!['total_orders'] as num).toInt() : provider.vendorOrders.length;
+    int completedOrdersCount = hasRemote ? (remote!['total_completed_orders'] as num).toInt() : provider.vendorOrders.where((o) => o.status.toUpperCase() == 'COMPLETED' || o.status.toUpperCase() == 'READY').length;
     
-    if (totalOrders == 0) {
+    if (!hasRemote && totalOrders == 0) {
       // High fidelity seed data for empty simulation
       totalOrders = 28 + ((vendor.id ?? 1) % 7 * 4);
       completedOrdersCount = 26 + ((vendor.id ?? 1) % 7 * 4);
     }
     
-    double successRate = totalOrders > 0 ? (completedOrdersCount / totalOrders) * 100 : 100.0;
+    double successRate = hasRemote ? (remote!['order_fulfillment_rate'] as num).toDouble() : (totalOrders > 0 ? (completedOrdersCount / totalOrders) * 100 : 100.0);
     
     // Preparation/Execution Speed calculation
     double avgPrepMinutes = 11.5;
-    if (provider.vendorOrders.isNotEmpty) {
-      final completedOrders = provider.vendorOrders.where((o) => o.status.toUpperCase() == 'COMPLETED').toList();
-      if (completedOrders.isNotEmpty) {
-        double totalSecs = 0;
-        for (var o in completedOrders) {
-          totalSecs += (8.0 + (o.id ?? 1) % 4 + (o.quantity % 3 * 1.5)) * 60;
-        }
-        avgPrepMinutes = (totalSecs / completedOrders.length) / 60;
-      } else {
-        avgPrepMinutes = 10.5 + ((vendor.id ?? 3) % 3) + ((vendor.id ?? 3) % 2 * 1.5);
-      }
+    if (hasRemote) {
+      avgPrepMinutes = (remote!['avg_completion_time_minutes'] as num).toDouble();
     } else {
-      avgPrepMinutes = 11.0 + ((vendor.id ?? 3) % 4 * 1.2);
+      if (provider.vendorOrders.isNotEmpty) {
+        final completedOrders = provider.vendorOrders.where((o) => o.status.toUpperCase() == 'COMPLETED').toList();
+        if (completedOrders.isNotEmpty) {
+          double totalSecs = 0;
+          for (var o in completedOrders) {
+            totalSecs += (8.0 + (o.id ?? 1) % 4 + (o.quantity % 3 * 1.5)) * 60;
+          }
+          avgPrepMinutes = (totalSecs / completedOrders.length) / 60;
+        } else {
+          avgPrepMinutes = 10.5 + ((vendor.id ?? 3) % 3) + ((vendor.id ?? 3) % 2 * 1.5);
+        }
+      } else {
+        avgPrepMinutes = 11.0 + ((vendor.id ?? 3) % 4 * 1.2);
+      }
     }
 
     // Popular items calculation
-    final Map<String, int> popularMap = {};
-    for (var o in provider.vendorOrders) {
-      popularMap[o.foodName] = (popularMap[o.foodName] ?? 0) + o.quantity;
-    }
-    
-    List<MapEntry<String, int>> sortedPopular = popularMap.entries.toList()
-      ..sort((a, b) => b.value.compareTo(a.value));
-
-    // Fallback popular items for beautiful layout
     List<Map<String, dynamic>> finalPopularList = [];
-    if (sortedPopular.isEmpty) {
-      finalPopularList = [
-        {'name': 'Jollof with Grilled Chicken', 'count': 45 + ((vendor.id ?? 1) * 3), 'revenue': (45 + ((vendor.id ?? 1) * 3)) * 15.0},
-        {'name': 'Waakye Deluxe', 'count': 32 + ((vendor.id ?? 1) * 2), 'revenue': (32 + ((vendor.id ?? 1) * 2)) * 12.0},
-        {'name': 'Kelewele Box', 'count': 24 + ((vendor.id ?? 1) * 4), 'revenue': (24 + ((vendor.id ?? 1) * 4)) * 8.0},
-      ];
-    } else {
-      finalPopularList = sortedPopular.take(3).map((entry) {
+    if (hasRemote && remote!['popular_menu_items'] != null) {
+      final remotePopular = remote!['popular_menu_items'] as List;
+      finalPopularList = remotePopular.map((item) {
         return {
-          'name': entry.key,
-          'count': entry.value,
-          'revenue': entry.value * 12.50 // average meal cost
+          'name': item['name'] ?? 'Unknown Item',
+          'count': item['quantity_sold'] ?? 0,
+          'revenue': (item['sales'] as num).toDouble(),
         };
       }).toList();
+    } else {
+      final Map<String, int> popularMap = {};
+      for (var o in provider.vendorOrders) {
+        popularMap[o.foodName] = (popularMap[o.foodName] ?? 0) + o.quantity;
+      }
+      List<MapEntry<String, int>> sortedPopular = popularMap.entries.toList()
+        ..sort((a, b) => b.value.compareTo(a.value));
+
+      if (sortedPopular.isEmpty) {
+        finalPopularList = [
+          {'name': 'Jollof with Grilled Chicken', 'count': 45 + ((vendor.id ?? 1) * 3), 'revenue': (45 + ((vendor.id ?? 1) * 3)) * 15.0},
+          {'name': 'Waakye Deluxe', 'count': 32 + ((vendor.id ?? 1) * 2), 'revenue': (32 + ((vendor.id ?? 1) * 2)) * 12.0},
+          {'name': 'Kelewele Box', 'count': 24 + ((vendor.id ?? 1) * 4), 'revenue': (24 + ((vendor.id ?? 1) * 4)) * 8.0},
+        ];
+      } else {
+        finalPopularList = sortedPopular.take(3).map((entry) {
+          return {
+            'name': entry.key,
+            'count': entry.value,
+            'revenue': entry.value * 12.50
+          };
+        }).toList();
+      }
     }
 
     return SingleChildScrollView(
@@ -372,6 +394,72 @@ class _VendorDashboardScreenState extends State<VendorDashboardScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
+          if (provider.isFetchingRemoteMetrics)
+            const Padding(
+              padding: EdgeInsets.only(bottom: 12.0),
+              child: LinearProgressIndicator(),
+            ),
+          
+          Card(
+            color: hasRemote ? Colors.green[900] : Colors.blueGrey[900],
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+              child: Row(
+                children: [
+                  Icon(
+                    hasRemote ? Icons.cloud_done : Icons.cloud_queue,
+                    color: Colors.white,
+                    size: 20,
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Text(
+                      hasRemote 
+                        ? "Laravel Cloud Synced Performance Dashboard" 
+                        : "Standalone Offline Mode Performance Dashboard",
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontWeight: FontWeight.bold,
+                        fontSize: 12,
+                      ),
+                    ),
+                  ),
+                  if (hasRemote)
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                      decoration: BoxDecoration(
+                        color: Colors.green[400],
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: const Text(
+                        "ONLINE",
+                        style: TextStyle(
+                          color: Colors.black,
+                          fontSize: 9,
+                          fontWeight: FontWeight.black,
+                        ),
+                      ),
+                    )
+                  else
+                    ElevatedButton(
+                      style: ElevatedButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                        minimumSize: Size.zero,
+                        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                        backgroundColor: Colors.white24,
+                        foregroundColor: Colors.white,
+                      ),
+                      onPressed: () {
+                        provider.fetchVendorPerformanceMetrics(vendor.id!);
+                      },
+                      child: const Text("SYNC", style: TextStyle(fontSize: 9, fontWeight: FontWeight.bold)),
+                    ),
+                ],
+              ),
+            ),
+          ),
+          const SizedBox(height: 12),
           // 1. Overview Counter Grid
           Row(
             children: [

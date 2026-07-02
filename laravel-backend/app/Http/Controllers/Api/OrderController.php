@@ -877,4 +877,160 @@ class OrderController extends Controller
 
         return $stages;
     }
+
+    /**
+     * Submit multiple order requests (shopping cart checkout) for the authenticated user.
+     */
+    public function cartCheckout(Request $request)
+    {
+        $user = $request->user();
+        if (!$user) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Unauthenticated.'
+            ], 401);
+        }
+
+        $validator = Validator::make($request->all(), [
+            'items' => 'required|array|min:1',
+            'items.*.menu_item_id' => 'required|integer|exists:menu_items,id',
+            'items.*.quantity' => 'required|integer|min:1',
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Validation failed: cart items array structure is invalid.',
+                'errors' => $validator->errors()
+            ], 400);
+        }
+
+        $cartItems = $request->input('items');
+        $validatedItems = [];
+        $totalCheckoutCost = 0;
+
+        foreach ($cartItems as $index => $item) {
+            $menuItemId = $item['menu_item_id'];
+            $quantity = intval($item['quantity']);
+
+            $menuItem = \App\Models\MenuItem::find($menuItemId);
+            if (!$menuItem) {
+                return response()->json([
+                    'success' => false,
+                    'message' => "Menu item at index {$index} does not exist."
+                ], 404);
+            }
+
+            if (!$menuItem->is_available) {
+                return response()->json([
+                    'success' => false,
+                    'message' => "Menu item '{$menuItem->name}' is currently unavailable."
+                ], 400);
+            }
+
+            $price = floatval($menuItem->price);
+            $itemTotal = round($price * $quantity, 2);
+            $totalCheckoutCost += $itemTotal;
+
+            $validatedItems[] = [
+                'menu_item' => $menuItem,
+                'quantity' => $quantity,
+                'unit_price' => $price,
+                'total_price' => $itemTotal,
+                'vendor_id' => $menuItem->vendor_id,
+                'food_name' => $menuItem->name,
+            ];
+        }
+
+        // Verify sufficient balance
+        if ($user->balance < $totalCheckoutCost) {
+            return response()->json([
+                'success' => false,
+                'message' => "Insufficient wallet balance. Total cart cost is GH₵ " . number_format($totalCheckoutCost, 2) . ", but your balance is GH₵ " . number_format($user->balance, 2) . "."
+            ], 400);
+        }
+
+        try {
+            $createdOrders = DB::transaction(function () use ($user, $validatedItems, $totalCheckoutCost) {
+                // Deduct balance
+                $user->balance = $user->balance - $totalCheckoutCost;
+                $user->save();
+
+                $orders = [];
+                $securePin = (string) rand(1000, 9999);
+
+                foreach ($validatedItems as $item) {
+                    $createdOrder = Order::create([
+                        'customer_id' => $user->id,
+                        'student_id' => $user->id,
+                        'user_id' => $user->id,
+                        'vendor_id' => $item['vendor_id'],
+                        'menu_item_id' => $item['menu_item']->id,
+                        'food_name' => $item['food_name'],
+                        'quantity' => $item['quantity'],
+                        'unit_price' => $item['unit_price'],
+                        'total_price' => $item['total_price'],
+                        'order_timestamp' => time() * 1000,
+                        'status' => 'PENDING',
+                        'pickup_pin' => $securePin,
+                        'estimated_pickup_time' => 'Calculating...',
+                    ]);
+
+                    // Add an order item entry if order_items table exists
+                    try {
+                        DB::table('order_items')->insert([
+                            'order_id' => $createdOrder->id,
+                            'food_item_id' => $item['menu_item']->id,
+                            'quantity' => $item['quantity'],
+                            'price' => $item['unit_price'],
+                            'created_at' => now(),
+                            'updated_at' => now(),
+                        ]);
+                    } catch (\Exception $e) {
+                        // Suppress if table doesn't fully match or exist
+                    }
+
+                    // Register individual audit log
+                    \App\Models\AuditLog::create([
+                        'user_id' => $user->id,
+                        'action' => 'ORDER_CREATED',
+                        'details' => "Placed order #{$createdOrder->id} for '{$item['food_name']}' x {$item['quantity']}",
+                        'created_at' => now(),
+                        'updated_at' => now(),
+                    ]);
+
+                    $orders[] = $createdOrder;
+                }
+
+                // Register Wallet Transaction
+                \App\Models\WalletTransaction::create([
+                    'user_id' => $user->id,
+                    'type' => 'PAYMENT',
+                    'amount' => -$totalCheckoutCost,
+                    'status' => 'SUCCESS',
+                    'reference' => 'CART-ORD-' . uniqid() . '-' . time(),
+                    'description' => 'Cart Checkout payment for ' . count($validatedItems) . ' food items.',
+                    'created_at' => now(),
+                    'updated_at' => now(),
+                ]);
+
+                return $orders;
+            });
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Cart checkout completed successfully. Orders placed.',
+                'orders' => $createdOrders,
+                'total_cost' => $totalCheckoutCost,
+                'remaining_balance' => round($user->balance, 2)
+            ], 200);
+
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Cart checkout transactional failure.',
+                'error' => $e->getMessage()
+            ], 500);
+        }
+    }
 }

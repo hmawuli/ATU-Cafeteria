@@ -3,6 +3,7 @@ import 'dart:io';
 import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:google_generative_ai/google_generative_ai.dart';
+import 'package:crypto/crypto.dart';
 import '../models/models.dart';
 import '../database/db_helper.dart';
 
@@ -12,6 +13,22 @@ class CafeteriaProvider extends ChangeNotifier {
   // Real-time State Streams
   User? _currentUser;
   User? get currentUser => _currentUser;
+
+  String? _authToken;
+  String? get authToken => _authToken;
+
+  bool _isOrderCacheOffline = false;
+  bool get isOrderCacheOffline => _isOrderCacheOffline;
+
+  // Remote Synchronization & Performance Metrics
+  Map<String, dynamic>? _remoteVendorMetrics;
+  Map<String, dynamic>? get remoteVendorMetrics => _remoteVendorMetrics;
+
+  List<dynamic>? _remoteRechartsData;
+  List<dynamic>? get remoteRechartsData => _remoteRechartsData;
+
+  bool _isFetchingRemoteMetrics = false;
+  bool get isFetchingRemoteMetrics => _isFetchingRemoteMetrics;
 
   bool _isLoading = false;
   bool get isLoading => _isLoading;
@@ -83,6 +100,12 @@ class CafeteriaProvider extends ChangeNotifier {
     return hash.toRadixString(16);
   }
 
+  String _sha256Hash(String pin) {
+    final bytes = utf8.encode(pin);
+    final digest = sha256.convert(bytes);
+    return digest.toString();
+  }
+
   // ==========================================
   // INITIALIZATION AND DB DATABASE SEEDING
   // ==========================================
@@ -97,6 +120,45 @@ class CafeteriaProvider extends ChangeNotifier {
     notifyListeners();
   }
 
+  Future<void> fetchAndCacheStudentOrders(int studentId) async {
+    try {
+      final url = Uri.parse("$_laravelBaseUrl/api/orders/customer/$studentId");
+      final client = HttpClient();
+      client.connectionTimeout = const Duration(seconds: 3);
+      final request = await client.getUrl(url);
+      if (_authToken != null) {
+        request.headers.add("Authorization", "Bearer $_authToken");
+      }
+      final response = await request.close();
+      if (response.statusCode == 200) {
+        final body = await response.transform(utf8.decoder).join();
+        final List decoded = json.decode(body);
+        for (var item in decoded) {
+          final order = Order(
+            id: item['id'],
+            customerId: item['customer_id'] ?? item['student_id'] ?? studentId,
+            vendorId: item['vendor_id'] ?? 0,
+            foodItemId: item['food_item_id'] ?? item['menu_item_id'] ?? 0,
+            foodName: item['food_name'] ?? 'Meal',
+            quantity: item['quantity'] ?? 1,
+            unitPrice: (item['unit_price'] as num?)?.toDouble() ?? 0.0,
+            totalPrice: (item['total_price'] as num?)?.toDouble() ?? 0.0,
+            orderTimestamp: item['order_timestamp'] ?? DateTime.now().millisecondsSinceEpoch,
+            status: item['status'] ?? item['order_status'] ?? 'PENDING',
+            pickupPin: item['pickup_pin'] ?? '0000',
+          );
+          await _db.insertOrder(order);
+        }
+        _isOrderCacheOffline = false;
+      } else {
+        _isOrderCacheOffline = true;
+      }
+    } catch (e) {
+      debugPrint("Campus network unstable: loading from SQLite local cache. Exception: $e");
+      _isOrderCacheOffline = true;
+    }
+  }
+
   Future<void> refreshAllData() async {
     _allVendors = await _db.getAllVendors();
     _allFoodItems = await _db.getAllFoodItems();
@@ -106,6 +168,7 @@ class CafeteriaProvider extends ChangeNotifier {
 
     if (_currentUser != null) {
       if (_currentUser!.role == 'STUDENT') {
+        await fetchAndCacheStudentOrders(_currentUser!.id!);
         _customerOrders = await _db.getOrdersForCustomer(_currentUser!.id!);
       } else if (_currentUser!.role == 'VENDOR') {
         _vendorOrders = await _db.getOrdersForVendor(_currentUser!.id!);
@@ -289,12 +352,38 @@ class CafeteriaProvider extends ChangeNotifier {
   Future<bool> loginUser(String username, String pinCode) async {
     _isLoading = true;
     _loginError = null;
+    _authToken = null;
     notifyListeners();
 
     try {
       final user = await _db.getUserByUsername(username);
       if (user != null && user.passwordHash == _hashPin(pinCode)) {
         _currentUser = user;
+
+        // Attempt to sync auth session on Laravel backend
+        try {
+          final loginUrl = Uri.parse("$_laravelBaseUrl/api/login");
+          final client = HttpClient();
+          client.connectionTimeout = const Duration(seconds: 3);
+          final request = await client.postUrl(loginUrl);
+          request.headers.add("Content-Type", "application/json");
+          request.add(utf8.encode(json.encode({
+            'username': username,
+            'pin': _sha256Hash(pinCode),
+          })));
+          final response = await request.close();
+          if (response.statusCode == 200) {
+            final body = await response.transform(utf8.decoder).join();
+            final decoded = json.decode(body);
+            if (decoded['token'] != null) {
+              _authToken = decoded['token'];
+              debugPrint("Synced authentication token successfully from Laravel: $_authToken");
+            }
+          }
+        } catch (e) {
+          debugPrint("Laravel backend authentication skipped / offline ($e). Running in standalone local mode.");
+        }
+
         await _db.insertAuditLog(AuditLog(
           userId: user.id!,
           action: "USER_LOGIN",
@@ -594,7 +683,44 @@ class CafeteriaProvider extends ChangeNotifier {
       timestamp: DateTime.now().millisecondsSinceEpoch,
     ));
 
-    _startRealTimeTrackingSimulation(orderId);
+    // Try to sync with Laravel backend
+    int remoteOrderId = orderId;
+    bool isSynced = false;
+    try {
+      final postUrl = Uri.parse("$_laravelBaseUrl/api/orders");
+      final client = HttpClient();
+      client.connectionTimeout = const Duration(seconds: 3);
+      final request = await client.postUrl(postUrl);
+      request.headers.add("Content-Type", "application/json");
+      
+      final payload = json.encode({
+        'customer_id': _currentUser!.id!,
+        'student_id': _currentUser!.id!,
+        'vendor_id': foodItem.vendorId,
+        'food_item_id': foodItem.id!,
+        'menu_item_id': foodItem.id!,
+        'food_name': foodItem.name,
+        'quantity': quantity,
+        'unit_price': foodItem.price,
+        'total_price': requiredSum,
+      });
+      request.add(utf8.encode(payload));
+      
+      final response = await request.close();
+      if (response.statusCode == 201) {
+        final body = await response.transform(utf8.decoder).join();
+        final decoded = json.decode(body);
+        if (decoded['id'] != null) {
+          remoteOrderId = decoded['id'];
+          isSynced = true;
+          debugPrint("Order synced with Laravel backend successfully. Real order ID: $remoteOrderId");
+        }
+      }
+    } catch (e) {
+      debugPrint("Laravel sync unavailable ($e). Utilizing local fallback.");
+    }
+
+    _startRealTimeTrackingSimulation(remoteOrderId);
 
     await refreshAllData();
     return true;
@@ -607,6 +733,128 @@ class CafeteriaProvider extends ChangeNotifier {
   void updateLaravelBaseUrl(String url) {
     _laravelBaseUrl = url;
     notifyListeners();
+  }
+
+  // Remote Synchronization & Performance Metrics
+  Future<void> fetchVendorPerformanceMetrics(int vendorId) async {
+    _isFetchingRemoteMetrics = true;
+    _remoteVendorMetrics = null;
+    _remoteRechartsData = null;
+    notifyListeners();
+
+    try {
+      // 1. Fetch performance metrics from Laravel API
+      final metricsUrl = Uri.parse("$_laravelBaseUrl/api/vendor/performance-metrics");
+      final client = HttpClient();
+      client.connectionTimeout = const Duration(seconds: 4);
+      final request = await client.getUrl(metricsUrl);
+      final response = await request.close();
+      
+      if (response.statusCode == 200) {
+        final body = await response.transform(utf8.decoder).join();
+        final decoded = json.decode(body);
+        if (decoded['success'] == true && decoded['performance'] != null) {
+          final perfList = decoded['performance'] as List;
+          final vendorMetrics = perfList.firstWhere(
+            (item) => item['vendor_id'] == vendorId,
+            orElse: () => null,
+          );
+          if (vendorMetrics != null) {
+            _remoteVendorMetrics = Map<String, dynamic>.from(vendorMetrics);
+          }
+        }
+      }
+
+      // 2. Fetch Recharts timeline analytics from Laravel API
+      final rechartsUrl = Uri.parse("$_laravelBaseUrl/api/vendor/recharts-sales?vendor_id=$vendorId");
+      final rRequest = await client.getUrl(rechartsUrl);
+      final rResponse = await rRequest.close();
+      if (rResponse.statusCode == 200) {
+        final rBody = await rResponse.transform(utf8.decoder).join();
+        final rDecoded = json.decode(rBody);
+        if (rDecoded['success'] == true && rDecoded['data'] != null && rDecoded['data']['by_date'] != null) {
+          _remoteRechartsData = rDecoded['data']['by_date'] as List;
+        }
+      }
+    } catch (e) {
+      debugPrint("Error fetching remote performance metrics from Laravel: $e");
+    } finally {
+      _isFetchingRemoteMetrics = false;
+      notifyListeners();
+    }
+  }
+
+  // Paystack Billing API Client Methods
+  Future<Map<String, dynamic>?> initializePaystackPayment({
+    required double amount,
+    required String email,
+    required String purpose,
+  }) async {
+    try {
+      final initUrl = Uri.parse("$_laravelBaseUrl/api/paystack/initialize");
+      final client = HttpClient();
+      client.connectionTimeout = const Duration(seconds: 4);
+      final request = await client.postUrl(initUrl);
+      request.headers.add("Content-Type", "application/json");
+      
+      final payload = json.encode({
+        'amount': amount,
+        'email': email,
+        'purpose': purpose,
+      });
+      request.add(utf8.encode(payload));
+      
+      final response = await request.close();
+      final body = await response.transform(utf8.decoder).join();
+      final decoded = json.decode(body);
+      
+      if (response.statusCode == 200 && decoded['success'] == true) {
+        return Map<String, dynamic>.from(decoded['data']);
+      } else {
+        debugPrint("Initialize Paystack error response: $body");
+      }
+    } catch (e) {
+      debugPrint("Exception initializing Paystack payment: $e");
+    }
+    return null;
+  }
+
+  Future<bool> verifyPaystackPayment({
+    required String reference,
+    required double amount,
+    required String purpose,
+  }) async {
+    try {
+      final verifyUrl = Uri.parse("$_laravelBaseUrl/api/paystack/verify/$reference?amount=$amount&purpose=$purpose");
+      final client = HttpClient();
+      client.connectionTimeout = const Duration(seconds: 4);
+      final request = await client.getUrl(verifyUrl);
+      final response = await request.close();
+      final body = await response.transform(utf8.decoder).join();
+      final decoded = json.decode(body);
+      
+      if (response.statusCode == 200 && decoded['success'] == true) {
+        if (purpose == 'WALLET_TOPUP') {
+          // Sync local balance
+          _studentWalletBalance += amount;
+          if (_currentUser != null) {
+            await _db.insertAuditLog(AuditLog(
+              userId: _currentUser!.id!,
+              action: "WALLET_CREDIT_SECURE",
+              details: "MoMo Paystack checkout validated successfully. Reference: $reference. Amount: GH₵ ${amount.toStringAsFixed(2)}",
+              timestamp: DateTime.now().millisecondsSinceEpoch,
+            ));
+          }
+          await refreshAllData();
+        }
+        return true;
+      } else {
+        debugPrint("Verify Paystack error response: $body");
+      }
+    } catch (e) {
+      debugPrint("Exception verifying Paystack payment: $e");
+    }
+    return false;
   }
 
   void _startRealTimeTrackingSimulation(int orderId) {
@@ -768,6 +1016,31 @@ class CafeteriaProvider extends ChangeNotifier {
 
   Future<void> updateOrderStatus(int orderId, String newStatus) async {
     await _db.updateOrderStatus(orderId, newStatus);
+    
+    // Attempt Laravel synchronization
+    if (_authToken != null) {
+      try {
+        final statusUrl = Uri.parse("$_laravelBaseUrl/api/orders/$orderId/status");
+        final client = HttpClient();
+        client.connectionTimeout = const Duration(seconds: 3);
+        final request = await client.putUrl(statusUrl);
+        request.headers.add("Content-Type", "application/json");
+        request.headers.add("Authorization", "Bearer $_authToken");
+        request.add(utf8.encode(json.encode({
+          'status': newStatus,
+        })));
+        final response = await request.close();
+        if (response.statusCode == 200) {
+          debugPrint("Order status synced with Laravel: $newStatus");
+        } else {
+          final body = await response.transform(utf8.decoder).join();
+          debugPrint("Laravel status sync failed: $body");
+        }
+      } catch (e) {
+        debugPrint("Exception syncing status with Laravel: $e");
+      }
+    }
+
     if (_currentUser != null) {
       await _db.insertAuditLog(AuditLog(
         userId: _currentUser!.id!,
@@ -787,6 +1060,29 @@ class CafeteriaProvider extends ChangeNotifier {
 
     if (targetOrder.pickupPin == enteredPin) {
       await _db.updateOrderStatus(orderId, "Delivered");
+
+      // Sync to Laravel if online
+      if (_authToken != null) {
+        try {
+          final url = Uri.parse("$_laravelBaseUrl/api/orders/$orderId/verify-pickup");
+          final client = HttpClient();
+          client.connectionTimeout = const Duration(seconds: 3);
+          final request = await client.postUrl(url);
+          request.headers.add("Content-Type", "application/json");
+          request.headers.add("Authorization", "Bearer $_authToken");
+          request.add(utf8.encode(json.encode({
+            'vendor_id': _currentUser!.id!,
+            'pickup_pin': enteredPin,
+          })));
+          final response = await request.close();
+          if (response.statusCode == 200) {
+            debugPrint("Order pickup validation synced with Laravel for #$orderId");
+          }
+        } catch (e) {
+          debugPrint("Could not sync pickup validation with Laravel: $e");
+        }
+      }
+
       await _db.insertAuditLog(AuditLog(
         userId: _currentUser!.id!,
         action: "SECURE_PICKUP_VALIDATED",

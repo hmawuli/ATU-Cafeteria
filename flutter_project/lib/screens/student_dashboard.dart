@@ -342,101 +342,151 @@ class _StudentDashboardScreenState extends State<StudentDashboardScreen> {
   // ==========================================
   Widget _buildTrackOrders(BuildContext context, CafeteriaProvider provider) {
     final list = provider.customerOrders;
+    final isOffline = provider.isOrderCacheOffline;
 
-    if (list.isEmpty) {
-      return const Center(child: Text("You have not initialized any orders yet."));
-    }
-
-    return ListView.builder(
-      padding: const EdgeInsets.all(12),
-      itemCount: list.length,
-      itemBuilder: (context, index) {
-        final order = list[index];
-        final timeStr = DateFormat('h:mm a - d MMM').format(DateTime.fromMillisecondsSinceEpoch(order.orderTimestamp));
-        final orderColor = _statusColor(order.status);
-
-        return Card(
-          elevation: 2,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-          child: ExpansionTile(
-            title: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Expanded(
-                  child: Text(
-                    order.foodName,
-                    style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
+    return Column(
+      children: [
+        Padding(
+          padding: const EdgeInsets.fromLTRB(12.0, 12.0, 12.0, 4.0),
+          child: Card(
+            color: isOffline ? Colors.orange[900] : Colors.green[900],
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+              child: Row(
+                children: [
+                  Icon(
+                    isOffline ? Icons.wifi_off : Icons.cloud_done,
+                    color: Colors.white,
+                    size: 20,
                   ),
-                ),
-                Container(
-                  padding: const EdgeInsets.symmetric(vertical: 4, horizontal: 8),
-                  decoration: BoxDecoration(color: orderColor.withOpacity(0.12), borderRadius: BorderRadius.circular(8)),
-                  child: Text(
-                    order.status,
-                    style: TextStyle(color: orderColor, fontWeight: FontWeight.bold, fontSize: 11),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Text(
+                      isOffline 
+                        ? "Campus network unstable. Displaying offline cached order history." 
+                        : "Orders synchronized securely with ATU Cloud.",
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontWeight: FontWeight.bold,
+                        fontSize: 12,
+                      ),
+                    ),
                   ),
-                )
-              ],
-            ),
-            subtitle: Text(
-              "Qty: ${order.quantity} | Total: GH₵ ${order.totalPrice.toStringAsFixed(2)}\n$timeStr",
-              style: const TextStyle(fontSize: 12, height: 1.4),
-            ),
-            children: [
-              Padding(
-                padding: const EdgeInsets.all(16.0),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Divider(),
-                    _buildTrackingStepper(order.status),
-                    const SizedBox(height: 8),
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        const Text(
-                          "Authentication Token / PIN:",
-                          style: TextStyle(fontWeight: FontWeight.w600, fontSize: 13),
-                        ),
-                        Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
-                          decoration: BoxDecoration(
-                            color: Colors.grey[200],
-                            borderRadius: BorderRadius.circular(6),
-                            border: Border.all(color: Colors.grey[400]!),
-                          ),
-                          child: Text(
-                            order.pickupPin,
-                            style: const TextStyle(
-                              letterSpacing: 2,
-                              fontWeight: FontWeight.bold,
-                              fontSize: 16,
-                              fontFamily: 'monospace',
-                            ),
-                          ),
-                        )
-                      ],
+                  ElevatedButton(
+                    style: ElevatedButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                      minimumSize: Size.zero,
+                      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                      backgroundColor: Colors.white24,
+                      foregroundColor: Colors.white,
                     ),
-                    const SizedBox(height: 12),
-                    Text(
-                      "Provide this secure 4-digit token to the cook upon receiving custody of order to validate pickup.",
-                      style: TextStyle(color: Colors.grey[500], fontSize: 11),
-                    ),
-                    const SizedBox(height: 16),
-                    if (order.status == 'COMPLETED') ...[
-                      ElevatedButton.icon(
-                        icon: const Icon(Icons.rate_review),
-                        label: const Text("POST RATING & FEEDBACK AUDIT"),
-                        onPressed: () => _showFeedbackDialog(context, order, provider),
-                      )
-                    ]
-                  ],
-                ),
-              )
-            ],
+                    onPressed: () {
+                      provider.refreshAllData();
+                    },
+                    child: const Text("RETRY", style: TextStyle(fontSize: 9, fontWeight: FontWeight.bold)),
+                  ),
+                ],
+              ),
+            ),
           ),
-        );
-      },
+        ),
+        Expanded(
+          child: list.isEmpty
+              ? const Center(child: Text("You have not initialized any orders yet."))
+              : ListView.builder(
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                  itemCount: list.length,
+                  itemBuilder: (context, index) {
+                    final order = list[index];
+                    final timeStr = DateFormat('h:mm a - d MMM').format(DateTime.fromMillisecondsSinceEpoch(order.orderTimestamp));
+                    final orderColor = _statusColor(order.status);
+
+                    return Card(
+                      elevation: 2,
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                      child: ExpansionTile(
+                        title: Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Expanded(
+                              child: Text(
+                                order.foodName,
+                                style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
+                              ),
+                            ),
+                            Container(
+                              padding: const EdgeInsets.symmetric(vertical: 4, horizontal: 8),
+                              decoration: BoxDecoration(color: orderColor.withOpacity(0.12), borderRadius: BorderRadius.circular(8)),
+                              child: Text(
+                                order.status,
+                                style: TextStyle(color: orderColor, fontWeight: FontWeight.bold, fontSize: 11),
+                              ),
+                            )
+                          ],
+                        ),
+                        subtitle: Text(
+                          "Qty: ${order.quantity} | Total: GH₵ ${order.totalPrice.toStringAsFixed(2)}\n$timeStr",
+                          style: const TextStyle(fontSize: 12, height: 1.4),
+                        ),
+                        children: [
+                          Padding(
+                            padding: const EdgeInsets.all(16.0),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                const Divider(),
+                                _buildTrackingStepper(order.status),
+                                const SizedBox(height: 8),
+                                Row(
+                                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                  children: [
+                                    const Text(
+                                      "Authentication Token / PIN:",
+                                      style: TextStyle(fontWeight: FontWeight.w600, fontSize: 13),
+                                    ),
+                                    Container(
+                                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+                                      decoration: BoxDecoration(
+                                        color: Colors.grey[200],
+                                        borderRadius: BorderRadius.circular(6),
+                                        border: Border.all(color: Colors.grey[400]!),
+                                      ),
+                                      child: Text(
+                                        order.pickupPin,
+                                        style: const TextStyle(
+                                          letterSpacing: 2,
+                                          fontWeight: FontWeight.bold,
+                                          fontSize: 16,
+                                          fontFamily: 'monospace',
+                                        ),
+                                      ),
+                                    )
+                                  ],
+                                ),
+                                const SizedBox(height: 12),
+                                Text(
+                                  "Provide this secure 4-digit token to the cook upon receiving custody of order to validate pickup.",
+                                  style: TextStyle(color: Colors.grey[500], fontSize: 11),
+                                ),
+                                const SizedBox(height: 16),
+                                if (order.status == 'COMPLETED') ...[
+                                  ElevatedButton.icon(
+                                    icon: const Icon(Icons.rate_review),
+                                    label: const Text("POST RATING & FEEDBACK AUDIT"),
+                                    onPressed: () => _showFeedbackDialog(context, order, provider),
+                                  )
+                                ]
+                              ],
+                            ),
+                          )
+                        ],
+                      ),
+                    );
+                  },
+                ),
+        ),
+      ],
     );
   }
 
@@ -731,48 +781,410 @@ class _StudentDashboardScreenState extends State<StudentDashboardScreen> {
 
   void _showTopUpDialog(BuildContext context, CafeteriaProvider provider) {
     final amountController = TextEditingController();
-    final phoneController = TextEditingController();
+    final phoneController = TextEditingController(text: "055-123-4567");
 
     showDialog(
       context: context,
       builder: (context) {
-        return AlertDialog(
-          title: const Text("MoMo Digital Wallet Recharge", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              TextField(
-                controller: amountController,
-                keyboardType: TextInputType.number,
-                decoration: const InputDecoration(labelText: "Top-Up Amount (GH₵)", border: OutlineInputBorder()),
+        return StatefulBuilder(
+          builder: (context, setDialogState) {
+            bool isLoading = false;
+            String? errorMsg;
+
+            return AlertDialog(
+              title: Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(6),
+                    decoration: BoxDecoration(
+                      color: Colors.blue.withOpacity(0.1),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: const Icon(Icons.account_balance_wallet, color: Colors.blue, size: 20),
+                  ),
+                  const SizedBox(width: 12),
+                  const Text("MoMo / Card Wallet Top-Up", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                ],
               ),
-              const SizedBox(height: 12),
-              TextField(
-                controller: phoneController,
-                keyboardType: TextInputType.phone,
-                decoration: const InputDecoration(labelText: "Mobile Money Phone Number", border: OutlineInputBorder()),
+              content: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  const Text(
+                    "Load digital funds securely to your student cafeteria wallet via Paystack gateway.",
+                    style: TextStyle(fontSize: 11, color: Colors.grey),
+                  ),
+                  const SizedBox(height: 16),
+                  TextField(
+                    controller: amountController,
+                    keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                    decoration: const InputDecoration(
+                      labelText: "Top-Up Amount (GH₵)",
+                      prefixText: "GH₵ ",
+                      border: OutlineInputBorder(),
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  TextField(
+                    controller: phoneController,
+                    keyboardType: TextInputType.phone,
+                    decoration: const InputDecoration(
+                      labelText: "Mobile Money Phone Number",
+                      prefixIcon: Icon(Icons.phone_android, size: 16),
+                      border: OutlineInputBorder(),
+                    ),
+                  ),
+                  if (errorMsg != null) ...[
+                    const SizedBox(height: 8),
+                    Text(errorMsg!, style: const TextStyle(color: Colors.red, fontSize: 11, fontWeight: FontWeight.bold)),
+                  ]
+                ],
               ),
-            ],
-          ),
-          actions: [
-            TextButton(onPressed: () => Navigator.pop(context), child: const Text("CANCEL")),
-            ElevatedButton(
-              onPressed: () {
-                final amt = double.tryParse(amountController.text) ?? 0.0;
-                if (amt > 0) {
-                  provider.rechargeWallet(amt);
-                  Navigator.pop(context);
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(content: Text("Credited GH₵ ${amt.toStringAsFixed(2)} securely via Mobile Money gateway.")),
-                  );
-                }
-              },
-              child: const Text("AUTHENTICATE TOP UP"),
-            )
-          ],
+              actions: [
+                TextButton(
+                  onPressed: isLoading ? null : () => Navigator.pop(context),
+                  child: const Text("CANCEL"),
+                ),
+                ElevatedButton(
+                  onPressed: isLoading
+                      ? null
+                      : () async {
+                          final amt = double.tryParse(amountController.text) ?? 0.0;
+                          if (amt < 1.0) {
+                            setDialogState(() {
+                              errorMsg = "Minimum top-up is GH₵ 1.00";
+                            });
+                            return;
+                          }
+
+                          setDialogState(() {
+                            isLoading = true;
+                            errorMsg = null;
+                          });
+
+                          // Initialize Paystack with Laravel
+                          final user = provider.currentUser;
+                          final email = user != null ? "${user.username}@atu.edu.gh" : "student@atu.edu.gh";
+                          final paystackInit = await provider.initializePaystackPayment(
+                            amount: amt,
+                            email: email,
+                            purpose: 'WALLET_TOPUP',
+                          );
+
+                          setDialogState(() {
+                            isLoading = false;
+                          });
+
+                          if (paystackInit != null) {
+                            // Close current dialog and show Paystack Checkout simulator
+                            Navigator.pop(context);
+                            _showPaystackSimulator(context, provider, paystackInit, amt);
+                          } else {
+                            setDialogState(() {
+                              errorMsg = "Payment gateway offline. Utilizing standalone mock bypass.";
+                            });
+                            
+                            // Fallback mock top-up if backend is not running
+                            Future.delayed(const Duration(seconds: 1), () {
+                              provider.rechargeWallet(amt);
+                              Navigator.pop(context);
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(content: Text("Mock credited GH₵ ${amt.toStringAsFixed(2)} to wallet successfully.")),
+                              );
+                            });
+                          }
+                        },
+                  child: isLoading
+                      ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2))
+                      : const Text("INITIATE CHECKOUT"),
+                ),
+              ],
+            );
+          },
         );
       },
     );
+  }
+
+  // Beautiful Paystack Payment Gateway Simulator View
+  void _showPaystackSimulator(
+    BuildContext context,
+    CafeteriaProvider provider,
+    Map<String, dynamic> paystackData,
+    double amount,
+  ) {
+    final stepWrapper = {'step': 0};
+    String cardHolder = provider.currentUser?.fullName ?? "STUDENT SCHOLAR";
+    String cardNumber = "4012 3456 7890 1234";
+    String otpInput = "";
+    bool isProcessing = false;
+    String verifyStatus = "Verifying transaction with Laravel...";
+
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) {
+        return StatefulBuilder(
+          builder: (context, setSimState) {
+            final step = stepWrapper['step']!;
+
+            return Dialog(
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+              child: AnimatedContainer(
+                duration: const Duration(milliseconds: 300),
+                width: 320,
+                padding: const EdgeInsets.all(20),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    // Paystack Secure Branding
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Row(
+                          children: [
+                            Container(
+                              width: 10,
+                              height: 10,
+                              decoration: const BoxDecoration(
+                                color: Color(0xFF09A5DB), // Paystack Teal
+                                shape: BoxShape.circle,
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            const Text(
+                              "paystack",
+                              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18, color: Colors.black87),
+                            ),
+                          ],
+                        ),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                          decoration: BoxDecoration(
+                            color: Colors.amber.withOpacity(0.12),
+                            borderRadius: BorderRadius.circular(6),
+                          ),
+                          child: const Row(
+                            children: [
+                              Icon(Icons.lock, color: Colors.amber, size: 10),
+                              SizedBox(width: 4),
+                              Text("TEST GATEWAY", style: TextStyle(color: Colors.amber, fontSize: 8, fontWeight: FontWeight.bold)),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                    const Divider(height: 24),
+
+                    // STEP 0: CARD / MOMO INPUTS
+                    if (step == 0) ...[
+                      Text(
+                        "PAYMENT TO: Accra Tech Cafeteria",
+                        style: TextStyle(color: Colors.grey[600], fontSize: 10, fontWeight: FontWeight.bold, letterSpacing: 0.5),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        "GH₵ ${amount.toStringAsFixed(2)}",
+                        style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: Colors.black87),
+                      ),
+                      const SizedBox(height: 16),
+                      Text(
+                        "Reference: ${paystackData['reference']}",
+                        style: TextStyle(fontSize: 9, fontFamily: 'monospace', color: Colors.grey[500]),
+                      ),
+                      const SizedBox(height: 16),
+                      
+                      // Payment Methods Selection
+                      Container(
+                        padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 12),
+                        decoration: BoxDecoration(
+                          border: Border.all(color: Colors.grey[300]!),
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            const Row(
+                              children: [
+                                Icon(Icons.phone_android, color: Colors.teal, size: 18),
+                                SizedBox(width: 8),
+                                Text("Mobile Money (MTN/Telecel/AT)", style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
+                              ],
+                            ),
+                            Icon(Icons.check_circle, color: Colors.teal[700], size: 16),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+
+                      TextField(
+                        controller: TextEditingController(text: provider.currentUser?.info ?? "0551234567"),
+                        enabled: false,
+                        decoration: const InputDecoration(
+                          labelText: "MoMo Account Number",
+                          border: OutlineInputBorder(),
+                        ),
+                      ),
+                      const SizedBox(height: 20),
+
+                      ElevatedButton(
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: const Color(0xFF3AC5A0), // Paystack Bright Teal Button
+                          foregroundColor: Colors.white,
+                          padding: const EdgeInsets.symmetric(vertical: 14),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                        ),
+                        onPressed: isProcessing ? null : () {
+                          setSimState(() {
+                            stepWrapper['step'] = 1; // transition to OTP Verification
+                          });
+                        },
+                        child: const Text("PAY WITH MOBILE MONEY", style: TextStyle(fontWeight: FontWeight.bold)),
+                      ),
+                    ],
+
+                    // STEP 1: OTP SIMULATOR
+                    if (step == 1) ...[
+                      const Icon(Icons.security, color: Color(0xFF09A5DB), size: 48),
+                      const SizedBox(height: 16),
+                      const Center(
+                        child: Text(
+                          "Verify MoMo Transaction",
+                          style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      const Center(
+                        child: Text(
+                          "A push notification OTP was simulated to your handset. Please type '1234' below to authorize the withdrawal request.",
+                          textAlign: TextAlign.center,
+                          style: TextStyle(fontSize: 11, color: Colors.grey),
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+                      TextField(
+                        keyboardType: TextInputType.number,
+                        textAlign: TextAlign.center,
+                        obscureText: true,
+                        maxLength: 4,
+                        style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold, letterSpacing: 8),
+                        decoration: const InputDecoration(
+                          counterText: "",
+                          border: OutlineInputBorder(),
+                          hintText: "••••",
+                        ),
+                        onChanged: (val) {
+                          otpInput = val;
+                        },
+                      ),
+                      const SizedBox(height: 20),
+                      ElevatedButton(
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.teal[600],
+                          padding: const EdgeInsets.symmetric(vertical: 14),
+                        ),
+                        onPressed: () {
+                          if (otpInput == "1234") {
+                            setSimState(() {
+                              stepWrapper['step'] = 2; // transition to Backend Verification
+                            });
+                            _performBackendVerification(context, provider, paystackData['reference'], amount, setSimState, stepWrapper);
+                          } else {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(content: Text("Incorrect OTP pin. Please input '1234' to authorize.")),
+                            );
+                          }
+                        },
+                        child: const Text("AUTHORIZE PAYMENT", style: TextStyle(fontWeight: FontWeight.bold)),
+                      ),
+                    ],
+
+                    // STEP 2: BACKEND LARAVEL VERIFICATION
+                    if (step == 2) ...[
+                      const SizedBox(height: 24),
+                      const Center(child: CircularProgressIndicator(color: Color(0xFF09A5DB))),
+                      const SizedBox(height: 24),
+                      Center(
+                        child: Text(
+                          verifyStatus,
+                          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Colors.black54),
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      const Center(
+                        child: Text(
+                          "Synchronizing digital signatures with Accra Tech ledger and writing security audit trails...",
+                          textAlign: TextAlign.center,
+                          style: TextStyle(fontSize: 10, color: Colors.grey, fontStyle: FontStyle.italic),
+                        ),
+                      ),
+                    ],
+
+                    // STEP 3: TRANSACTION SUCCESS
+                    if (step == 3) ...[
+                      const Icon(Icons.check_circle_rounded, color: Colors.green, size: 64),
+                      const SizedBox(height: 16),
+                      const Center(
+                        child: Text(
+                          "TRANSACTION SUCCESSFUL",
+                          style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: Colors.green),
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      Center(
+                        child: Text(
+                          "Credited GH₵ ${amount.toStringAsFixed(2)} to student wallet securely.",
+                          textAlign: TextAlign.center,
+                          style: const TextStyle(fontSize: 12),
+                        ),
+                      ),
+                      const SizedBox(height: 24),
+                      ElevatedButton(
+                        style: ElevatedButton.styleFrom(backgroundColor: Colors.green),
+                        onPressed: () {
+                          Navigator.pop(context);
+                        },
+                        child: const Text("DONE", style: TextStyle(fontWeight: FontWeight.bold)),
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+
+  // Triggers the Laravel API verify request
+  void _performBackendVerification(
+    BuildContext context,
+    CafeteriaProvider provider,
+    String reference,
+    double amount,
+    StateSetter setSimState,
+    Map<String, int> stepWrapper,
+  ) async {
+    final success = await provider.verifyPaystackPayment(
+      reference: reference,
+      amount: amount,
+      purpose: 'WALLET_TOPUP',
+    );
+
+    if (success) {
+      setSimState(() {
+        stepWrapper['step'] = 3; // transition to SUCCESS Step
+      });
+    } else {
+      Navigator.pop(context);
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("Laravel payment verification failed. Standalone bypass triggered.")),
+      );
+      // fallback
+      provider.rechargeWallet(amount);
+    }
   }
 
   Widget _ratingRow(String label, int current, Function(int) onSelect) {

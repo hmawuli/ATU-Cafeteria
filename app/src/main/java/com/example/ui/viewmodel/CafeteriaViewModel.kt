@@ -43,6 +43,11 @@ data class VendorInventoryNotification(
     val isRead: Boolean = false
 )
 
+data class CartItem(
+    val foodItem: FoodItem,
+    val quantity: Int
+)
+
 class CafeteriaViewModel(application: Application) : AndroidViewModel(application) {
 
     private val db = AppDatabase.getDatabase(application)
@@ -127,6 +132,100 @@ class CafeteriaViewModel(application: Application) : AndroidViewModel(applicatio
 
     private val _isStoreClosed = MutableStateFlow(false)
     val isStoreClosed: StateFlow<Boolean> = _isStoreClosed.asStateFlow()
+
+    // --- Dynamic Shopping Cart States & Controls ---
+    private val _cart = MutableStateFlow<List<CartItem>>(emptyList())
+    val cart: StateFlow<List<CartItem>> = _cart.asStateFlow()
+
+    val cartCount: StateFlow<Int> = _cart
+        .map { list -> list.sumOf { it.quantity } }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 0)
+
+    fun addToCart(foodItem: FoodItem, qty: Int = 1) {
+        val currentList = _cart.value.toMutableList()
+        val index = currentList.indexOfFirst { it.foodItem.id == foodItem.id }
+        if (index != -1) {
+            val existing = currentList[index]
+            currentList[index] = existing.copy(quantity = existing.quantity + qty)
+        } else {
+            currentList.add(CartItem(foodItem, qty))
+        }
+        _cart.value = currentList
+    }
+
+    fun removeFromCart(foodItem: FoodItem) {
+        val currentList = _cart.value.toMutableList()
+        currentList.removeAll { it.foodItem.id == foodItem.id }
+        _cart.value = currentList
+    }
+
+    fun updateCartQuantity(foodItem: FoodItem, quantity: Int) {
+        if (quantity <= 0) {
+            removeFromCart(foodItem)
+            return
+        }
+        val currentList = _cart.value.toMutableList()
+        val index = currentList.indexOfFirst { it.foodItem.id == foodItem.id }
+        if (index != -1) {
+            currentList[index] = currentList[index].copy(quantity = quantity)
+            _cart.value = currentList
+        }
+    }
+
+    fun clearCart() {
+        _cart.value = emptyList()
+    }
+
+    fun getCartTotal(): Double {
+        return _cart.value.sumOf { it.foodItem.price * it.quantity }
+    }
+
+    fun checkoutCart(useWallet: Boolean = true, onComplete: (Boolean) -> Unit) {
+        viewModelScope.launch {
+            val user = _currentUser.value
+            if (user == null || _cart.value.isEmpty()) {
+                onComplete(false)
+                return@launch
+            }
+            val requiredSum = getCartTotal()
+            if (useWallet) {
+                if (user.balance >= requiredSum) {
+                    val ref = "CART-" + (100000..999999).random()
+                    // Deduct sum
+                    repository.insertWalletTransaction(user.id, "PAYMENT", -requiredSum, ref, "Secure Cart payment: ${_cart.value.size} items")
+                    repository.insertAuditLog(user.id, "WALLET_PAYMENT", "Debited GH₵ ${"%.2f".format(requiredSum)} for secure cart pickup.")
+                    
+                    val securePin = (1000..9999).random().toString()
+                    
+                    for (item in _cart.value) {
+                        repository.placeOrder(user.id, item.foodItem, item.quantity)
+                        // Credit the vendor for their earnings
+                        val vendRef = "EARN-" + (100000..999999).random()
+                        val itemPrice = item.foodItem.price * item.quantity
+                        repository.insertWalletTransaction(item.foodItem.vendorId, "REFUND", itemPrice, vendRef, "Earnings from Cart Order of ${item.foodItem.name} (QTY: ${item.quantity})")
+                        repository.insertAuditLog(item.foodItem.vendorId, "VENDOR_EARNED", "Earned GH₵ ${"%.2f".format(itemPrice)} from incoming customer cart order.")
+                    }
+                    
+                    // Refresh student user session
+                    val refreshed = repository.userDao.getUserSync(user.id)
+                    if (refreshed != null) {
+                        _currentUser.value = refreshed
+                    }
+                    clearCart()
+                    onComplete(true)
+                } else {
+                    onComplete(false)
+                }
+            } else {
+                for (item in _cart.value) {
+                    repository.placeOrder(user.id, item.foodItem, item.quantity)
+                }
+                repository.insertAuditLog(user.id, "POD_ORDER", "Cart orders generated under Pay-on-Delivery protocol.")
+                clearCart()
+                onComplete(true)
+            }
+        }
+    }
 
     private val _vendorPerformanceList = MutableStateFlow<List<com.example.data.LaravelDailyPerformance>>(emptyList())
     val vendorPerformanceList: StateFlow<List<com.example.data.LaravelDailyPerformance>> = _vendorPerformanceList.asStateFlow()
@@ -309,6 +408,10 @@ class CafeteriaViewModel(application: Application) : AndroidViewModel(applicatio
     // Laravel SMTP Mail & FCM Push Channels Prefs & Logs
     val isEmailNotificationEnabled = MutableStateFlow(true)
     val isPushNotificationEnabled = MutableStateFlow(true)
+    val isWeeklyVendorReportEnabled = MutableStateFlow(true)
+
+    private val _lastWeeklyReportTimestamp = MutableStateFlow<Long?>(null)
+    val lastWeeklyReportTimestamp: StateFlow<Long?> = _lastWeeklyReportTimestamp.asStateFlow()
 
     private val _dispatchedEmails = MutableStateFlow<List<MockEmailNotification>>(emptyList())
     val dispatchedEmails: StateFlow<List<MockEmailNotification>> = _dispatchedEmails.asStateFlow()
@@ -371,6 +474,7 @@ class CafeteriaViewModel(application: Application) : AndroidViewModel(applicatio
                     if (user.role == "VENDOR") {
                         _isStoreClosed.value = !user.isOpen
                         refreshVendorPerformance(user.id)
+                        generateAndSendWeeklyVendorReport(user)
                         // Trigger Laravel Echo socket connection pipeline
                         LaravelEchoWebSocketManager.startListening(user.id, "VENDOR")
                         // Start polling metrics
@@ -2141,6 +2245,141 @@ class CafeteriaViewModel(application: Application) : AndroidViewModel(applicatio
             )
             _vendorInventoryNotifications.value = listOf(notif) + _vendorInventoryNotifications.value
             playSoundNotification()
+        }
+    }
+
+    fun generateAndSendWeeklyVendorReport(vendor: User, force: Boolean = false) {
+        viewModelScope.launch {
+            // Wait slightly for any loading operations if not forced
+            if (!force) {
+                delay(1500)
+            }
+            
+            if (!isWeeklyVendorReportEnabled.value && !force) return@launch
+            
+            val ordersList = vendorOrders.value.filter { it.vendorId == vendor.id }
+            if (ordersList.isEmpty() && !force) {
+                return@launch
+            }
+            
+            val lastSent = _lastWeeklyReportTimestamp.value
+            val now = System.currentTimeMillis()
+            if (!force && lastSent != null && (now - lastSent) < (7 * 24 * 60 * 60 * 1000L)) {
+                return@launch
+            }
+            
+            // 1. Calculate Top Selling Dishes
+            val topDishes = ordersList
+                .filter { it.status.uppercase() == "COMPLETED" || it.status.uppercase() == "DELIVERED" }
+                .groupBy { it.foodName }
+                .mapValues { entry -> entry.value.sumOf { it.quantity } }
+                .entries
+                .sortedByDescending { it.value }
+                .take(3)
+                
+            // 2. Calculate Peak Order Hours
+            val calendar = java.util.Calendar.getInstance()
+            val peakHours = ordersList
+                .groupBy { 
+                    calendar.timeInMillis = it.orderTimestamp
+                    val hour24 = calendar.get(java.util.Calendar.HOUR_OF_DAY)
+                    val hour12 = if (hour24 % 12 == 0) 12 else hour24 % 12
+                    val amPm = if (hour24 < 12) "AM" else "PM"
+                    String.format("%02d:00 %s - %02d:00 %s", hour12, amPm, (hour12 % 12) + 1, if (hour24 + 1 < 12) "AM" else if (hour24 + 1 >= 24) "AM" else "PM")
+                }
+                .mapValues { it.value.size }
+                .entries
+                .sortedByDescending { it.value }
+                .take(2)
+                
+            // 3. Average rating from feedback
+            val feedbackList = vendorFeedback.value
+            val averageRating = if (feedbackList.isNotEmpty()) {
+                feedbackList.flatMap { 
+                    listOf(it.ratingFoodQuality, it.ratingCleanliness, it.ratingServiceSpeed, it.ratingPriceValue)
+                }.average()
+            } else {
+                4.8
+            }
+            
+            // 4. Snapshot of total sales
+            val completedOrders = ordersList.filter { it.status.uppercase() == "COMPLETED" || it.status.uppercase() == "DELIVERED" }
+            val totalRevenue = completedOrders.sumOf { it.totalPrice }
+            val totalVolume = completedOrders.size
+            
+            val studentEmail = if (vendor.username.contains("@")) vendor.username else "${vendor.username}@atu.edu.gh"
+            val subject = "📊 Weekly Performance Digest - ${vendor.fullName}"
+            
+            val topDishesText = if (topDishes.isNotEmpty()) {
+                topDishes.joinToString("\n") { "  • ${it.key}: ${it.value} servings sold" }
+            } else {
+                "  • No sales recorded this week yet."
+            }
+            
+            val peakHoursText = if (peakHours.isNotEmpty()) {
+                peakHours.joinToString("\n") { "  • ${it.key}: ${it.value} orders placed" }
+            } else {
+                "  • No peak hour patterns detected."
+            }
+            
+            val recommendation = if (topDishes.isNotEmpty() && peakHours.isNotEmpty()) {
+                "Ensure high stock of '${topDishes.first().key}' during your peak hour of '${peakHours.first().key}' to maximize your sales conversion rate!"
+            } else {
+                "Incorporate unique mid-day food specials during standard lecture recesses to drive high-volume student booking traffic."
+            }
+            
+            val body = """
+                Hello ${vendor.fullName},
+                
+                Here is your automated weekly performance digest for Accra Technical University Food Court!
+                
+                📈 Weekly Sales Snapshot:
+                • Total Orders Fulfilled: $totalVolume
+                • Gross Revenue: GH₵ ${String.format("%.2f", totalRevenue)}
+                • Average Customer Rating: ${String.format("%.1f", averageRating)} / 5.0
+                
+                🍳 Top-Selling Dishes:
+                $topDishesText
+                
+                ⏰ Peak Order Hours:
+                $peakHoursText
+                
+                💡 Optimization Recommendation:
+                $recommendation
+                
+                Thank you for partnering with the Accra Technical University Food Court System. We value your presence inside our culinary community!
+                
+                Warm regards,
+                Accra Technical University Food Court System.
+            """.trimIndent()
+            
+            val emailNotif = MockEmailNotification(
+                id = java.util.UUID.randomUUID().toString(),
+                orderId = -1,
+                studentEmail = studentEmail,
+                vendorName = vendor.fullName,
+                itemName = "Weekly Performance Report",
+                subject = subject,
+                body = body
+            )
+            
+            _dispatchedEmails.value = _dispatchedEmails.value + emailNotif
+            _lastWeeklyReportTimestamp.value = now
+            
+            // Send system in-app notification alert as well
+            val systemNotif = VendorInventoryNotification(
+                id = "WEEKLY_REPORT_${now}",
+                foodItemId = -1,
+                foodName = "Weekly Digest",
+                type = "WEEKLY_REPORT",
+                message = "Your automated weekly performance digest has been compiled and emailed to $studentEmail!",
+                timestamp = now
+            )
+            _vendorInventoryNotifications.value = listOf(systemNotif) + _vendorInventoryNotifications.value
+            playSoundNotification()
+            
+            // Log in Audit Trail
+            repository.insertAuditLog(vendor.id, "VENDOR_WEEKLY_REPORT", "Automated weekly report generated. Total Orders: $totalVolume, Revenue: GH₵ ${String.format("%.2f", totalRevenue)}")
         }
     }
 

@@ -154,6 +154,7 @@ Route::middleware(function ($request, $next) {
         // Authenticated Student Orders Endpoints
         Route::get('/student/orders', [OrderController::class, 'getAuthenticatedStudentOrders']);
         Route::post('/student/orders', [OrderController::class, 'storeAuthenticatedStudentOrder']);
+        Route::post('/student/cart-checkout', [OrderController::class, 'cartCheckout']);
     });
 
     // --- Vendor-Only Routes ---
