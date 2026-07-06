@@ -5,6 +5,9 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
 use App\Services\PerformanceAnalyticsService;
+use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Cache;
 
 class VendorController extends Controller
 {
@@ -277,5 +280,133 @@ class VendorController extends Controller
             'topPerformingItems' => $topPerformingItems,
             'lowStockItems' => $lowStockItems,
         ]);
+    }
+
+    /**
+     * Retrieve system-wide health and connectivity diagnostics (DB and Cache).
+     */
+    public function getSystemHealth()
+    {
+        $dbStatus = 'OK';
+        $dbMessage = 'Successfully connected to database.';
+        try {
+            DB::connection()->getPdo();
+        } catch (\Exception $e) {
+            $dbStatus = 'FAILED';
+            $dbMessage = $e->getMessage();
+        }
+
+        $cacheStatus = 'OK';
+        $cacheMessage = 'Successfully verified cache store functionality.';
+        try {
+            Cache::store()->get('health_check_test_key');
+            Cache::store()->put('health_check_test_key', 'OK', 10);
+        } catch (\Exception $e) {
+            $cacheStatus = 'FAILED';
+            $cacheMessage = $e->getMessage();
+        }
+
+        $diskFree = 'N/A';
+        try {
+            $diskFree = round(disk_free_space('/') / 1024 / 1024 / 1024, 2) . ' GB';
+        } catch (\Exception $e) {}
+
+        $health = [
+            'status' => ($dbStatus === 'OK' && $cacheStatus === 'OK') ? 'HEALTHY' : 'UNHEALTHY',
+            'timestamp' => now()->toIso8601String(),
+            'php_version' => PHP_VERSION,
+            'environment' => config('app.env'),
+            'debug_mode' => config('app.debug'),
+            'services' => [
+                'database' => [
+                    'status' => $dbStatus,
+                    'driver' => config('database.default'),
+                    'message' => $dbMessage,
+                ],
+                'cache' => [
+                    'status' => $cacheStatus,
+                    'driver' => config('cache.default'),
+                    'message' => $cacheMessage,
+                ],
+            ],
+            'diagnostics' => [
+                'memory_usage_mb' => round(memory_get_usage(true) / 1024 / 1024, 2),
+                'disk_free_space_gb' => $diskFree,
+            ]
+        ];
+
+        return response()->json($health, $health['status'] === 'HEALTHY' ? 200 : 503);
+    }
+
+    /**
+     * Parse recent errors and stack traces from laravel.log file safely.
+     */
+    public function getDiagnosticLogs(Request $request)
+    {
+        $logPath = storage_path('logs/laravel.log');
+        
+        if (!file_exists($logPath)) {
+            return response()->json([
+                'success' => true,
+                'logs' => [],
+                'message' => 'No log file found at storage/logs/laravel.log yet.'
+            ]);
+        }
+        
+        $fileSize = filesize($logPath);
+        $maxBytes = 256 * 1024; // 256KB max to avoid memory overload
+        $handle = fopen($logPath, 'r');
+        
+        if ($fileSize > $maxBytes) {
+            fseek($handle, -$maxBytes, SEEK_END);
+        }
+        
+        $content = fread($handle, $maxBytes);
+        fclose($handle);
+        
+        // Match standard [YYYY-MM-DD HH:MM:SS] level.ERROR: messages
+        preg_match_all('/\[(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2})\]\s+([a-zA-Z0-9_-]+)\.([A-Z]+):\s+(.*?)(?=\n\[\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}\]|\z)/s', $content, $matches, PREG_SET_ORDER);
+        
+        $logs = [];
+        foreach ($matches as $match) {
+            $timestamp = $match[1];
+            $env = $match[2];
+            $level = $match[3];
+            $message = trim($match[4]);
+            
+            $shortMessage = strtok($message, "\n");
+            $hasStack = strpos($message, "\n") !== false;
+            
+            $logs[] = [
+                'timestamp' => $timestamp,
+                'environment' => $env,
+                'level' => $level,
+                'short_message' => $shortMessage,
+                'full_message' => $message,
+                'has_stack' => $hasStack,
+            ];
+        }
+        
+        // Reverse logs to show the most recent entries first
+        $logs = array_reverse($logs);
+        
+        return response()->json([
+            'success' => true,
+            'file_size_kb' => round($fileSize / 1024, 2),
+            'logs' => array_slice($logs, 0, 100),
+        ]);
+    }
+
+    /**
+     * Clear current log file contents.
+     */
+    public function clearDiagnosticLogs(Request $request)
+    {
+        $logPath = storage_path('logs/laravel.log');
+        if (file_exists($logPath)) {
+            file_put_contents($logPath, '');
+            return response()->json(['success' => true, 'message' => 'Log file cleared successfully.']);
+        }
+        return response()->json(['success' => false, 'message' => 'Log file does not exist.']);
     }
 }

@@ -658,6 +658,10 @@ Route::middleware(function ($request, $next) {
         Route::get('/vendor/order-items-revenue', [OrderItemMetricsController::class, 'getDailyRevenueMetrics']);
         Route::get('/vendor/order-items-menu-metrics', [OrderItemMetricsController::class, 'getMenuItemMetrics']);
 
+        // System diagnostics logs routes
+        Route::get('/system/logs', [VendorController::class, 'getDiagnosticLogs']);
+        Route::post('/system/logs/clear', [VendorController::class, 'clearDiagnosticLogs']);
+
         // Vendor Specific endpoints
         Route::put('/vendor/menu/availability', [VendorSpecificController::class, 'updateMenuAvailability']);
         Route::get('/vendor/orders/summary', [VendorSpecificController::class, 'getOrderSummary']);
@@ -751,3 +755,6 @@ Route::post('/food-items/feedback', [FoodItemFeedbackController::class, 'store']
 // Centralised Quality Assurance Traceability Audit Logs Endpoints
 Route::get('/audit-logs', [AuditLogController::class, 'index']);
 Route::post('/audit-logs', [AuditLogController::class, 'store']);
+
+// System Status Monitoring (JSON health check of DB & Cache)
+Route::get('/system/status', [VendorController::class, 'getSystemHealth']);

@@ -841,6 +841,100 @@
 
         </div>
 
+        <!-- System Diagnostics & Logging Console -->
+        <div class="mt-12 bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden" id="system-diagnostics-console">
+            <div class="p-6 bg-gradient-to-r from-slate-900 to-indigo-950 text-white flex flex-col md:flex-row md:items-center justify-between gap-4">
+                <div class="flex items-center gap-3">
+                    <div class="p-2.5 bg-indigo-600/30 rounded-xl border border-indigo-400/30 text-indigo-400">
+                        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"></path>
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path>
+                        </svg>
+                    </div>
+                    <div>
+                        <h3 class="text-lg font-extrabold tracking-tight flex items-center gap-2">
+                            🔧 Central Diagnostics & System Log Auditing
+                        </h3>
+                        <p class="text-xs text-slate-300">Monitor database connectivity, cache health, and examine active application errors.</p>
+                    </div>
+                </div>
+                
+                <!-- Action Buttons -->
+                <div class="flex flex-wrap items-center gap-2">
+                    <button type="button" onclick="fetchSystemHealth()" class="px-3.5 py-1.5 bg-indigo-500/20 hover:bg-indigo-500/30 text-indigo-300 border border-indigo-500/30 text-xs font-bold rounded-xl transition-all flex items-center gap-1.5">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 1121.248 8H18.25"></path></svg>
+                        Test Health
+                    </button>
+                    <button type="button" onclick="fetchLogs()" class="px-3.5 py-1.5 bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-300 border border-emerald-500/30 text-xs font-bold rounded-xl transition-all flex items-center gap-1.5">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 1121.248 8H18.25"></path></svg>
+                        Reload Logs
+                    </button>
+                    <button type="button" onclick="clearLogs()" class="px-3.5 py-1.5 bg-rose-500/20 hover:bg-rose-500/30 text-rose-300 border border-rose-500/30 text-xs font-bold rounded-xl transition-all flex items-center gap-1.5">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
+                        Clear Logs
+                    </button>
+                </div>
+            </div>
+
+            <!-- Health Status Panel -->
+            <div class="p-6 border-b border-slate-100 bg-slate-50/50">
+                <h4 class="text-xs font-bold uppercase text-slate-400 tracking-wider mb-4 font-semibold">Real-Time Connectivity & Driver Health</h4>
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                    <!-- DB Card -->
+                    <div class="bg-white rounded-2xl p-4 border border-slate-200 flex items-center gap-3 shadow-3xs" id="db_health_card">
+                        <div class="p-2 bg-indigo-50 text-indigo-600 rounded-xl" id="db_health_icon">
+                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.582 4 8 4s8-1.79 8-4M4 7c0-2.21 3.582-4 8-4s8 1.79 8 4m0 5c0 2.21-3.582 4-8 4s-8-1.79-8-4"></path></svg>
+                        </div>
+                        <div>
+                            <p class="text-[10px] text-slate-400 font-bold uppercase">Database Connection</p>
+                            <p class="text-sm font-extrabold text-slate-800" id="db_health_status">Checking...</p>
+                            <p class="text-[11px] text-slate-500 mt-0.5" id="db_health_desc">-</p>
+                        </div>
+                    </div>
+                    <!-- Cache Card -->
+                    <div class="bg-white rounded-2xl p-4 border border-slate-200 flex items-center gap-3 shadow-3xs" id="cache_health_card">
+                        <div class="p-2 bg-emerald-50 text-emerald-600 rounded-xl" id="cache_health_icon">
+                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path></svg>
+                        </div>
+                        <div>
+                            <p class="text-[10px] text-slate-400 font-bold uppercase">Cache Driver Store</p>
+                            <p class="text-sm font-extrabold text-slate-800" id="cache_health_status">Checking...</p>
+                            <p class="text-[11px] text-slate-500 mt-0.5" id="cache_health_desc">-</p>
+                        </div>
+                    </div>
+                    <!-- Stats Card -->
+                    <div class="bg-white rounded-2xl p-4 border border-slate-200 flex items-center gap-3 shadow-3xs">
+                        <div class="p-2 bg-slate-50 text-slate-600 rounded-xl">
+                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 3v2m6-2v2M9 19v2m6-2v2M5 9H3m2 6H3m18-6h-2m2 6h-2M7 19h10a2 2 0 002-2V7a2 2 0 00-2-2H7a2 2 0 00-2 2v10a2 2 0 002 2zM9 9h6v6H9V9z"></path></svg>
+                        </div>
+                        <div>
+                            <p class="text-[10px] text-slate-400 font-bold uppercase">Server Metrics</p>
+                            <p class="text-sm font-extrabold text-slate-800" id="system_health_env">-</p>
+                            <p class="text-[11px] text-slate-500 mt-0.5" id="system_health_ram">-</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Log Parser List Content -->
+            <div class="p-6">
+                <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-4">
+                    <div class="relative flex-grow max-w-md">
+                        <span class="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none text-slate-400">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path></svg>
+                        </span>
+                        <input type="text" id="logSearchInput" oninput="filterLogs()" placeholder="Search error logs by keyword or class..." class="w-full pl-9 pr-4 py-2 text-xs rounded-xl border border-slate-300 focus:ring-2 focus:ring-indigo-500 outline-none transition-all placeholder:text-slate-400">
+                    </div>
+                    <p class="text-xs text-slate-500 font-medium" id="logSummaryLabel">Loading error logs...</p>
+                </div>
+
+                <!-- Logs Stream Console -->
+                <div class="bg-slate-900 text-slate-100 rounded-2xl border border-slate-800 p-4 code-font text-xs max-h-[420px] overflow-y-auto space-y-3" id="log_stream_container">
+                    <!-- Logs list generated dynamically -->
+                </div>
+            </div>
+        </div>
+
     </main>
 
     <footer class="bg-slate-900 text-slate-400 text-xs py-10 mt-16 border-t border-slate-800">
@@ -1369,6 +1463,198 @@
             @if(!empty($lowStockItems))
                 showLowStockToast(@json($lowStockItems));
             @endif
+
+            // Initialize System Health and Diagnostic Log Streams
+            fetchSystemHealth();
+            fetchLogs();
+        });
+
+        // Diagnostics Log & Health Console routines
+        let activeLogsList = [];
+
+        function fetchSystemHealth() {
+            const dbCard = document.getElementById('db_health_card');
+            const cacheCard = document.getElementById('cache_health_card');
+            
+            document.getElementById('db_health_status').textContent = "Checking...";
+            document.getElementById('cache_health_status').textContent = "Checking...";
+            
+            fetch('/api/system/status')
+            .then(res => {
+                if (!res.ok && res.status !== 503) {
+                    throw new Error("HTTP " + res.status);
+                }
+                return res.json();
+            })
+            .then(data => {
+                const db = data.services.database;
+                const cache = data.services.cache;
+                
+                // DB Card styling
+                const dbStatusEl = document.getElementById('db_health_status');
+                dbStatusEl.textContent = db.status;
+                document.getElementById('db_health_desc').textContent = db.driver.toUpperCase() + ": " + (db.status === 'OK' ? 'Connected successfully' : 'Connection failed');
+                
+                if (db.status === 'OK') {
+                    dbStatusEl.className = "text-sm font-extrabold text-emerald-600";
+                    dbCard.className = "bg-white rounded-2xl p-4 border border-slate-200 flex items-center gap-3 shadow-3xs";
+                } else {
+                    dbStatusEl.className = "text-sm font-extrabold text-rose-600";
+                    dbCard.className = "bg-rose-50 rounded-2xl p-4 border border-rose-200 flex items-center gap-3 shadow-3xs animate-pulse";
+                }
+                
+                // Cache Card styling
+                const cacheStatusEl = document.getElementById('cache_health_status');
+                cacheStatusEl.textContent = cache.status;
+                document.getElementById('cache_health_desc').textContent = cache.driver.toUpperCase() + ": " + (cache.status === 'OK' ? 'Active storage store' : 'Store unreachable');
+                
+                if (cache.status === 'OK') {
+                    cacheStatusEl.className = "text-sm font-extrabold text-emerald-600";
+                    cacheCard.className = "bg-white rounded-2xl p-4 border border-slate-200 flex items-center gap-3 shadow-3xs";
+                } else {
+                    cacheStatusEl.className = "text-sm font-extrabold text-rose-600";
+                    cacheCard.className = "bg-rose-50 rounded-2xl p-4 border border-rose-200 flex items-center gap-3 shadow-3xs animate-pulse";
+                }
+                
+                // System stats styling
+                document.getElementById('system_health_env').textContent = `PHP ${data.php_version} (${data.environment.toUpperCase()})`;
+                document.getElementById('system_health_ram').textContent = `RAM: ${data.diagnostics.memory_usage_mb} MB | Disk: ${data.diagnostics.disk_free_space_gb}`;
+            })
+            .catch(err => {
+                console.error("Health diagnostics failed:", err);
+                document.getElementById('db_health_status').textContent = "ERROR";
+                document.getElementById('db_health_desc').textContent = "Failed to query system health API";
+                document.getElementById('cache_health_status').textContent = "ERROR";
+                document.getElementById('cache_health_desc').textContent = "Failed to query system health API";
+            });
+        }
+
+        function fetchLogs() {
+            const container = document.getElementById('log_stream_container');
+            container.innerHTML = `<div class="py-12 text-center text-slate-400 animate-pulse">⚡ Connecting log streaming buffer...</div>`;
+            
+            fetch('/api/system/logs')
+            .then(res => res.json())
+            .then(data => {
+                if (data.success) {
+                    activeLogsList = data.logs || [];
+                    renderLogs(activeLogsList);
+                } else {
+                    container.innerHTML = `<div class="py-8 text-center text-rose-400 font-bold">❌ Failed to parse system logs: ${data.message}</div>`;
+                }
+            })
+            .catch(err => {
+                console.error("Log fetch failed:", err);
+                container.innerHTML = `<div class="py-8 text-center text-rose-400 font-bold">❌ Server connection failure during log streaming</div>`;
+            });
+        }
+
+        function renderLogs(logs) {
+            const container = document.getElementById('log_stream_container');
+            document.getElementById('logSummaryLabel').textContent = `Showing latest ${logs.length} parsed log entries`;
+            
+            if (logs.length === 0) {
+                container.innerHTML = `<div class="py-12 text-center text-slate-500">✨ Log buffer is empty. No recent errors or exceptions captured.</div>`;
+                return;
+            }
+            
+            let html = "";
+            logs.forEach((log, index) => {
+                let badgeClass = "bg-slate-800 text-slate-300";
+                if (log.level === 'ERROR' || log.level === 'CRITICAL' || log.level === 'EMERGENCY' || log.level === 'ALERT') {
+                    badgeClass = "bg-red-500/20 text-red-400 border border-red-500/30";
+                } else if (log.level === 'WARNING') {
+                    badgeClass = "bg-amber-500/20 text-amber-400 border border-amber-500/30";
+                } else if (log.level === 'INFO' || log.level === 'DEBUG') {
+                    badgeClass = "bg-sky-500/20 text-sky-400 border border-sky-500/30";
+                }
+                
+                html += `
+                    <div class="border-b border-slate-800/80 pb-3 last:border-none last:pb-0">
+                        <div class="flex flex-col md:flex-row md:items-center justify-between gap-2">
+                            <div class="flex items-center gap-2 flex-wrap">
+                                <span class="px-2 py-0.5 text-[10px] rounded-md font-extrabold ${badgeClass}">${log.level}</span>
+                                <span class="text-slate-500 text-[11px] font-bold">${log.timestamp}</span>
+                                <span class="text-slate-400 text-[10px] uppercase font-bold tracking-wider">${log.environment}</span>
+                            </div>
+                            ${log.has_stack ? `
+                                <button onclick="toggleStackTrace(${index})" class="text-[10px] text-indigo-400 hover:text-indigo-300 font-bold underline focus:outline-none">
+                                    Show Details/Stack
+                                </button>
+                            ` : ''}
+                        </div>
+                        <p class="text-slate-200 mt-1.5 leading-relaxed break-all font-medium">${escapeHtml(log.short_message)}</p>
+                        
+                        ${log.has_stack ? `
+                            <div id="stack-trace-${index}" class="hidden mt-3 p-3 bg-slate-950 text-slate-400 rounded-xl border border-slate-800/50 max-h-[300px] overflow-y-auto whitespace-pre-wrap select-text leading-relaxed font-mono">
+${escapeHtml(log.full_message)}
+                            </div>
+                        ` : ''}
+                    </div>
+                `;
+            });
+            
+            container.innerHTML = html;
+        }
+
+        function toggleStackTrace(index) {
+            const el = document.getElementById(`stack-trace-${index}`);
+            if (el) {
+                el.classList.toggle('hidden');
+            }
+        }
+
+        function filterLogs() {
+            const query = document.getElementById('logSearchInput').value.toLowerCase().trim();
+            if (!query) {
+                renderLogs(activeLogsList);
+                return;
+            }
+            
+            const filtered = activeLogsList.filter(log => {
+                return log.full_message.toLowerCase().includes(query) || 
+                       log.level.toLowerCase().includes(query) || 
+                       log.timestamp.includes(query);
+            });
+            
+            renderLogs(filtered);
+        }
+
+        function clearLogs() {
+            if (!confirm("Are you sure you want to permanently empty the Laravel error log file? This action is irreversible.")) {
+                return;
+            }
+            
+            fetch('/api/system/logs/clear', {
+                method: 'POST',
+                headers: {
+                    'X-CSRF-TOKEN': '{{ csrf_token() }}'
+                }
+            })
+            .then(res => res.json())
+            .then(data => {
+                if (data.success) {
+                    fetchLogs();
+                    alert("Laravel logs truncated successfully!");
+                } else {
+                    alert("Failed to clear logs: " + data.message);
+                }
+            })
+            .catch(err => {
+                console.error("Clear logs request failed:", err);
+                alert("Network communication failure while trying to clear logs.");
+            });
+        }
+
+        function escapeHtml(str) {
+            if (!str) return '';
+            return str
+                .replace(/&/g, "&amp;")
+                .replace(/</g, "&lt;")
+                .replace(/>/g, "&gt;")
+                .replace(/"/g, "&quot;")
+                .replace(/'/g, "&#039;");
+        }
         });
     </script>
 
