@@ -26,7 +26,7 @@ class UpdateFoodItemRequest extends FormRequest
             'name' => 'nullable|string|max:255',
             'price' => 'nullable|numeric|min:0',
             'category' => 'nullable|string',
-            'description' => 'nullable|string|max:1000',
+            'description' => 'nullable|string|min:10|max:1000',
             'image_url' => 'nullable|string',
             'is_available' => 'nullable|boolean',
         ];

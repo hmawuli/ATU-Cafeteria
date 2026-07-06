@@ -53,6 +53,205 @@ Route::post('/student/login', [StudentAuthController::class, 'login']);
 // Specialized Vendor Sanctum Auth Endpoints
 Route::post('/vendor/register', [VendorAuthController::class, 'register']);
 Route::post('/vendor/login', [VendorAuthController::class, 'login']);
+Route::get('/vendor/dashboard', [VendorController::class, 'dashboardView']);
+
+// Interactive Vendor Dashboard Web Actions (for Blade templates compatibility)
+Route::post('/vendor/food-items', function (\Illuminate\Http\Request $request) {
+    $validator = \Illuminate\Support\Facades\Validator::make($request->all(), [
+        'vendor_id' => 'required|integer|exists:users,id',
+        'name' => 'required|string|max:255',
+        'price' => 'required|numeric|min:0',
+        'category' => 'required|string',
+        'description' => 'required|string|min:10|max:1000',
+    ]);
+
+    if ($validator->fails()) {
+        return redirect()->back()->withErrors($validator)->withInput();
+    }
+
+    $food = \App\Models\FoodItem::create([
+        'vendor_id' => $request->input('vendor_id'),
+        'name' => $request->input('name'),
+        'price' => $request->input('price'),
+        'category' => $request->input('category'),
+        'description' => $request->input('description'),
+        'is_available' => true,
+    ]);
+
+    // Create audit log
+    \App\Models\AuditLog::create([
+        'user_id' => $food->vendor_id,
+        'timestamp' => time() * 1000,
+        'action' => 'MENU_ITEM_CREATED',
+        'details' => "Added dish: '{$food->name}' to category '{$food->category}' via Vendor Blade Dashboard.",
+    ]);
+
+    return redirect()->back()->with('success', "Food item '{$food->name}' added successfully!");
+});
+
+Route::post('/vendor/food-items/{id}/delete', function ($id) {
+    $food = \App\Models\FoodItem::find($id);
+    if ($food) {
+        $name = $food->name;
+        $vendorId = $food->vendor_id;
+        $food->delete();
+
+        // Create audit log
+        \App\Models\AuditLog::create([
+            'user_id' => $vendorId,
+            'timestamp' => time() * 1000,
+            'action' => 'MENU_ITEM_DELETED',
+            'details' => "Eradicated menu item '{$name}' from vending list via Vendor Blade Dashboard.",
+        ]);
+
+        return redirect()->back()->with('success', "Food item '{$name}' deleted successfully!");
+    }
+    return redirect()->back()->with('error', "Food item not found.");
+});
+
+Route::post('/vendor/food-items/{id}/toggle-status', function ($id) {
+    $food = \App\Models\FoodItem::find($id);
+    if ($food) {
+        $food->is_available = !$food->is_available;
+        $food->save();
+
+        $statusStr = $food->is_available ? 'In Stock' : 'Out of Stock';
+
+        // Create audit log
+        \App\Models\AuditLog::create([
+            'user_id' => $food->vendor_id,
+            'timestamp' => time() * 1000,
+            'action' => 'MENU_ITEM_UPDATED',
+            'details' => "Updated availability of '{$food->name}' to '{$statusStr}' via Vendor Blade Dashboard.",
+        ]);
+
+        return redirect()->back()->with('success', "Food item '{$food->name}' is now {$statusStr}!");
+    }
+    return redirect()->back()->with('error', "Food item not found.");
+});
+
+Route::get('/vendor/export-csv', function (\Illuminate\Http\Request $request) {
+    $vendorId = $request->query('vendor_id', 10);
+    $user = \App\Models\User::find($vendorId);
+    if (!$user) {
+        return response("Vendor not found", 404);
+    }
+
+    $service = new \App\Services\PerformanceAnalyticsService();
+    $metrics = $service->getVendorReport($user->id);
+
+    $orders = \App\Models\Order::where('vendor_id', $user->id)
+        ->with(['customer', 'student'])
+        ->orderBy('id', 'desc')
+        ->get();
+
+    $filename = "vendor_report_" . str_replace(' ', '_', strtolower($user->fullName)) . "_" . date('Ymd_His') . ".csv";
+
+    $headers = [
+        "Content-type"        => "text/csv",
+        "Content-Disposition" => "attachment; filename=$filename",
+        "Pragma"              => "no-cache",
+        "Cache-Control"       => "must-revalidate, post-check=0, pre-check=0",
+        "Expires"             => "0"
+    ];
+
+    $callback = function() use ($user, $metrics, $orders) {
+        $file = fopen('php://output', 'w');
+
+        // UTF-8 BOM
+        fputs($file, "\xEF\xBB\xBF");
+
+        // 1. Vendor Header
+        fputcsv($file, ["VENDOR PERFORMANCE METRICS REPORT"]);
+        fputcsv($file, ["Vendor Profile", $user->fullName]);
+        fputcsv($file, ["Student/Staff ID", $user->student_staff_id]);
+        fputcsv($file, ["Outlet Name", $user->profile_info['outlet_name'] ?? 'N/A']);
+        fputcsv($file, ["Report Generated At", date('Y-m-d H:i:s')]);
+        fputcsv($file, []);
+
+        // 2. Metrics Block
+        fputcsv($file, ["METRIC", "VALUE"]);
+        fputcsv($file, ["Escrow Balance (GH₵)", number_format($user->balance, 2)]);
+        fputcsv($file, ["Average Preparation Time", $metrics['completion_time_metrics']['average_formatted'] ?? 'N/A']);
+        fputcsv($file, ["Fastest Preparation Time", $metrics['completion_time_metrics']['fastest_formatted'] ?? 'N/A']);
+        fputcsv($file, ["Completion Rate (%)", ($metrics['order_metrics']['completion_rate_percentage'] ?? '100') . "%"]);
+        fputcsv($file, ["Total Completed Sales (GH₵)", number_format($metrics['order_metrics']['total_completed_revenue'] ?? 0.0, 2)]);
+        fputcsv($file, ["Total Orders Placed", $metrics['order_metrics']['total_orders_placed'] ?? 0]);
+        fputcsv($file, ["Quality Score Rating (out of 5.0)", $metrics['rating_metrics']['overall_average_rating'] ?? '5.0']);
+        fputcsv($file, ["Total Customer Feedback Count", $metrics['rating_metrics']['total_feedback_count'] ?? 0]);
+        fputcsv($file, []);
+
+        // 3. Order History Header
+        fputcsv($file, ["COMPLETE TRANSACTIONS & ORDER HISTORY"]);
+        fputcsv($file, ["Order ID", "Customer Name", "Dish Name", "Quantity", "Unit Price (GH₵)", "Total Price (GH₵)", "Date Placed", "Status", "Estimated Pickup Time"]);
+
+        // 4. Order Rows
+        foreach ($orders as $order) {
+            $customerName = $order->customer ? $order->customer->fullName : ($order->student ? $order->student->fullName : 'Unknown Customer');
+            $dateStr = date('Y-m-d H:i:s', $order->order_timestamp / 1000);
+            fputcsv($file, [
+                $order->id,
+                $customerName,
+                $order->food_name ?? 'N/A',
+                $order->quantity ?? 1,
+                number_format($order->unit_price ?? 0.0, 2),
+                number_format($order->total_price ?? 0.0, 2),
+                $dateStr,
+                $order->status,
+                $order->estimated_pickup_time ?? 'N/A'
+            ]);
+        }
+
+        fclose($file);
+    };
+
+    return response()->stream($callback, 200, $headers);
+});
+
+Route::post('/vendor/orders/{id}/update-status', function (\Illuminate\Http\Request $request, $id) {
+    $order = \App\Models\Order::find($id);
+    if (!$order) {
+        return redirect()->back()->with('error', "Order not found.");
+    }
+
+    $newStatus = strtoupper($request->input('status'));
+    $oldStatus = $order->status;
+
+    // Validate newStatus
+    $validStatuses = ['PENDING', 'ORDER_PLACED', 'PREPARING', 'READY', 'COMPLETED', 'DECLINED', 'CANCELLED'];
+    if (!in_array($newStatus, $validStatuses)) {
+        return redirect()->back()->with('error', "Invalid status: {$newStatus}");
+    }
+
+    $order->status = $newStatus;
+    $order->order_status = $newStatus;
+    $order->save();
+
+    // Create audit log
+    \App\Models\AuditLog::create([
+        'user_id' => $order->vendor_id,
+        'timestamp' => time() * 1000,
+        'action' => 'ORDER_STATUS_CHANGED',
+        'details' => "Order #{$order->id} status updated from '{$oldStatus}' to '{$newStatus}' via Vendor Blade Dashboard.",
+    ]);
+
+    // Dispatch Events/Notifications if needed (so background triggers work flawlessly)
+    if ($newStatus === 'READY') {
+        try {
+            event(new \App\Events\OrderStatusReady($order));
+        } catch (\Exception $e) {
+            \Illuminate\Support\Facades\Log::error("Failed to fire OrderStatusReady event: " . $e->getMessage());
+        }
+    } elseif ($newStatus === 'COMPLETED') {
+        try {
+            event(new \App\Events\OrderStatusCompleted($order));
+        } catch (\Exception $e) {
+            \Illuminate\Support\Facades\Log::error("Failed to fire OrderStatusCompleted event: " . $e->getMessage());
+        }
+    }
+
+    return redirect()->back()->with('success', "Order #{$order->id} status updated to {$newStatus} successfully!");
+});
 
 // Explicit Laravel Breeze & Passport OAuth2 endpoints
 Route::post('/oauth/token', [PassportAuthController::class, 'issueOAuthToken']);
