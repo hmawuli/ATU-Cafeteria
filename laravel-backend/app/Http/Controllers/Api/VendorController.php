@@ -193,6 +193,28 @@ class VendorController extends Controller
             $foodItems = $user->foodItems;
         }
 
+        $lowStockItems = [];
+        // Calculate remaining stock and low stock thresholds for each food item
+        foreach ($foodItems as $food) {
+            $orderVolume = \App\Models\Order::where('food_item_id', $food->id)
+                ->whereIn('status', ['PENDING', 'ORDER_PLACED', 'PREPARING', 'READY', 'COMPLETED'])
+                ->sum('quantity');
+
+            $food->order_volume = (int)$orderVolume;
+            $food->remaining_stock = max(0, (int)$food->initial_stock - (int)$orderVolume);
+            $food->is_low_stock = $food->remaining_stock <= (int)$food->low_stock_threshold;
+
+            if ($food->is_low_stock && $food->is_available) {
+                $lowStockItems[] = [
+                    'id' => $food->id,
+                    'name' => $food->name,
+                    'remaining' => $food->remaining_stock,
+                    'threshold' => $food->low_stock_threshold,
+                    'initial' => $food->initial_stock,
+                ];
+            }
+        }
+
         $service = new PerformanceAnalyticsService();
         $metrics = $service->getVendorReport($user->id);
 
@@ -253,6 +275,7 @@ class VendorController extends Controller
             'weeklySales' => array_values($weeklySalesData),
             'orders' => $orders,
             'topPerformingItems' => $topPerformingItems,
+            'lowStockItems' => $lowStockItems,
         ]);
     }
 }

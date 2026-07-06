@@ -30,6 +30,9 @@
 </head>
 <body class="bg-slate-50 min-h-screen text-slate-800">
 
+    <!-- Low Stock Toast Container -->
+    <div id="lowStockToastContainer" class="fixed top-5 right-5 z-50 flex flex-col gap-3 pointer-events-none max-w-sm w-full"></div>
+
     <!-- Top Banner Navigation -->
     <header class="bg-gradient-to-r from-indigo-900 via-indigo-800 to-slate-900 text-white shadow-xl">
         <div class="max-w-7xl mx-auto px-4 py-5 sm:px-6 lg:px-8 flex flex-col md:flex-row items-center justify-between gap-4">
@@ -108,6 +111,38 @@
                         <li>{{ $error }}</li>
                     @endforeach
                 </ul>
+            </div>
+        @endif
+
+
+        @if(!empty($lowStockItems))
+            <!-- Low Stock Warnings Alert Banner -->
+            <div class="mb-8 p-5 bg-amber-50 border-l-4 border-amber-500 rounded-2xl flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 shadow-sm animate-pulse">
+                <div class="flex items-start gap-3">
+                    <div class="bg-amber-100 text-amber-700 p-2 rounded-xl mt-0.5">
+                        <svg class="w-6 h-6 text-amber-600" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path>
+                        </svg>
+                    </div>
+                    <div>
+                        <h4 class="text-sm font-extrabold text-amber-900">⚠️ Menu Stock Alert: Low Inventory Detected!</h4>
+                        <p class="text-xs text-amber-700 mt-1 leading-relaxed">
+                            The following dishes are running extremely low based on their current daily order volumes and thresholds:
+                        </p>
+                        <div class="flex flex-wrap gap-2 mt-2">
+                            @foreach($lowStockItems as $item)
+                                <span class="inline-flex items-center gap-1.5 px-3 py-1 bg-amber-100 text-amber-800 text-xs font-extrabold rounded-lg border border-amber-200">
+                                    🔴 {{ $item['name'] }} ({{ $item['remaining'] }} remaining)
+                                </span>
+                            @endforeach
+                        </div>
+                    </div>
+                </div>
+                <button type="button" onclick="this.parentElement.remove()" class="text-amber-500 hover:text-amber-800 transition-colors">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                    </svg>
+                </button>
             </div>
         @endif
 
@@ -413,55 +448,85 @@
 
                     <!-- Mobile responsive card list for incoming orders -->
                     <div class="block md:hidden p-4 space-y-4">
+                        <p class="text-[11px] text-indigo-600 font-extrabold px-1 flex items-center gap-1.5 animate-pulse">
+                            <span>📱</span>
+                            <span>Pro-Tip: Swipe right on active mobile orders to instantly complete them!</span>
+                        </p>
                         @forelse($orders as $order)
-                            <div class="bg-slate-50 rounded-2xl p-4 border border-slate-200 space-y-3 relative shadow-3xs">
-                                <div class="flex items-center justify-between">
-                                    <span class="text-xs font-semibold code-font text-slate-400">#{{ $order->id }}</span>
-                                    @php
-                                        $currStatus = strtoupper($order->status);
-                                        $badgeColor = $statusColors[$currStatus] ?? 'bg-slate-50 text-slate-600 border-slate-200';
-                                    @endphp
-                                    <span class="px-2.5 py-1 text-[10px] font-bold rounded-full border {{ $badgeColor }}">
-                                        {{ $order->status }}
-                                    </span>
-                                </div>
-                                <div>
-                                    <h4 class="font-extrabold text-slate-900 text-sm">{{ $order->food_name ?? 'N/A' }}</h4>
-                                    <p class="text-xs text-slate-500 mt-0.5">
-                                        By: 
-                                        @if($order->customer)
-                                            {{ $order->customer->fullName }}
-                                        @elseif($order->student)
-                                            {{ $order->student->fullName }}
-                                        @else
-                                            Student (ID: {{ $order->customer_id }})
-                                        @endif
-                                    </p>
-                                    <div class="text-[10px] text-indigo-600 font-extrabold code-font mt-1 flex items-center gap-1">
-                                        <span>🔑 Pickup PIN:</span>
-                                        <span class="bg-indigo-50 px-1.5 py-0.5 rounded border border-indigo-100 text-indigo-700">{{ $order->pickup_pin }}</span>
+                            @php
+                                $currStatus = strtoupper($order->status);
+                                $isSwipeable = !in_array($currStatus, ['COMPLETED', 'DECLINED', 'CANCELLED']);
+                                $badgeColor = $statusColors[$currStatus] ?? 'bg-slate-50 text-slate-600 border-slate-200';
+                            @endphp
+                            <div class="relative overflow-hidden rounded-2xl border border-slate-200 bg-white group select-none shadow-3xs animate-fade-in">
+                                @if($isSwipeable)
+                                    <!-- Background action revealed on swipe right -->
+                                    <div class="absolute inset-y-0 left-0 w-full bg-emerald-600 flex items-center pl-6 text-white font-extrabold text-xs transition-opacity duration-150 opacity-0 pointer-events-none animate-pulse" id="swipe-bg-{{ $order->id }}">
+                                        <div class="flex items-center gap-2">
+                                            <span class="text-base">✓</span>
+                                            <span>Swipe right to Complete Order #{{ $order->id }}</span>
+                                        </div>
                                     </div>
-                                </div>
-                                <div class="flex items-center justify-between border-t border-slate-100 pt-2.5 text-xs">
+                                @endif
+
+                                <!-- Foreground Swipeable Card -->
+                                <div class="bg-slate-50 p-4 space-y-3 relative z-10 transition-transform duration-150"
+                                     id="order-card-{{ $order->id }}"
+                                     @if($isSwipeable)
+                                         style="touch-action: pan-y;"
+                                         ontouchstart="handleTouchStart(event, '{{ $order->id }}')"
+                                         ontouchmove="handleTouchMove(event, '{{ $order->id }}')"
+                                         ontouchend="handleTouchEnd(event, '{{ $order->id }}')"
+                                     @endif>
+                                    <div class="flex items-center justify-between">
+                                        <div class="flex items-center gap-1.5">
+                                            <span class="text-xs font-semibold code-font text-slate-400">#{{ $order->id }}</span>
+                                            @if($isSwipeable)
+                                                <span class="text-[9px] text-slate-400 font-bold bg-slate-200/50 px-1.5 py-0.5 rounded-md animate-pulse">Swipeable ➔</span>
+                                            @endif
+                                        </div>
+                                        <span class="px-2.5 py-1 text-[10px] font-bold rounded-full border {{ $badgeColor }}">
+                                            {{ $order->status }}
+                                        </span>
+                                    </div>
                                     <div>
-                                        <span class="text-slate-400 font-medium">Qty:</span> <strong class="text-slate-700 font-bold">{{ $order->quantity ?? 1 }}</strong>
-                                        <span class="mx-1.5 text-slate-300">|</span>
-                                        <strong class="text-indigo-600 font-black code-font">GH₵ {{ number_format($order->total_price, 2) }}</strong>
+                                        <h4 class="font-extrabold text-slate-900 text-sm">{{ $order->food_name ?? 'N/A' }}</h4>
+                                        <p class="text-xs text-slate-500 mt-0.5">
+                                            By: 
+                                            @if($order->customer)
+                                                {{ $order->customer->fullName }}
+                                            @elseif($order->student)
+                                                {{ $order->student->fullName }}
+                                            @else
+                                                Student (ID: {{ $order->customer_id }})
+                                            @endif
+                                        </p>
+                                        <div class="text-[10px] text-indigo-600 font-extrabold code-font mt-1 flex items-center gap-1">
+                                            <span>🔑 Pickup PIN:</span>
+                                            <span class="bg-indigo-50 px-1.5 py-0.5 rounded border border-indigo-100 text-indigo-700">{{ $order->pickup_pin }}</span>
+                                        </div>
                                     </div>
-                                    <span class="text-[10px] text-slate-400 font-medium">{{ date('H:i', $order->order_timestamp / 1000) }}</span>
-                                </div>
-                                <div class="bg-white p-2.5 rounded-xl border border-slate-200/60 flex items-center justify-between gap-2 mt-2 shadow-3xs">
-                                    <span class="text-[11px] font-bold text-slate-500">Action:</span>
-                                    <form action="/api/vendor/orders/{{ $order->id }}/update-status" method="POST" class="flex-grow max-w-[160px]">
-                                        @csrf
-                                        <select name="status" onchange="this.form.submit()" class="w-full px-2 py-1.5 text-xs rounded-lg border border-slate-300 bg-slate-50 text-slate-700 font-bold focus:outline-none focus:ring-2 focus:ring-indigo-500 transition-all cursor-pointer">
-                                            <option value="ORDER_PLACED" {{ $currStatus === 'ORDER_PLACED' ? 'selected' : '' }}>Pending</option>
-                                            <option value="PREPARING" {{ $currStatus === 'PREPARING' ? 'selected' : '' }}>Preparing</option>
-                                            <option value="READY" {{ $currStatus === 'READY' ? 'selected' : '' }}>Ready</option>
-                                            <option value="COMPLETED" {{ $currStatus === 'COMPLETED' ? 'selected' : '' }}>Completed</option>
-                                            <option value="DECLINED" {{ $currStatus === 'DECLINED' ? 'selected' : '' }}>Declined</option>
-                                        </select>
-                                    </form>
+                                    <div class="flex items-center justify-between border-t border-slate-100 pt-2.5 text-xs">
+                                        <div>
+                                            <span class="text-slate-400 font-medium">Qty:</span> <strong class="text-slate-700 font-bold">{{ $order->quantity ?? 1 }}</strong>
+                                            <span class="mx-1.5 text-slate-300">|</span>
+                                            <strong class="text-indigo-600 font-black code-font">GH₵ {{ number_format($order->total_price, 2) }}</strong>
+                                        </div>
+                                        <span class="text-[10px] text-slate-400 font-medium">{{ date('H:i', $order->order_timestamp / 1000) }}</span>
+                                    </div>
+                                    <div class="bg-white p-2.5 rounded-xl border border-slate-200/60 flex items-center justify-between gap-2 mt-2 shadow-3xs">
+                                        <span class="text-[11px] font-bold text-slate-500">Action:</span>
+                                        <form action="/api/vendor/orders/{{ $order->id }}/update-status" method="POST" class="flex-grow max-w-[160px]" id="status-form-{{ $order->id }}">
+                                            @csrf
+                                            <select name="status" onchange="this.form.submit()" class="w-full px-2 py-1.5 text-xs rounded-lg border border-slate-300 bg-slate-50 text-slate-700 font-bold focus:outline-none focus:ring-2 focus:ring-indigo-500 transition-all cursor-pointer">
+                                                <option value="ORDER_PLACED" {{ $currStatus === 'ORDER_PLACED' ? 'selected' : '' }}>Pending</option>
+                                                <option value="PREPARING" {{ $currStatus === 'PREPARING' ? 'selected' : '' }}>Preparing</option>
+                                                <option value="READY" {{ $currStatus === 'READY' ? 'selected' : '' }}>Ready</option>
+                                                <option value="COMPLETED" {{ $currStatus === 'COMPLETED' ? 'selected' : '' }}>Completed</option>
+                                                <option value="DECLINED" {{ $currStatus === 'DECLINED' ? 'selected' : '' }}>Declined</option>
+                                            </select>
+                                        </form>
+                                    </div>
                                 </div>
                             </div>
                         @empty
@@ -520,6 +585,7 @@
                                     <th class="py-4 px-4">Category</th>
                                     <th class="py-4 px-4 text-right">Unit Price</th>
                                     <th class="py-4 px-4">Description</th>
+                                    <th class="py-4 px-4 text-center">Daily Stock</th>
                                     <th class="py-4 px-4 text-center">Status</th>
                                     <th class="py-4 px-6 text-center">Actions</th>
                                 </tr>
@@ -539,6 +605,17 @@
                                         </td>
                                         <td class="py-4 px-4 text-xs text-slate-500 max-w-[200px] truncate" title="{{ $food->description }}">
                                             {{ $food->description }}
+                                        </td>
+                                        <td class="py-4 px-4 text-center">
+                                            @if($food->is_low_stock)
+                                                <span class="inline-flex items-center gap-1.5 px-2.5 py-1 bg-rose-50 text-rose-700 text-xs font-extrabold rounded-lg border border-rose-100 animate-pulse" title="Running low on ingredients!">
+                                                    ⚠️ {{ $food->remaining_stock }} / {{ $food->initial_stock }}
+                                                </span>
+                                            @else
+                                                <span class="inline-flex items-center gap-1.5 px-2.5 py-1 bg-slate-100 text-slate-700 text-xs font-semibold rounded-lg border border-slate-200">
+                                                    📦 {{ $food->remaining_stock }} / {{ $food->initial_stock }}
+                                                </span>
+                                            @endif
                                         </td>
                                         <td class="py-4 px-4 text-center">
                                             <!-- Simple status toggle action -->
@@ -597,7 +674,18 @@
                                     <span class="px-2 py-1 bg-white border border-slate-200 text-slate-700 text-[10px] font-bold rounded-md">
                                         {{ $food->category }}
                                     </span>
-                                    <strong class="text-indigo-600 font-extrabold text-sm code-font">GH₵ {{ number_format($food->price, 2) }}</strong>
+                                    <div class="flex items-center gap-1.5">
+                                        @if($food->is_low_stock)
+                                            <span class="px-2 py-1 bg-rose-50 text-rose-700 text-[9px] font-extrabold rounded-md border border-rose-100 animate-pulse">
+                                                Low Stock: {{ $food->remaining_stock }}
+                                            </span>
+                                        @else
+                                            <span class="px-2 py-1 bg-slate-100 text-slate-700 text-[9px] font-semibold rounded-md border border-slate-200">
+                                                Stock: {{ $food->remaining_stock }} / {{ $food->initial_stock }}
+                                            </span>
+                                        @endif
+                                        <strong class="text-indigo-600 font-extrabold text-sm code-font">GH₵ {{ number_format($food->price, 2) }}</strong>
+                                    </div>
                                 </div>
                                 <div>
                                     <h4 class="font-bold text-slate-900 text-sm">{{ $food->name }}</h4>
@@ -726,6 +814,19 @@
                             <label class="block text-xs font-bold text-slate-600 uppercase tracking-wider mb-1">Dish Description</label>
                             <textarea name="description" rows="4" placeholder="Briefly describe preparation & ingredients (e.g. Spiced crispy fried plantain cubes, roasted groundnuts. Minimum 10 characters required)" required class="w-full px-4 py-2.5 text-sm rounded-xl border border-slate-300 focus:ring-2 focus:ring-indigo-500 outline-none transition-all placeholder:text-slate-400 leading-relaxed">{{ old('description') }}</textarea>
                             <p class="text-[10px] text-indigo-500 mt-1 font-semibold">★ Description must be at least 10 characters long to satisfy validation audits.</p>
+                        </div>
+
+                        <div class="grid grid-cols-2 gap-4">
+                            <div>
+                                <label class="block text-xs font-bold text-slate-600 uppercase tracking-wider mb-1">Daily Prep Limit (Stock)</label>
+                                <input type="number" name="initial_stock" value="{{ old('initial_stock', 50) }}" placeholder="50" required class="w-full px-4 py-2.5 text-sm rounded-xl border border-slate-300 focus:ring-2 focus:ring-indigo-500 outline-none transition-all code-font">
+                                <p class="text-[9px] text-slate-400 mt-1">Total quantity prepared per day</p>
+                            </div>
+                            <div>
+                                <label class="block text-xs font-bold text-slate-600 uppercase tracking-wider mb-1">Low Stock Alert at</label>
+                                <input type="number" name="low_stock_threshold" value="{{ old('low_stock_threshold', 10) }}" placeholder="10" required class="w-full px-4 py-2.5 text-sm rounded-xl border border-slate-300 focus:ring-2 focus:ring-indigo-500 outline-none transition-all code-font">
+                                <p class="text-[9px] text-slate-400 mt-1">Notify when remaining stock <= this</p>
+                            </div>
                         </div>
 
                         <button type="submit" class="w-full py-3 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-xl transition-all shadow-md hover:shadow-lg flex items-center justify-center gap-2">
@@ -956,6 +1057,131 @@
         let qrCodeInstance = null;
         let qrCodeLink = "";
 
+        // Touch gesture state tracking for swipe-to-complete
+        const swipeData = {};
+
+        function handleTouchStart(e, id) {
+            const touch = e.touches[0];
+            swipeData[id] = {
+                startX: touch.clientX,
+                startY: touch.clientY,
+                card: document.getElementById('order-card-' + id),
+                bg: document.getElementById('swipe-bg-' + id),
+                triggered: false
+            };
+            if (swipeData[id].card) {
+                swipeData[id].card.classList.remove('transition-transform', 'duration-150');
+            }
+        }
+
+        function handleTouchMove(e, id) {
+            const data = swipeData[id];
+            if (!data || !data.card || data.triggered) return;
+
+            const touch = e.touches[0];
+            const diffX = touch.clientX - data.startX;
+            const diffY = touch.clientY - data.startY;
+
+            // If vertical scroll is larger, ignore horizontal swipe
+            if (Math.abs(diffY) > Math.abs(diffX) && Math.abs(diffX) < 10) {
+                return;
+            }
+
+            // Only allow swiping to the right (positive diffX)
+            if (diffX > 0) {
+                e.preventDefault(); // prevent vertical scrolling when swiping horizontally
+                const moveAmount = Math.min(diffX, 220); // Cap the movement
+                data.card.style.transform = `translateX(${moveAmount}px)`;
+                
+                if (data.bg) {
+                    data.bg.style.opacity = Math.min(1, moveAmount / 120);
+                }
+            }
+        }
+
+        function handleTouchEnd(e, id) {
+            const data = swipeData[id];
+            if (!data || !data.card) return;
+
+            data.card.classList.add('transition-transform', 'duration-150');
+            const touch = e.changedTouches[0];
+            const diffX = touch.clientX - data.startX;
+
+            if (diffX > 140) {
+                // Swipe triggered successfully!
+                data.triggered = true;
+                data.card.style.transform = 'translateX(100%)';
+                if (data.bg) {
+                    data.bg.style.opacity = '1';
+                    const label = data.bg.querySelector('span:last-child');
+                    if (label) label.textContent = '⚡ Completing...';
+                }
+                
+                // Programmatically submit the form to update state to COMPLETED
+                setTimeout(() => {
+                    const form = document.getElementById('status-form-' + id);
+                    if (form) {
+                        const select = form.querySelector('select[name="status"]');
+                        if (select) {
+                            select.value = 'COMPLETED';
+                            form.submit();
+                        }
+                    } else {
+                        window.location.reload();
+                    }
+                }, 300);
+            } else {
+                // Reset card position
+                data.card.style.transform = 'translateX(0px)';
+                if (data.bg) {
+                    data.bg.style.opacity = '0';
+                }
+            }
+            
+            delete swipeData[id];
+        }
+
+        // Low stock toast alerts function
+        function showLowStockToast(items) {
+            const container = document.getElementById('lowStockToastContainer');
+            if (!container) return;
+            
+            items.forEach((item, index) => {
+                setTimeout(() => {
+                    const toast = document.createElement('div');
+                    toast.className = "pointer-events-auto bg-slate-950 text-white rounded-2xl shadow-2xl border border-slate-800 p-4 flex gap-3 transition-all transform translate-x-full duration-300 relative overflow-hidden";
+                    toast.style.borderLeft = "4px solid #ef4444"; // red-500
+                    
+                    toast.innerHTML = `
+                        <div class="text-red-500 text-xl">⚠️</div>
+                        <div class="flex-grow">
+                            <h5 class="text-xs font-extrabold text-slate-100 uppercase tracking-wider">Low Stock Alert</h5>
+                            <p class="text-sm font-bold text-white mt-0.5">${item.name}</p>
+                            <p class="text-[11px] text-slate-400 mt-1">Remaining: <span class="text-red-400 font-bold">${item.remaining}</span> / ${item.initial}</p>
+                        </div>
+                        <button type="button" onclick="this.parentElement.remove()" class="text-slate-400 hover:text-white transition-colors self-start">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                            </svg>
+                        </button>
+                    `;
+                    
+                    container.appendChild(toast);
+                    
+                    // Slide in
+                    setTimeout(() => {
+                        toast.classList.remove('translate-x-full');
+                    }, 50);
+                    
+                    // Auto remove after 8 seconds
+                    setTimeout(() => {
+                        toast.classList.add('opacity-0', 'scale-95');
+                        setTimeout(() => toast.remove(), 300);
+                    }, 8000 + (index * 1500));
+                }, index * 300);
+            });
+        }
+
         function openTopItemsModal() {
             document.getElementById('topItemsModal').classList.remove('hidden');
             document.body.classList.add('overflow-hidden');
@@ -1138,6 +1364,11 @@
             // Run check on load, then poll every 10 seconds
             setTimeout(checkIncomingOrders, 2000);
             setInterval(checkIncomingOrders, 10000);
+
+            // Trigger low-stock toast alerts
+            @if(!empty($lowStockItems))
+                showLowStockToast(@json($lowStockItems));
+            @endif
         });
     </script>
 

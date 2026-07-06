@@ -249,20 +249,31 @@ Route::post('/vendor/food-items', function (\Illuminate\Http\Request $request) {
         'price' => 'required|numeric|min:0',
         'category' => 'required|string',
         'description' => 'required|string|min:10|max:1000',
+        'initial_stock' => 'nullable|integer|min:1',
+        'low_stock_threshold' => 'nullable|integer|min:0',
     ]);
 
     if ($validator->fails()) {
         return redirect()->back()->withErrors($validator)->withInput();
     }
 
-    $food = \App\Models\FoodItem::create([
+    $data = [
         'vendor_id' => $request->input('vendor_id'),
         'name' => $request->input('name'),
         'price' => $request->input('price'),
         'category' => $request->input('category'),
         'description' => $request->input('description'),
         'is_available' => true,
-    ]);
+    ];
+
+    if (\Illuminate\Support\Facades\Schema::hasColumn('food_items', 'initial_stock')) {
+        $data['initial_stock'] = (int)$request->input('initial_stock', 50);
+    }
+    if (\Illuminate\Support\Facades\Schema::hasColumn('food_items', 'low_stock_threshold')) {
+        $data['low_stock_threshold'] = (int)$request->input('low_stock_threshold', 10);
+    }
+
+    $food = \App\Models\FoodItem::create($data);
 
     // Create audit log
     \App\Models\AuditLog::create([

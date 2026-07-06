@@ -19,12 +19,32 @@ class FoodItem extends Model
         'image_url',
         'description',
         'is_available',
+        'initial_stock',
+        'low_stock_threshold',
     ];
 
     protected $casts = [
         'price' => 'double',
         'is_available' => 'boolean',
+        'initial_stock' => 'integer',
+        'low_stock_threshold' => 'integer',
     ];
+
+    /**
+     * Graceful fallback accessor for initial_stock
+     */
+    public function getInitialStockAttribute($value)
+    {
+        return $value !== null ? (int)$value : 50;
+    }
+
+    /**
+     * Graceful fallback accessor for low_stock_threshold
+     */
+    public function getLowStockThresholdAttribute($value)
+    {
+        return $value !== null ? (int)$value : 10;
+    }
 
     /**
      * Get the Vendor User that offers this food dish.
