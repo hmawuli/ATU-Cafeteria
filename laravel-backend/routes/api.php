@@ -55,6 +55,192 @@ Route::post('/vendor/register', [VendorAuthController::class, 'register']);
 Route::post('/vendor/login', [VendorAuthController::class, 'login']);
 Route::get('/vendor/dashboard', [VendorController::class, 'dashboardView']);
 
+// Progressive Web App (PWA) manifest route
+Route::get('/manifest.json', function() {
+    return response()->json([
+        'name' => 'ATU Cafeteria Vendor Portal',
+        'short_name' => 'ATU Vendor',
+        'description' => 'Accra Technical University Cafeteria Vendor Management System',
+        'start_url' => '/api/vendor/dashboard?vendor_id=10',
+        'display' => 'standalone',
+        'orientation' => 'portrait',
+        'background_color' => '#f8fafc',
+        'theme_color' => '#4f46e5',
+        'icons' => [
+            [
+                'src' => 'https://img.icons8.com/color/192/hamburger.png',
+                'sizes' => '192x192',
+                'type' => 'image/png',
+                'purpose' => 'any'
+            ],
+            [
+                'src' => 'https://img.icons8.com/color/512/hamburger.png',
+                'sizes' => '512x512',
+                'type' => 'image/png',
+                'purpose' => 'any'
+            ]
+        ]
+    ], 200, [
+        'Content-Type' => 'application/json',
+        'Access-Control-Allow-Origin' => '*'
+    ]);
+});
+
+// PWA Service Worker route
+Route::get('/service-worker.js', function() {
+    $sw = <<<JS
+const CACHE_NAME = 'atu-vendor-cache-v1';
+const urlsToCache = [
+    '/api/manifest.json',
+    'https://cdn.tailwindcss.com',
+    'https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap'
+];
+
+self.addEventListener('install', event => {
+    event.waitUntil(
+        caches.open(CACHE_NAME).then(cache => {
+            return cache.addAll(urlsToCache);
+        })
+    );
+    self.skipWaiting();
+});
+
+self.addEventListener('activate', event => {
+    event.waitUntil(
+        caches.keys().then(cacheNames => {
+            return Promise.all(
+                cacheNames.map(cacheName => {
+                    if (cacheName !== CACHE_NAME) {
+                        return caches.delete(cacheName);
+                    }
+                })
+            );
+        })
+    );
+    self.clients.claim();
+});
+
+self.addEventListener('fetch', event => {
+    if (event.request.method !== 'GET') return;
+    
+    event.respondWith(
+        fetch(event.request).catch(() => {
+            return caches.match(event.request);
+        })
+    );
+});
+
+// Listener for background or foreground client page notifications
+self.addEventListener('message', event => {
+    if (event.data && event.data.type === 'NEW_ORDER') {
+        self.registration.showNotification(event.data.title, {
+            body: event.data.body,
+            icon: 'https://img.icons8.com/color/192/hamburger.png',
+            vibrate: [200, 100, 200],
+            badge: 'https://img.icons8.com/color/192/hamburger.png',
+            data: {
+                url: event.data.url || '/api/vendor/dashboard?vendor_id=10'
+            }
+        });
+    }
+});
+
+self.addEventListener('notificationclick', event => {
+    event.notification.close();
+    event.waitUntil(
+        clients.matchAll({ type: 'window', includeUncontrolled: true }).then(clientList => {
+            for (const client of clientList) {
+                if (client.url.indexOf('/api/vendor/dashboard') !== -1 && 'focus' in client) {
+                    return client.focus();
+                }
+            }
+            if (clients.openWindow) {
+                return clients.openWindow(event.notification.data?.url || '/api/vendor/dashboard?vendor_id=10');
+            }
+        })
+    );
+});
+JS;
+    return response($sw, 200, [
+        'Content-Type' => 'application/javascript',
+        'Access-Control-Allow-Origin' => '*'
+    ]);
+});
+
+// Lightweight order counter for real-time notification polling
+Route::get('/vendor/orders/unread-count', function (\Illuminate\Http\Request $request) {
+    $vendorId = $request->input('vendor_id');
+    if (!$vendorId) {
+        return response()->json(['count' => 0, 'orders' => []]);
+    }
+    
+    // Fetch pending/placed orders
+    $orders = \App\Models\Order::where('vendor_id', $vendorId)
+        ->whereIn('status', ['PENDING', 'ORDER_PLACED'])
+        ->orderBy('id', 'desc')
+        ->get();
+
+    return response()->json([
+        'count' => count($orders),
+        'orders' => $orders
+    ]);
+});
+
+// Student QR Code view for a single food item
+Route::get('/student/order-item/{id}', function ($id) {
+    $item = \App\Models\FoodItem::with('vendor')->find($id);
+    if (!$item) {
+        return response("Food item #{$id} was not found on this cafeteria server.", 404);
+    }
+    // Get seeded student users for selector
+    $students = \App\Models\User::where('role', 'STUDENT')->get();
+    return view('student.order_item', compact('item', 'students'));
+});
+
+// Student QR Code place order action
+Route::post('/student/order-item/{id}/place', function (\Illuminate\Http\Request $request, $id) {
+    $item = \App\Models\FoodItem::find($id);
+    if (!$item) {
+        return redirect()->back()->withErrors(['message' => 'The selected food item does not exist.']);
+    }
+
+    $qty = intval($request->input('quantity', 1));
+    if ($qty < 1) $qty = 1;
+
+    $studentId = $request->input('student_id', 1); // fallback to ID 1
+    $student = \App\Models\User::find($studentId);
+
+    // Generate random secure 4 digit PIN
+    $pin = strval(rand(1000, 9999));
+    $totalPrice = $item->price * $qty;
+
+    $order = \App\Models\Order::create([
+        'customer_id' => $studentId,
+        'student_id' => $studentId,
+        'user_id' => $studentId,
+        'vendor_id' => $item->vendor_id,
+        'food_item_id' => $item->id,
+        'food_name' => $item->name,
+        'quantity' => $qty,
+        'unit_price' => $item->price,
+        'total_price' => $totalPrice,
+        'order_timestamp' => time() * 1000,
+        'status' => 'ORDER_PLACED',
+        'pickup_pin' => $pin,
+        'estimated_pickup_time' => $request->input('pickup_time', 'In 15 Mins'),
+    ]);
+
+    // Create Audit Log entry
+    \App\Models\AuditLog::create([
+        'user_id' => $studentId,
+        'timestamp' => time() * 1000,
+        'action' => 'ORDER_PLACED',
+        'details' => "Student '{$student->fullName}' successfully placed order #{$order->id} for {$qty}x '{$item->name}' (PIN: {$pin}) via scanned QR counter page.",
+    ]);
+
+    return view('student.order_success', compact('order', 'item', 'student'));
+});
+
 // Interactive Vendor Dashboard Web Actions (for Blade templates compatibility)
 Route::post('/vendor/food-items', function (\Illuminate\Http\Request $request) {
     $validator = \Illuminate\Support\Facades\Validator::make($request->all(), [

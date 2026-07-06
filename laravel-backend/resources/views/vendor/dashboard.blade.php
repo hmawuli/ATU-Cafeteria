@@ -4,11 +4,21 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Vendor Dashboard | ATU Cafeteria Console</title>
+    <!-- PWA configuration and touch tags -->
+    <link rel="manifest" href="/api/manifest.json">
+    <meta name="theme-color" content="#4f46e5">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <link rel="apple-touch-icon" href="https://img.icons8.com/color/512/hamburger.png">
+    
     <!-- Tailwind CSS CDN -->
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
     <!-- Chart.js CDN -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <!-- QRCode.js Library CDN -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+    
     <style>
         body {
             font-family: 'Plus Jakarta Sans', sans-serif;
@@ -309,7 +319,8 @@
                         </span>
                     </div>
 
-                    <div class="overflow-x-auto">
+                    <!-- Desktop-only view table -->
+                    <div class="hidden md:block overflow-x-auto">
                         <table class="w-full text-left border-collapse">
                             <thead>
                                 <tr class="bg-slate-50 border-b border-slate-200 text-[11px] text-slate-400 font-extrabold uppercase tracking-wider">
@@ -399,6 +410,72 @@
                             </tbody>
                         </table>
                     </div>
+
+                    <!-- Mobile responsive card list for incoming orders -->
+                    <div class="block md:hidden p-4 space-y-4">
+                        @forelse($orders as $order)
+                            <div class="bg-slate-50 rounded-2xl p-4 border border-slate-200 space-y-3 relative shadow-3xs">
+                                <div class="flex items-center justify-between">
+                                    <span class="text-xs font-semibold code-font text-slate-400">#{{ $order->id }}</span>
+                                    @php
+                                        $currStatus = strtoupper($order->status);
+                                        $badgeColor = $statusColors[$currStatus] ?? 'bg-slate-50 text-slate-600 border-slate-200';
+                                    @endphp
+                                    <span class="px-2.5 py-1 text-[10px] font-bold rounded-full border {{ $badgeColor }}">
+                                        {{ $order->status }}
+                                    </span>
+                                </div>
+                                <div>
+                                    <h4 class="font-extrabold text-slate-900 text-sm">{{ $order->food_name ?? 'N/A' }}</h4>
+                                    <p class="text-xs text-slate-500 mt-0.5">
+                                        By: 
+                                        @if($order->customer)
+                                            {{ $order->customer->fullName }}
+                                        @elseif($order->student)
+                                            {{ $order->student->fullName }}
+                                        @else
+                                            Student (ID: {{ $order->customer_id }})
+                                        @endif
+                                    </p>
+                                    <div class="text-[10px] text-indigo-600 font-extrabold code-font mt-1 flex items-center gap-1">
+                                        <span>🔑 Pickup PIN:</span>
+                                        <span class="bg-indigo-50 px-1.5 py-0.5 rounded border border-indigo-100 text-indigo-700">{{ $order->pickup_pin }}</span>
+                                    </div>
+                                </div>
+                                <div class="flex items-center justify-between border-t border-slate-100 pt-2.5 text-xs">
+                                    <div>
+                                        <span class="text-slate-400 font-medium">Qty:</span> <strong class="text-slate-700 font-bold">{{ $order->quantity ?? 1 }}</strong>
+                                        <span class="mx-1.5 text-slate-300">|</span>
+                                        <strong class="text-indigo-600 font-black code-font">GH₵ {{ number_format($order->total_price, 2) }}</strong>
+                                    </div>
+                                    <span class="text-[10px] text-slate-400 font-medium">{{ date('H:i', $order->order_timestamp / 1000) }}</span>
+                                </div>
+                                <div class="bg-white p-2.5 rounded-xl border border-slate-200/60 flex items-center justify-between gap-2 mt-2 shadow-3xs">
+                                    <span class="text-[11px] font-bold text-slate-500">Action:</span>
+                                    <form action="/api/vendor/orders/{{ $order->id }}/update-status" method="POST" class="flex-grow max-w-[160px]">
+                                        @csrf
+                                        <select name="status" onchange="this.form.submit()" class="w-full px-2 py-1.5 text-xs rounded-lg border border-slate-300 bg-slate-50 text-slate-700 font-bold focus:outline-none focus:ring-2 focus:ring-indigo-500 transition-all cursor-pointer">
+                                            <option value="ORDER_PLACED" {{ $currStatus === 'ORDER_PLACED' ? 'selected' : '' }}>Pending</option>
+                                            <option value="PREPARING" {{ $currStatus === 'PREPARING' ? 'selected' : '' }}>Preparing</option>
+                                            <option value="READY" {{ $currStatus === 'READY' ? 'selected' : '' }}>Ready</option>
+                                            <option value="COMPLETED" {{ $currStatus === 'COMPLETED' ? 'selected' : '' }}>Completed</option>
+                                            <option value="DECLINED" {{ $currStatus === 'DECLINED' ? 'selected' : '' }}>Declined</option>
+                                        </select>
+                                    </form>
+                                </div>
+                            </div>
+                        @empty
+                            <div class="py-12 text-center">
+                                <div class="flex flex-col items-center justify-center text-slate-400">
+                                    <svg class="w-12 h-12 stroke-current opacity-60" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z"></path>
+                                    </svg>
+                                    <p class="font-bold mt-2">No incoming orders found</p>
+                                    <p class="text-xs mt-0.5">Orders placed by customers will be populated here.</p>
+                                </div>
+                            </div>
+                        @endforelse
+                    </div>
                 </div>
 
                 <div class="bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden">
@@ -433,7 +510,8 @@
                         </div>
                     </div>
 
-                    <div class="overflow-x-auto">
+                    <!-- Desktop-only view table -->
+                    <div class="hidden md:block overflow-x-auto">
                         <table class="w-full text-left border-collapse">
                             <thead>
                                 <tr class="bg-slate-50 border-b border-slate-200 text-[11px] text-slate-400 font-extrabold uppercase tracking-wider">
@@ -474,15 +552,24 @@
                                             </form>
                                         </td>
                                         <td class="py-4 px-6 text-center">
-                                            <!-- Web Delete Form Action -->
-                                            <form action="/api/vendor/food-items/{{ $food->id }}/delete" method="POST" onsubmit="return confirm('Are you sure you want to remove \'{{ $food->name }}\' from your menu?')" class="inline-block">
-                                                @csrf
-                                                <button type="submit" class="p-1.5 bg-rose-50 text-rose-600 hover:bg-rose-100 hover:text-rose-700 rounded-lg border border-rose-200 transition-all shadow-sm" title="Delete Food Item">
+                                            <div class="inline-flex items-center gap-1.5">
+                                                <!-- Generate QR Code action button -->
+                                                <button type="button" onclick="generateFoodItemQr('{{ $food->id }}', '{{ addslashes($food->name) }}', '{{ $food->price }}')" class="p-1.5 bg-indigo-50 text-indigo-600 hover:bg-indigo-100 hover:text-indigo-700 rounded-lg border border-indigo-200 transition-all shadow-sm flex items-center justify-center" title="Generate Customer Scan QR Code">
                                                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
+                                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v1m6 11h2m-6 0h-2v4m0-11v3m0 0h.01M12 12h.01M16 12h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
                                                     </svg>
                                                 </button>
-                                            </form>
+
+                                                <!-- Web Delete Form Action -->
+                                                <form action="/api/vendor/food-items/{{ $food->id }}/delete" method="POST" onsubmit="return confirm('Are you sure you want to remove \'{{ $food->name }}\' from your menu?')" class="inline-block">
+                                                    @csrf
+                                                    <button type="submit" class="p-1.5 bg-rose-50 text-rose-600 hover:bg-rose-100 hover:text-rose-700 rounded-lg border border-rose-200 transition-all shadow-sm" title="Delete Food Item">
+                                                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
+                                                        </svg>
+                                                    </button>
+                                                </form>
+                                            </div>
                                         </td>
                                     </tr>
                                 @empty
@@ -500,6 +587,66 @@
                                 @endforelse
                             </tbody>
                         </table>
+                    </div>
+
+                    <!-- Mobile responsive card list for Active Menu Catalog -->
+                    <div class="block md:hidden p-4 space-y-4">
+                        @forelse($foodItems as $food)
+                            <div class="bg-slate-50 rounded-2xl p-4 border border-slate-200 space-y-3 shadow-3xs">
+                                <div class="flex items-center justify-between">
+                                    <span class="px-2 py-1 bg-white border border-slate-200 text-slate-700 text-[10px] font-bold rounded-md">
+                                        {{ $food->category }}
+                                    </span>
+                                    <strong class="text-indigo-600 font-extrabold text-sm code-font">GH₵ {{ number_format($food->price, 2) }}</strong>
+                                </div>
+                                <div>
+                                    <h4 class="font-bold text-slate-900 text-sm">{{ $food->name }}</h4>
+                                    <p class="text-xs text-slate-500 mt-1 leading-relaxed">{{ $food->description }}</p>
+                                </div>
+                                <div class="flex items-center justify-between border-t border-slate-200/50 pt-3 mt-1.5">
+                                    <!-- Stock Status Toggle -->
+                                    <form action="/api/vendor/food-items/{{ $food->id }}/toggle-status" method="POST">
+                                        @csrf
+                                        <button type="submit" class="focus:outline-none">
+                                            <span class="px-2.5 py-1 text-[10px] font-bold rounded-full border transition-all duration-150 cursor-pointer shadow-3xs {{ $food->is_available ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : 'bg-rose-50 text-rose-700 border-rose-200' }}">
+                                                {{ $food->is_available ? 'In Stock ●' : 'Sold Out ○' }}
+                                            </span>
+                                        </button>
+                                    </form>
+
+                                    <!-- Touch actions buttons -->
+                                    <div class="flex items-center gap-2">
+                                        <!-- QR Code Button -->
+                                        <button type="button" onclick="generateFoodItemQr('{{ $food->id }}', '{{ addslashes($food->name) }}', '{{ $food->price }}')" class="px-2.5 py-1.5 bg-indigo-50 text-indigo-600 border border-indigo-200 text-xs font-bold rounded-xl flex items-center gap-1 transition-all" style="min-height: 40px;">
+                                            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v1m6 11h2m-6 0h-2v4m0-11v3m0 0h.01M12 12h.01M16 12h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                                            </svg>
+                                            <span>QR Code</span>
+                                        </button>
+
+                                        <!-- Delete action -->
+                                        <form action="/api/vendor/food-items/{{ $food->id }}/delete" method="POST" onsubmit="return confirm('Are you sure you want to remove \'{{ $food->name }}\' from your menu?')" class="inline-block">
+                                            @csrf
+                                            <button type="submit" class="p-2 bg-rose-50 text-rose-600 rounded-xl border border-rose-200 flex items-center justify-center transition-all" style="min-width: 40px; min-height: 40px;">
+                                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
+                                                </svg>
+                                            </button>
+                                        </form>
+                                    </div>
+                                </div>
+                            </div>
+                        @empty
+                            <div class="py-12 text-center">
+                                <div class="flex flex-col items-center justify-center text-slate-400">
+                                    <svg class="w-12 h-12 stroke-current opacity-60" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 13h6m-3-3v6m-9 1V4a2 2 0 012-2h6l2 2h6a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2z"></path>
+                                    </svg>
+                                    <p class="font-bold mt-2">No food items added yet</p>
+                                    <p class="text-xs mt-0.5">Use the creation panel on the right to list your first dish.</p>
+                                </div>
+                            </div>
+                        @endforelse
                     </div>
                 </div>
 
@@ -747,8 +894,68 @@
         </div>
     </div>
 
-    <!-- JavaScript Helpers for Modal -->
+    <!-- Interactive QR Code Modal -->
+    <div id="qrCodeModal" class="fixed inset-0 z-50 overflow-y-auto hidden" aria-labelledby="qr-modal-title" role="dialog" aria-modal="true">
+        <div class="flex items-end justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:block sm:p-0">
+            <!-- Background overlay -->
+            <div class="fixed inset-0 bg-slate-900 bg-opacity-75 transition-opacity" aria-hidden="true" onclick="closeQrModal()"></div>
+
+            <!-- Frame element to center modal contents -->
+            <span class="hidden sm:inline-block sm:align-middle sm:h-screen" aria-hidden="true">&#8203;</span>
+
+            <div class="inline-block align-bottom bg-white rounded-3xl text-left overflow-hidden shadow-2xl transform transition-all sm:my-8 sm:align-middle sm:max-w-md sm:w-full border border-slate-200">
+                <div class="bg-indigo-600 px-6 py-4 flex items-center justify-between text-white">
+                    <div class="flex items-center gap-2">
+                        <span class="text-2xl">📱</span>
+                        <div>
+                            <h3 class="text-base font-bold" id="qr-modal-title">Student Menu QR Code</h3>
+                            <p class="text-[11px] text-indigo-100">Scan at cafeteria counter to order instantly</p>
+                        </div>
+                    </div>
+                    <button type="button" onclick="closeQrModal()" class="text-indigo-200 hover:text-white transition-colors outline-none focus:outline-none">
+                        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                        </svg>
+                    </button>
+                </div>
+
+                <div class="p-6 bg-slate-50 flex flex-col items-center text-center">
+                    <h4 id="qrFoodName" class="font-extrabold text-slate-800 text-lg mb-1">Dish Name</h4>
+                    <p id="qrFoodPrice" class="text-indigo-600 font-bold text-sm mb-4">GH₵ 0.00</p>
+                    
+                    <!-- QR Container Card -->
+                    <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex items-center justify-center mb-4">
+                        <div id="qrcode" class="p-2"></div>
+                    </div>
+                    
+                    <p class="text-xs text-slate-400 max-w-xs leading-relaxed mb-6">
+                        Print this QR code and paste it on your cafeteria counter. Students scan this to open this dish's checkout page instantly!
+                    </p>
+
+                    <div class="w-full space-y-2">
+                        <button type="button" id="copyBtn" onclick="copyQrLink()" class="w-full py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold rounded-xl transition-all border border-slate-200">
+                            Copy Order Link
+                        </button>
+                        <a id="previewBtn" href="#" target="_blank" class="w-full block py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold rounded-xl transition-all shadow-xs text-center">
+                            Open Checkout Preview
+                        </a>
+                    </div>
+                </div>
+
+                <div class="bg-slate-100 px-6 py-4 flex justify-end border-t border-slate-200">
+                    <button type="button" onclick="closeQrModal()" class="px-4 py-2 bg-slate-800 hover:bg-slate-900 text-white text-xs font-bold rounded-xl transition-all shadow">
+                        Close
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- JavaScript Helpers for Modals & PWA Notifications -->
     <script>
+        let qrCodeInstance = null;
+        let qrCodeLink = "";
+
         function openTopItemsModal() {
             document.getElementById('topItemsModal').classList.remove('hidden');
             document.body.classList.add('overflow-hidden');
@@ -758,6 +965,180 @@
             document.getElementById('topItemsModal').classList.add('hidden');
             document.body.classList.remove('overflow-hidden');
         }
+
+        function generateFoodItemQr(itemId, itemName, itemPrice) {
+            document.getElementById('qrFoodName').textContent = itemName;
+            document.getElementById('qrFoodPrice').textContent = "GH₵ " + parseFloat(itemPrice).toFixed(2);
+            
+            // Build absolute URL for the student-facing food item checkout route
+            qrCodeLink = window.location.origin + "/api/student/order-item/" + itemId;
+            
+            // Set href for preview button
+            document.getElementById('previewBtn').href = qrCodeLink;
+            
+            // Reset qrcode container
+            const qrContainer = document.getElementById('qrcode');
+            qrContainer.innerHTML = "";
+            
+            // Create a brand new QRCode instance using library
+            qrCodeInstance = new QRCode(qrContainer, {
+                text: qrCodeLink,
+                width: 160,
+                height: 160,
+                colorDark : "#0f172a", // slate-900
+                colorLight : "#ffffff",
+                correctLevel : QRCode.CorrectLevel.H
+            });
+            
+            // Display Modal
+            document.getElementById('qrCodeModal').classList.remove('hidden');
+            document.body.classList.add('overflow-hidden');
+        }
+
+        function closeQrModal() {
+            document.getElementById('qrCodeModal').classList.add('hidden');
+            document.body.classList.remove('overflow-hidden');
+        }
+
+        function copyQrLink() {
+            if (!qrCodeLink) return;
+            navigator.clipboard.writeText(qrCodeLink).then(() => {
+                const btn = document.getElementById('copyBtn');
+                const origText = btn.textContent;
+                btn.textContent = "✓ Link Copied!";
+                btn.classList.remove('bg-slate-100', 'text-slate-700');
+                btn.classList.add('bg-emerald-500', 'text-white', 'border-emerald-600');
+                
+                setTimeout(() => {
+                    btn.textContent = origText;
+                    btn.classList.remove('bg-emerald-500', 'text-white', 'border-emerald-600');
+                    btn.classList.add('bg-slate-100', 'text-slate-700');
+                }, 2000);
+            }).catch(err => {
+                alert("Failed to copy link: " + err);
+            });
+        }
+
+        // PWA Service Worker Registration & Notification Integration
+        document.addEventListener("DOMContentLoaded", function() {
+            // 1. Service Worker Registration
+            if ('serviceWorker' in navigator) {
+                navigator.serviceWorker.register('/api/service-worker.js')
+                .then(reg => {
+                    console.log('PWA Service Worker registered successfully:', reg.scope);
+                })
+                .catch(err => {
+                    console.error('Service Worker registration failed:', err);
+                });
+            }
+
+            // 2. Request Notification Permissions
+            if ('Notification' in window) {
+                if (Notification.permission === 'default') {
+                    Notification.requestPermission();
+                }
+            }
+
+            // 3. Setup Order Polling for instant pushes
+            const vendorId = "{{ $vendor->id }}";
+            
+            // Load previously notified orders from LocalStorage to avoid repetitive alerts on page reload
+            let notifiedOrders = JSON.parse(localStorage.getItem('notified_order_ids') || '[]');
+
+            function checkIncomingOrders() {
+                if (!vendorId) return;
+                
+                fetch(`/api/vendor/orders/unread-count?vendor_id=${vendorId}`)
+                .then(response => response.json())
+                .then(data => {
+                    if (data && data.orders) {
+                        let playSound = false;
+                        let newOrdersCount = 0;
+                        
+                        data.orders.forEach(order => {
+                            const orderIdStr = String(order.id);
+                            if (!notifiedOrders.includes(orderIdStr)) {
+                                playSound = true;
+                                newOrdersCount++;
+                                notifiedOrders.push(orderIdStr);
+                                
+                                // Show Notification
+                                triggerPushNotification(
+                                    `🍲 New Order Received! (#${order.id})`,
+                                    `Dish: ${order.food_name || 'Cafeteria Item'} (Qty: ${order.quantity || 1}) - Total: GH₵ ${parseFloat(order.total_price).toFixed(2)}`
+                                );
+                            }
+                        });
+                        
+                        if (playSound) {
+                            // Persist updated list
+                            localStorage.setItem('notified_order_ids', JSON.stringify(notifiedOrders));
+                            
+                            // Play a modern subtle sound to grab attention
+                            try {
+                                const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+                                const oscillator = audioCtx.createOscillator();
+                                const gainNode = audioCtx.createGain();
+                                
+                                oscillator.connect(gainNode);
+                                gainNode.connect(audioCtx.destination);
+                                
+                                oscillator.type = 'sine';
+                                oscillator.frequency.setValueAtTime(587.33, audioCtx.currentTime); // D5 note
+                                gainNode.gain.setValueAtTime(0.3, audioCtx.currentTime);
+                                
+                                oscillator.start();
+                                oscillator.stop(audioCtx.currentTime + 0.15);
+                                
+                                setTimeout(() => {
+                                    const osc2 = audioCtx.createOscillator();
+                                    osc2.connect(gainNode);
+                                    osc2.type = 'sine';
+                                    osc2.frequency.setValueAtTime(880.00, audioCtx.currentTime); // A5 note
+                                    osc2.start();
+                                    osc2.stop(audioCtx.currentTime + 0.3);
+                                }, 180);
+                            } catch (e) {
+                                console.log("Audio alert blocked or unsupported:", e);
+                            }
+                            
+                            // Vibrate if supported
+                            if ('vibrate' in navigator) {
+                                navigator.vibrate([150, 100, 150]);
+                            }
+                            
+                            // Automatically reload page view to update UI elements without hard manual refresh
+                            setTimeout(() => {
+                                window.location.reload();
+                            }, 3500);
+                        }
+                    }
+                })
+                .catch(err => console.error('Error polling for orders:', err));
+            }
+
+            function triggerPushNotification(title, body) {
+                // If tab is focused, show HTML5 web notification
+                if (document.visibilityState === 'visible' && 'Notification' in window && Notification.permission === 'granted') {
+                    new Notification(title, {
+                        body: body,
+                        icon: 'https://img.icons8.com/color/192/hamburger.png'
+                    });
+                } else if ('serviceWorker' in navigator && navigator.serviceWorker.controller) {
+                    // If screen is off or app is backgrounded, send to SW message queue to trigger active push
+                    navigator.serviceWorker.controller.postMessage({
+                        type: 'NEW_ORDER',
+                        title: title,
+                        body: body,
+                        url: window.location.href
+                    });
+                }
+            }
+
+            // Run check on load, then poll every 10 seconds
+            setTimeout(checkIncomingOrders, 2000);
+            setInterval(checkIncomingOrders, 10000);
+        });
     </script>
 
 </body>
