@@ -31,6 +31,8 @@ use App\Http\Controllers\Api\IngredientDemandController;
 use App\Http\Controllers\Api\StudentBudgetController;
 use App\Http\Controllers\Api\LoyaltyController;
 use App\Http\Controllers\Api\GroupOrderController;
+use App\Http\Controllers\Api\HealthController;
+use App\Http\Controllers\Api\SwaggerController;
 
 // Register explicit listeners for OrderStatusCompleted event
 Event::listen(
@@ -51,17 +53,17 @@ Event::listen(
 */
 
 // Auth Endpoints (Generic)
-Route::post('/register', [AuthController::class, 'register']);
-Route::post('/login', [AuthController::class, 'login']);
+Route::post('/register', [AuthController::class, 'register'])->middleware('throttle:auth');
+Route::post('/login', [AuthController::class, 'login'])->middleware('throttle:auth');
 Route::get('/users', [AuthController::class, 'getAllUsers']);
 
 // Specialized Student Sanctum Auth Endpoints
-Route::post('/student/register', [StudentAuthController::class, 'register']);
-Route::post('/student/login', [StudentAuthController::class, 'login']);
+Route::post('/student/register', [StudentAuthController::class, 'register'])->middleware('throttle:auth');
+Route::post('/student/login', [StudentAuthController::class, 'login'])->middleware('throttle:auth');
 
 // Specialized Vendor Sanctum Auth Endpoints
-Route::post('/vendor/register', [VendorAuthController::class, 'register']);
-Route::post('/vendor/login', [VendorAuthController::class, 'login']);
+Route::post('/vendor/register', [VendorAuthController::class, 'register'])->middleware('throttle:auth');
+Route::post('/vendor/login', [VendorAuthController::class, 'login'])->middleware('throttle:auth');
 Route::get('/vendor/dashboard', [VendorController::class, 'dashboardView']);
 
 // Progressive Web App (PWA) manifest route
@@ -175,6 +177,13 @@ JS;
         'Access-Control-Allow-Origin' => '*'
     ]);
 });
+
+// OpenAPI Swagger UI interactive docs
+Route::get('/docs', [SwaggerController::class, 'index']);
+Route::get('/docs/openapi.json', [SwaggerController::class, 'openapiJson']);
+
+// API Health Check Route for Railway monitoring
+Route::get('/health', [HealthController::class, 'check']);
 
 // Lightweight order counter for real-time notification polling
 Route::get('/vendor/orders/unread-count', function (\Illuminate\Http\Request $request) {

@@ -7,6 +7,9 @@ use App\Models\FoodItem;
 use App\Models\Order;
 use App\Models\Feedback;
 use App\Models\AuditLog;
+use App\Models\Vendor;
+use App\Models\OrderItem;
+use App\Models\WalletTransaction;
 use Illuminate\Database\Seeder;
 
 class DatabaseSeeder extends Seeder
@@ -40,6 +43,9 @@ class DatabaseSeeder extends Seeder
                 'email' => 'daniel.mensah@atu.edu.gh'
             ],
             'info' => 'ATU-2024-D45',
+            'balance' => 250.00,
+            'loyalty_points' => 120,
+            'total_spent' => 55.00,
         ]);
 
         $stud2 = User::create([
@@ -57,6 +63,9 @@ class DatabaseSeeder extends Seeder
                 'email' => 'abena.osei@atu.edu.gh'
             ],
             'info' => 'ATU-2025-S12',
+            'balance' => 180.00,
+            'loyalty_points' => 85,
+            'total_spent' => 55.00,
         ]);
 
         $v1 = User::create([
@@ -73,6 +82,8 @@ class DatabaseSeeder extends Seeder
                 'primary_category' => 'Rice & Local Dishes'
             ],
             'info' => 'Auntie Mary Special',
+            'balance' => 45.00,
+            'is_open' => true,
         ]);
 
         $v2 = User::create([
@@ -89,6 +100,8 @@ class DatabaseSeeder extends Seeder
                 'primary_category' => 'Traditional Dishes'
             ],
             'info' => 'ATU Local Hub',
+            'balance' => 65.00,
+            'is_open' => true,
         ]);
 
         $v3 = User::create([
@@ -105,6 +118,45 @@ class DatabaseSeeder extends Seeder
                 'primary_category' => 'Pastries & Drinks'
             ],
             'info' => 'ATU Snack Corner',
+            'balance' => 0.00,
+            'is_open' => false,
+        ]);
+
+        // Seed corresponding Vendor profiles in the vendors table
+        Vendor::create([
+            'user_id' => $v1->id,
+            'name' => $v1->fullName,
+            'location' => $v1->profile_info['location'],
+            'contact_info' => $v1->profile_info['telephone'],
+            'operational_status' => 'active',
+            'store_name' => $v1->profile_info['outlet_name'],
+            'location_within_campus' => $v1->profile_info['location'],
+            'contact_email' => $v1->username . '@atu.edu.gh',
+            'operational_hours' => '07:30 AM - 06:30 PM',
+        ]);
+
+        Vendor::create([
+            'user_id' => $v2->id,
+            'name' => $v2->fullName,
+            'location' => $v2->profile_info['location'],
+            'contact_info' => $v2->profile_info['telephone'],
+            'operational_status' => 'active',
+            'store_name' => $v2->profile_info['outlet_name'],
+            'location_within_campus' => $v2->profile_info['location'],
+            'contact_email' => $v2->username . '@atu.edu.gh',
+            'operational_hours' => '08:00 AM - 06:00 PM',
+        ]);
+
+        Vendor::create([
+            'user_id' => $v3->id,
+            'name' => $v3->fullName,
+            'location' => $v3->profile_info['location'],
+            'contact_info' => $v3->profile_info['telephone'],
+            'operational_status' => 'active',
+            'store_name' => $v3->profile_info['outlet_name'],
+            'location_within_campus' => $v3->profile_info['location'],
+            'contact_email' => $v3->username . '@atu.edu.gh',
+            'operational_hours' => '08:00 AM - 05:00 PM',
         ]);
 
         $admin = User::create([
@@ -211,10 +263,11 @@ class DatabaseSeeder extends Seeder
             ]);
         }
 
-        // 4. Create Historical Orders
+        // 4. Create Historical and Active Orders
         $now = time() * 1000; // millisecond timestamp matching Android client
         $dayInMs = 86400000;
 
+        // Order 1001: Completed
         $order1 = Order::create([
             'id' => 1001,
             'customer_id' => $stud1->id,
@@ -229,7 +282,16 @@ class DatabaseSeeder extends Seeder
             'pickup_pin' => '4444',
             'estimated_pickup_time' => '15 mins',
         ]);
+        OrderItem::create([
+            'order_id' => 1001,
+            'food_item_id' => 101,
+            'name' => 'ATU Chicken Jollof Rice',
+            'quantity' => 1,
+            'unit_price' => 25.0,
+            'total_price' => 25.0,
+        ]);
 
+        // Order 1002: Completed
         $order2 = Order::create([
             'id' => 1002,
             'customer_id' => $stud2->id,
@@ -244,7 +306,16 @@ class DatabaseSeeder extends Seeder
             'pickup_pin' => '5555',
             'estimated_pickup_time' => '5 mins',
         ]);
+        OrderItem::create([
+            'order_id' => 1002,
+            'food_item_id' => 102,
+            'name' => 'Zesty Ginger Sobolo',
+            'quantity' => 2,
+            'unit_price' => 10.0,
+            'total_price' => 20.0,
+        ]);
 
+        // Order 1003: Completed
         $order3 = Order::create([
             'id' => 1003,
             'customer_id' => $stud1->id,
@@ -259,7 +330,16 @@ class DatabaseSeeder extends Seeder
             'pickup_pin' => '6666',
             'estimated_pickup_time' => '20 mins',
         ]);
+        OrderItem::create([
+            'order_id' => 1003,
+            'food_item_id' => 201,
+            'name' => 'Waakye Supreme',
+            'quantity' => 1,
+            'unit_price' => 30.0,
+            'total_price' => 30.0,
+        ]);
 
+        // Order 1004: Completed
         $order4 = Order::create([
             'id' => 1004,
             'customer_id' => $stud2->id,
@@ -274,6 +354,259 @@ class DatabaseSeeder extends Seeder
             'pickup_pin' => '7777',
             'estimated_pickup_time' => '15 mins',
         ]);
+        OrderItem::create([
+            'order_id' => 1004,
+            'food_item_id' => 202,
+            'name' => 'Fufu & Goat Light Soup',
+            'quantity' => 1,
+            'unit_price' => 35.0,
+            'total_price' => 35.0,
+        ]);
+
+        // Order 1005: Pending Order
+        $order5 = Order::create([
+            'id' => 1005,
+            'customer_id' => $stud1->id,
+            'vendor_id' => $v1->id,
+            'food_item_id' => 101,
+            'food_name' => 'ATU Chicken Jollof Rice',
+            'quantity' => 1,
+            'unit_price' => 25.0,
+            'total_price' => 25.0,
+            'order_timestamp' => $now - 5 * 60000, // 5 mins ago
+            'status' => 'PENDING',
+            'pickup_pin' => '1212',
+            'estimated_pickup_time' => '15 mins',
+        ]);
+        OrderItem::create([
+            'order_id' => 1005,
+            'food_item_id' => 101,
+            'name' => 'ATU Chicken Jollof Rice',
+            'quantity' => 1,
+            'unit_price' => 25.0,
+            'total_price' => 25.0,
+        ]);
+
+        // Order 1006: Preparing Order (Multiple items in a single checkout)
+        $order6 = Order::create([
+            'id' => 1006,
+            'customer_id' => $stud2->id,
+            'vendor_id' => $v1->id,
+            'food_item_id' => 103,
+            'food_name' => 'Red-Red Beans Stew',
+            'quantity' => 1,
+            'unit_price' => 20.0,
+            'total_price' => 30.0, // Includes 10.0 Sobolo below
+            'order_timestamp' => $now - 12 * 60000, // 12 mins ago
+            'status' => 'PREPARING',
+            'pickup_pin' => '3434',
+            'estimated_pickup_time' => '10 mins',
+        ]);
+        OrderItem::create([
+            'order_id' => 1006,
+            'food_item_id' => 103,
+            'name' => 'Red-Red Beans Stew',
+            'quantity' => 1,
+            'unit_price' => 20.0,
+            'total_price' => 20.0,
+        ]);
+        OrderItem::create([
+            'order_id' => 1006,
+            'food_item_id' => 102,
+            'name' => 'Zesty Ginger Sobolo',
+            'quantity' => 1,
+            'unit_price' => 10.0,
+            'total_price' => 10.0,
+        ]);
+
+        // Order 1007: Ready for Pickup Order
+        $order7 = Order::create([
+            'id' => 1007,
+            'customer_id' => $stud1->id,
+            'vendor_id' => $v3->id,
+            'food_item_id' => 301,
+            'food_name' => 'Savoury Meat Pie',
+            'quantity' => 2,
+            'unit_price' => 15.0,
+            'total_price' => 38.0, // Includes 8.0 Coca-cola
+            'order_timestamp' => $now - 25 * 60000, // 25 mins ago
+            'status' => 'READY',
+            'pickup_pin' => '7878',
+            'estimated_pickup_time' => 'Ready Now',
+        ]);
+        OrderItem::create([
+            'order_id' => 1007,
+            'food_item_id' => 301,
+            'name' => 'Savoury Meat Pie',
+            'quantity' => 2,
+            'unit_price' => 15.0,
+            'total_price' => 30.0,
+        ]);
+        OrderItem::create([
+            'order_id' => 1007,
+            'food_item_id' => 302,
+            'name' => 'Chilled Coca-Cola',
+            'quantity' => 1,
+            'unit_price' => 8.0,
+            'total_price' => 8.0,
+        ]);
+
+        // Order 1008: Cancelled Order
+        $order8 = Order::create([
+            'id' => 1008,
+            'customer_id' => $stud1->id,
+            'vendor_id' => $v2->id,
+            'food_item_id' => 201,
+            'food_name' => 'Waakye Supreme',
+            'quantity' => 1,
+            'unit_price' => 30.0,
+            'total_price' => 30.0,
+            'order_timestamp' => $now - $dayInMs * 5,
+            'status' => 'CANCELLED',
+            'pickup_pin' => '9090',
+            'estimated_pickup_time' => 'Cancelled',
+        ]);
+        OrderItem::create([
+            'order_id' => 1008,
+            'food_item_id' => 201,
+            'name' => 'Waakye Supreme',
+            'quantity' => 1,
+            'unit_price' => 30.0,
+            'total_price' => 30.0,
+        ]);
+
+        // Order 1009: Completed Order
+        $order9 = Order::create([
+            'id' => 1009,
+            'customer_id' => $stud2->id,
+            'vendor_id' => $v2->id,
+            'food_item_id' => 202,
+            'food_name' => 'Fufu & Goat Light Soup',
+            'quantity' => 1,
+            'unit_price' => 35.0,
+            'total_price' => 35.0,
+            'order_timestamp' => $now - $dayInMs * 6,
+            'status' => 'COMPLETED',
+            'pickup_pin' => '1122',
+            'estimated_pickup_time' => '15 mins',
+        ]);
+        OrderItem::create([
+            'order_id' => 1009,
+            'food_item_id' => 202,
+            'name' => 'Fufu & Goat Light Soup',
+            'quantity' => 1,
+            'unit_price' => 35.0,
+            'total_price' => 35.0,
+        ]);
+
+        // Order 1010: Completed Order
+        $order10 = Order::create([
+            'id' => 1010,
+            'customer_id' => $stud1->id,
+            'vendor_id' => $v1->id,
+            'food_item_id' => 103,
+            'food_name' => 'Red-Red Beans Stew',
+            'quantity' => 1,
+            'unit_price' => 20.0,
+            'total_price' => 20.0,
+            'order_timestamp' => $now - $dayInMs * 1,
+            'status' => 'COMPLETED',
+            'pickup_pin' => '3344',
+            'estimated_pickup_time' => '15 mins',
+        ]);
+        OrderItem::create([
+            'order_id' => 1010,
+            'food_item_id' => 103,
+            'name' => 'Red-Red Beans Stew',
+            'quantity' => 1,
+            'unit_price' => 20.0,
+            'total_price' => 20.0,
+        ]);
+
+        // Order 1011: Declined Order
+        $order11 = Order::create([
+            'id' => 1011,
+            'customer_id' => $stud2->id,
+            'vendor_id' => $v1->id,
+            'food_item_id' => 101,
+            'food_name' => 'ATU Chicken Jollof Rice',
+            'quantity' => 1,
+            'unit_price' => 25.0,
+            'total_price' => 25.0,
+            'order_timestamp' => $now - $dayInMs * 2,
+            'status' => 'DECLINED',
+            'pickup_pin' => '5566',
+            'estimated_pickup_time' => 'Sold Out',
+        ]);
+        OrderItem::create([
+            'order_id' => 1011,
+            'food_item_id' => 101,
+            'name' => 'ATU Chicken Jollof Rice',
+            'quantity' => 1,
+            'unit_price' => 25.0,
+            'total_price' => 25.0,
+        ]);
+
+
+        // 4b. Create Digital Wallet Ledger Transactions
+        WalletTransaction::create([
+            'user_id' => $stud1->id,
+            'type' => 'DEPOSIT',
+            'amount' => 300.00,
+            'status' => 'SUCCESS',
+            'reference' => 'TXN-DEP-847291',
+            'details' => 'Paystack Virtual Deposit via Mobile Money wallet',
+        ]);
+        WalletTransaction::create([
+            'user_id' => $stud1->id,
+            'type' => 'PAYMENT',
+            'amount' => 25.00,
+            'status' => 'SUCCESS',
+            'reference' => 'TXN-PAY-1001',
+            'details' => 'Payment for Order #1001: ATU Chicken Jollof Rice',
+        ]);
+        WalletTransaction::create([
+            'user_id' => $stud1->id,
+            'type' => 'PAYMENT',
+            'amount' => 30.00,
+            'status' => 'SUCCESS',
+            'reference' => 'TXN-PAY-1003',
+            'details' => 'Payment for Order #1003: Waakye Supreme',
+        ]);
+
+        WalletTransaction::create([
+            'user_id' => $stud2->id,
+            'type' => 'DEPOSIT',
+            'amount' => 250.00,
+            'status' => 'SUCCESS',
+            'reference' => 'TXN-DEP-392811',
+            'details' => 'Visa Card Top-Up on ATU Escrow System',
+        ]);
+        WalletTransaction::create([
+            'user_id' => $stud2->id,
+            'type' => 'PAYMENT',
+            'amount' => 20.00,
+            'status' => 'SUCCESS',
+            'reference' => 'TXN-PAY-1002',
+            'details' => 'Payment for Order #1002: Zesty Ginger Sobolo',
+        ]);
+        WalletTransaction::create([
+            'user_id' => $stud2->id,
+            'type' => 'PAYMENT',
+            'amount' => 35.00,
+            'status' => 'SUCCESS',
+            'reference' => 'TXN-PAY-1004',
+            'details' => 'Payment for Order #1004: Fufu & Goat Light Soup',
+        ]);
+        WalletTransaction::create([
+            'user_id' => $stud1->id,
+            'type' => 'REFUND',
+            'amount' => 30.00,
+            'status' => 'SUCCESS',
+            'reference' => 'TXN-REF-1008',
+            'details' => 'Refund for Cancelled Order #1008: Waakye Supreme',
+        ]);
+
 
         // 5. Create Dynamic Feedback Ratings
         Feedback::create([
