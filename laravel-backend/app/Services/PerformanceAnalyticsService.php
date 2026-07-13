@@ -149,6 +149,8 @@ class PerformanceAnalyticsService
                 'status_breakdown' => $orderBreakdown,
                 'completion_rate_percentage' => $completionRate,
                 'total_completed_revenue' => round(floatval($totalRevenue), 2),
+                'completed_orders_count' => $completedOrdersCount,
+                'average_order_value' => $completedOrdersCount > 0 ? round($totalRevenue / $completedOrdersCount, 2) : 0.0,
             ],
             'completion_time_metrics' => [
                 'average_seconds' => round($averageCompletionSeconds, 1),

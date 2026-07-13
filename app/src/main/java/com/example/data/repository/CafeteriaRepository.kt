@@ -384,7 +384,11 @@ class CafeteriaRepository(private val db: AppDatabase) {
     }
 
     // Transactions
-    suspend fun placeOrder(customerId: Int, foodItem: FoodItem, quantity: Int): Order = withContext(Dispatchers.IO) {
+    suspend fun placeOrder(customerId: Int, foodItem: FoodItem, quantity: Int, pointsToRedeem: Int = 0, estimatedPickupTime: String = "Calculating..."): Order = withContext(Dispatchers.IO) {
+        val discount = pointsToRedeem * 0.10
+        val originalTotal = foodItem.price * quantity
+        val finalTotal = (originalTotal - discount).coerceAtLeast(0.0)
+
         if (LaravelClientManager.isLaravelEnabled) {
             try {
                 val service = LaravelClientManager.getService()
@@ -396,7 +400,9 @@ class CafeteriaRepository(private val db: AppDatabase) {
                         food_name = foodItem.name,
                         quantity = quantity,
                         unit_price = foodItem.price,
-                        total_price = foodItem.price * quantity
+                        total_price = originalTotal,
+                        points_to_redeem = pointsToRedeem,
+                        estimated_pickup_time = estimatedPickupTime
                     )
                 )
                 val roomOrder = LaravelClientManager.toRoomOrder(lOrder)
@@ -439,14 +445,29 @@ class CafeteriaRepository(private val db: AppDatabase) {
             foodName = foodItem.name,
             quantity = quantity,
             unitPrice = foodItem.price,
-            totalPrice = foodItem.price * quantity,
+            totalPrice = finalTotal,
             status = "PENDING",
             pickupPin = securePin,
-            estimatedPickupTime = "Calculating..."
+            estimatedPickupTime = estimatedPickupTime,
+            pointsRedeemed = pointsToRedeem,
+            discountApplied = discount
         )
         val orderId = orderDao.insertOrder(order)
-        insertAuditLog(customerId, "ORDER_CREATED", "Created order #${orderId} for '${foodItem.name}' (QTY: ${quantity}) with secure pick-up code.")
+        insertAuditLog(customerId, "ORDER_CREATED", "Created order #${orderId} for '${foodItem.name}' (QTY: ${quantity}) with secure pick-up code." + (if (pointsToRedeem > 0) " Redeemed $pointsToRedeem points for GHS $discount discount." else ""))
         
+        // Deduct user balance and loyalty points locally
+        try {
+            val u = userDao.getUserSync(customerId)
+            if (u != null) {
+                userDao.updateUser(u.copy(
+                    balance = (u.balance - finalTotal).coerceAtLeast(0.0),
+                    loyaltyPoints = (u.loyaltyPoints - pointsToRedeem).coerceAtLeast(0)
+                ))
+            }
+        } catch (e: Exception) {
+            Log.e("CafeteriaRepository", "Failed to deduct wallet / loyalty balance locally", e)
+        }
+
         // Dispatch WebSocket broadcast instantly to subscriber roles in real-time
         com.example.data.LaravelEchoWebSocketManager.broadcastOrderPlacedLocally(
             orderId = orderId.toInt(),
@@ -582,6 +603,56 @@ class CafeteriaRepository(private val db: AppDatabase) {
             }
         } catch (e: Exception) {
             Log.e("CafeteriaRepository", "Failed to process automatic refund", e)
+        }
+    }
+
+    suspend fun studentCancelOrder(studentId: Int, orderId: Int) = withContext(Dispatchers.IO) {
+        if (LaravelClientManager.isLaravelEnabled) {
+            try {
+                val service = LaravelClientManager.getService()
+                val lOrder = service.cancelOrder(orderId)
+                orderDao.insertOrder(LaravelClientManager.toRoomOrder(lOrder))
+            } catch (e: Exception) {
+                Log.e("CafeteriaRepository", "Laravel studentCancelOrder failed", e)
+                throw e
+            }
+        } else {
+            val o = orderDao.getOrderById(orderId) ?: return@withContext
+            if (o.status.uppercase() != "PENDING") {
+                throw IllegalStateException("Only PENDING orders can be cancelled.")
+            }
+            val updated = o.copy(status = "CANCELLED", estimatedPickupTime = "Cancelled")
+            orderDao.updateOrder(updated)
+            insertAuditLog(studentId, "ORDER_CANCELLED", "Order #${orderId} was cancelled by Student.")
+
+            // Refund user balance and restore loyalty points if redeemed
+            val u = userDao.getUserSync(studentId)
+            if (u != null) {
+                val restoredPoints = u.loyaltyPoints + o.pointsRedeemed
+                val restoredBalance = u.balance + o.totalPrice
+                userDao.updateUser(u.copy(balance = restoredBalance, loyaltyPoints = restoredPoints))
+
+                // Insert refund wallet transaction
+                val studentRef = "REF-" + (100000..999999).random()
+                insertWalletTransaction(
+                    userId = studentId,
+                    type = "REFUND",
+                    amount = o.totalPrice,
+                    reference = studentRef,
+                    details = "Refund for cancelled Order #${o.id} ('${o.foodName}')"
+                )
+            }
+
+            // Restore stock
+            try {
+                val food = foodItemDao.getFoodItemById(o.foodItemId)
+                if (food != null) {
+                    val restoredStock = food.currentStock + o.quantity
+                    foodItemDao.updateFoodItem(food.copy(currentStock = restoredStock))
+                }
+            } catch (e: Exception) {
+                Log.e("CafeteriaRepository", "Failed to restore stock on student cancel", e)
+            }
         }
     }
 
@@ -1024,6 +1095,54 @@ class CafeteriaRepository(private val db: AppDatabase) {
                 insights_markdown = "### Offline Mode Active\nConfigure and enable Laravel core server to run integrated mathematical regression models.",
                 generated_at = ""
             )
+        }
+    }
+
+    suspend fun bulkToggleFoodItems(ids: List<Int>, isAvailable: Boolean): Boolean = withContext(Dispatchers.IO) {
+        try {
+            // Update local SQLite / Room DB first
+            foodItemDao.bulkToggleAvailability(ids, isAvailable)
+            insertAuditLog(0, "MENU_ITEMS_BULK_TOGGLED", "Bulk toggled items availability locally: ids=$ids, isAvailable=$isAvailable")
+            
+            if (LaravelClientManager.isLaravelEnabled) {
+                try {
+                    val service = LaravelClientManager.getService()
+                    val response = service.bulkToggleFoodItems(LaravelBulkToggleRequest(ids, isAvailable))
+                    response.success
+                } catch (e: Exception) {
+                    Log.e("CafeteriaRepository", "Failed to bulk toggle availability on Laravel", e)
+                    false
+                }
+            } else {
+                true
+            }
+        } catch (e: Exception) {
+            Log.e("CafeteriaRepository", "Local error bulk toggling items", e)
+            false
+        }
+    }
+
+    suspend fun replyToFeedback(feedbackId: Int, reply: String): Boolean = withContext(Dispatchers.IO) {
+        try {
+            // Update local SQLite / Room DB first
+            feedbackDao.updateFeedbackReply(feedbackId, reply)
+            insertAuditLog(0, "FEEDBACK_REPLIED", "Replied to feedback #$feedbackId locally: '$reply'")
+            
+            if (LaravelClientManager.isLaravelEnabled) {
+                try {
+                    val service = LaravelClientManager.getService()
+                    service.replyToFeedback(feedbackId, LaravelFeedbackReplyRequest(reply))
+                    true
+                } catch (e: Exception) {
+                    Log.e("CafeteriaRepository", "Failed to reply to feedback on Laravel", e)
+                    false
+                }
+            } else {
+                true
+            }
+        } catch (e: Exception) {
+            Log.e("CafeteriaRepository", "Local error replying to feedback", e)
+            false
         }
     }
 }

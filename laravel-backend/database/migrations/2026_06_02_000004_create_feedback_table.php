@@ -21,6 +21,7 @@ return new class extends Migration
             $table->integer('rating_service_speed');
             $table->integer('rating_price_value');
             $table->text('comment')->nullable();
+            $table->text('vendor_reply')->nullable();
             $table->bigInteger('timestamp');
             $table->timestamps();
 

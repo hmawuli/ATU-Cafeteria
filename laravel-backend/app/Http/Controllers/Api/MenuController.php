@@ -269,4 +269,45 @@ class MenuController extends Controller
             'menu_item' => $item
         ], 201);
     }
+
+    /**
+     * Search and filter standalone menu items by category or price range.
+     */
+    public function search(Request $request)
+    {
+        $query = MenuItem::with('vendor');
+
+        // Filter by Category
+        if ($request->has('category') && $request->input('category') !== '') {
+            $query->where('category', 'like', '%' . $request->input('category') . '%');
+        }
+
+        // Filter by Min Price
+        if ($request->has('min_price') && is_numeric($request->input('min_price'))) {
+            $query->where('price', '>=', (float) $request->input('min_price'));
+        }
+
+        // Filter by Max Price
+        if ($request->has('max_price') && is_numeric($request->input('max_price'))) {
+            $query->where('price', '<=', (float) $request->input('max_price'));
+        }
+
+        // General search query (on food_name, description, category)
+        if ($request->has('q') && $request->input('q') !== '') {
+            $search = $request->input('q');
+            $query->where(function($q) use ($search) {
+                $q->where('food_name', 'like', '%' . $search . '%')
+                  ->orWhere('name', 'like', '%' . $search . '%')
+                  ->orWhere('description', 'like', '%' . $search . '%')
+                  ->orWhere('category', 'like', '%' . $search . '%');
+            });
+        }
+
+        $items = $query->get();
+
+        return response()->json([
+            'success' => true,
+            'menu_items' => $items
+        ], 200);
+    }
 }

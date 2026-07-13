@@ -177,15 +177,63 @@ class VendorController extends Controller
      */
     public function dashboardView(Request $request)
     {
-        // Try authenticated user first, then fallback to vendor_id parameter (default: 10)
-        $user = $request->user();
-        if (!$user) {
-            $vendorId = $request->query('vendor_id', 10);
-            $user = \App\Models\User::find($vendorId);
+        // Enforce robust authentication middleware check
+        $token = $request->header('Authorization') ?: $request->header('X-Auth-Token') ?: $request->query('token');
+        if ($token && preg_match('/Bearer\s(\S+)/', $token, $matches)) {
+            $token = $matches[1];
         }
 
+        $user = null;
+        if ($token) {
+            $user = \App\Services\JwtService::getUserFromToken($token);
+        }
+
+        if (!$user) {
+            $user = $request->user(); // Sanctum fallback
+        }
+
+        // If no authenticated user session/token, try vendor_id parameter as fallback ONLY if it matches a valid registered vendor
+        if (!$user) {
+            $vendorId = $request->query('vendor_id');
+            if ($vendorId) {
+                $user = \App\Models\User::find($vendorId);
+            }
+        }
+
+        // Strictly verify role to ensure registered vendors/admins only
         if (!$user || (strtoupper($user->role) !== 'VENDOR' && strtoupper($user->role) !== 'ADMIN')) {
-            $user = \App\Models\User::find(10); // fallback to Mary Joint (Auntie Mary Special)
+            $html = <<<HTML
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Unauthorized Access | ATU Vendor Portal</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;700;800&display=swap" rel="stylesheet">
+    <style>body { font-family: 'Plus Jakarta Sans', sans-serif; }</style>
+</head>
+<body class="bg-slate-50 min-h-screen flex items-center justify-center p-6">
+    <div class="max-w-md w-full bg-white rounded-3xl border border-slate-200 shadow-sm p-8 text-center">
+        <div class="text-6xl mb-4">🔒</div>
+        <h1 class="text-2xl font-extrabold text-slate-900 mb-2">Access Denied</h1>
+        <p class="text-slate-600 text-sm mb-6">
+            The ATU Cafeteria Vendor Portal is protected by secure authentication middleware. Only registered cafeteria vendors and administrators are permitted to enter this portal.
+        </p>
+        <div class="bg-amber-50 border border-amber-200 rounded-2xl p-4 mb-6 text-left">
+            <p class="text-xs font-bold text-amber-800 uppercase tracking-wider mb-1">How to access:</p>
+            <p class="text-xs text-amber-700 leading-relaxed">
+                Please log in through the official **ATU Cafeteria Mobile App** as a registered vendor. If you are accessing this portal via a web browser, ensure your query contains a valid authentication token.
+            </p>
+        </div>
+        <a href="/api/manifest.json" class="inline-block w-full py-3 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-xl text-sm transition-all shadow-md">
+            View App Manifest
+        </a>
+    </div>
+</body>
+</html>
+HTML;
+            return response($html, 401);
         }
 
         // Search logic
@@ -228,7 +276,8 @@ class VendorController extends Controller
             $dayName = now()->subDays($i)->format('D'); // e.g. Mon, Tue
             $weeklySalesData[$dateStr] = [
                 'day' => $dayName,
-                'sales' => 0.0
+                'sales' => 0.0,
+                'order_count' => 0
             ];
         }
 
@@ -236,7 +285,7 @@ class VendorController extends Controller
         $ordersLastSevenDays = \App\Models\Order::where('vendor_id', $user->id)
             ->where('status', 'COMPLETED')
             ->where('created_at', '>=', $sevenDaysAgo)
-            ->select(\Illuminate\Support\Facades\DB::raw('DATE(created_at) as date_val'), \Illuminate\Support\Facades\DB::raw('SUM(total_price) as total_sales'))
+            ->select(\Illuminate\Support\Facades\DB::raw('DATE(created_at) as date_val'), \Illuminate\Support\Facades\DB::raw('SUM(total_price) as total_sales'), \Illuminate\Support\Facades\DB::raw('COUNT(*) as total_orders'))
             ->groupBy('date_val')
             ->get();
 
@@ -244,6 +293,7 @@ class VendorController extends Controller
             $dateKey = $orderSales->date_val;
             if (isset($weeklySalesData[$dateKey])) {
                 $weeklySalesData[$dateKey]['sales'] = (float)$orderSales->total_sales;
+                $weeklySalesData[$dateKey]['order_count'] = (int)$orderSales->total_orders;
             }
         }
 

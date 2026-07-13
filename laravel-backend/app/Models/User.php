@@ -28,6 +28,8 @@ class User extends Authenticatable
         'info',     // Student Id or Brand description
         'balance',  // User's virtual wallet balance
         'is_open',  // Vendor open status
+        'loyalty_points',
+        'total_spent',
     ];
 
     /**
@@ -39,6 +41,8 @@ class User extends Authenticatable
         'is_open' => 'boolean',
         'balance' => 'double',
         'profile_info' => 'array',
+        'loyalty_points' => 'integer',
+        'total_spent' => 'double',
     ];
 
     /**

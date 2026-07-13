@@ -9,18 +9,23 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Facades\DB;
 
-class MenuItemController extends Controller
+class VendorMenuItemController extends Controller
 {
     /**
-     * List all menu items.
+     * Display a listing of the vendor's menu items.
      */
     public function index(Request $request)
     {
-        $query = MenuItem::with('vendor');
-        if ($request->has('vendor_id')) {
-            $query->where('vendor_id', $request->query('vendor_id'));
+        $user = $request->user();
+        if (strtoupper($user->role) !== 'VENDOR') {
+            return response()->json([
+                'success' => false,
+                'message' => 'Unauthorized. Only vendors can perform this action.'
+            ], 403);
         }
-        $items = $query->get();
+
+        $items = MenuItem::where('vendor_id', $user->id)->get();
+
         return response()->json([
             'success' => true,
             'menu_items' => $items
@@ -28,52 +33,41 @@ class MenuItemController extends Controller
     }
 
     /**
-     * Show a single menu item.
+     * Store a newly created menu item in storage.
      */
-    public function show($id)
-    {
-        $item = MenuItem::with('vendor')->find($id);
-        if (!$item) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Menu item not found.'
-            ], 404);
-        }
-
-        return response()->json([
-            'success' => true,
-            'menu_item' => $item
-        ], 200);
-    }
-
-    /**
-     * Store/create a new menu item.
-     */
-    public function store(\App\Http\Requests\StoreMenuItemRequest $request)
+    public function store(Request $request)
     {
         $user = $request->user();
-        
-        // Ensure user is VENDOR or ADMIN
-        if (strtoupper($user->role) !== 'VENDOR' && strtoupper($user->role) !== 'ADMIN') {
+        if (strtoupper($user->role) !== 'VENDOR') {
             return response()->json([
                 'success' => false,
-                'message' => 'Only vendors and admins are authorized to add menu items.'
+                'message' => 'Unauthorized. Only vendors can perform this action.'
             ], 403);
         }
 
-        // Default vendor_id to log-in user's ID
-        $vendorId = $user->id;
-        if (strtoupper($user->role) === 'ADMIN' && $request->has('vendor_id')) {
-            $vendorId = $request->input('vendor_id');
+        $validator = Validator::make($request->all(), [
+            'food_name' => 'required|string|max:255',
+            'price' => 'required|numeric|min:0',
+            'description' => 'nullable|string',
+            'category' => 'nullable|string|max:255',
+            'is_available' => 'nullable|boolean',
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Validation error.',
+                'errors' => $validator->errors()
+            ], 400);
         }
 
-        $item = DB::transaction(function () use ($request, $vendorId) {
+        $item = DB::transaction(function () use ($request, $user) {
             $foodName = $request->input('food_name');
             
             $createdItem = MenuItem::create([
-                'vendor_id' => $vendorId,
+                'vendor_id' => $user->id,
                 'food_name' => $foodName,
-                'name' => $foodName, // duplicate to name for compatibility
+                'name' => $foodName,
                 'price' => $request->input('price'),
                 'description' => $request->input('description') ?? '',
                 'category' => $request->input('category'),
@@ -81,10 +75,10 @@ class MenuItemController extends Controller
             ]);
 
             AuditLog::create([
-                'user_id' => $request->user()->id,
+                'user_id' => $user->id,
                 'timestamp' => time() * 1000,
                 'action' => 'MENU_ITEM_CREATED',
-                'details' => "Vendor added new food item '{$createdItem->food_name}' under category '{$createdItem->category}' at GH₵{$createdItem->price}.",
+                'details' => "Vendor added new food item '{$createdItem->food_name}' under category '{$createdItem->category}' at GH₵{$createdItem->price} through Vendor CRUD.",
             ]);
 
             return $createdItem;
@@ -98,10 +92,18 @@ class MenuItemController extends Controller
     }
 
     /**
-     * Update an existing menu item.
+     * Display the specified menu item if owned by the vendor.
      */
-    public function update(Request $request, $id)
+    public function show(Request $request, $id)
     {
+        $user = $request->user();
+        if (strtoupper($user->role) !== 'VENDOR') {
+            return response()->json([
+                'success' => false,
+                'message' => 'Unauthorized. Only vendors can perform this action.'
+            ], 403);
+        }
+
         $item = MenuItem::find($id);
         if (!$item) {
             return response()->json([
@@ -110,8 +112,41 @@ class MenuItemController extends Controller
             ], 404);
         }
 
+        if ($item->vendor_id !== $user->id) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Unauthorized. You do not own this menu item.'
+            ], 403);
+        }
+
+        return response()->json([
+            'success' => true,
+            'menu_item' => $item
+        ], 200);
+    }
+
+    /**
+     * Update the specified menu item in storage.
+     */
+    public function update(Request $request, $id)
+    {
         $user = $request->user();
-        if ($item->vendor_id !== $user->id && strtoupper($user->role) !== 'ADMIN') {
+        if (strtoupper($user->role) !== 'VENDOR') {
+            return response()->json([
+                'success' => false,
+                'message' => 'Unauthorized. Only vendors can perform this action.'
+            ], 403);
+        }
+
+        $item = MenuItem::find($id);
+        if (!$item) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Menu item not found.'
+            ], 404);
+        }
+
+        if ($item->vendor_id !== $user->id) {
             return response()->json([
                 'success' => false,
                 'message' => 'Unauthorized. You do not own this menu item.'
@@ -120,7 +155,6 @@ class MenuItemController extends Controller
 
         $validator = Validator::make($request->all(), [
             'food_name' => 'nullable|string|max:255',
-            'name' => 'nullable|string|max:255',
             'price' => 'nullable|numeric|min:0',
             'description' => 'nullable|string',
             'category' => 'nullable|string|max:255',
@@ -130,12 +164,13 @@ class MenuItemController extends Controller
         if ($validator->fails()) {
             return response()->json([
                 'success' => false,
+                'message' => 'Validation error.',
                 'errors' => $validator->errors()
             ], 400);
         }
 
-        $updated = DB::transaction(function () use ($item, $request) {
-            $foodName = $request->input('food_name') ?? $request->input('name') ?? $item->food_name;
+        $updated = DB::transaction(function () use ($item, $request, $user) {
+            $foodName = $request->input('food_name') ?? $item->food_name;
 
             $item->update([
                 'food_name' => $foodName,
@@ -147,10 +182,10 @@ class MenuItemController extends Controller
             ]);
 
             AuditLog::create([
-                'user_id' => $request->user()->id,
+                'user_id' => $user->id,
                 'timestamp' => time() * 1000,
                 'action' => 'MENU_ITEM_UPDATED',
-                'details' => "Vendor updated food item '{$item->food_name}' (price: GH₵{$item->price}, category: '{$item->category}').",
+                'details' => "Vendor updated food item '{$item->food_name}' via Vendor CRUD.",
             ]);
 
             return $item;
@@ -164,10 +199,18 @@ class MenuItemController extends Controller
     }
 
     /**
-     * Delete/remove an existing menu item.
+     * Remove the specified menu item from storage.
      */
     public function destroy(Request $request, $id)
     {
+        $user = $request->user();
+        if (strtoupper($user->role) !== 'VENDOR') {
+            return response()->json([
+                'success' => false,
+                'message' => 'Unauthorized. Only vendors can perform this action.'
+            ], 403);
+        }
+
         $item = MenuItem::find($id);
         if (!$item) {
             return response()->json([
@@ -176,8 +219,7 @@ class MenuItemController extends Controller
             ], 404);
         }
 
-        $user = $request->user();
-        if ($item->vendor_id !== $user->id && strtoupper($user->role) !== 'ADMIN') {
+        if ($item->vendor_id !== $user->id) {
             return response()->json([
                 'success' => false,
                 'message' => 'Unauthorized. You do not own this menu item.'
@@ -191,45 +233,7 @@ class MenuItemController extends Controller
                 'user_id' => $user->id,
                 'timestamp' => time() * 1000,
                 'action' => 'MENU_ITEM_DELETED',
-                'details' => "Vendor deleted menu item ID: {$item->id} ('{$item->food_name}').",
-            ]);
-        });
-
-        return response()->json([
-            'success' => true,
-            'message' => 'Menu item deleted successfully.'
-        ], 200);
-    }
-
-    /**
-     * Delete/remove an existing menu item (Admin only).
-     */
-    public function destroyAdmin(Request $request, $id)
-    {
-        $item = MenuItem::find($id);
-        if (!$item) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Menu item not found.'
-            ], 404);
-        }
-
-        $user = $request->user();
-        if (!$user || strtoupper($user->role) !== 'ADMIN') {
-            return response()->json([
-                'success' => false,
-                'message' => 'Unauthorized. Only administrative personnel can delete menu items.'
-            ], 403);
-        }
-
-        DB::transaction(function () use ($item, $user) {
-            $item->delete(); // Soft delete
-
-            AuditLog::create([
-                'user_id' => $user->id,
-                'timestamp' => time() * 1000,
-                'action' => 'MENU_ITEM_DELETED',
-                'details' => "Administrator deleted menu item ID: {$item->id} ('{$item->food_name}').",
+                'details' => "Vendor deleted menu item ID: {$item->id} ('{$item->food_name}') via Vendor CRUD.",
             ]);
         });
 

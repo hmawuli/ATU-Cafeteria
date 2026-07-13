@@ -147,6 +147,19 @@
         @endif
 
 
+        <!-- Tab Navigation Switcher -->
+        <div class="flex border-b border-slate-200 mb-8 overflow-x-auto whitespace-nowrap scrollbar-none">
+            <button onclick="switchTab('operations')" id="tabBtn-operations" class="px-6 py-3.5 text-sm font-extrabold flex items-center gap-2 border-b-2 border-indigo-600 text-indigo-600 transition-all duration-200 focus:outline-none">
+                🏪 Shop Operations & Catalog
+            </button>
+            <button onclick="switchTab('analytics')" id="tabBtn-analytics" class="px-6 py-3.5 text-sm font-bold flex items-center gap-2 border-b-2 border-transparent text-slate-500 hover:text-slate-800 transition-all duration-200 focus:outline-none">
+                📊 Interactive Performance Analytics
+            </button>
+        </div>
+
+        <!-- Tab 1 Container: Shop Operations -->
+        <div id="tabContent-operations" class="space-y-8">
+
         <!-- Overview Summary & Information Info -->
         <div class="grid grid-cols-1 lg:grid-cols-3 gap-8 mb-8">
             <div class="lg:col-span-2 bg-gradient-to-br from-slate-900 via-slate-800 to-indigo-950 text-white rounded-3xl p-6 shadow-xl flex flex-col justify-between relative overflow-hidden">
@@ -840,6 +853,262 @@
             </div>
 
         </div>
+        </div> <!-- End of tabContent-operations -->
+
+        <!-- Tab 2 Container: Interactive Analytics Dashboard -->
+        <div id="tabContent-analytics" class="hidden space-y-8">
+            
+            <!-- Analytics Welcome & Highlights Banner -->
+            <div class="bg-gradient-to-r from-slate-900 via-indigo-950 to-slate-900 text-white rounded-3xl p-6 shadow-xl relative overflow-hidden">
+                <div class="absolute right-0 bottom-0 opacity-10 transform translate-x-12 translate-y-12">
+                    <svg class="w-80 h-80 text-white" fill="currentColor" viewBox="0 0 20 20">
+                        <path d="M2 10a8 8 0 018-8v8h8a8 8 0 11-16 0z"></path>
+                        <path d="M12 2.252A8.014 8.014 0 0117.748 8H12V2.252z"></path>
+                    </svg>
+                </div>
+                <div class="relative z-10">
+                    <div class="flex items-center gap-2 mb-2">
+                        <span class="px-3 py-1 bg-indigo-500/20 text-indigo-300 font-extrabold text-xs tracking-wider rounded-full uppercase border border-indigo-500/30">
+                            📊 DATA INTELLIGENCE
+                        </span>
+                        <span class="text-xs text-slate-400 font-medium">Updated Real-Time</span>
+                    </div>
+                    <h3 class="text-2xl md:text-3xl font-extrabold text-slate-100">Performance & Analytics Hub</h3>
+                    <p class="text-slate-300 mt-2 text-sm max-w-2xl leading-relaxed">
+                        In-depth sales, feedback, and fulfillment analysis. Use these data visualizations to identify popular items, optimize menu pricing, and enhance preparation efficiency.
+                    </p>
+                </div>
+            </div>
+
+            <!-- Analytics Key Metrics Grid -->
+            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-5">
+                
+                <!-- KPI 1: Total Orders Processed -->
+                <div class="bg-white rounded-2xl p-5 shadow-sm border border-slate-200 flex flex-col justify-between hover:shadow-md transition-shadow">
+                    <div class="flex items-center gap-3">
+                        <div class="bg-indigo-50 text-indigo-600 p-2.5 rounded-xl">
+                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"></path>
+                            </svg>
+                        </div>
+                        <div>
+                            <span class="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Completed Orders</span>
+                            <h4 class="text-xl font-extrabold text-slate-900 mt-0.5 code-font">{{ $metrics['order_metrics']['completed_orders_count'] ?? 0 }}</h4>
+                        </div>
+                    </div>
+                    <div class="mt-4 border-t border-slate-100 pt-3 flex items-center justify-between text-xs">
+                        <span class="text-slate-500">Total Placed:</span>
+                        <strong class="text-indigo-600 font-bold code-font">{{ $metrics['order_metrics']['total_orders_placed'] ?? 0 }}</strong>
+                    </div>
+                </div>
+
+                <!-- KPI 2: Average Order Value (AOV) -->
+                <div class="bg-white rounded-2xl p-5 shadow-sm border border-slate-200 flex flex-col justify-between hover:shadow-md transition-shadow">
+                    <div class="flex items-center gap-3">
+                        <div class="bg-emerald-50 text-emerald-600 p-2.5 rounded-xl">
+                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                            </svg>
+                        </div>
+                        <div>
+                            <span class="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Avg Order Value</span>
+                            <h4 class="text-xl font-extrabold text-slate-900 mt-0.5 code-font">GH₵ {{ number_format($metrics['order_metrics']['average_order_value'] ?? 0, 2) }}</h4>
+                        </div>
+                    </div>
+                    <div class="mt-4 border-t border-slate-100 pt-3 flex items-center justify-between text-xs">
+                        <span class="text-slate-500">Total Revenue:</span>
+                        <strong class="text-emerald-600 font-bold code-font">GH₵ {{ number_format($metrics['order_metrics']['total_completed_revenue'] ?? 0, 2) }}</strong>
+                    </div>
+                </div>
+
+                <!-- KPI 3: Popular Food Item -->
+                <div class="bg-white rounded-2xl p-5 shadow-sm border border-slate-200 flex flex-col justify-between hover:shadow-md transition-shadow">
+                    <div class="flex items-center gap-3">
+                        <div class="bg-amber-50 text-amber-600 p-2.5 rounded-xl">
+                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z"></path>
+                            </svg>
+                        </div>
+                        <div class="overflow-hidden">
+                            <span class="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Popular Dish</span>
+                            <h4 class="text-sm font-extrabold text-slate-900 mt-0.5 truncate" title="{{ isset($topPerformingItems[0]) ? $topPerformingItems[0]->food_name : 'N/A' }}">
+                                {{ isset($topPerformingItems[0]) ? $topPerformingItems[0]->food_name : 'N/A' }}
+                            </h4>
+                        </div>
+                    </div>
+                    <div class="mt-4 border-t border-slate-100 pt-3 flex items-center justify-between text-xs">
+                        <span class="text-slate-500">Units Sold:</span>
+                        <strong class="text-amber-600 font-bold code-font">{{ isset($topPerformingItems[0]) ? (int)$topPerformingItems[0]->total_quantity : 0 }}</strong>
+                    </div>
+                </div>
+
+                <!-- KPI 4: Customer Feedback Rating -->
+                <div class="bg-white rounded-2xl p-5 shadow-sm border border-slate-200 flex flex-col justify-between hover:shadow-md transition-shadow">
+                    <div class="flex items-center gap-3">
+                        <div class="bg-rose-50 text-rose-600 p-2.5 rounded-xl">
+                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z"></path>
+                            </svg>
+                        </div>
+                        <div>
+                            <span class="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Quality Score</span>
+                            <h4 class="text-xl font-extrabold text-slate-900 mt-0.5 code-font">{{ $metrics['rating_metrics']['overall_average_rating'] ?? '0.0' }} / 5.0</h4>
+                        </div>
+                    </div>
+                    <div class="mt-4 border-t border-slate-100 pt-3 flex items-center justify-between text-xs">
+                        <span class="text-slate-500">Reviews:</span>
+                        <strong class="text-rose-600 font-bold code-font">{{ $metrics['rating_metrics']['total_feedback_count'] ?? 0 }}</strong>
+                    </div>
+                </div>
+
+                <!-- KPI 5: Average Order Prep Time -->
+                <div class="bg-white rounded-2xl p-5 shadow-sm border border-slate-200 flex flex-col justify-between hover:shadow-md transition-shadow">
+                    <div class="flex items-center gap-3">
+                        <div class="bg-blue-50 text-blue-600 p-2.5 rounded-xl">
+                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                            </svg>
+                        </div>
+                        <div>
+                            <span class="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Avg Prep Time</span>
+                            <h4 class="text-lg font-extrabold text-slate-900 mt-0.5 code-font">{{ $metrics['completion_time_metrics']['average_formatted'] ?? '0s' }}</h4>
+                        </div>
+                    </div>
+                    <div class="mt-4 border-t border-slate-100 pt-3 flex items-center justify-between text-xs">
+                        <span class="text-slate-500">Fastest Prep:</span>
+                        <strong class="text-blue-600 font-bold text-[11px] code-font">{{ $metrics['completion_time_metrics']['fastest_formatted'] ?? 'N/A' }}</strong>
+                    </div>
+                </div>
+
+            </div>
+
+            <!-- Visualization Charts Grid -->
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                
+                <!-- Chart 1: Sales & Orders Volume -->
+                <div class="bg-white rounded-3xl border border-slate-200 shadow-sm p-6 flex flex-col justify-between h-[360px]">
+                    <div>
+                        <h3 class="text-base font-bold text-slate-900 flex items-center gap-2">
+                            <span>📈</span> Sales & Volume Trend (Past 7 Days)
+                        </h3>
+                        <p class="text-xs text-slate-400 mt-0.5">Overview of daily revenue and transaction volume completed in the cafeteria.</p>
+                    </div>
+                    <div class="relative w-full h-[240px] mt-4">
+                        <canvas id="salesAndOrdersChart"></canvas>
+                    </div>
+                </div>
+
+                <!-- Chart 2: Popular Menu Items share -->
+                <div class="bg-white rounded-3xl border border-slate-200 shadow-sm p-6 flex flex-col justify-between h-[360px]">
+                    <div>
+                        <h3 class="text-base font-bold text-slate-900 flex items-center gap-2">
+                            <span>🍩</span> Top Menu Offerings Popularity
+                        </h3>
+                        <p class="text-xs text-slate-400 mt-0.5">Quantity of dishes sold and the relative share of each menu item.</p>
+                    </div>
+                    <div class="relative w-full h-[240px] mt-4 flex items-center justify-center">
+                        @if(!$topPerformingItems->isEmpty())
+                            <canvas id="popularItemsChart"></canvas>
+                        @else
+                            <div class="text-slate-400 text-xs text-center">
+                                <span class="text-3xl block mb-2">🍽️</span>
+                                No completed orders available to plot popularity chart.
+                            </div>
+                        @endif
+                    </div>
+                </div>
+
+                <!-- Chart 3: Detailed Feedback Breakdown -->
+                <div class="bg-white rounded-3xl border border-slate-200 shadow-sm p-6 flex flex-col justify-between h-[360px]">
+                    <div>
+                        <h3 class="text-base font-bold text-slate-900 flex items-center gap-2">
+                            <span>⭐</span> Customer Feedback Dimensions
+                        </h3>
+                        <p class="text-xs text-slate-400 mt-0.5">Multidimensional student ratings evaluating food quality, speed, and service value.</p>
+                    </div>
+                    <div class="relative w-full h-[240px] mt-4">
+                        @if(($metrics['rating_metrics']['total_feedback_count'] ?? 0) > 0)
+                            <canvas id="feedbackDimensionsChart"></canvas>
+                        @else
+                            <div class="text-slate-400 text-xs text-center flex flex-col items-center justify-center h-full">
+                                <span class="text-3xl block mb-2">⭐</span>
+                                No feedback reviews submitted yet.
+                            </div>
+                        @endif
+                    </div>
+                </div>
+
+                <!-- Chart 4: Fulfillment Status Breakdown -->
+                <div class="bg-white rounded-3xl border border-slate-200 shadow-sm p-6 flex flex-col justify-between h-[360px]">
+                    <div>
+                        <h3 class="text-base font-bold text-slate-900 flex items-center gap-2">
+                            <span>⏱️</span> Order Fulfillment Status Distribution
+                        </h3>
+                        <p class="text-xs text-slate-400 mt-0.5">Distribution of all active and historic orders across different prep statuses.</p>
+                    </div>
+                    <div class="relative w-full h-[240px] mt-4">
+                        <canvas id="fulfillmentStatusChart"></canvas>
+                    </div>
+                </div>
+
+            </div>
+
+            <!-- Customer Reviews & Comments Table -->
+            <div class="bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden">
+                <div class="px-6 py-5 border-b border-slate-100">
+                    <h3 class="text-base font-bold text-slate-900 flex items-center gap-2">
+                        <span>💬</span> Recent Student Feedback Comments
+                    </h3>
+                    <p class="text-xs text-slate-400 mt-0.5">Read recent remarks and ratings posted by students on your dishes.</p>
+                </div>
+                <div class="overflow-x-auto">
+                    <table class="w-full text-left border-collapse">
+                        <thead>
+                            <tr class="bg-slate-50 border-b border-slate-200 text-[11px] text-slate-400 font-extrabold uppercase tracking-wider">
+                                <th class="py-4 px-6">Student</th>
+                                <th class="py-4 px-4">Rating Breakdown</th>
+                                <th class="py-4 px-4">Comment</th>
+                                <th class="py-4 px-6 text-right">Submitted At</th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y divide-slate-100 text-sm">
+                            @forelse($metrics['recent_customer_feedback'] ?? [] as $feedback)
+                                <tr class="hover:bg-slate-50/50 transition-colors duration-150">
+                                    <td class="py-4 px-6 font-bold text-slate-800">
+                                        {{ $feedback['customer_name'] }}
+                                    </td>
+                                    <td class="py-4 px-4 text-xs">
+                                        <div class="grid grid-cols-2 gap-x-4 gap-y-1 text-[11px]">
+                                            <div>🍔 Quality: <span class="font-extrabold text-indigo-600">{{ $feedback['ratings']['food_quality'] }}</span>/5</div>
+                                            <div>🧹 Clean: <span class="font-extrabold text-emerald-600">{{ $feedback['ratings']['cleanliness'] }}</span>/5</div>
+                                            <div>⚡ Speed: <span class="font-extrabold text-amber-600">{{ $feedback['ratings']['service_speed'] }}</span>/5</div>
+                                            <div>💰 Value: <span class="font-extrabold text-rose-600">{{ $feedback['ratings']['price_value'] }}</span>/5</div>
+                                        </div>
+                                        <div class="mt-1.5 flex items-center gap-1">
+                                            <span class="text-yellow-400 text-xs">★</span>
+                                            <span class="font-bold text-slate-700">Average: {{ $feedback['ratings']['average'] }}/5</span>
+                                        </div>
+                                    </td>
+                                    <td class="py-4 px-4 text-xs italic text-slate-600 max-w-[300px] whitespace-normal leading-relaxed">
+                                        "{{ $feedback['comment'] ?? 'No written comment left.' }}"
+                                    </td>
+                                    <td class="py-4 px-6 text-right text-xs text-slate-400 font-medium">
+                                        {{ $feedback['submitted_at'] }}
+                                    </td>
+                                </tr>
+                            @empty
+                                <tr>
+                                    <td colspan="4" class="py-10 text-center text-slate-400 text-xs font-semibold">
+                                        No customer feedback remarks found.
+                                    </td>
+                                </tr>
+                            @endforelse
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+        </div> <!-- End of tabContent-analytics -->
 
         <!-- System Diagnostics & Logging Console -->
         <div class="mt-12 bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden" id="system-diagnostics-console">
@@ -947,7 +1216,38 @@
 
     <!-- Chart.js Initialization -->
     <script>
+        // Global tab switching functionality
+        function switchTab(tab) {
+            const opBtn = document.getElementById('tabBtn-operations');
+            const anBtn = document.getElementById('tabBtn-analytics');
+            const opContent = document.getElementById('tabContent-operations');
+            const anContent = document.getElementById('tabContent-analytics');
+
+            if (!opBtn || !anBtn || !opContent || !anContent) return;
+
+            if (tab === 'operations') {
+                opBtn.classList.add('border-b-2', 'border-indigo-600', 'text-indigo-600');
+                opBtn.classList.remove('border-transparent', 'text-slate-500');
+                anBtn.classList.remove('border-b-2', 'border-indigo-600', 'text-indigo-600');
+                anBtn.classList.add('border-transparent', 'text-slate-500');
+
+                opContent.classList.remove('hidden');
+                anContent.classList.add('hidden');
+            } else {
+                anBtn.classList.add('border-b-2', 'border-indigo-600', 'text-indigo-600');
+                anBtn.classList.remove('border-transparent', 'text-slate-500');
+                opBtn.classList.remove('border-b-2', 'border-indigo-600', 'text-indigo-600');
+                opBtn.classList.add('border-transparent', 'text-slate-500');
+
+                anContent.classList.remove('hidden');
+                opContent.classList.add('hidden');
+            }
+        }
+
         document.addEventListener("DOMContentLoaded", function() {
+            // Re-render / make sure correct default tab is set
+            switchTab('operations');
+
             const ctx = document.getElementById('weeklySalesChart').getContext('2d');
             
             // Weekly sales data passed dynamically from Laravel
@@ -1013,6 +1313,252 @@
                                     family: 'Plus Jakarta Sans',
                                     weight: '600',
                                     size: 11
+                                }
+                            }
+                        }
+                    }
+                }
+            });
+
+            // 1. Sales & Orders Dual Chart
+            const salesAndOrdersCtx = document.getElementById('salesAndOrdersChart').getContext('2d');
+            new Chart(salesAndOrdersCtx, {
+                type: 'bar',
+                data: {
+                    labels: labels,
+                    datasets: [
+                        {
+                            label: 'Revenue (GH₵)',
+                            data: values,
+                            type: 'line',
+                            borderColor: '#4f46e5',
+                            backgroundColor: 'rgba(79, 70, 229, 0.05)',
+                            borderWidth: 3,
+                            tension: 0.3,
+                            yAxisID: 'y'
+                        },
+                        {
+                            label: 'Orders Processed',
+                            data: salesData.map(item => item.order_count),
+                            type: 'bar',
+                            backgroundColor: 'rgba(16, 185, 129, 0.6)',
+                            borderColor: '#10b981',
+                            borderWidth: 1.5,
+                            borderRadius: 6,
+                            yAxisID: 'y1'
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            display: true,
+                            position: 'top',
+                            labels: {
+                                font: {
+                                    family: 'Plus Jakarta Sans',
+                                    size: 10,
+                                    weight: 'bold'
+                                }
+                            }
+                        }
+                    },
+                    scales: {
+                        y: {
+                            type: 'linear',
+                            display: true,
+                            position: 'left',
+                            beginAtZero: true,
+                            title: {
+                                display: true,
+                                text: 'Revenue (GH₵)',
+                                font: { family: 'Plus Jakarta Sans', size: 10, weight: 'bold' }
+                            },
+                            ticks: {
+                                font: { family: 'JetBrains Mono', size: 9 }
+                            }
+                        },
+                        y1: {
+                            type: 'linear',
+                            display: true,
+                            position: 'right',
+                            beginAtZero: true,
+                            grid: {
+                                drawOnChartArea: false
+                            },
+                            title: {
+                                display: true,
+                                text: 'Orders Count',
+                                font: { family: 'Plus Jakarta Sans', size: 10, weight: 'bold' }
+                            },
+                            ticks: {
+                                stepSize: 1,
+                                font: { family: 'JetBrains Mono', size: 9 }
+                            }
+                        }
+                    }
+                }
+            });
+
+            // 2. Popular Food Items Doughnut Chart
+            const topItemsData = @json($topPerformingItems);
+            if (topItemsData.length > 0) {
+                const popularCtx = document.getElementById('popularItemsChart').getContext('2d');
+                const popularLabels = topItemsData.slice(0, 5).map(item => item.food_name);
+                const popularValues = topItemsData.slice(0, 5).map(item => parseInt(item.total_quantity));
+                
+                new Chart(popularCtx, {
+                    type: 'doughnut',
+                    data: {
+                        labels: popularLabels,
+                        datasets: [{
+                            data: popularValues,
+                            backgroundColor: [
+                                '#4f46e5',
+                                '#10b981',
+                                '#f59e0b',
+                                '#ef4444',
+                                '#8b5cf6'
+                            ],
+                            borderWidth: 2,
+                            borderColor: '#ffffff'
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: {
+                            legend: {
+                                display: true,
+                                position: 'right',
+                                labels: {
+                                    font: {
+                                        family: 'Plus Jakarta Sans',
+                                        size: 10,
+                                        weight: '600'
+                                    },
+                                    boxWidth: 12
+                                }
+                            }
+                        },
+                        cutout: '65%'
+                    }
+                });
+            }
+
+            // 3. Customer Feedback Radar Chart
+            const totalFeedbackCount = {{ $metrics['rating_metrics']['total_feedback_count'] ?? 0 }};
+            if (totalFeedbackCount > 0) {
+                const feedbackCtx = document.getElementById('feedbackDimensionsChart').getContext('2d');
+                new Chart(feedbackCtx, {
+                    type: 'radar',
+                    data: {
+                        labels: ['Food Quality', 'Cleanliness', 'Service Speed', 'Value for Money'],
+                        datasets: [{
+                            label: 'Average Score',
+                            data: [
+                                {{ $metrics['rating_metrics']['average_food_quality'] ?? 0 }},
+                                {{ $metrics['rating_metrics']['average_cleanliness'] ?? 0 }},
+                                {{ $metrics['rating_metrics']['average_service_speed'] ?? 0 }},
+                                {{ $metrics['rating_metrics']['average_price_value'] ?? 0 }}
+                            ],
+                            backgroundColor: 'rgba(79, 70, 229, 0.2)',
+                            borderColor: '#4f46e5',
+                            borderWidth: 2,
+                            pointBackgroundColor: '#4f46e5',
+                            pointHoverBackgroundColor: '#10b981'
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: {
+                            legend: {
+                                display: false
+                            }
+                        },
+                        scales: {
+                            r: {
+                                angleLines: {
+                                    display: true
+                                },
+                                suggestedMin: 0,
+                                suggestedMax: 5,
+                                ticks: {
+                                    stepSize: 1,
+                                    font: { family: 'JetBrains Mono', size: 9 }
+                                },
+                                pointLabels: {
+                                    font: {
+                                        family: 'Plus Jakarta Sans',
+                                        size: 10,
+                                        weight: 'bold'
+                                    }
+                                }
+                            }
+                        }
+                    }
+                });
+            }
+
+            // 4. Fulfillment Status Breakdown Chart
+            const statusBreakdown = @json($metrics['order_metrics']['status_breakdown']);
+            const fulfillmentCtx = document.getElementById('fulfillmentStatusChart').getContext('2d');
+            
+            new Chart(fulfillmentCtx, {
+                type: 'bar',
+                data: {
+                    labels: ['Pending', 'Preparing', 'Ready', 'Completed', 'Declined'],
+                    datasets: [{
+                        data: [
+                            (statusBreakdown['PENDING'] || 0) + (statusBreakdown['ORDER_PLACED'] || 0),
+                            statusBreakdown['PREPARING'] || 0,
+                            statusBreakdown['READY'] || 0,
+                            statusBreakdown['COMPLETED'] || 0,
+                            statusBreakdown['DECLINED'] || 0
+                        ],
+                        backgroundColor: [
+                            '#f59e0b',
+                            '#3b82f6',
+                            '#10b981',
+                            '#64748b',
+                            '#ef4444'
+                        ],
+                        borderRadius: 6,
+                        borderWidth: 0
+                    }]
+                },
+                options: {
+                    indexAxis: 'y',
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            display: false
+                        }
+                    },
+                    scales: {
+                        x: {
+                            beginAtZero: true,
+                            grid: {
+                                color: 'rgba(241, 245, 249, 1)'
+                            },
+                            ticks: {
+                                stepSize: 1,
+                                font: { family: 'JetBrains Mono', size: 9 }
+                            }
+                        },
+                        y: {
+                            grid: {
+                                display: false
+                            },
+                            ticks: {
+                                font: {
+                                    family: 'Plus Jakarta Sans',
+                                    weight: 'bold',
+                                    size: 10
                                 }
                             }
                         }

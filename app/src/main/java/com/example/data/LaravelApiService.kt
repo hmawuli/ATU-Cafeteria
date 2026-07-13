@@ -98,7 +98,9 @@ data class LaravelOrder(
     val order_timestamp: Long,
     val status: String,
     val pickup_pin: String,
-    val estimated_pickup_time: String
+    val estimated_pickup_time: String,
+    val points_redeemed: Int? = 0,
+    val discount_applied: Double? = 0.0
 )
 
 @JsonClass(generateAdapter = true)
@@ -109,7 +111,9 @@ data class LaravelAddOrderRequest(
     val food_name: String,
     val quantity: Int,
     val unit_price: Double,
-    val total_price: Double
+    val total_price: Double,
+    val points_to_redeem: Int? = 0,
+    val estimated_pickup_time: String? = null
 )
 
 @JsonClass(generateAdapter = true)
@@ -142,6 +146,7 @@ data class LaravelFeedback(
     val rating_service_speed: Int,
     val rating_price_value: Int,
     val comment: String?,
+    val vendor_reply: String? = null,
     val timestamp: Long
 )
 
@@ -155,6 +160,11 @@ data class LaravelAddFeedbackRequest(
     val speed: Int,
     val value: Int,
     val comment: String
+)
+
+@JsonClass(generateAdapter = true)
+data class LaravelFeedbackReplyRequest(
+    val vendor_reply: String
 )
 
 @JsonClass(generateAdapter = true)
@@ -459,6 +469,12 @@ data class LaravelBulkUpdateResponse(
 )
 
 @JsonClass(generateAdapter = true)
+data class LaravelBulkToggleRequest(
+    val ids: List<Int>,
+    val is_available: Boolean
+)
+
+@JsonClass(generateAdapter = true)
 data class LaravelGeminiInsightResponse(
     val success: Boolean,
     val vendor_id: Int,
@@ -524,6 +540,9 @@ interface LaravelApiService {
     @POST("api/orders")
     suspend fun createOrder(@Body request: LaravelAddOrderRequest): LaravelOrder
 
+    @POST("api/orders/{id}/cancel")
+    suspend fun cancelOrder(@Path("id") id: Int): LaravelOrder
+
     @PUT("api/orders/{id}/status")
     suspend fun updateOrderStatus(@Path("id") id: Int, @Body request: LaravelUpdateOrderStatusRequest): LaravelOrder
 
@@ -538,6 +557,9 @@ interface LaravelApiService {
 
     @POST("api/feedback")
     suspend fun createFeedback(@Body request: LaravelAddFeedbackRequest): LaravelFeedback
+
+    @POST("api/feedback/{id}/reply")
+    suspend fun replyToFeedback(@Path("id") feedbackId: Int, @Body request: LaravelFeedbackReplyRequest): LaravelFeedback
 
     @GET("api/food-items/feedback")
     suspend fun getAllFoodFeedback(): List<LaravelFoodItemFeedback>
@@ -609,6 +631,9 @@ interface LaravelApiService {
 
     @POST("api/vendor/menu/bulk-update")
     suspend fun bulkUpdateMenu(@Body request: List<LaravelBulkUpdateItem>): LaravelBulkUpdateResponse
+
+    @POST("api/food-items/bulk-toggle")
+    suspend fun bulkToggleFoodItems(@Body request: LaravelBulkToggleRequest): LaravelGeneralResponse
 
     @POST("api/user/profile")
     suspend fun updateProfile(@Body request: LaravelUpdateProfileRequest): LaravelGeneralResponse
@@ -717,7 +742,9 @@ object LaravelClientManager {
             orderTimestamp = l.order_timestamp,
             status = l.status,
             pickupPin = l.pickup_pin,
-            estimatedPickupTime = l.estimated_pickup_time
+            estimatedPickupTime = l.estimated_pickup_time,
+            pointsRedeemed = l.points_redeemed ?: 0,
+            discountApplied = l.discount_applied ?: 0.0
         )
     }
 
@@ -732,6 +759,7 @@ object LaravelClientManager {
             ratingServiceSpeed = l.rating_service_speed,
             ratingPriceValue = l.rating_price_value,
             comment = l.comment ?: "",
+            vendorReply = l.vendor_reply,
             timestamp = l.timestamp
         )
     }

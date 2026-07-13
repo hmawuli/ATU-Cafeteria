@@ -25,7 +25,9 @@ data class User(
     val logoUrl: String? = null,
     val pictureUrl: String? = null,
     val email: String? = null,
-    val paymentMethods: String? = null
+    val paymentMethods: String? = null,
+    @Json(name = "loyalty_points") val loyaltyPoints: Int = 0,
+    @Json(name = "total_spent") val totalSpent: Double = 0.0
 )
 
 @Entity(
@@ -80,7 +82,9 @@ data class Order(
     val orderTimestamp: Long = System.currentTimeMillis(),
     val status: String = "PENDING", // "PENDING", "PREPARING", "READY", "COMPLETED", "DECLINED"
     val pickupPin: String, // Secure 4-digit PIN generated to substantiate custody hand-off
-    val estimatedPickupTime: String = "Calculating..."
+    val estimatedPickupTime: String = "Calculating...",
+    @Json(name = "points_redeemed") val pointsRedeemed: Int = 0,
+    @Json(name = "discount_applied") val discountApplied: Double = 0.0
 )
 
 @Entity(
@@ -105,6 +109,7 @@ data class Feedback(
     val ratingServiceSpeed: Int, // 1 to 5
     val ratingPriceValue: Int, // 1 to 5
     val comment: String,
+    val vendorReply: String? = null,
     val timestamp: Long = System.currentTimeMillis()
 )
 

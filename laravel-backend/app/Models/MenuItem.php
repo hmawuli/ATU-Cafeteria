@@ -20,6 +20,9 @@ class MenuItem extends Model
         'description',
         'category',
         'is_available',
+        'initial_stock',
+        'current_stock',
+        'low_stock_threshold',
     ];
 
     protected static function boot()
@@ -39,6 +42,9 @@ class MenuItem extends Model
         'vendor_id' => 'integer',
         'price' => 'double',
         'is_available' => 'boolean',
+        'initial_stock' => 'integer',
+        'current_stock' => 'integer',
+        'low_stock_threshold' => 'integer',
     ];
 
     /**

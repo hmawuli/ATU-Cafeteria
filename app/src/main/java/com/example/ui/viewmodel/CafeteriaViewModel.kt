@@ -180,7 +180,7 @@ class CafeteriaViewModel(application: Application) : AndroidViewModel(applicatio
         return _cart.value.sumOf { it.foodItem.price * it.quantity }
     }
 
-    fun checkoutCart(useWallet: Boolean = true, onComplete: (Boolean) -> Unit) {
+    fun checkoutCart(useWallet: Boolean = true, estimatedPickupTime: String = "Calculating...", onComplete: (Boolean) -> Unit) {
         viewModelScope.launch {
             val user = _currentUser.value
             if (user == null || _cart.value.isEmpty()) {
@@ -198,7 +198,7 @@ class CafeteriaViewModel(application: Application) : AndroidViewModel(applicatio
                     val securePin = (1000..9999).random().toString()
                     
                     for (item in _cart.value) {
-                        repository.placeOrder(user.id, item.foodItem, item.quantity)
+                        repository.placeOrder(user.id, item.foodItem, item.quantity, 0, estimatedPickupTime)
                         // Credit the vendor for their earnings
                         val vendRef = "EARN-" + (100000..999999).random()
                         val itemPrice = item.foodItem.price * item.quantity
@@ -218,7 +218,7 @@ class CafeteriaViewModel(application: Application) : AndroidViewModel(applicatio
                 }
             } else {
                 for (item in _cart.value) {
-                    repository.placeOrder(user.id, item.foodItem, item.quantity)
+                    repository.placeOrder(user.id, item.foodItem, item.quantity, 0, estimatedPickupTime)
                 }
                 repository.insertAuditLog(user.id, "POD_ORDER", "Cart orders generated under Pay-on-Delivery protocol.")
                 clearCart()
@@ -359,6 +359,12 @@ class CafeteriaViewModel(application: Application) : AndroidViewModel(applicatio
     private val _isAnalyzingHistoricalOrders = MutableStateFlow(false)
     val isAnalyzingHistoricalOrders: StateFlow<Boolean> = _isAnalyzingHistoricalOrders.asStateFlow()
 
+    private val _vendorDemandForecast = MutableStateFlow<String?>(null)
+    val vendorDemandForecast: StateFlow<String?> = _vendorDemandForecast.asStateFlow()
+
+    private val _isGeneratingDemandForecast = MutableStateFlow(false)
+    val isGeneratingDemandForecast: StateFlow<Boolean> = _isGeneratingDemandForecast.asStateFlow()
+
     // 5. In-App Real-time Order Notifications
     private val _newOrderAlerts = MutableStateFlow<List<Order>>(emptyList())
     val newOrderAlerts: StateFlow<List<Order>> = _newOrderAlerts.asStateFlow()
@@ -408,6 +414,9 @@ class CafeteriaViewModel(application: Application) : AndroidViewModel(applicatio
     // Laravel SMTP Mail & FCM Push Channels Prefs & Logs
     val isEmailNotificationEnabled = MutableStateFlow(true)
     val isPushNotificationEnabled = MutableStateFlow(true)
+    val isOrderConfirmationNotificationEnabled = MutableStateFlow(true)
+    val isOrderStatusChangeNotificationEnabled = MutableStateFlow(true)
+    val isPromotionalAlertsNotificationEnabled = MutableStateFlow(true)
     val isWeeklyVendorReportEnabled = MutableStateFlow(true)
 
     private val _lastWeeklyReportTimestamp = MutableStateFlow<Long?>(null)
@@ -670,6 +679,17 @@ class CafeteriaViewModel(application: Application) : AndroidViewModel(applicatio
                                     body = "Vendor $vendorName is now preparing your '$itemName'! Estimated: ${order.estimatedPickupTime}."
                                 )
                                 _dispatchedPushNotifications.value = _dispatchedPushNotifications.value + pushNotif
+                                try {
+                                    val context = getApplication<android.app.Application>().applicationContext
+                                    com.example.ui.util.NotificationHelper.sendOrderStatusNotification(
+                                        context = context,
+                                        orderId = order.id,
+                                        title = "Order is Being Prepared!",
+                                        text = "Vendor $vendorName is now preparing your '$itemName'!"
+                                    )
+                                } catch (e: Exception) {
+                                    e.printStackTrace()
+                                }
                             }
                         }
 
@@ -712,6 +732,17 @@ class CafeteriaViewModel(application: Application) : AndroidViewModel(applicatio
                                     body = "Your food '$itemName' from $vendorName is hot & ready! Use Ticket Pin: $pPin."
                                 )
                                 _dispatchedPushNotifications.value = _dispatchedPushNotifications.value + pushNotif
+                                try {
+                                    val context = getApplication<android.app.Application>().applicationContext
+                                    com.example.ui.util.NotificationHelper.sendOrderStatusNotification(
+                                        context = context,
+                                        orderId = order.id,
+                                        title = "Order Ready for Pickup!",
+                                        text = "Your food '$itemName' from $vendorName is hot & ready! Use Ticket Pin: $pPin."
+                                    )
+                                } catch (e: Exception) {
+                                    e.printStackTrace()
+                                }
                             }
                         }
 
@@ -753,6 +784,17 @@ class CafeteriaViewModel(application: Application) : AndroidViewModel(applicatio
                                     body = "Your order of '$itemName' has been marked Delivered. Tap here to rate $vendorName now!"
                                 )
                                 _dispatchedPushNotifications.value = _dispatchedPushNotifications.value + pushNotif
+                                try {
+                                    val context = getApplication<android.app.Application>().applicationContext
+                                    com.example.ui.util.NotificationHelper.sendOrderStatusNotification(
+                                        context = context,
+                                        orderId = order.id,
+                                        title = "Order Delivered!",
+                                        text = "Your order of '$itemName' has been marked Delivered."
+                                    )
+                                } catch (e: Exception) {
+                                    e.printStackTrace()
+                                }
                             }
                         }
                     }
@@ -1327,19 +1369,21 @@ class CafeteriaViewModel(application: Application) : AndroidViewModel(applicatio
         }
     }
 
-    fun placeOrder(foodItem: FoodItem, quantity: Int, useWallet: Boolean = false, onComplete: (Boolean) -> Unit) {
+    fun placeOrder(foodItem: FoodItem, quantity: Int, useWallet: Boolean = false, pointsToRedeem: Int = 0, estimatedPickupTime: String = "Calculating...", onComplete: (Boolean) -> Unit) {
         viewModelScope.launch {
             val user = _currentUser.value
             if (user == null) {
                 onComplete(false)
                 return@launch
             }
-            val requiredSum = foodItem.price * quantity
+            val originalSum = foodItem.price * quantity
+            val discount = pointsToRedeem * 0.10
+            val requiredSum = (originalSum - discount).coerceAtLeast(0.0)
             if (useWallet) {
                 if (user.balance >= requiredSum) {
                     val ref = "ORD-" + (100000..999999).random()
-                    repository.insertWalletTransaction(user.id, "PAYMENT", -requiredSum, ref, "Secure Pre-order payment: ${foodItem.name} (QTY: $quantity)")
-                    repository.placeOrder(user.id, foodItem, quantity)
+                    repository.insertWalletTransaction(user.id, "PAYMENT", -requiredSum, ref, "Secure Pre-order payment: ${foodItem.name} (QTY: $quantity)" + (if (pointsToRedeem > 0) " (Loyalty Discount applied)" else ""))
+                    repository.placeOrder(user.id, foodItem, quantity, pointsToRedeem, estimatedPickupTime)
                     repository.insertAuditLog(user.id, "WALLET_PAYMENT", "Debited GH₵ ${"%.2f".format(requiredSum)} for secure pickup.")
                     
                     // Credit the vendor for their earnings
@@ -1358,8 +1402,8 @@ class CafeteriaViewModel(application: Application) : AndroidViewModel(applicatio
                     onComplete(false)
                 }
             } else {
-                repository.placeOrder(user.id, foodItem, quantity)
-                repository.insertAuditLog(user.id, "POD_ORDER", "Order generated under Pay-on-Delivery protocol.")
+                repository.placeOrder(user.id, foodItem, quantity, pointsToRedeem, estimatedPickupTime)
+                repository.insertAuditLog(user.id, "POD_ORDER", "Order generated under Pay-on-Delivery protocol." + (if (pointsToRedeem > 0) " Loyalty points applied offline." else ""))
                 onComplete(true)
             }
         }
@@ -1467,6 +1511,22 @@ class CafeteriaViewModel(application: Application) : AndroidViewModel(applicatio
         viewModelScope.launch {
             val updated = item.copy(isAvailable = isAvailable)
             repository.updateMenuFoodItem(updated)
+        }
+    }
+
+    fun bulkToggleFoodItems(ids: List<Int>, isAvailable: Boolean, onComplete: () -> Unit) {
+        viewModelScope.launch {
+            repository.bulkToggleFoodItems(ids, isAvailable)
+            repository.syncAllFromLaravel()
+            onComplete()
+        }
+    }
+
+    fun replyToFeedback(feedbackId: Int, reply: String, onComplete: () -> Unit) {
+        viewModelScope.launch {
+            repository.replyToFeedback(feedbackId, reply)
+            repository.syncAllFromLaravel()
+            onComplete()
         }
     }
 
@@ -1627,6 +1687,21 @@ class CafeteriaViewModel(application: Application) : AndroidViewModel(applicatio
         }
     }
 
+    fun studentCancelOrder(orderId: Int) {
+        viewModelScope.launch {
+            val student = _currentUser.value ?: return@launch
+            try {
+                repository.studentCancelOrder(student.id, orderId)
+                val refreshed = repository.userDao.getUserSync(student.id)
+                if (refreshed != null) {
+                    _currentUser.value = refreshed
+                }
+            } catch (e: Exception) {
+                Log.e("CafeteriaViewModel", "Failed to cancel order as student", e)
+            }
+        }
+    }
+
     fun verifySecurePickup(orderId: Int, inputPin: String, onResult: (Boolean) -> Unit) {
         viewModelScope.launch {
             val vendor = _currentUser.value ?: return@launch
@@ -1777,6 +1852,23 @@ class CafeteriaViewModel(application: Application) : AndroidViewModel(applicatio
                 )
             }
             _isAnalyzingHistoricalOrders.value = false
+        }
+    }
+
+    fun runVendorDemandForecast(vendorId: Int, vendorName: String, allOrders: List<Order>, allFoodItems: List<FoodItem>) {
+        viewModelScope.launch {
+            _isGeneratingDemandForecast.value = true
+            _vendorDemandForecast.value = null
+
+            val filteredOrders = allOrders.filter { it.vendorId == vendorId }
+            val filteredFoodItems = allFoodItems.filter { it.vendorId == vendorId }
+
+            _vendorDemandForecast.value = geminiRepository.generateDailyDemandForecast(
+                vendorName = vendorName,
+                orders = filteredOrders,
+                menuItems = filteredFoodItems
+            )
+            _isGeneratingDemandForecast.value = false
         }
     }
 
@@ -1955,6 +2047,59 @@ class CafeteriaViewModel(application: Application) : AndroidViewModel(applicatio
 
                     onResult(true, "CSV Download success! Saved to Downloads: ${file.name}")
                 }
+            } catch (e: Exception) {
+                e.printStackTrace()
+                onResult(false, "Export Error: ${e.localizedMessage}")
+            }
+        }
+    }
+
+    fun exportDailyOrderLogsToCSV(
+        vendorId: Int,
+        orders: List<com.example.data.Order>,
+        onResult: (Boolean, String) -> Unit
+    ) {
+        viewModelScope.launch {
+            try {
+                val context = getApplication<Application>().applicationContext
+                val directory = context.getExternalFilesDir(android.os.Environment.DIRECTORY_DOWNLOADS)
+                if (directory == null || (!directory.exists() && !directory.mkdirs())) {
+                    onResult(false, "Failed to access download folder.")
+                    return@launch
+                }
+
+                val timestamp = System.currentTimeMillis()
+                val filename = "Daily_Order_Logs_Vendor_${vendorId}_$timestamp.csv"
+                val file = java.io.File(directory, filename)
+                val writer = java.io.FileWriter(file)
+
+                // CSV Header
+                writer.append("Order ID,Student ID,Food Item Name,Quantity,Unit Price (GH₵),Total Price (GH₵),Redeemed Points,Discount (GH₵),Status,Time,PIN\n")
+
+                // Filter vendor's orders
+                val vendorOrders = orders.filter { it.vendorId == vendorId }.sortedByDescending { it.orderTimestamp }
+                
+                val sdf = java.text.SimpleDateFormat("yyyy-MM-dd HH:mm:ss", java.util.Locale.US)
+                
+                for (order in vendorOrders) {
+                    val dateStr = sdf.format(java.util.Date(order.orderTimestamp))
+                    writer.append("${order.id},")
+                    writer.append("${order.customerId},")
+                    writer.append("\"${order.foodName.replace("\"", "\"\"")}\",")
+                    writer.append("${order.quantity},")
+                    writer.append("${order.unitPrice},")
+                    writer.append("${order.totalPrice},")
+                    writer.append("${order.pointsRedeemed},")
+                    writer.append("${order.discountApplied},")
+                    writer.append("${order.status},")
+                    writer.append("$dateStr,")
+                    writer.append("'${order.pickupPin}'\n")
+                }
+
+                writer.flush()
+                writer.close()
+
+                onResult(true, "Successfully exported ${vendorOrders.size} orders to Downloads: ${file.name}")
             } catch (e: Exception) {
                 e.printStackTrace()
                 onResult(false, "Export Error: ${e.localizedMessage}")

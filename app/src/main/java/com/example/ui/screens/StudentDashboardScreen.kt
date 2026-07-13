@@ -1,5 +1,6 @@
 package com.example.ui.screens
 import com.example.ui.util.generatePdfReceipt
+import com.example.ui.util.generatePdfOrderHistoryReport
 
 import androidx.compose.animation.*
 import androidx.compose.animation.core.*
@@ -149,12 +150,13 @@ fun StudentDashboardScreen(
     val isAdminActing by viewModel.isAdminActing.collectAsStateWithLifecycle()
     val redeemedPoints by viewModel.redeemedLoyaltyPoints.collectAsStateWithLifecycle()
     val allOrdersSnapshot by viewModel.allOrdersSnapshot.collectAsStateWithLifecycle()
+    val auditLogs by viewModel.auditLogs.collectAsStateWithLifecycle()
     val currentTotalPoints = remember(studentOrders) {
         studentOrders.sumOf { order ->
             if (order.status.uppercase() == "COMPLETED") 25 else 10
         }
     }
-    val availablePoints = currentTotalPoints - redeemedPoints
+    val availablePoints = currentUser?.loyaltyPoints ?: (currentTotalPoints - redeemedPoints)
 
     val acknowledgedOrders = remember { mutableStateListOf<Int>() }
     var showQrForOrder by remember { mutableStateOf<Order?>(null) }
@@ -193,6 +195,7 @@ fun StudentDashboardScreen(
     var orderQuantity by remember { mutableIntStateOf(1) }
     var payViaWallet by remember { mutableStateOf(false) }
     var orderPlacementError by remember { mutableStateOf<String?>(null) }
+    var redeemLoyaltyPointsChecked by remember { mutableStateOf(false) }
 
     var showSubmissionConfirmation by remember { mutableStateOf(false) }
     var submissionConfirmFood by remember { mutableStateOf<FoodItem?>(null) }
@@ -264,6 +267,38 @@ fun StudentDashboardScreen(
     var searchQuery by remember { mutableStateOf("") }
     var selectedCategory by remember { mutableStateOf("All") }
     val categories = listOf("All", "Breakfast", "Local Dish", "Fast Food", "Drinks", "Snacks")
+    var selectedDietaryFilter by remember { mutableStateOf("All") }
+    var showCartCheckoutDialog by remember { mutableStateOf(false) }
+
+    // Real-time order status tracking via polling
+    LaunchedEffect(currentUser) {
+        if (currentUser != null) {
+            while (true) {
+                delay(8000) // Poll every 8 seconds
+                if (isOnline) {
+                    viewModel.syncAllFromLaravel { }
+                }
+            }
+        }
+    }
+
+    val trackingContext = androidx.compose.ui.platform.LocalContext.current
+    var previousStatuses by remember { mutableStateOf<Map<Int, String>>(emptyMap()) }
+    LaunchedEffect(studentOrders) {
+        if (previousStatuses.isNotEmpty()) {
+            studentOrders.forEach { order ->
+                val prevStatus = previousStatuses[order.id]
+                if (prevStatus == "PREPARING" && order.status == "READY") {
+                    android.widget.Toast.makeText(
+                        trackingContext,
+                        "Your order of ${order.foodName} is ready for pickup!",
+                        android.widget.Toast.LENGTH_LONG
+                    ).show()
+                }
+            }
+        }
+        previousStatuses = studentOrders.associate { it.id to it.status }
+    }
 
     Scaffold(
         topBar = {
@@ -302,7 +337,12 @@ fun StudentDashboardScreen(
                                 .padding(horizontal = 8.dp, vertical = 4.dp)
                         ) {
                             Row(verticalAlignment = Alignment.CenterVertically) {
-                                Text("⭐", fontSize = 10.sp)
+                                val tierEmojiHeader = when {
+                                    availablePoints < 100 -> "🥉"
+                                    availablePoints < 300 -> "🥈"
+                                    else -> "🥇"
+                                }
+                                Text("$tierEmojiHeader ⭐", fontSize = 10.sp)
                                 Spacer(modifier = Modifier.width(3.dp))
                                 Text(
                                     text = "$availablePoints pts",
@@ -315,6 +355,31 @@ fun StudentDashboardScreen(
                     }
                 },
                 actions = {
+                    val cartCountVal by viewModel.cartCount.collectAsStateWithLifecycle()
+                    IconButton(
+                        onClick = { showCartCheckoutDialog = true },
+                        modifier = Modifier.testTag("student_top_cart_button")
+                    ) {
+                        BadgedBox(
+                            badge = {
+                                if (cartCountVal > 0) {
+                                    Badge(
+                                        containerColor = MaterialTheme.colorScheme.tertiary,
+                                        contentColor = MaterialTheme.colorScheme.onTertiary
+                                    ) {
+                                        Text(cartCountVal.toString(), fontSize = 9.sp, fontWeight = FontWeight.Bold)
+                                    }
+                                }
+                            }
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.ShoppingCart,
+                                contentDescription = "View Shopping Cart",
+                                tint = Color.White
+                            )
+                        }
+                    }
+
                     if (LaravelClientManager.isLaravelEnabled) {
                         val unreadCount = studentNotifications.count { it.read_at == null }
                         IconButton(onClick = { showNotificationCenter = true }) {
@@ -901,6 +966,103 @@ fun StudentDashboardScreen(
                                 }
 
                                 item {
+                                    val completedOrdersForPoints = studentOrders.filter { it.status.uppercase() == "COMPLETED" || it.status.uppercase() == "DELIVERED" }
+                                    
+                                    Card(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .testTag("loyalty_points_dashboard_card"),
+                                        shape = RoundedCornerShape(16.dp),
+                                        colors = CardDefaults.cardColors(
+                                            containerColor = MaterialTheme.colorScheme.tertiaryContainer.copy(alpha = 0.15f)
+                                        ),
+                                        border = BorderStroke(1.dp, MaterialTheme.colorScheme.tertiary.copy(alpha = 0.3f))
+                                    ) {
+                                        Column(modifier = Modifier.padding(16.dp)) {
+                                            Row(
+                                                modifier = Modifier.fillMaxWidth(),
+                                                horizontalArrangement = Arrangement.SpaceBetween,
+                                                verticalAlignment = Alignment.CenterVertically
+                                            ) {
+                                                Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.weight(1f)) {
+                                                    Text("⭐", fontSize = 22.sp)
+                                                    Spacer(modifier = Modifier.width(8.dp))
+                                                    Column {
+                                                        Text(
+                                                            text = "Loyalty Rewards Club",
+                                                            fontWeight = FontWeight.Bold,
+                                                            style = MaterialTheme.typography.titleMedium,
+                                                            color = MaterialTheme.colorScheme.onTertiaryContainer
+                                                        )
+                                                        Text(
+                                                            text = "Calculated from completed orders",
+                                                            fontSize = 10.sp,
+                                                            color = MaterialTheme.colorScheme.onTertiaryContainer.copy(alpha = 0.7f)
+                                                        )
+                                                    }
+                                                }
+                                                Box(
+                                                    modifier = Modifier
+                                                        .clip(RoundedCornerShape(8.dp))
+                                                        .background(MaterialTheme.colorScheme.tertiary)
+                                                        .padding(horizontal = 10.dp, vertical = 6.dp)
+                                                ) {
+                                                    Text(
+                                                        text = "${currentUser?.loyaltyPoints ?: 0} PTS",
+                                                        fontWeight = FontWeight.ExtraBold,
+                                                        fontSize = 14.sp,
+                                                        color = MaterialTheme.colorScheme.onTertiary
+                                                    )
+                                                }
+                                            }
+
+                                            Spacer(modifier = Modifier.height(12.dp))
+                                            HorizontalDivider(color = MaterialTheme.colorScheme.tertiary.copy(alpha = 0.2f), thickness = 1.dp)
+                                            Spacer(modifier = Modifier.height(8.dp))
+
+                                            Text(
+                                                text = "Recent Points Ledger:",
+                                                fontWeight = FontWeight.Bold,
+                                                fontSize = 11.sp,
+                                                color = MaterialTheme.colorScheme.onSurface
+                                            )
+
+                                            if (completedOrdersForPoints.isEmpty()) {
+                                                Text(
+                                                    text = "No recent completed orders yet. Complete orders to earn 25 PTS each!",
+                                                    fontSize = 10.sp,
+                                                    fontStyle = androidx.compose.ui.text.font.FontStyle.Italic,
+                                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                                    modifier = Modifier.padding(vertical = 4.dp)
+                                                )
+                                            } else {
+                                                Column(verticalArrangement = Arrangement.spacedBy(4.dp), modifier = Modifier.padding(top = 4.dp)) {
+                                                    completedOrdersForPoints.take(3).forEach { o ->
+                                                        Row(
+                                                            modifier = Modifier.fillMaxWidth(),
+                                                            horizontalArrangement = Arrangement.SpaceBetween,
+                                                            verticalAlignment = Alignment.CenterVertically
+                                                        ) {
+                                                            Text(
+                                                                text = "• ${o.foodName} (Order #${o.id})",
+                                                                fontSize = 10.sp,
+                                                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                                                            )
+                                                            Text(
+                                                                text = "+25 PTS",
+                                                                fontSize = 10.sp,
+                                                                fontWeight = FontWeight.Bold,
+                                                                color = Color(0xFF2E7D32)
+                                                            )
+                                                        }
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+
+                                item {
                             Card(
                                 colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer),
                                 modifier = Modifier.fillMaxWidth()
@@ -1250,7 +1412,7 @@ fun StudentDashboardScreen(
                                         }
                                     }
                                 },
-                                placeholder = { Text("Search delicious local dishes...") },
+                                placeholder = { Text("Search delicious local dishes or vendor name...") },
                                 label = { Text("Search Campus Menus") },
                                 singleLine = true,
                                 shape = RoundedCornerShape(12.dp),
@@ -1435,6 +1597,38 @@ fun StudentDashboardScreen(
                                             selectedContainerColor = MaterialTheme.colorScheme.secondary,
                                             selectedLabelColor = MaterialTheme.colorScheme.onSecondary
                                         )
+                                    )
+                                }
+                            }
+                        }
+
+                        item {
+                            // Dietary Preference Horizontal Chips
+                            Text(
+                                text = "Filter by Dietary Preferences",
+                                style = MaterialTheme.typography.labelSmall,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
+                                modifier = Modifier.padding(top = 4.dp, bottom = 2.dp)
+                            )
+                            LazyRow(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                contentPadding = PaddingValues(vertical = 4.dp)
+                            ) {
+                                val dietaryOptions = listOf("All", "Vegan", "Vegetarian", "Gluten-Free")
+                                items(dietaryOptions) { dietary ->
+                                    val isSelected = selectedDietaryFilter == dietary
+                                    FilterChip(
+                                        selected = isSelected,
+                                        onClick = { selectedDietaryFilter = dietary },
+                                        label = { Text(dietary, fontSize = 11.sp, fontWeight = FontWeight.SemiBold) },
+                                        shape = RoundedCornerShape(16.dp),
+                                        colors = FilterChipDefaults.filterChipColors(
+                                            selectedContainerColor = MaterialTheme.colorScheme.tertiary,
+                                            selectedLabelColor = MaterialTheme.colorScheme.onTertiary
+                                        ),
+                                        modifier = Modifier.testTag("dietary_chip_$dietary")
                                     )
                                 }
                             }
@@ -1702,10 +1896,23 @@ fun StudentDashboardScreen(
                         }
 
                         val filteredFoods = allFoodItems.filter { food ->
-                            food.isAvailable &&
+                            val vendor = allVendors.find { it.id == food.vendorId }
+                            val vendorName = vendor?.fullName ?: ""
+                            val vendorInfo = vendor?.info ?: ""
+                            val matchesDietary = when (selectedDietaryFilter) {
+                                "Vegan" -> food.description.contains("Vegan", ignoreCase = true) || food.name.contains("Vegan", ignoreCase = true) || food.allergens.contains("Vegan", ignoreCase = true)
+                                "Vegetarian" -> food.description.contains("Vegetarian", ignoreCase = true) || food.name.contains("Vegetarian", ignoreCase = true) || food.description.contains("Vegan", ignoreCase = true) || food.allergens.contains("Vegetarian", ignoreCase = true)
+                                "Gluten-Free" -> food.description.contains("Gluten-Free", ignoreCase = true) || food.name.contains("Gluten-Free", ignoreCase = true) || food.allergens.contains("Gluten-Free", ignoreCase = true) || !food.allergens.contains("Wheat", ignoreCase = true)
+                                else -> true
+                            }
+                            matchesDietary &&
                             (selectedVendorIdFilter == null || food.vendorId == selectedVendorIdFilter) &&
                             (selectedCategory == "All" || food.category.equals(selectedCategory, ignoreCase = true)) &&
-                            (searchQuery.isBlank() || food.name.contains(searchQuery, ignoreCase = true) || food.description.contains(searchQuery, ignoreCase = true))
+                            (searchQuery.isBlank() || 
+                             food.name.contains(searchQuery, ignoreCase = true) || 
+                             food.description.contains(searchQuery, ignoreCase = true) ||
+                             vendorName.contains(searchQuery, ignoreCase = true) ||
+                             vendorInfo.contains(searchQuery, ignoreCase = true))
                         }
                         if (filteredFoods.isEmpty()) {
                             item {
@@ -1722,15 +1929,19 @@ fun StudentDashboardScreen(
                             items(filteredFoods) { food ->
                                 val vendor = allVendors.find { it.id == food.vendorId }
                                 val vendorIsOpen = vendor?.isOpen ?: true
+                                val isSoldOut = !food.isAvailable
+                                val isClickable = vendorIsOpen && !isSoldOut
                                 Card(
                                     modifier = Modifier
                                         .fillMaxWidth()
-                                        .bounceClickable(enabled = vendorIsOpen) {
+                                        .bounceClickable(enabled = isClickable) {
                                             orderQuantity = 1
                                             selectedFoodForOrder = food
                                         },
                                     shape = RoundedCornerShape(12.dp),
-                                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
+                                    colors = CardDefaults.cardColors(
+                                        containerColor = if (isSoldOut) MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f) else MaterialTheme.colorScheme.surface
+                                    )
                                 ) {
                                     Column(modifier = Modifier.padding(16.dp)) {
                                         Row(
@@ -1760,7 +1971,6 @@ fun StudentDashboardScreen(
                                                         )
                                                     }
                                                     
-                                                    val vendorIsOpen = vendor?.isOpen ?: true
                                                     if (!vendorIsOpen) {
                                                         Spacer(modifier = Modifier.width(8.dp))
                                                         Box(
@@ -1770,10 +1980,26 @@ fun StudentDashboardScreen(
                                                                 .padding(horizontal = 6.dp, vertical = 2.dp)
                                                         ) {
                                                             Text(
-                                                                text = "CLOSED",
+                                                                 text = "CLOSED",
+                                                                 fontSize = 8.sp,
+                                                                 fontWeight = FontWeight.Bold,
+                                                                 color = MaterialTheme.colorScheme.onErrorContainer
+                                                            )
+                                                        }
+                                                    }
+                                                    if (isSoldOut) {
+                                                        Spacer(modifier = Modifier.width(8.dp))
+                                                        Box(
+                                                            modifier = Modifier
+                                                                .clip(RoundedCornerShape(6.dp))
+                                                                .background(MaterialTheme.colorScheme.error)
+                                                                .padding(horizontal = 6.dp, vertical = 2.dp)
+                                                        ) {
+                                                            Text(
+                                                                text = "SOLD OUT",
                                                                 fontSize = 8.sp,
                                                                 fontWeight = FontWeight.Bold,
-                                                                color = MaterialTheme.colorScheme.onErrorContainer
+                                                                color = Color.White
                                                             )
                                                         }
                                                     }
@@ -2377,6 +2603,25 @@ fun StudentDashboardScreen(
                                                             fontSize = 12.sp,
                                                             color = MaterialTheme.colorScheme.onSecondaryContainer
                                                         )
+                                                        Spacer(modifier = Modifier.height(10.dp))
+                                                        Button(
+                                                            onClick = { viewModel.studentCancelOrder(order.id) },
+                                                            modifier = Modifier.fillMaxWidth().height(36.dp).testTag("student_cancel_order_${order.id}"),
+                                                            colors = ButtonDefaults.buttonColors(
+                                                                containerColor = MaterialTheme.colorScheme.error,
+                                                                contentColor = MaterialTheme.colorScheme.onError
+                                                            ),
+                                                            shape = RoundedCornerShape(8.dp),
+                                                            contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp)
+                                                        ) {
+                                                            Icon(
+                                                                imageVector = Icons.Default.Cancel,
+                                                                contentDescription = "Cancel Order",
+                                                                modifier = Modifier.size(16.dp)
+                                                            )
+                                                            Spacer(modifier = Modifier.width(6.dp))
+                                                            Text("Cancel Order", fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                                                        }
                                                     } else if (order.status == "PREPARING") {
                                                         Text(
                                                             text = "ESTIMATED PICKUP TIME",
@@ -2390,6 +2635,79 @@ fun StudentDashboardScreen(
                                                             fontSize = 13.sp,
                                                             color = MaterialTheme.colorScheme.onSecondaryContainer
                                                         )
+                                                        
+                                                        val avgPrepMin = remember(order.vendorId, auditLogs) {
+                                                            val vendorReadyLogs = auditLogs.filter { 
+                                                                it.action == "ORDER_STATUS_CHANGED" && 
+                                                                it.details.contains("transitioned to: READY", ignoreCase = true) 
+                                                            }
+                                                            val durations = mutableListOf<Long>()
+                                                            for (rLog in vendorReadyLogs) {
+                                                                try {
+                                                                    val orderIdPart = rLog.details.substringAfter("Order #").substringBefore(" ")
+                                                                    val orderId = orderIdPart.toIntOrNull()
+                                                                    if (orderId != null) {
+                                                                        val pLog = auditLogs.find { 
+                                                                            it.action == "ORDER_STATUS_CHANGED" && 
+                                                                            it.details.contains("Order #$orderId ") && 
+                                                                            it.details.contains("transitioned to: PREPARING", ignoreCase = true) 
+                                                                        }
+                                                                        if (pLog != null && rLog.timestamp > pLog.timestamp) {
+                                                                            durations.add(rLog.timestamp - pLog.timestamp)
+                                                                        }
+                                                                    }
+                                                                } catch (e: Exception) {
+                                                                    // Ignore parsing issues
+                                                                }
+                                                            }
+                                                            if (durations.isNotEmpty()) {
+                                                                (durations.average() / 60000.0)
+                                                            } else {
+                                                                10.0
+                                                             }
+                                                        }
+                                                        
+                                                        val prepDurationMs = (avgPrepMin * 60 * 1000).toLong()
+                                                        val targetTimeMs = order.orderTimestamp + prepDurationMs
+                                                        
+                                                        var timeLeftSeconds by remember(order.id, targetTimeMs) { 
+                                                            mutableLongStateOf(((targetTimeMs - System.currentTimeMillis()) / 1000).coerceAtLeast(0)) 
+                                                        }
+                                                        
+                                                        LaunchedEffect(order.id, targetTimeMs) {
+                                                            while (timeLeftSeconds > 0) {
+                                                                delay(1000)
+                                                                timeLeftSeconds = ((targetTimeMs - System.currentTimeMillis()) / 1000).coerceAtLeast(0)
+                                                            }
+                                                        }
+                                                        
+                                                        Spacer(modifier = Modifier.height(6.dp))
+                                                        Row(
+                                                            verticalAlignment = Alignment.CenterVertically,
+                                                            horizontalArrangement = Arrangement.spacedBy(4.dp),
+                                                            modifier = Modifier
+                                                                .background(MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.2f), RoundedCornerShape(4.dp))
+                                                                .padding(horizontal = 6.dp, vertical = 4.dp)
+                                                        ) {
+                                                            Icon(
+                                                                imageVector = Icons.Default.Schedule,
+                                                                contentDescription = "Countdown Timer",
+                                                                tint = MaterialTheme.colorScheme.error,
+                                                                modifier = Modifier.size(12.dp)
+                                                            )
+                                                            val minutesLeft = timeLeftSeconds / 60
+                                                            val secondsLeft = timeLeftSeconds % 60
+                                                            Text(
+                                                                text = if (timeLeftSeconds > 0) {
+                                                                    "Fulfillment Countdown: ${minutesLeft}m ${secondsLeft}s"
+                                                                } else {
+                                                                    "Wrapping up preparation..."
+                                                                },
+                                                                fontSize = 10.sp,
+                                                                fontWeight = FontWeight.Bold,
+                                                                color = MaterialTheme.colorScheme.error
+                                                            )
+                                                        }
                                                     } else if (order.status.uppercase() == "READY") {
                                                         Text(
                                                             text = "HOT & READY FOR RETRIEVAL",
@@ -2903,7 +3221,8 @@ fun StudentDashboardScreen(
                               }
                           }
                         } else if (ordersSubTab == 1) {
-                            val completedOrCanceledOrders = studentOrders.filter { it.status == "COMPLETED" || it.status == "DELIVERED" || it.status == "DECLINED" || it.status == "CANCELLED" }
+                            val context = androidx.compose.ui.platform.LocalContext.current
+                            val completedOrCanceledOrders = studentOrders
                             val totalSpend = completedOrCanceledOrders.filter { it.status == "COMPLETED" || it.status == "DELIVERED" }.sumOf { it.totalPrice }
                             val orderCount = completedOrCanceledOrders.filter { it.status == "COMPLETED" || it.status == "DELIVERED" }.size
                             
@@ -2960,18 +3279,65 @@ fun StudentDashboardScreen(
                                 verticalArrangement = Arrangement.spacedBy(16.dp)
                             ) {
                                 item {
-                                    Column {
-                                        Text(
-                                            text = "Student Meal Dashboard",
-                                            style = MaterialTheme.typography.titleMedium,
-                                            fontWeight = FontWeight.Bold,
-                                            color = MaterialTheme.colorScheme.primary
-                                        )
-                                        Text(
-                                            text = "Examine your cumulative dining footprints and vendor performance archives.",
-                                            style = MaterialTheme.typography.bodySmall,
-                                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                                        )
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        horizontalArrangement = Arrangement.SpaceBetween,
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        Column(modifier = Modifier.weight(1f)) {
+                                            Text(
+                                                text = "Student Meal Dashboard",
+                                                style = MaterialTheme.typography.titleMedium,
+                                                fontWeight = FontWeight.Bold,
+                                                color = MaterialTheme.colorScheme.primary
+                                            )
+                                            Text(
+                                                text = "Examine your cumulative dining footprints and vendor performance archives.",
+                                                style = MaterialTheme.typography.bodySmall,
+                                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                                            )
+                                        }
+                                        
+                                        var isSyncingHistory by remember { mutableStateOf(false) }
+                                        Row(
+                                            verticalAlignment = Alignment.CenterVertically,
+                                            horizontalArrangement = Arrangement.spacedBy(4.dp)
+                                        ) {
+                                            IconButton(
+                                                onClick = {
+                                                    generatePdfOrderHistoryReport(
+                                                        context = context,
+                                                        studentName = currentUser?.fullName ?: "Student",
+                                                        orders = filteredPastOrders
+                                                    )
+                                                },
+                                                modifier = Modifier.testTag("download_pdf_history_btn")
+                                            ) {
+                                                Icon(
+                                                    imageVector = Icons.Default.PictureAsPdf,
+                                                    contentDescription = "Download PDF Summary",
+                                                    tint = MaterialTheme.colorScheme.primary,
+                                                    modifier = Modifier.size(24.dp)
+                                                )
+                                            }
+                                            
+                                            IconButton(
+                                                onClick = {
+                                                    isSyncingHistory = true
+                                                    viewModel.syncAllFromLaravel {
+                                                        isSyncingHistory = false
+                                                    }
+                                                },
+                                                modifier = Modifier.testTag("sync_order_history_btn")
+                                            ) {
+                                                Icon(
+                                                    imageVector = Icons.Default.Refresh,
+                                                    contentDescription = "Sync from API",
+                                                    tint = if (isSyncingHistory) MaterialTheme.colorScheme.primary.copy(alpha = 0.5f) else MaterialTheme.colorScheme.primary,
+                                                    modifier = Modifier.size(24.dp)
+                                                )
+                                            }
+                                        }
                                     }
                                 }
 
@@ -3174,11 +3540,13 @@ fun StudentDashboardScreen(
                                         horizontalArrangement = Arrangement.spacedBy(6.dp),
                                         verticalAlignment = Alignment.CenterVertically
                                     ) {
-                                        listOf("All", "COMPLETED", "DECLINED", "CANCELLED").forEach { status ->
+                                        listOf("All", "PENDING", "PREPARING", "READY", "COMPLETED", "CANCELLED").forEach { status ->
                                             val isSel = pastOrdersSelectedStatus == status
                                             val label = when(status) {
+                                                "PENDING" -> "Pending"
+                                                "PREPARING" -> "Preparing"
+                                                "READY" -> "Ready"
                                                 "COMPLETED" -> "Completed"
-                                                "DECLINED" -> "Declined"
                                                 "CANCELLED" -> "Cancelled"
                                                 else -> "All Statuses"
                                             }
@@ -3198,35 +3566,67 @@ fun StudentDashboardScreen(
 
                                 // Info headers and counter
                                 item {
+                                    val context = androidx.compose.ui.platform.LocalContext.current
                                     Row(
-                                        modifier = Modifier.fillMaxWidth(),
+                                        modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
                                         horizontalArrangement = Arrangement.SpaceBetween,
                                         verticalAlignment = Alignment.CenterVertically
                                     ) {
-                                        Text(
-                                            text = "Official Receipt Journal (${filteredPastOrders.size} dishes found)", 
-                                            fontWeight = FontWeight.Bold, 
-                                            style = MaterialTheme.typography.titleSmall, 
-                                            color = MaterialTheme.colorScheme.primary
-                                        )
-
-                                        if (pastOrdersSearchQuery.isNotEmpty() || pastOrdersSelectedStatus != "All" || pastOrdersSelectedVendorId != null || pastOrdersSelectedPeriod != "All Time") {
-                                            TextButton(
-                                                onClick = {
-                                                    pastOrdersSearchQuery = ""
-                                                    pastOrdersSelectedStatus = "All"
-                                                    pastOrdersSelectedVendorId = null
-                                                    pastOrdersSelectedPeriod = "All Time"
-                                                    pastOrdersSortBy = "Newest First"
-                                                },
-                                                modifier = Modifier.height(26.dp),
-                                                contentPadding = PaddingValues(0.dp)
-                                            ) {
-                                                Text("Reset", fontSize = 11.sp, color = MaterialTheme.colorScheme.error)
-                                            }
+                                        Column(modifier = Modifier.weight(1f)) {
+                                            Text(
+                                                text = "Official Receipt Journal (${filteredPastOrders.size} dishes found)", 
+                                                fontWeight = FontWeight.Bold, 
+                                                style = MaterialTheme.typography.titleSmall, 
+                                                color = MaterialTheme.colorScheme.primary
+                                            )
                                         }
-                                    }
-                                }
+                                        
+                                        Row(
+                                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                            verticalAlignment = Alignment.CenterVertically
+                                        ) {
+                                            if (filteredPastOrders.isNotEmpty()) {
+                                                OutlinedButton(
+                                                    onClick = {
+                                                        generatePdfOrderHistoryReport(
+                                                            context,
+                                                            currentUser?.fullName ?: "Accra Tech Student",
+                                                            filteredPastOrders
+                                                        )
+                                                    },
+                                                    modifier = Modifier.height(30.dp),
+                                                    contentPadding = PaddingValues(horizontal = 8.dp),
+                                                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary)
+                                                ) {
+                                                    Icon(
+                                                        Icons.Default.Print,
+                                                        contentDescription = "Export PDF",
+                                                        modifier = Modifier.size(14.dp),
+                                                        tint = MaterialTheme.colorScheme.primary
+                                                    )
+                                                    Spacer(modifier = Modifier.width(4.dp))
+                                                    Text("Export PDF", fontSize = 11.sp, color = MaterialTheme.colorScheme.primary)
+                                                }
+                                            }
+
+                                            if (pastOrdersSearchQuery.isNotEmpty() || pastOrdersSelectedStatus != "All" || pastOrdersSelectedVendorId != null || pastOrdersSelectedPeriod != "All Time") {
+                                                TextButton(
+                                                    onClick = {
+                                                        pastOrdersSearchQuery = ""
+                                                        pastOrdersSelectedStatus = "All"
+                                                        pastOrdersSelectedVendorId = null
+                                                        pastOrdersSelectedPeriod = "All Time"
+                                                        pastOrdersSortBy = "Newest First"
+                                                    },
+                                                    modifier = Modifier.height(30.dp),
+                                                    contentPadding = PaddingValues(horizontal = 8.dp)
+                                                 ) {
+                                                     Text("Reset", fontSize = 11.sp, color = MaterialTheme.colorScheme.error)
+                                                 }
+                                             }
+                                         }
+                                     }
+                                 }
 
                                 if (filteredPastOrders.isEmpty()) {
                                     item {
@@ -3432,12 +3832,16 @@ fun StudentDashboardScreen(
                                                                         imageUrl = "",
                                                                         description = "Archived culinary selection from past transactions"
                                                                     )
-                                                                    orderQuantity = order.quantity
-                                                                    selectedFoodForOrder = matchedFood
+                                                                    viewModel.addToCart(matchedFood, order.quantity)
+                                                                    android.widget.Toast.makeText(
+                                                                        context,
+                                                                        "${order.foodName} added to shopping cart!",
+                                                                        android.widget.Toast.LENGTH_SHORT
+                                                                    ).show()
                                                                 },
                                                                 colors = ButtonDefaults.buttonColors(
-                                                                    containerColor = MaterialTheme.colorScheme.secondaryContainer,
-                                                                    contentColor = MaterialTheme.colorScheme.onSecondaryContainer
+                                                                    containerColor = MaterialTheme.colorScheme.primary,
+                                                                    contentColor = MaterialTheme.colorScheme.onPrimary
                                                                 ),
                                                                 shape = RoundedCornerShape(8.dp),
                                                                 modifier = Modifier
@@ -3447,7 +3851,7 @@ fun StudentDashboardScreen(
                                                             ) {
                                                                 Icon(Icons.Default.Refresh, contentDescription = "Reorder", modifier = Modifier.size(14.dp))
                                                                 Spacer(modifier = Modifier.width(6.dp))
-                                                                Text("Reorder Meal", fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                                                                Text("Reorder", fontSize = 11.sp, fontWeight = FontWeight.Bold)
                                                             }
 
                                                             if (order.status == "COMPLETED") {
@@ -4779,6 +5183,82 @@ fun StudentDashboardScreen(
                                             contentColor = MaterialTheme.colorScheme.onTertiary
                                         ) {
                                             Text("Loyal Student Level", fontSize = 9.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(horizontal = 4.dp, vertical = 2.dp))
+                                        }
+                                    }
+
+                                    Spacer(modifier = Modifier.height(10.dp))
+                                    
+                                    val tierLabel: String
+                                    val tierBadgeIcon: String
+                                    val tierColorVal: Color
+                                    val nextPointsNeeded: Int
+                                    val progressPercentage: Float
+
+                                    if (availableLoyaltyPoints < 100) {
+                                        tierLabel = "Bronze Tier"
+                                        tierBadgeIcon = "🥉"
+                                        tierColorVal = Color(0xFFCD7F32)
+                                        nextPointsNeeded = 100
+                                        progressPercentage = availableLoyaltyPoints / 100f
+                                    } else if (availableLoyaltyPoints < 300) {
+                                        tierLabel = "Silver Tier"
+                                        tierBadgeIcon = "🥈"
+                                        tierColorVal = Color(0xFF9E9E9E)
+                                        nextPointsNeeded = 300
+                                        progressPercentage = (availableLoyaltyPoints - 100) / 200f
+                                    } else {
+                                        tierLabel = "Gold Tier"
+                                        tierBadgeIcon = "🥇"
+                                        tierColorVal = Color(0xFFFFB300)
+                                        nextPointsNeeded = 300
+                                        progressPercentage = 1.0f
+                                    }
+
+                                    Row(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .background(tierColorVal.copy(alpha = 0.15f), RoundedCornerShape(12.dp))
+                                            .padding(12.dp),
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.spacedBy(12.dp)
+                                    ) {
+                                        Text(tierBadgeIcon, fontSize = 32.sp)
+                                        Column(modifier = Modifier.weight(1f)) {
+                                            Row(
+                                                modifier = Modifier.fillMaxWidth(),
+                                                horizontalArrangement = Arrangement.SpaceBetween,
+                                                verticalAlignment = Alignment.CenterVertically
+                                            ) {
+                                                Text(
+                                                    text = tierLabel,
+                                                    fontWeight = FontWeight.ExtraBold,
+                                                    fontSize = 14.sp,
+                                                    color = tierColorVal
+                                                )
+                                                Text(
+                                                    text = if (availableLoyaltyPoints < 300) "${(progressPercentage * 100).toInt()}%" else "Max Level",
+                                                    fontSize = 11.sp,
+                                                    fontWeight = FontWeight.Bold,
+                                                    color = tierColorVal
+                                                )
+                                            }
+                                            val progressLabelText = if (availableLoyaltyPoints < 300) {
+                                                "$availableLoyaltyPoints / $nextPointsNeeded pts to next tier"
+                                            } else {
+                                                "Ultimate Gold status achieved!"
+                                            }
+                                            Text(
+                                                text = progressLabelText,
+                                                fontSize = 11.sp,
+                                                color = MaterialTheme.colorScheme.onTertiaryContainer.copy(alpha = 0.8f)
+                                            )
+                                            Spacer(modifier = Modifier.height(6.dp))
+                                            LinearProgressIndicator(
+                                                progress = progressPercentage,
+                                                modifier = Modifier.fillMaxWidth().height(6.dp).clip(RoundedCornerShape(3.dp)),
+                                                color = tierColorVal,
+                                                trackColor = tierColorVal.copy(alpha = 0.2f)
+                                            )
                                         }
                                     }
 
@@ -6512,6 +6992,8 @@ fun StudentDashboardScreen(
                 var gatewayTransactionStep by remember { mutableStateOf("") }
 
                 Dialog(onDismissRequest = { if (!isGatewayProcessing) selectedFoodForOrder = null }) {
+                    var scheduleForLaterEnabled by remember { mutableStateOf(false) }
+                    var preferredPickupTimeText by remember { mutableStateOf("12:30 PM") }
                     Card(
                         modifier = Modifier
                             .fillMaxWidth()
@@ -6533,6 +7015,159 @@ fun StudentDashboardScreen(
 
                             Text(food.name, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.bodyLarge)
                             Text(food.description, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+
+                            Spacer(modifier = Modifier.height(8.dp))
+                            // Nutritional Info Display Card
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clip(RoundedCornerShape(8.dp))
+                                    .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f))
+                                    .padding(8.dp),
+                                horizontalArrangement = Arrangement.spacedBy(16.dp)
+                            ) {
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(4.dp)
+                                ) {
+                                    Text("🔥", fontSize = 14.sp)
+                                    Column {
+                                        Text("Energy", fontSize = 9.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                        Text("${food.calories} kcal", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface)
+                                    }
+                                }
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(4.dp)
+                                ) {
+                                    Text("⚠️", fontSize = 14.sp)
+                                    Column {
+                                        Text("Allergens", fontSize = 9.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                        Text(food.allergens, fontSize = 11.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.error)
+                                    }
+                                }
+                            }
+
+                            val vendorActiveOrders = remember(allOrdersSnapshot, food.vendorId) {
+                                allOrdersSnapshot.filter { it.vendorId == food.vendorId && com.example.ui.util.WaitTimeService.isOrderActiveInQueue(it.status) }
+                            }
+                            val estimatedMinutes = remember(vendorActiveOrders, orderQuantity) {
+                                com.example.ui.util.WaitTimeService.calculateEstimatedWaitTime(vendorActiveOrders, orderQuantity)
+                            }
+                            val pickupTimeStr = remember(estimatedMinutes) {
+                                com.example.ui.util.WaitTimeService.calculatePickupTimeText(estimatedMinutes)
+                            }
+                            val pickupTimeTextForDb = if (scheduleForLaterEnabled) {
+                                "Scheduled for $preferredPickupTimeText"
+                            } else {
+                                "Ready in $estimatedMinutes mins ($pickupTimeStr)"
+                            }
+
+                            Spacer(modifier = Modifier.height(8.dp))
+
+                            Card(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .testTag("checkout_queue_wait_time_card"),
+                                colors = CardDefaults.cardColors(
+                                    containerColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.15f)
+                                ),
+                                border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.3f))
+                            ) {
+                                Row(
+                                    modifier = Modifier.padding(12.dp),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                ) {
+                                    Text("🕒", fontSize = 18.sp)
+                                    Column {
+                                        Text(
+                                            "Estimated Queue Wait Time",
+                                            fontWeight = FontWeight.Bold,
+                                            fontSize = 12.sp,
+                                            color = MaterialTheme.colorScheme.primary
+                                        )
+                                        Text(
+                                            "Approx. $estimatedMinutes mins (Ready around $pickupTimeStr)",
+                                            style = MaterialTheme.typography.bodySmall,
+                                            fontWeight = FontWeight.Medium
+                                        )
+                                        Text(
+                                            "Based on ${vendorActiveOrders.size} active orders currently in preparation queue.",
+                                            fontSize = 10.sp,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                                        )
+                                    }
+                                }
+                            }
+
+                            Spacer(modifier = Modifier.height(12.dp))
+                            Text("Delivery / Pickup Schedule Option:", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
+                            Spacer(modifier = Modifier.height(6.dp))
+
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clip(RoundedCornerShape(8.dp))
+                                    .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f))
+                                    .padding(8.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.SpaceBetween
+                            ) {
+                                Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.weight(1f)) {
+                                    Icon(Icons.Default.Schedule, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(18.dp))
+                                    Spacer(modifier = Modifier.width(8.dp))
+                                    Column {
+                                        Text("Schedule for Later", fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                                        Text("Select custom pickup time", fontSize = 10.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                    }
+                                }
+                                Switch(
+                                    checked = scheduleForLaterEnabled,
+                                    onCheckedChange = { scheduleForLaterEnabled = it },
+                                    colors = SwitchDefaults.colors(
+                                        checkedThumbColor = MaterialTheme.colorScheme.primary
+                                    ),
+                                    modifier = Modifier.testTag("schedule_for_later_switch")
+                                )
+                            }
+
+                            if (scheduleForLaterEnabled) {
+                                Spacer(modifier = Modifier.height(8.dp))
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                ) {
+                                    Text("Select Time:", fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                                    LazyRow(
+                                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                                    ) {
+                                        val pickupTimeOptions = listOf("11:30 AM", "12:00 PM", "12:30 PM", "1:00 PM", "1:30 PM", "2:00 PM", "3:00 PM", "4:00 PM")
+                                        items(pickupTimeOptions) { pickTime ->
+                                            val isPickSelected = preferredPickupTimeText == pickTime
+                                            Box(
+                                                modifier = Modifier
+                                                    .background(
+                                                        if (isPickSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f),
+                                                        RoundedCornerShape(8.dp)
+                                                    )
+                                                    .clickable { preferredPickupTimeText = pickTime }
+                                                    .padding(horizontal = 8.dp, vertical = 6.dp)
+                                                    .testTag("schedule_time_chip_$pickTime"),
+                                                contentAlignment = Alignment.Center
+                                            ) {
+                                                Text(
+                                                    text = pickTime,
+                                                    fontSize = 10.sp,
+                                                    fontWeight = FontWeight.Bold,
+                                                    color = if (isPickSelected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant
+                                                )
+                                            }
+                                        }
+                                    }
+                                }
+                            }
 
                             Spacer(modifier = Modifier.height(16.dp))
 
@@ -6561,16 +7196,113 @@ fun StudentDashboardScreen(
 
                             Spacer(modifier = Modifier.height(12.dp))
 
+                            Card(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(vertical = 4.dp),
+                                colors = CardDefaults.cardColors(
+                                    containerColor = MaterialTheme.colorScheme.tertiaryContainer.copy(alpha = 0.25f)
+                                ),
+                                shape = RoundedCornerShape(12.dp),
+                                border = BorderStroke(1.dp, MaterialTheme.colorScheme.tertiary.copy(alpha = 0.3f))
+                            ) {
+                                Column(modifier = Modifier.padding(12.dp)) {
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.SpaceBetween
+                                    ) {
+                                        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.weight(1f)) {
+                                            Text("⭐", fontSize = 16.sp)
+                                            Spacer(modifier = Modifier.width(8.dp))
+                                            Column {
+                                                Text(
+                                                    text = "Redeem Loyalty Points",
+                                                    fontWeight = FontWeight.Bold,
+                                                    fontSize = 12.sp,
+                                                    color = MaterialTheme.colorScheme.onTertiaryContainer
+                                                )
+                                                Text(
+                                                    text = "Balance: $availablePoints pts",
+                                                    fontSize = 11.sp,
+                                                    color = MaterialTheme.colorScheme.onTertiaryContainer.copy(alpha = 0.7f)
+                                                )
+                                            }
+                                        }
+                                        Switch(
+                                            checked = redeemLoyaltyPointsChecked,
+                                            onCheckedChange = { redeemLoyaltyPointsChecked = it },
+                                            enabled = availablePoints >= 10 && !isGatewayProcessing,
+                                            colors = SwitchDefaults.colors(
+                                                checkedThumbColor = MaterialTheme.colorScheme.tertiary,
+                                                checkedTrackColor = MaterialTheme.colorScheme.tertiaryContainer
+                                            ),
+                                            modifier = Modifier.testTag("redeem_loyalty_switch")
+                                        )
+                                    }
+                                    
+                                    if (redeemLoyaltyPointsChecked && availablePoints >= 10) {
+                                        val maxPointsNeeded = (food.price * orderQuantity * 10).toInt()
+                                        val pointsToRedeem = minOf(availablePoints, maxPointsNeeded)
+                                        val discountApplied = pointsToRedeem * 0.10
+                                        
+                                        Spacer(modifier = Modifier.height(8.dp))
+                                        Row(
+                                            modifier = Modifier.fillMaxWidth(),
+                                            horizontalArrangement = Arrangement.SpaceBetween
+                                        ) {
+                                            Text(
+                                                text = "Using $pointsToRedeem points",
+                                                fontSize = 11.sp,
+                                                fontWeight = FontWeight.SemiBold,
+                                                color = MaterialTheme.colorScheme.tertiary
+                                            )
+                                            Text(
+                                                text = "- GH₵ ${"%.2f".format(discountApplied)}",
+                                                fontSize = 11.sp,
+                                                fontWeight = FontWeight.Bold,
+                                                color = MaterialTheme.colorScheme.tertiary
+                                            )
+                                        }
+                                    } else if (availablePoints < 10) {
+                                        Spacer(modifier = Modifier.height(4.dp))
+                                        Text(
+                                            text = "Need at least 10 points to start redeeming.",
+                                            fontSize = 9.sp,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
+                                        )
+                                    }
+                                }
+                            }
+
+                            val calculatedPointsToRedeem = if (redeemLoyaltyPointsChecked) {
+                                val maxPointsNeeded = (food.price * orderQuantity * 10).toInt()
+                                minOf(availablePoints, maxPointsNeeded)
+                            } else 0
+                            val currentDiscountApplied = calculatedPointsToRedeem * 0.10
+                            val finalAmountPayable = (food.price * orderQuantity - currentDiscountApplied).coerceAtLeast(0.0)
+
                             HorizontalDivider()
 
                             Row(
                                 modifier = Modifier
                                     .fillMaxWidth()
                                     .padding(vertical = 12.dp),
-                                horizontalArrangement = Arrangement.SpaceBetween
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
                             ) {
-                                Text("Amount Payable:", fontWeight = FontWeight.Bold)
-                                Text("GH₵ ${"%.2f".format(food.price * orderQuantity)}", fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary, fontSize = 18.sp)
+                                Column {
+                                    Text("Amount Payable:", fontWeight = FontWeight.Bold)
+                                    if (currentDiscountApplied > 0) {
+                                        Text(
+                                            text = "Original: GH₵ ${"%.2f".format(food.price * orderQuantity)}",
+                                            style = MaterialTheme.typography.bodySmall,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                            textDecoration = androidx.compose.ui.text.style.TextDecoration.LineThrough
+                                        )
+                                    }
+                                }
+                                Text("GH₵ ${"%.2f".format(finalAmountPayable)}", fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary, fontSize = 18.sp)
                             }
 
                             Text("Choose Payment Mode:", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
@@ -6610,7 +7342,12 @@ fun StudentDashboardScreen(
 
                             when (checkoutPaymentMode) {
                                 "WALLET" -> {
-                                    val requiredSum = food.price * orderQuantity
+                                    val pointsToRedeem = if (redeemLoyaltyPointsChecked) {
+                                        val maxPointsNeeded = (food.price * orderQuantity * 10).toInt()
+                                        minOf(availablePoints, maxPointsNeeded)
+                                    } else 0
+                                    val discountApplied = pointsToRedeem * 0.10
+                                    val requiredSum = (food.price * orderQuantity - discountApplied).coerceAtLeast(0.0)
                                     val isLowOrInsufficient = studentWalletBalance < 15.0 || studentWalletBalance < requiredSum
                                     Card(
                                         modifier = Modifier.fillMaxWidth(),
@@ -6929,7 +7666,12 @@ fun StudentDashboardScreen(
                                     Spacer(modifier = Modifier.width(12.dp))
                                     Button(
                                         onClick = Button@{
-                                            val requiredSum = food.price * orderQuantity
+                                            val pointsToRedeem = if (redeemLoyaltyPointsChecked) {
+                                                val maxPointsNeeded = (food.price * orderQuantity * 10).toInt()
+                                                minOf(availablePoints, maxPointsNeeded)
+                                            } else 0
+                                            val discountApplied = pointsToRedeem * 0.10
+                                            val requiredSum = (food.price * orderQuantity - discountApplied).coerceAtLeast(0.0)
                                             when (checkoutPaymentMode) {
                                                 "WALLET" -> {
                                                     if (studentWalletBalance < requiredSum) {
@@ -6940,7 +7682,7 @@ fun StudentDashboardScreen(
                                                     submissionConfirmQuantity = orderQuantity
                                                     submissionConfirmPaymentMode = "WALLET"
                                                     submissionConfirmCallback = {
-                                                        viewModel.placeOrder(food, orderQuantity, true) { success ->
+                                                        viewModel.placeOrder(food, orderQuantity, true, pointsToRedeem, pickupTimeTextForDb) { success ->
                                                             submissionIsProcessing = false
                                                             showSubmissionConfirmation = false
                                                             if (success) {
@@ -6959,7 +7701,7 @@ fun StudentDashboardScreen(
                                                     submissionConfirmQuantity = orderQuantity
                                                     submissionConfirmPaymentMode = "POD"
                                                     submissionConfirmCallback = {
-                                                        viewModel.placeOrder(food, orderQuantity, false) { success ->
+                                                        viewModel.placeOrder(food, orderQuantity, false, pointsToRedeem, pickupTimeTextForDb) { success ->
                                                             submissionIsProcessing = false
                                                             showSubmissionConfirmation = false
                                                             if (success) {
@@ -7055,7 +7797,7 @@ fun StudentDashboardScreen(
                                                          submissionConfirmQuantity = orderQuantity
                                                          submissionConfirmPaymentMode = "GATEWAY"
                                                          submissionConfirmCallback = {
-                                                             viewModel.placeOrder(food, orderQuantity, true) { success ->
+                                                             viewModel.placeOrder(food, orderQuantity, true, pointsToRedeem, pickupTimeTextForDb) { success ->
                                                              submissionIsProcessing = false
                                                              showSubmissionConfirmation = false
                                                             isGatewayProcessing = false
@@ -7079,6 +7821,335 @@ fun StudentDashboardScreen(
                                 }
                             }
                         }
+                    }
+                }
+            }
+
+            // SHOPPING CART CHECKOUT DIALOG
+            if (showCartCheckoutDialog) {
+                val cartItems by viewModel.cart.collectAsStateWithLifecycle()
+                Dialog(onDismissRequest = { showCartCheckoutDialog = false }) {
+                    var animateCartTrigger by remember { mutableStateOf(false) }
+                    LaunchedEffect(Unit) {
+                        animateCartTrigger = true
+                    }
+                    LaunchedEffect(animateCartTrigger) {
+                        if (!animateCartTrigger) {
+                            delay(300)
+                            showCartCheckoutDialog = false
+                        }
+                    }
+                    AnimatedVisibility(
+                        visible = animateCartTrigger,
+                        enter = slideInVertically(initialOffsetY = { it / 2 }) + fadeIn(animationSpec = tween(300)),
+                        exit = slideOutVertically(targetOffsetY = { it / 2 }) + fadeOut(animationSpec = tween(300))
+                    ) {
+                        Card(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(vertical = 12.dp),
+                            shape = RoundedCornerShape(16.dp)
+                        ) {
+                        Column(
+                            modifier = Modifier
+                                .padding(24.dp)
+                                .verticalScroll(rememberScrollState())
+                        ) {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Text(
+                                    "Your Shopping Cart",
+                                    fontWeight = FontWeight.Bold,
+                                    style = MaterialTheme.typography.titleMedium,
+                                    color = MaterialTheme.colorScheme.primary
+                                )
+                                IconButton(
+                                    onClick = { animateCartTrigger = false },
+                                    modifier = Modifier.testTag("close_cart_btn")
+                                ) {
+                                    Icon(Icons.Default.Close, contentDescription = "Close")
+                                }
+                            }
+                            Spacer(modifier = Modifier.height(12.dp))
+
+                            if (cartItems.isEmpty()) {
+                                Column(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(vertical = 32.dp),
+                                    horizontalAlignment = Alignment.CenterHorizontally,
+                                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.ShoppingCart,
+                                        contentDescription = null,
+                                        tint = MaterialTheme.colorScheme.outlineVariant,
+                                        modifier = Modifier.size(64.dp)
+                                    )
+                                    Text(
+                                        "Your shopping cart is currently empty.",
+                                        fontWeight = FontWeight.SemiBold,
+                                        style = MaterialTheme.typography.bodyMedium,
+                                        textAlign = androidx.compose.ui.text.style.TextAlign.Center
+                                    )
+                                    Text(
+                                        "Add hot and delicious meals from the menu to get started!",
+                                        fontSize = 11.sp,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        textAlign = androidx.compose.ui.text.style.TextAlign.Center
+                                    )
+                                }
+                            } else {
+                                Column(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                                ) {
+                                    cartItems.forEach { item ->
+                                        Row(
+                                            modifier = Modifier
+                                                .fillMaxWidth()
+                                                .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f), RoundedCornerShape(8.dp))
+                                                .padding(8.dp),
+                                            verticalAlignment = Alignment.CenterVertically,
+                                            horizontalArrangement = Arrangement.SpaceBetween
+                                        ) {
+                                            Column(modifier = Modifier.weight(1f)) {
+                                                Text(item.foodItem.name, fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                                                Text("GH₵ ${"%.2f".format(item.foodItem.price)} each", fontSize = 10.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                                Text("Subtotal: GH₵ ${"%.2f".format(item.foodItem.price * item.quantity)}", fontSize = 11.sp, fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.secondary)
+                                            }
+                                            Row(
+                                                verticalAlignment = Alignment.CenterVertically,
+                                                horizontalArrangement = Arrangement.spacedBy(4.dp)
+                                            ) {
+                                                IconButton(
+                                                    onClick = {
+                                                        if (item.quantity > 1) {
+                                                            viewModel.updateCartQuantity(item.foodItem, item.quantity - 1)
+                                                        } else {
+                                                            viewModel.removeFromCart(item.foodItem)
+                                                        }
+                                                    }
+                                                ) {
+                                                    Text("-", fontSize = 18.sp, fontWeight = FontWeight.Bold)
+                                                }
+                                                Text("${item.quantity}", fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                                                IconButton(
+                                                    onClick = {
+                                                        if (item.quantity < 5) {
+                                                            viewModel.updateCartQuantity(item.foodItem, item.quantity + 1)
+                                                        }
+                                                    }
+                                                ) {
+                                                    Text("+", fontSize = 14.sp, fontWeight = FontWeight.Bold)
+                                                }
+                                                IconButton(
+                                                    onClick = { viewModel.removeFromCart(item.foodItem) },
+                                                    modifier = Modifier.testTag("remove_item_btn_${item.foodItem.id}")
+                                                ) {
+                                                    Icon(Icons.Default.Delete, contentDescription = "Remove", tint = MaterialTheme.colorScheme.error, modifier = Modifier.size(16.dp))
+                                                }
+                                            }
+                                        }
+                                    }
+
+                                    Spacer(modifier = Modifier.height(12.dp))
+                                    HorizontalDivider()
+                                    Spacer(modifier = Modifier.height(12.dp))
+
+                                    // Schedule Options for Cart
+                                    var cartScheduleForLaterEnabled by remember { mutableStateOf(false) }
+                                    var cartPreferredPickupTimeText by remember { mutableStateOf("12:30 PM") }
+
+                                    Text("Delivery / Pickup Schedule Option:", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
+                                    Spacer(modifier = Modifier.height(6.dp))
+
+                                    Row(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .clip(RoundedCornerShape(8.dp))
+                                            .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f))
+                                            .padding(8.dp),
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.SpaceBetween
+                                    ) {
+                                        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.weight(1f)) {
+                                            Icon(Icons.Default.Schedule, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(18.dp))
+                                            Spacer(modifier = Modifier.width(8.dp))
+                                            Column {
+                                                Text("Schedule for Later", fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                                                Text("Select custom pickup time", fontSize = 10.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                            }
+                                        }
+                                        Switch(
+                                            checked = cartScheduleForLaterEnabled,
+                                            onCheckedChange = { cartScheduleForLaterEnabled = it },
+                                            colors = SwitchDefaults.colors(
+                                                checkedThumbColor = MaterialTheme.colorScheme.primary
+                                            ),
+                                            modifier = Modifier.testTag("cart_schedule_for_later_switch")
+                                        )
+                                    }
+
+                                    if (cartScheduleForLaterEnabled) {
+                                        Spacer(modifier = Modifier.height(8.dp))
+                                        Row(
+                                            modifier = Modifier.fillMaxWidth(),
+                                            verticalAlignment = Alignment.CenterVertically,
+                                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                        ) {
+                                            Text("Select Time:", fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                                            LazyRow(
+                                                horizontalArrangement = Arrangement.spacedBy(6.dp)
+                                            ) {
+                                                val pickupTimeOptions = listOf("11:30 AM", "12:00 PM", "12:30 PM", "1:00 PM", "1:30 PM", "2:00 PM", "3:00 PM", "4:00 PM")
+                                                items(pickupTimeOptions) { pickTime ->
+                                                    val isPickSelected = cartPreferredPickupTimeText == pickTime
+                                                    Box(
+                                                        modifier = Modifier
+                                                            .background(
+                                                                if (isPickSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f),
+                                                                RoundedCornerShape(8.dp)
+                                                            )
+                                                            .clickable { cartPreferredPickupTimeText = pickTime }
+                                                            .padding(horizontal = 8.dp, vertical = 6.dp)
+                                                            .testTag("cart_schedule_time_chip_$pickTime"),
+                                                        contentAlignment = Alignment.Center
+                                                    ) {
+                                                        Text(
+                                                            text = pickTime,
+                                                            fontSize = 10.sp,
+                                                            fontWeight = FontWeight.Bold,
+                                                            color = if (isPickSelected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant
+                                                        )
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    }
+
+                                    val cartTotalSum = viewModel.getCartTotal()
+                                    val finalCartPickupTimeText = if (cartScheduleForLaterEnabled) {
+                                        "Scheduled for $cartPreferredPickupTimeText"
+                                    } else {
+                                        "As soon as possible"
+                                    }
+
+                                    Spacer(modifier = Modifier.height(12.dp))
+                                    HorizontalDivider()
+                                    Spacer(modifier = Modifier.height(12.dp))
+
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        horizontalArrangement = Arrangement.SpaceBetween,
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        Text("Total Amount:", fontWeight = FontWeight.Bold)
+                                        Text("GH₵ ${"%.2f".format(cartTotalSum)}", fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary, fontSize = 18.sp)
+                                    }
+
+                                    Spacer(modifier = Modifier.height(12.dp))
+                                    Text("Choose Payment Mode:", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
+                                    Spacer(modifier = Modifier.height(6.dp))
+
+                                    var cartPaymentMode by remember { mutableStateOf("WALLET") }
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        horizontalArrangement = Arrangement.spacedBy(4.dp)
+                                    ) {
+                                        listOf(
+                                            "WALLET" to "Student Wallet",
+                                            "POD" to "Cash (POD)"
+                                        ).forEach { (mode, label) ->
+                                            val isSelected = cartPaymentMode == mode
+                                            val containerColor = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
+                                            val textColor = if (isSelected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant
+                                            Box(
+                                                modifier = Modifier
+                                                    .weight(1f)
+                                                    .background(containerColor, RoundedCornerShape(8.dp))
+                                                    .clickable { cartPaymentMode = mode }
+                                                    .padding(vertical = 8.dp),
+                                                contentAlignment = Alignment.Center
+                                            ) {
+                                                Text(label, fontSize = 10.sp, fontWeight = FontWeight.Bold, color = textColor)
+                                            }
+                                        }
+                                    }
+
+                                    Spacer(modifier = Modifier.height(12.dp))
+
+                                    var cartCheckoutError by remember { mutableStateOf<String?>(null) }
+                                    var cartCheckoutProcessing by remember { mutableStateOf(false) }
+
+                                    if (cartPaymentMode == "WALLET") {
+                                        val isLowOrInsufficient = studentWalletBalance < cartTotalSum
+                                        Card(
+                                            modifier = Modifier.fillMaxWidth(),
+                                            colors = CardDefaults.cardColors(
+                                                containerColor = if (isLowOrInsufficient) MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.4f) else MaterialTheme.colorScheme.primary.copy(alpha = 0.04f)
+                                            )
+                                        ) {
+                                            Column(modifier = Modifier.padding(12.dp)) {
+                                                Text(
+                                                    text = "Your current balance: GH₵ ${"%.2f".format(studentWalletBalance)}",
+                                                    fontSize = 11.sp,
+                                                    color = if (isLowOrInsufficient) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary,
+                                                    fontWeight = FontWeight.Bold
+                                                )
+                                                if (isLowOrInsufficient) {
+                                                    Text(
+                                                        text = "⚠️ Insufficient smart balance for this order!",
+                                                        fontSize = 9.sp,
+                                                        fontWeight = FontWeight.Bold,
+                                                        color = MaterialTheme.colorScheme.error
+                                                    )
+                                                }
+                                            }
+                                        }
+                                    }
+
+                                    cartCheckoutError?.let { err ->
+                                        Text(err, color = MaterialTheme.colorScheme.error, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                                        Spacer(modifier = Modifier.height(8.dp))
+                                    }
+
+                                    if (cartCheckoutProcessing) {
+                                        CircularProgressIndicator(modifier = Modifier.size(24.dp).align(Alignment.CenterHorizontally))
+                                    } else {
+                                        Button(
+                                            onClick = {
+                                                if (cartPaymentMode == "WALLET" && studentWalletBalance < cartTotalSum) {
+                                                    cartCheckoutError = "Insufficient smart balance. Top up your virtual ID Wallet!"
+                                                } else {
+                                                    cartCheckoutProcessing = true
+                                                    cartCheckoutError = null
+                                                    viewModel.checkoutCart(
+                                                        useWallet = (cartPaymentMode == "WALLET"),
+                                                        estimatedPickupTime = finalCartPickupTimeText
+                                                    ) { success ->
+                                                        cartCheckoutProcessing = false
+                                                        if (success) {
+                                                            animateCartTrigger = false
+                                                        } else {
+                                                            cartCheckoutError = "Checkout transaction failed. Try again."
+                                                        }
+                                                    }
+                                                }
+                                            },
+                                            modifier = Modifier.fillMaxWidth().testTag("cart_checkout_submit_btn"),
+                                            shape = RoundedCornerShape(8.dp)
+                                        ) {
+                                            Text("Place Multi-Order (${cartItems.size} items)")
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
                     }
                 }
             }

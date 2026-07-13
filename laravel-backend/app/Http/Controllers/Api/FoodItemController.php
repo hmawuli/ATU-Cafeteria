@@ -152,4 +152,57 @@ class FoodItemController extends Controller
             'message' => 'Food item has been erased successfully.'
         ], 200);
     }
+
+    /**
+     * Toggle availability of multiple menu items simultaneously.
+     */
+    public function bulkToggle(Request $request)
+    {
+        $validator = Validator::make($request->all(), [
+            'ids' => 'required|array',
+            'ids.*' => 'integer|exists:food_items,id',
+            'is_available' => 'required|boolean',
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json([
+                'success' => false,
+                'errors' => $validator->errors()
+            ], 400);
+        }
+
+        $user = $request->user();
+        $ids = $request->input('ids');
+        $isAvailable = $request->input('is_available');
+
+        // Check ownership of all items
+        $foods = FoodItem::whereIn('id', $ids)->get();
+        foreach ($foods as $food) {
+            if ($food->vendor_id !== $user->id && strtoupper($user->role) !== 'ADMIN') {
+                return response()->json([
+                    'success' => false,
+                    'message' => "Unauthorized. You do not own the food item '{$food->name}'."
+                ], 403);
+            }
+        }
+
+        DB::transaction(function () use ($ids, $isAvailable, $foods, $user) {
+            FoodItem::whereIn('id', $ids)->update(['is_available' => $isAvailable]);
+
+            $names = $foods->pluck('name')->implode(', ');
+            $statusStr = $isAvailable ? 'Available' : 'Unavailable';
+            
+            AuditLog::create([
+                'user_id' => $user->id,
+                'timestamp' => time() * 1000,
+                'action' => 'MENU_ITEMS_BULK_TOGGLED',
+                'details' => "Bulk toggled items [{$names}] to {$statusStr} via Laravel API.",
+            ]);
+        });
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Menu items updated successfully.'
+        ], 200);
+    }
 }

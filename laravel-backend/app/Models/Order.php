@@ -28,6 +28,8 @@ class Order extends Model
         'order_status',    // Alias/Explicit field
         'pickup_pin',       // 4 digit code e.g. "4932"
         'estimated_pickup_time',
+        'points_redeemed',
+        'discount_applied',
     ];
 
     protected $casts = [
@@ -42,6 +44,8 @@ class Order extends Model
         'total_price' => 'double',
         'order_timestamp' => 'integer',
         'order_status' => 'string',
+        'points_redeemed' => 'integer',
+        'discount_applied' => 'double',
     ];
 
     /**

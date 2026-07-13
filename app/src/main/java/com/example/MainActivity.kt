@@ -24,6 +24,7 @@ import androidx.compose.ui.Modifier
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
+import androidx.navigation.compose.currentBackStackEntryAsState
 import com.example.ui.screens.LoginScreen
 import com.example.ui.screens.RegisterScreen
 import com.example.ui.screens.StudentDashboardScreen
@@ -42,6 +43,7 @@ class MainActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        com.example.ui.util.NotificationHelper.createNotificationChannels(this)
         enableEdgeToEdge()
         setContent {
             MyApplicationTheme {
@@ -51,12 +53,29 @@ class MainActivity : ComponentActivity() {
                 ) {
                     val navController = rememberNavController()
                     val currentUser by viewModel.currentUser.collectAsState()
+                    val currentBackStackEntry by navController.currentBackStackEntryAsState()
+                    val currentRoute = currentBackStackEntry?.destination?.route
 
-                    LaunchedEffect(currentUser) {
-                        if (currentUser == null) {
-                            val currentRoute = navController.currentBackStackEntry?.destination?.route
-                            if (currentRoute != "login" && currentRoute != "register") {
+                    LaunchedEffect(currentUser, currentRoute) {
+                        val user = currentUser
+                        if (user == null) {
+                            if (currentRoute != "login" && currentRoute != "register" && currentRoute != null) {
                                 navController.navigate("login") {
+                                    popUpTo(0) { inclusive = true }
+                                }
+                            }
+                        } else {
+                            val role = user.role.uppercase()
+                            if (role == "STUDENT" && (currentRoute == "vendor_home" || currentRoute == "admin_home")) {
+                                navController.navigate("student_home") {
+                                    popUpTo(0) { inclusive = true }
+                                }
+                            } else if (role == "VENDOR" && (currentRoute == "student_home" || currentRoute == "admin_home")) {
+                                navController.navigate("vendor_home") {
+                                    popUpTo(0) { inclusive = true }
+                                }
+                            } else if (role == "ADMIN" && (currentRoute == "student_home" || currentRoute == "vendor_home")) {
+                                navController.navigate("admin_home") {
                                     popUpTo(0) { inclusive = true }
                                 }
                             }

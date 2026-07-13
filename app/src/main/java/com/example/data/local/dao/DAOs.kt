@@ -54,6 +54,9 @@ interface FoodItemDao {
     @Update
     suspend fun updateFoodItem(item: FoodItem)
 
+    @Query("UPDATE food_items SET isAvailable = :isAvailable WHERE id IN (:ids)")
+    suspend fun bulkToggleAvailability(ids: List<Int>, isAvailable: Boolean)
+
     @Delete
     suspend fun deleteFoodItem(item: FoodItem)
 }
@@ -92,6 +95,12 @@ interface FeedbackDao {
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertFeedback(feedback: Feedback): Long
+
+    @Update
+    suspend fun updateFeedback(feedback: Feedback)
+
+    @Query("UPDATE feedback SET vendorReply = :vendorReply WHERE id = :feedbackId")
+    suspend fun updateFeedbackReply(feedbackId: Int, vendorReply: String)
 }
 
 @Dao

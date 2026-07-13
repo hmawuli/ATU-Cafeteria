@@ -20,6 +20,7 @@ class Feedback extends Model
         'rating_service_speed', // 1-5
         'rating_price_value',  // 1-5
         'comment',
+        'vendor_reply',
         'timestamp',
     ];
 

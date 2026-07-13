@@ -147,35 +147,8 @@ class OrderController extends Controller
     /**
      * Place a new pre-order order.
      */
-    public function store(Request $request)
+    public function store(\App\Http\Requests\StoreOrderRequest $request)
     {
-        // Support either student_id or customer_id
-        if ($request->has('student_id') && !$request->has('customer_id')) {
-            $request->merge(['customer_id' => $request->input('student_id')]);
-        } elseif ($request->has('customer_id') && !$request->has('student_id')) {
-            $request->merge(['student_id' => $request->input('customer_id')]);
-        }
-
-        $validator = Validator::make($request->all(), [
-            'customer_id' => 'required|integer|exists:users,id',
-            'student_id' => 'required|integer|exists:users,id',
-            'vendor_id' => 'required|integer|exists:users,id',
-            'food_item_id' => 'nullable|integer',
-            'menu_item_id' => 'required|integer|exists:menu_items,id',
-            'food_name' => 'required|string|min:2',
-            'quantity' => 'required|integer|min:1',
-            'unit_price' => 'required|numeric|min:0.01',
-            'total_price' => 'required|numeric|min:0.01',
-        ]);
-
-        if ($validator->fails()) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Input parameters invalid or missing.',
-                'errors' => $validator->errors()
-            ], 400);
-        }
-
         // Fetch menu item to validate availability, ownership, and calculate total price
         $menuItem = \App\Models\MenuItem::find($request->input('menu_item_id'));
         if (!$menuItem) {
@@ -229,7 +202,16 @@ class OrderController extends Controller
         // Generate a secure, randomized 4-digit pickup PIN code
         $securePin = (string) rand(1000, 9999);
 
-        $order = DB::transaction(function () use ($request, $securePin) {
+        $order = DB::transaction(function () use ($request, $securePin, $menuItem) {
+            if ($menuItem->current_stock !== null) {
+                $qty = intval($request->input('quantity'));
+                if ($menuItem->current_stock < $qty) {
+                    throw new \Exception("Insufficient stock for {$menuItem->food_name}. Only {$menuItem->current_stock} items remaining.");
+                }
+                $menuItem->current_stock -= $qty;
+                $menuItem->save();
+            }
+
             $createdOrder = Order::create([
                 'customer_id' => $request->input('customer_id'),
                 'student_id' => $request->input('student_id'),
@@ -244,7 +226,7 @@ class OrderController extends Controller
                 'order_timestamp' => time() * 1000,
                 'status' => 'ORDER_PLACED',
                 'pickup_pin' => $securePin,
-                'estimated_pickup_time' => 'Calculating...',
+                'estimated_pickup_time' => $request->input('estimated_pickup_time', 'Calculating...'),
             ]);
 
             // Register Audit Log
@@ -271,6 +253,122 @@ class OrderController extends Controller
         }
 
         return response()->json($order, 201);
+    }
+
+    /**
+     * Patch route to allow vendors to update order status (e.g., 'preparing', 'ready', 'delivered') with validation.
+     */
+    public function patchStatus(Request $request, $id)
+    {
+        $order = Order::find($id);
+        if (!$order) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Order not found.'
+            ], 404);
+        }
+
+        $user = $request->user();
+        if (!$user) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Unauthenticated.'
+            ], 401);
+        }
+
+        $role = strtoupper($user->role);
+        if ($role !== 'VENDOR' && $role !== 'ADMIN') {
+            return response()->json([
+                'success' => false,
+                'message' => 'Unauthorized. Only vendors and administrators can perform this action.'
+            ], 403);
+        }
+
+        if ($role === 'VENDOR' && $order->vendor_id !== $user->id) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Unauthorized. You do not own this order.'
+            ], 403);
+        }
+
+        $validator = Validator::make($request->all(), [
+            'status' => 'required|string|max:50',
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Validation failed.',
+                'errors' => $validator->errors()
+            ], 400);
+        }
+
+        $statusInput = strtoupper(trim($request->input('status')));
+        
+        // Map user/vendor friendly values to DB enum
+        if ($statusInput === 'PREPARING') {
+            $normalizedStatus = 'PREPARING';
+        } elseif ($statusInput === 'READY' || $statusInput === 'READY_FOR_PICKUP' || $statusInput === 'READY FOR PICKUP') {
+            $normalizedStatus = 'READY';
+        } elseif ($statusInput === 'DELIVERED') {
+            $normalizedStatus = 'DELIVERED';
+        } elseif ($statusInput === 'OUT_FOR_DELIVERY' || $statusInput === 'OUT FOR DELIVERY') {
+            $normalizedStatus = 'OUT_FOR_DELIVERY';
+        } elseif ($statusInput === 'COMPLETED') {
+            $normalizedStatus = 'COMPLETED';
+        } elseif ($statusInput === 'CANCELLED' || $statusInput === 'CANCEL' || $statusInput === 'CANCELED') {
+            $normalizedStatus = 'CANCELLED';
+        } elseif ($statusInput === 'DECLINED') {
+            $normalizedStatus = 'DECLINED';
+        } elseif ($statusInput === 'PENDING' || $statusInput === 'ORDER_PLACED' || $statusInput === 'ORDER PLACED') {
+            $normalizedStatus = 'ORDER_PLACED';
+        } else {
+            return response()->json([
+                'success' => false,
+                'message' => 'Invalid order status. Allowed values: preparing, ready, delivered, out_for_delivery, completed, cancelled, declined, pending.'
+            ], 400);
+        }
+
+        $oldStatus = $order->status;
+        $updatedOrder = DB::transaction(function () use ($order, $user, $normalizedStatus, $oldStatus) {
+            $order->status = $normalizedStatus;
+            $order->order_status = $normalizedStatus;
+            $order->save();
+
+            // Register Audit Log
+            AuditLog::create([
+                'user_id' => $user->id,
+                'timestamp' => time() * 1000,
+                'action' => 'ORDER_STATUS_PATCHED',
+                'details' => "Order #{$order->id} status patched from '{$oldStatus}' to '{$normalizedStatus}' by Vendor/Admin {$user->fullName}.",
+            ]);
+
+            return $order;
+        });
+
+        // Notify the student user of the status change
+        $studentId = $updatedOrder->customer_id ?? $updatedOrder->student_id;
+        if ($studentId) {
+            $student = \App\Models\User::find($studentId);
+            if ($student) {
+                try {
+                    $student->notify(new \App\Notifications\OrderStatusChangedNotification($updatedOrder, $oldStatus, $normalizedStatus));
+                    event(new \App\Events\OrderStatusUpdatedBroadcast($updatedOrder, $oldStatus, $normalizedStatus));
+                } catch (\Exception $e) {
+                    \Illuminate\Support\Facades\Log::error("Failed to notify student {$studentId} of order status patched to {$normalizedStatus}: " . $e->getMessage());
+                }
+            }
+        }
+
+        if ($normalizedStatus === 'COMPLETED') {
+            event(new OrderStatusCompleted($updatedOrder));
+        }
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Order status updated successfully.',
+            'order' => $updatedOrder
+        ], 200);
     }
 
     /**
@@ -400,6 +498,8 @@ class OrderController extends Controller
             if ($student) {
                 try {
                     $student->notify(new \App\Notifications\OrderStatusChangedNotification($updatedOrder, $oldStatus, $newStatus));
+                    // Fire real-time broadcast event to students
+                    event(new \App\Events\OrderStatusUpdatedBroadcast($updatedOrder, $oldStatus, $newStatus));
                 } catch (\Exception $e) {
                     \Illuminate\Support\Facades\Log::error("Failed to notify student {$studentId} of order status updated to {$newStatus}: " . $e->getMessage());
                 }
@@ -468,6 +568,8 @@ class OrderController extends Controller
                 if ($student) {
                     try {
                         $student->notify(new \App\Notifications\OrderStatusChangedNotification($updatedOrder, 'READY', 'COMPLETED'));
+                        // Fire real-time broadcast event to students
+                        event(new \App\Events\OrderStatusUpdatedBroadcast($updatedOrder, 'READY', 'COMPLETED'));
                     } catch (\Exception $e) {
                         \Illuminate\Support\Facades\Log::error("Failed to notify student {$studentId} of order completed: " . $e->getMessage());
                     }
@@ -498,6 +600,76 @@ class OrderController extends Controller
             'success' => false,
             'message' => 'Verification PIN mismatch. Access Denied.'
         ], 401);
+    }
+
+    /**
+     * Retrieve the authenticated student's personal order history, filtered by date.
+     */
+    public function getPersonalOrderHistory(Request $request)
+    {
+        $user = $request->user();
+        if (!$user) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Unauthenticated.'
+            ], 401);
+        }
+
+        // Base query for the authenticated user's orders
+        $ordersQuery = Order::where(function ($query) use ($user) {
+            $query->where('customer_id', $user->id)
+                  ->orWhere('student_id', $user->id)
+                  ->orWhere('user_id', $user->id);
+        });
+
+        // 1. Single Date filter (format: YYYY-MM-DD)
+        $date = $request->input('date');
+        if ($date && $date !== '') {
+            $startTimestamp = strtotime($date . ' 00:00:00') * 1000;
+            $endTimestamp = strtotime($date . ' 23:59:59') * 1000;
+            if ($startTimestamp && $endTimestamp) {
+                $ordersQuery->whereBetween('order_timestamp', [$startTimestamp, $endTimestamp]);
+            }
+        }
+
+        // 2. Date Range filter (format: YYYY-MM-DD or milliseconds)
+        $startDate = $request->input('start_date');
+        if ($startDate && $startDate !== '') {
+            if (is_numeric($startDate)) {
+                $startMs = (double) $startDate;
+                if ($startMs < 10000000000) {
+                    $startMs *= 1000;
+                }
+            } else {
+                $startMs = strtotime($startDate . ' 00:00:00') * 1000;
+            }
+            if ($startMs) {
+                $ordersQuery->where('order_timestamp', '>=', $startMs);
+            }
+        }
+
+        $endDate = $request->input('end_date');
+        if ($endDate && $endDate !== '') {
+            if (is_numeric($endDate)) {
+                $endMs = (double) $endDate;
+                if ($endMs < 10000000001) {
+                    $endMs *= 1000;
+                }
+            } else {
+                $endMs = strtotime($endDate . ' 23:59:59') * 1000;
+            }
+            if ($endMs) {
+                $ordersQuery->where('order_timestamp', '<=', $endMs);
+            }
+        }
+
+        // Order by order_timestamp descending
+        $orders = $ordersQuery->orderBy('order_timestamp', 'desc')->get();
+
+        return response()->json([
+            'success' => true,
+            'orders' => $orders
+        ], 200);
     }
 
     /**
@@ -606,8 +778,24 @@ class OrderController extends Controller
             ], 400);
         }
 
+        // Verify loyalty points redemption if requested
+        $pointsToRedeem = intval($request->input('points_to_redeem', 0));
+        $discount = 0.00;
+        if ($pointsToRedeem > 0) {
+            if (($user->loyalty_points ?? 0) < $pointsToRedeem) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Insufficient loyalty points balance. You have ' . ($user->loyalty_points ?? 0) . ' points.'
+                ], 400);
+            }
+            // 10 points = 1.00 GHS discount
+            $discount = round($pointsToRedeem * 0.10, 2);
+        }
+
+        $finalPrice = max(0.00, round($totalPriceInput - $discount, 2));
+
         // Verify balance
-        if ($user->balance < $totalPriceInput) {
+        if ($user->balance < $finalPrice) {
             return response()->json([
                 'success' => false,
                 'message' => 'Insufficient wallet balance. Please top up your wallet first.'
@@ -618,9 +806,22 @@ class OrderController extends Controller
         $securePin = (string) rand(1000, 9999);
 
         try {
-            $order = DB::transaction(function () use ($request, $user, $securePin, $totalPriceInput) {
-                // Deduct balance from user
-                $user->balance = $user->balance - $totalPriceInput;
+            $order = DB::transaction(function () use ($request, $user, $securePin, $totalPriceInput, $pointsToRedeem, $discount, $finalPrice, $menuItem) {
+                // Check and decrement stock
+                if ($menuItem->current_stock !== null) {
+                    $qty = intval($request->input('quantity'));
+                    if ($menuItem->current_stock < $qty) {
+                        throw new \Exception("Insufficient stock for {$menuItem->food_name}. Only {$menuItem->current_stock} items remaining.");
+                    }
+                    $menuItem->current_stock -= $qty;
+                    $menuItem->save();
+                }
+
+                // Deduct balance and loyalty points from user
+                $user->balance = $user->balance - $finalPrice;
+                if ($pointsToRedeem > 0) {
+                    $user->loyalty_points = ($user->loyalty_points ?? 0) - $pointsToRedeem;
+                }
                 $user->save();
 
                 // Create Order
@@ -634,21 +835,23 @@ class OrderController extends Controller
                     'food_name' => $request->input('food_name'),
                     'quantity' => $request->input('quantity'),
                     'unit_price' => $request->input('unit_price'),
-                    'total_price' => $request->input('total_price'),
+                    'total_price' => $finalPrice,
                     'order_timestamp' => time() * 1000,
                     'status' => 'PENDING',
                     'pickup_pin' => $securePin,
-                    'estimated_pickup_time' => 'Calculating...',
+                    'estimated_pickup_time' => $request->input('estimated_pickup_time', 'Calculating...'),
+                    'points_redeemed' => $pointsToRedeem,
+                    'discount_applied' => $discount,
                 ]);
 
                 // Create Wallet Transaction
                 \App\Models\WalletTransaction::create([
                     'user_id' => $user->id,
                     'type' => 'PAYMENT',
-                    'amount' => -$totalPriceInput,
+                    'amount' => -$finalPrice,
                     'status' => 'SUCCESS',
                     'reference' => 'TXN-ORD-' . uniqid() . '-' . time(),
-                    'details' => "Paid for Pre-order #{$createdOrder->id} ('{$createdOrder->food_name}')"
+                    'details' => "Paid for Pre-order #{$createdOrder->id} ('{$createdOrder->food_name}')" . ($discount > 0 ? " with GHS " . number_format($discount, 2) . " loyalty discount" : "")
                 ]);
 
                 // Register Audit Log
@@ -656,7 +859,7 @@ class OrderController extends Controller
                     'user_id' => $user->id,
                     'timestamp' => time() * 1000,
                     'action' => 'ORDER_CREATED',
-                    'details' => "Pre-order #{$createdOrder->id} created securely for '{$createdOrder->food_name}' by Student {$user->fullName} with verification PIN: {$securePin}. Wallet debited: GHS {$totalPriceInput}.",
+                    'details' => "Pre-order #{$createdOrder->id} created securely for '{$createdOrder->food_name}' by Student {$user->fullName} with verification PIN: {$securePin}. Wallet debited: GHS {$finalPrice}." . ($discount > 0 ? " Redeemed {$pointsToRedeem} loyalty points for GHS {$discount} discount." : ""),
                 ]);
 
                 return $createdOrder;
@@ -728,12 +931,20 @@ class OrderController extends Controller
             ], 403);
         }
 
-        // Validate current order status (only pending / order_placed is cancellable)
+        // Validate current order status (only pending / order_placed / ordered is cancellable)
         $currentStatus = strtoupper($order->status);
-        if ($currentStatus !== 'PENDING' && $currentStatus !== 'ORDER_PLACED') {
+        $allowedCancelStatuses = ['PENDING', 'ORDER_PLACED', 'ORDERED'];
+        if ($role === 'STUDENT' && !in_array($currentStatus, $allowedCancelStatuses)) {
             return response()->json([
                 'success' => false,
-                'message' => 'Orders can only be cancelled if the current status is pending.'
+                'message' => 'Students can only cancel orders if the current status is still pending or ordered.'
+            ], 400);
+        }
+
+        if (!in_array($currentStatus, $allowedCancelStatuses)) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Orders can only be cancelled if the current status is pending or ordered.'
             ], 400);
         }
 
@@ -743,12 +954,39 @@ class OrderController extends Controller
             $order->order_status = 'CANCELLED';
             $order->save();
 
+            // Restore stock if tracked
+            if ($order->menu_item_id) {
+                $menuItem = \App\Models\MenuItem::find($order->menu_item_id);
+                if ($menuItem && $menuItem->current_stock !== null) {
+                    $menuItem->current_stock += intval($order->quantity);
+                    $menuItem->save();
+                }
+            }
+
+            // Find student to refund
+            $studentId = $order->customer_id ?? ($order->student_id ?? $order->user_id);
+            $student = User::find($studentId);
+            if ($student) {
+                $student->balance = $student->balance + floatval($order->total_price);
+                $student->save();
+
+                // Create Refund Transaction
+                \App\Models\WalletTransaction::create([
+                    'user_id' => $student->id,
+                    'type' => 'REFUND',
+                    'amount' => floatval($order->total_price),
+                    'status' => 'SUCCESS',
+                    'reference' => 'TXN-REF-' . uniqid() . '-' . time(),
+                    'details' => "Refund for cancelled Order #{$order->id} ('{$order->food_name}')"
+                ]);
+            }
+
             // Register Audit Log
             AuditLog::create([
-                'user_id' => $order->customer_id,
+                'user_id' => $order->customer_id ?? ($order->student_id ?? $order->user_id),
                 'timestamp' => time() * 1000,
                 'action' => 'ORDER_CANCELLED',
-                'details' => "Order #{$order->id} was cancelled. Status updated to CANCELLED.",
+                'details' => "Order #{$order->id} was cancelled. Status updated to CANCELLED. Amount of GHS " . number_format($order->total_price, 2) . " was refunded to Student balance.",
             ]);
 
             return $order;
@@ -879,6 +1117,118 @@ class OrderController extends Controller
     }
 
     /**
+     * Polling mechanism for students to fetch real-time updates and push alerts for READY orders.
+     */
+    public function pollOrderStatusReady(Request $request)
+    {
+        $user = $request->user();
+        if (!$user) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Unauthenticated.'
+            ], 401);
+        }
+
+        $studentId = $user->id;
+        
+        // Find any active orders that are in 'READY' status
+        $readyOrders = Order::where(function ($query) use ($studentId) {
+                $query->where('customer_id', $studentId)
+                      ->orWhere('student_id', $studentId)
+                      ->orWhere('user_id', $studentId);
+            })
+            ->where(DB::raw('upper(status)'), 'READY')
+            ->get();
+
+        $alerts = [];
+        foreach ($readyOrders as $order) {
+            $alerts[] = [
+                'order_id' => $order->id,
+                'food_name' => $order->food_name,
+                'vendor_id' => $order->vendor_id,
+                'pickup_pin' => $order->pickup_pin,
+                'title' => 'Order Ready for Pickup! 🍽️',
+                'body' => "Your order #{$order->id} ('{$order->food_name}') is ready at the cafeteria. Hand-off PIN is {$order->pickup_pin}.",
+                'alert_push' => true,
+                'vibrate' => [100, 50, 100],
+            ];
+        }
+
+        return response()->json([
+            'success' => true,
+            'student_id' => $studentId,
+            'has_ready_orders' => count($alerts) > 0,
+            'ready_alerts' => $alerts,
+            'active_orders_count' => Order::where(function ($query) use ($studentId) {
+                $query->where('customer_id', $studentId)
+                      ->orWhere('student_id', $studentId)
+                      ->orWhere('user_id', $studentId);
+            })->whereNotIn(DB::raw('upper(status)'), ['COMPLETED', 'DELIVERED', 'CANCELLED', 'DECLINED'])->count(),
+            'polled_at' => date('c')
+        ], 200);
+    }
+
+    /**
+     * Real-time SSE listener stream specifically alerting when active order statuses change to 'READY'.
+     */
+    public function streamOrderStatusReady(Request $request)
+    {
+        $user = $request->user();
+        if (!$user) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Unauthenticated.'
+            ], 401);
+        }
+
+        $studentId = $user->id;
+
+        return response()->stream(function () use ($studentId) {
+            $notifiedOrders = []; // Track already emitted ready order IDs in this session
+            
+            // Loop for up to 20 cycles (approx 40 seconds) to maintain live stream connection
+            for ($cycle = 0; $cycle < 20; $cycle++) {
+                $readyOrders = Order::where(function ($query) use ($studentId) {
+                        $query->where('customer_id', $studentId)
+                              ->orWhere('student_id', $studentId)
+                              ->orWhere('user_id', $studentId);
+                    })
+                    ->where(DB::raw('upper(status)'), 'READY')
+                    ->get();
+
+                foreach ($readyOrders as $order) {
+                    if (!in_array($order->id, $notifiedOrders)) {
+                        echo "event: order_ready_push\n";
+                        echo "data: " . json_encode([
+                            'order_id' => $order->id,
+                            'food_name' => $order->food_name,
+                            'pickup_pin' => $order->pickup_pin,
+                            'message' => "Your order #{$order->id} ('{$order->food_name}') is ready for pickup!",
+                            'timestamp' => date('c')
+                        ]) . "\n\n";
+                        ob_flush();
+                        flush();
+                        $notifiedOrders[] = $order->id;
+                    }
+                }
+
+                // Heartbeat to keep connection alive
+                echo "event: heartbeat\n";
+                echo "data: " . json_encode(['status' => 'listening', 'cycle' => $cycle]) . "\n\n";
+                ob_flush();
+                flush();
+
+                sleep(2);
+            }
+        }, 200, [
+            'Content-Type' => 'text/event-stream',
+            'Cache-Control' => 'no-cache',
+            'Connection' => 'keep-alive',
+            'X-Accel-Buffering' => 'no'
+        ]);
+    }
+
+    /**
      * Submit multiple order requests (shopping cart checkout) for the authenticated user.
      */
     public function cartCheckout(Request $request)
@@ -942,24 +1292,63 @@ class OrderController extends Controller
             ];
         }
 
+        // Verify loyalty points redemption if requested
+        $pointsToRedeem = intval($request->input('points_to_redeem', 0));
+        $discount = 0.00;
+        if ($pointsToRedeem > 0) {
+            if (($user->loyalty_points ?? 0) < $pointsToRedeem) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Insufficient loyalty points balance. You have ' . ($user->loyalty_points ?? 0) . ' points.'
+                ], 400);
+            }
+            // 10 points = 1.00 GHS discount
+            $discount = round($pointsToRedeem * 0.10, 2);
+        }
+
+        $finalCheckoutCost = max(0.00, round($totalCheckoutCost - $discount, 2));
+
         // Verify sufficient balance
-        if ($user->balance < $totalCheckoutCost) {
+        if ($user->balance < $finalCheckoutCost) {
             return response()->json([
                 'success' => false,
-                'message' => "Insufficient wallet balance. Total cart cost is GH₵ " . number_format($totalCheckoutCost, 2) . ", but your balance is GH₵ " . number_format($user->balance, 2) . "."
+                'message' => "Insufficient wallet balance. Total cart cost is GH₵ " . number_format($finalCheckoutCost, 2) . ", but your balance is GH₵ " . number_format($user->balance, 2) . "."
             ], 400);
         }
 
         try {
-            $createdOrders = DB::transaction(function () use ($user, $validatedItems, $totalCheckoutCost) {
-                // Deduct balance
-                $user->balance = $user->balance - $totalCheckoutCost;
+            $createdOrders = DB::transaction(function () use ($request, $user, $validatedItems, $totalCheckoutCost, $finalCheckoutCost, $pointsToRedeem, $discount) {
+                // Deduct balance and loyalty points
+                $user->balance = $user->balance - $finalCheckoutCost;
+                if ($pointsToRedeem > 0) {
+                    $user->loyalty_points = ($user->loyalty_points ?? 0) - $pointsToRedeem;
+                }
                 $user->save();
 
                 $orders = [];
                 $securePin = (string) rand(1000, 9999);
 
-                foreach ($validatedItems as $item) {
+                $remainingPointsToDistribute = $pointsToRedeem;
+                $remainingDiscountToDistribute = $discount;
+                $itemsCount = count($validatedItems);
+
+                foreach ($validatedItems as $index => $item) {
+                    // Proportional distribution of points and discount
+                    if ($index === $itemsCount - 1) {
+                        // Last item gets the remainder
+                        $itemPoints = $remainingPointsToDistribute;
+                        $itemDiscount = $remainingDiscountToDistribute;
+                    } else {
+                        $ratio = $item['total_price'] / max(1.0, $totalCheckoutCost);
+                        $itemPoints = intval(round($pointsToRedeem * $ratio));
+                        $itemDiscount = round($discount * $ratio, 2);
+
+                        $remainingPointsToDistribute -= $itemPoints;
+                        $remainingDiscountToDistribute -= $itemDiscount;
+                    }
+
+                    $itemFinalPrice = max(0.00, round($item['total_price'] - $itemDiscount, 2));
+
                     $createdOrder = Order::create([
                         'customer_id' => $user->id,
                         'student_id' => $user->id,
@@ -969,11 +1358,13 @@ class OrderController extends Controller
                         'food_name' => $item['food_name'],
                         'quantity' => $item['quantity'],
                         'unit_price' => $item['unit_price'],
-                        'total_price' => $item['total_price'],
+                        'total_price' => $itemFinalPrice,
                         'order_timestamp' => time() * 1000,
                         'status' => 'PENDING',
                         'pickup_pin' => $securePin,
-                        'estimated_pickup_time' => 'Calculating...',
+                        'estimated_pickup_time' => $request->input('estimated_pickup_time', 'Calculating...'),
+                        'points_redeemed' => $itemPoints,
+                        'discount_applied' => $itemDiscount,
                     ]);
 
                     // Add an order item entry if order_items table exists
@@ -1069,6 +1460,88 @@ class OrderController extends Controller
         return response()->json([
             'success' => true,
             'message' => 'Order deleted successfully.'
+        ], 200);
+    }
+
+    /**
+     * Calculates and returns the estimated wait time for a vendor's queue.
+     */
+    public function getVendorWaitTime(Request $request, $vendorId = null)
+    {
+        // If not specified in path, check query param or authenticated user
+        if (!$vendorId) {
+            if ($request->has('vendor_id')) {
+                $vendorId = (int)$request->input('vendor_id');
+            } else {
+                $user = $request->user();
+                if ($user && (strtoupper($user->role) === 'VENDOR' || strtoupper($user->role) === 'ADMIN')) {
+                    $vendorId = $user->id;
+                } else {
+                    return response()->json([
+                        'success' => false,
+                        'message' => 'Vendor ID is required.'
+                    ], 400);
+                }
+            }
+        }
+
+        $vendor = \App\Models\User::find($vendorId);
+        if (!$vendor) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Vendor not found.'
+            ], 444);
+        }
+
+        // Fetch all preparing or pending orders for this vendor
+        $activeOrders = Order::where('vendor_id', $vendorId)
+            ->whereIn(DB::raw('upper(status)'), ['PREPARING', 'PENDING', 'ORDER_PLACED', 'ORDERED'])
+            ->get();
+
+        $preparingCount = 0;
+        $pendingCount = 0;
+        $totalMinutes = 0;
+
+        foreach ($activeOrders as $order) {
+            $status = strtoupper($order->status);
+            $qty = intval($order->quantity ?: 1);
+
+            if ($status === 'PREPARING') {
+                $preparingCount++;
+                // Base 5 mins for preparing + 2 mins per extra item
+                $totalMinutes += 5 + (($qty - 1) * 2);
+            } else {
+                $pendingCount++;
+                // Base 3 mins for pending/placed + 1 min per extra item
+                $totalMinutes += 3 + (($qty - 1) * 1.5);
+            }
+        }
+
+        // Concurrency factor (vendors usually have multiple stoves or prepare 2 orders in parallel)
+        $concurrencyFactor = 2; // parallel processing capacity
+        $estimatedMinutes = $totalMinutes > 0 ? ceil($totalMinutes / $concurrencyFactor) : 0;
+
+        // Add a base buffer of 3 minutes if there are any active orders
+        if ($estimatedMinutes > 0) {
+            $estimatedMinutes += 3; // buffer time
+        } else {
+            $estimatedMinutes = 3; // minimum wait time (instant fulfillment prep)
+        }
+
+        return response()->json([
+            'success' => true,
+            'vendor_id' => (int)$vendorId,
+            'vendor_name' => $vendor->fullName,
+            'queue_metrics' => [
+                'total_active_orders' => count($activeOrders),
+                'preparing_orders_count' => $preparingCount,
+                'pending_orders_count' => $pendingCount,
+                'total_queue_quantity' => (int)$activeOrders->sum('quantity'),
+            ],
+            'estimated_wait_time_minutes' => (int)$estimatedMinutes,
+            'formatted_wait_time' => "{$estimatedMinutes} mins",
+            'congestion_level' => $preparingCount >= 8 ? 'CRITICAL' : ($preparingCount >= 4 ? 'HIGH' : ($preparingCount >= 1 ? 'MODERATE' : 'LOW')),
+            'calculated_at' => date('c')
         ], 200);
     }
 }

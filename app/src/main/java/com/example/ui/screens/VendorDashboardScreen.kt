@@ -90,6 +90,7 @@ fun VendorDashboardScreen(
     val performanceMetrics by viewModel.vendorPerformanceMetricsList.collectAsStateWithLifecycle()
     val dailyRevenueResponse by viewModel.vendorDailyRevenueResponse.collectAsStateWithLifecycle()
     val allUsers by viewModel.allUsers.collectAsStateWithLifecycle()
+    val auditLogs by viewModel.auditLogs.collectAsStateWithLifecycle()
 
     val scope = rememberCoroutineScope()
 
@@ -105,6 +106,9 @@ fun VendorDashboardScreen(
 
     val historicalInsightsText by viewModel.vendorHistoricalInsights.collectAsStateWithLifecycle()
     val isAnalyzingHistoricalOrders by viewModel.isAnalyzingHistoricalOrders.collectAsStateWithLifecycle()
+
+    val vendorDemandForecast by viewModel.vendorDemandForecast.collectAsStateWithLifecycle()
+    val isGeneratingDemandForecast by viewModel.isGeneratingDemandForecast.collectAsStateWithLifecycle()
 
     val todayOrders = remember(incomingOrders) {
         val cal = java.util.Calendar.getInstance().apply {
@@ -1650,6 +1654,7 @@ fun VendorDashboardScreen(
 
                         item {
                             var isInventoryExpanded by remember { mutableStateOf(true) }
+                            val selectedFoodIds = remember { androidx.compose.runtime.mutableStateListOf<Int>() }
                             Card(
                                 modifier = Modifier
                                     .fillMaxWidth()
@@ -3739,8 +3744,111 @@ fun VendorDashboardScreen(
                             }
                         }
 
+                        // 1bb. DAILY ACCOUNTING & INVENTORY LOGS (CSV)
+                        Card(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(vertical = 4.dp),
+                            colors = CardDefaults.cardColors(
+                                containerColor = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.15f)
+                            )
+                        ) {
+                            Column(modifier = Modifier.padding(16.dp)) {
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                ) {
+                                    Icon(
+                                        Icons.Default.Assessment,
+                                        contentDescription = "Accounting Logs",
+                                        tint = MaterialTheme.colorScheme.secondary
+                                    )
+                                    Text(
+                                        text = "Daily Accounting & Inventory Logs",
+                                        fontWeight = FontWeight.Bold,
+                                        style = MaterialTheme.typography.titleSmall,
+                                        color = MaterialTheme.colorScheme.secondary
+                                    )
+                                }
+                                
+                                Spacer(modifier = Modifier.height(4.dp))
+                                
+                                Text(
+                                    text = "Export a standard CSV of all order receipts including food items, quantities, and prices for inventory matching and daily cash flow statements.",
+                                    fontSize = 11.sp,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+
+                                Spacer(modifier = Modifier.height(12.dp))
+
+                                var accountingExportStatusText by remember { mutableStateOf<String?>(null) }
+                                var isExportingAccounting by remember { mutableStateOf(false) }
+
+                                if (isExportingAccounting) {
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        horizontalArrangement = Arrangement.Center,
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        CircularProgressIndicator(modifier = Modifier.size(16.dp))
+                                        Spacer(modifier = Modifier.width(12.dp))
+                                        Text(
+                                            text = "Compiling CSV receipts...",
+                                            fontSize = 11.sp,
+                                            fontWeight = FontWeight.SemiBold
+                                        )
+                                    }
+                                } else {
+                                    accountingExportStatusText?.let { status ->
+                                        Box(
+                                            modifier = Modifier
+                                                .fillMaxWidth()
+                                                .background(
+                                                    MaterialTheme.colorScheme.secondaryContainer,
+                                                    RoundedCornerShape(8.dp)
+                                                )
+                                                .padding(8.dp),
+                                            contentAlignment = Alignment.Center
+                                        ) {
+                                            Text(
+                                                text = status,
+                                                fontSize = 11.sp,
+                                                fontWeight = FontWeight.Bold,
+                                                color = MaterialTheme.colorScheme.onSecondaryContainer
+                                            )
+                                        }
+                                        Spacer(modifier = Modifier.height(12.dp))
+                                    }
+
+                                    Button(
+                                        onClick = {
+                                            isExportingAccounting = true
+                                            viewModel.exportDailyOrderLogsToCSV(
+                                                vendorId = currentUser?.id ?: 0,
+                                                orders = filteredIncomingOrders
+                                            ) { success, message ->
+                                                isExportingAccounting = false
+                                                accountingExportStatusText = message
+                                            }
+                                        },
+                                        shape = RoundedCornerShape(8.dp),
+                                        modifier = Modifier.fillMaxWidth().testTag("export_daily_accounting_csv_btn"),
+                                        colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.secondary)
+                                    ) {
+                                        Icon(
+                                            Icons.Default.GridOn,
+                                            contentDescription = null,
+                                            modifier = Modifier.size(16.dp)
+                                        )
+                                        Spacer(modifier = Modifier.width(6.dp))
+                                        Text("Export Daily Order Logs (CSV)", fontSize = 11.sp)
+                                    }
+                                }
+                            }
+                        }
+
                         // 1c. d3.js Interactive Dashboard Chart View
-                        D3DashboardChart(orders = filteredIncomingOrders, feedbacks = filteredFeedbackList, modifier = Modifier.fillMaxWidth())
+                        D3DashboardChart(orders = filteredIncomingOrders, feedbacks = filteredFeedbackList, auditLogs = auditLogs, modifier = Modifier.fillMaxWidth())
 
                         Spacer(modifier = Modifier.height(8.dp))
 
@@ -4700,6 +4808,139 @@ fun VendorDashboardScreen(
                                         Spacer(modifier = Modifier.width(6.dp))
                                         Text(
                                             text = if (historicalInsightsText == null) "Analyze Historical Demand Patterns" else "Regenerate Campus Demand Insights",
+                                            fontSize = 11.sp,
+                                            fontWeight = FontWeight.Bold
+                                        )
+                                    }
+                                }
+                            }
+                        }
+
+                        Spacer(modifier = Modifier.height(12.dp))
+
+                        // 3f. Gemini AI Daily Demand Forecasting Widget (NEW)
+                        Card(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(vertical = 4.dp)
+                                .testTag("gemini_demand_forecasting_card"),
+                            colors = CardDefaults.cardColors(
+                                containerColor = MaterialTheme.colorScheme.tertiaryContainer.copy(alpha = 0.12f)
+                            ),
+                            shape = RoundedCornerShape(16.dp),
+                            border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.tertiary.copy(alpha = 0.25f))
+                        ) {
+                            Column(modifier = Modifier.padding(16.dp)) {
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.AutoAwesome,
+                                        contentDescription = "Demand Forecasting",
+                                        tint = MaterialTheme.colorScheme.tertiary
+                                    )
+                                    Text(
+                                        text = "Gemini AI Item Demand Forecaster",
+                                        fontWeight = FontWeight.Bold,
+                                        style = MaterialTheme.typography.titleMedium,
+                                        color = MaterialTheme.colorScheme.tertiary
+                                    )
+                                }
+                                
+                                Spacer(modifier = Modifier.height(4.dp))
+                                
+                                Text(
+                                    text = "Forecast tomorrow's daily demand for specific menu items based on past sales history to optimize inventory, ingredient prep, and minimize food waste.",
+                                    fontSize = 11.sp,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+
+                                Spacer(modifier = Modifier.height(12.dp))
+
+                                if (isGeneratingDemandForecast) {
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth().padding(vertical = 12.dp),
+                                        horizontalArrangement = Arrangement.Center,
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        CircularProgressIndicator(modifier = Modifier.size(20.dp), color = MaterialTheme.colorScheme.tertiary)
+                                        Spacer(modifier = Modifier.width(12.dp))
+                                        Text(
+                                            text = "Forecasting daily menu demand...",
+                                            fontSize = 12.sp,
+                                            fontWeight = FontWeight.SemiBold,
+                                            color = MaterialTheme.colorScheme.tertiary
+                                        )
+                                    }
+                                } else {
+                                    vendorDemandForecast?.let { forecastReport ->
+                                        Box(
+                                            modifier = Modifier
+                                                .fillMaxWidth()
+                                                .background(
+                                                    MaterialTheme.colorScheme.surface.copy(alpha = 0.9f),
+                                                    RoundedCornerShape(12.dp)
+                                                )
+                                                .border(androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant))
+                                                .padding(14.dp)
+                                        ) {
+                                            Column {
+                                                Row(
+                                                    verticalAlignment = Alignment.CenterVertically,
+                                                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                                                    modifier = Modifier.padding(bottom = 8.dp)
+                                                ) {
+                                                    Box(
+                                                        modifier = Modifier
+                                                            .background(MaterialTheme.colorScheme.tertiaryContainer, RoundedCornerShape(4.dp))
+                                                            .padding(horizontal = 6.dp, vertical = 2.dp)
+                                                    ) {
+                                                        Text(
+                                                            "GEMINI PREDICTIVE FORECAST",
+                                                            color = MaterialTheme.colorScheme.onTertiaryContainer,
+                                                            fontSize = 9.sp,
+                                                            fontWeight = FontWeight.Bold
+                                                        )
+                                                    }
+                                                }
+                                                Text(
+                                                    text = forecastReport,
+                                                    fontSize = 12.sp,
+                                                    lineHeight = 18.sp,
+                                                    color = MaterialTheme.colorScheme.onSurface
+                                                )
+                                            }
+                                        }
+                                        Spacer(modifier = Modifier.height(12.dp))
+                                    }
+
+                                    Button(
+                                        onClick = {
+                                            viewModel.runVendorDemandForecast(
+                                                vendorId = currentUser?.id ?: 0,
+                                                vendorName = currentUser?.fullName ?: "Vendor",
+                                                allOrders = incomingOrders,
+                                                allFoodItems = vendorFoods
+                                            )
+                                        },
+                                        colors = ButtonDefaults.buttonColors(
+                                            containerColor = MaterialTheme.colorScheme.tertiary,
+                                            contentColor = MaterialTheme.colorScheme.onTertiary
+                                        ),
+                                        shape = RoundedCornerShape(8.dp),
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .testTag("run_demand_forecast_button")
+                                    ) {
+                                        Icon(
+                                            Icons.Default.AutoAwesome,
+                                            contentDescription = null,
+                                            modifier = Modifier.size(16.dp)
+                                        )
+                                        Spacer(modifier = Modifier.width(6.dp))
+                                        Text(
+                                            text = if (vendorDemandForecast == null) "Forecast Tomorrow's Menu Demand" else "Regenerate Tomorrow's Forecast",
                                             fontSize = 11.sp,
                                             fontWeight = FontWeight.Bold
                                         )

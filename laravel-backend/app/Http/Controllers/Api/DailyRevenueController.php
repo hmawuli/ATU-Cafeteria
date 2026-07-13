@@ -79,4 +79,72 @@ class DailyRevenueController extends Controller
             'generated_at' => date('Y-m-d H:i:s')
         ], 200);
     }
+
+    /**
+     * Calculate and return daily sales revenue for a specific vendor.
+     */
+    public function getVendorDailyRevenue($vendorId, Request $request)
+    {
+        // Check if vendor exists
+        $vendor = User::find($vendorId);
+        if (!$vendor) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Vendor not found.'
+            ], 404);
+        }
+
+        // Base query for orders belonging to this vendor
+        $query = Order::where('vendor_id', $vendorId)
+            ->where('status', 'COMPLETED');
+
+        // Optional date filter (format: YYYY-MM-DD)
+        if ($request->has('date') && $request->input('date') !== '') {
+            $date = $request->input('date');
+            $startTimestamp = strtotime($date . ' 00:00:00') * 1000;
+            $endTimestamp = strtotime($date . ' 23:59:59') * 1000;
+            if ($startTimestamp && $endTimestamp) {
+                $query->whereBetween('order_timestamp', [$startTimestamp, $endTimestamp]);
+            }
+        }
+
+        // Let's get the daily grouped totals
+        $driver = DB::connection()->getDriverName();
+        if ($driver === 'sqlite') {
+            $dateExpr = "strftime('%Y-%m-%d', datetime(created_at, 'localtime'))";
+        } else {
+            $dateExpr = "CAST(created_at AS DATE)";
+        }
+
+        $results = $query->select([
+                DB::raw("$dateExpr as revenue_date"),
+                DB::raw("COUNT(id) as total_completed_orders"),
+                DB::raw("SUM(total_price) as total_revenue")
+            ])
+            ->groupBy(DB::raw($dateExpr))
+            ->orderBy('revenue_date', 'desc')
+            ->get();
+
+        $dailyData = $results->map(function ($row) {
+            return [
+                'date' => $row->revenue_date,
+                'completed_orders_count' => intval($row->total_completed_orders),
+                'revenue' => round(floatval($row->total_revenue), 2)
+            ];
+        });
+
+        // Let's also compute the total aggregate completed revenue for this vendor
+        $totalAggregateRevenue = Order::where('vendor_id', $vendorId)
+            ->where('status', 'COMPLETED')
+            ->sum('total_price');
+
+        return response()->json([
+            'success' => true,
+            'vendor_id' => (int) $vendorId,
+            'vendor_name' => $vendor->fullName,
+            'total_aggregate_revenue' => round(floatval($totalAggregateRevenue), 2),
+            'daily_sales_revenue' => $dailyData,
+            'generated_at' => date('Y-m-d H:i:s')
+        ], 200);
+    }
 }

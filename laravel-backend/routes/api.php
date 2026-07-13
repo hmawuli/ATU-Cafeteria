@@ -21,7 +21,16 @@ use App\Http\Controllers\Api\PassportAuthController;
 use App\Http\Controllers\Api\DailyRevenueController;
 use App\Http\Controllers\Api\MenuItemController;
 use App\Http\Controllers\Api\InventoryCronController;
+use App\Http\Controllers\Api\WeeklyReportCronController;
+use App\Http\Controllers\Api\DeliveredOrderReviewController;
 use App\Http\Controllers\Api\OrderItemMetricsController;
+use App\Http\Controllers\Api\VendorMenuItemController;
+use App\Http\Controllers\Api\VendorMetricsController;
+use App\Http\Controllers\Api\FavoriteMenuItemController;
+use App\Http\Controllers\Api\IngredientDemandController;
+use App\Http\Controllers\Api\StudentBudgetController;
+use App\Http\Controllers\Api\LoyaltyController;
+use App\Http\Controllers\Api\GroupOrderController;
 
 // Register explicit listeners for OrderStatusCompleted event
 Event::listen(
@@ -623,20 +632,50 @@ Route::middleware(function ($request, $next) {
     Route::middleware($checkStudent)->group(function () {
         // Authenticated Student Orders Endpoints
         Route::get('/student/orders', [OrderController::class, 'getAuthenticatedStudentOrders']);
+        Route::get('/student/order-history', [OrderController::class, 'getPersonalOrderHistory']);
         Route::post('/student/orders', [OrderController::class, 'storeAuthenticatedStudentOrder']);
         Route::post('/student/cart-checkout', [OrderController::class, 'cartCheckout']);
+        Route::get('/student/orders/poll-ready', [OrderController::class, 'pollOrderStatusReady']);
+        Route::get('/student/orders/stream-ready', [OrderController::class, 'streamOrderStatusReady']);
+
+        // Favorite Menu Items Endpoints
+        Route::get('/student/favorites', [FavoriteMenuItemController::class, 'index']);
+        Route::post('/student/favorites', [FavoriteMenuItemController::class, 'store']);
+        Route::delete('/student/favorites/{id}', [FavoriteMenuItemController::class, 'destroy']);
+
+        // Student Budget & Spending Analytics Endpoints
+        Route::get('/student/budget/analytics', [StudentBudgetController::class, 'getBudgetAnalytics']);
+        Route::post('/student/budget/limit', [StudentBudgetController::class, 'setBudgetLimit']);
+
+        // Student Loyalty Points & Rewards Endpoints
+        Route::get('/student/loyalty/summary', [LoyaltyController::class, 'getLoyaltySummary']);
+        Route::post('/student/loyalty/preview-discount', [LoyaltyController::class, 'previewDiscount']);
+
+        // Student Shared Group Order Endpoints
+        Route::post('/student/group-order', [GroupOrderController::class, 'createSession']);
+        Route::get('/student/group-order/{code}', [GroupOrderController::class, 'getSessionDetails']);
+        Route::post('/student/group-order/{code}/contribute', [GroupOrderController::class, 'contributeItem']);
+        Route::delete('/student/group-order/{code}/items/{itemId}', [GroupOrderController::class, 'removeContribution']);
+        Route::post('/student/group-order/{code}/lock', [GroupOrderController::class, 'lockSession']);
+        Route::post('/student/group-order/{code}/cancel', [GroupOrderController::class, 'cancelSession']);
+        Route::post('/student/group-order/{code}/checkout', [GroupOrderController::class, 'checkoutSession']);
     });
 
     // --- Vendor-Only Routes ---
     Route::middleware($checkVendor)->group(function () {
         // Protected Vendor Menu & Food Items Endpoints
         Route::post('/food-items', [FoodItemController::class, 'store']);
+        Route::post('/food-items/bulk-toggle', [FoodItemController::class, 'bulkToggle']);
         Route::put('/food-items/{id}', [FoodItemController::class, 'update']);
         Route::delete('/food-items/{id}', [FoodItemController::class, 'destroy']);
 
         // Protected Vendor Pre-Orders & Hand-offs
         Route::put('/orders/{id}/status', [OrderController::class, 'updateStatus']);
+        Route::patch('/orders/{id}/status', [OrderController::class, 'patchStatus']);
         Route::post('/orders/{id}/verify-pickup', [OrderController::class, 'verifyAndCompletePickup']);
+        Route::post('/feedback/{id}/reply', [FeedbackController::class, 'reply']);
+        Route::get('/vendor/feedback/sentiment', [FeedbackController::class, 'getFeedbackSentimentReport']);
+        Route::get('/vendor/{vendorId}/feedback/sentiment', [FeedbackController::class, 'getFeedbackSentimentReport']);
 
         // Authenticated Vendor Private Feeds
         Route::get('/vendor/my-menu', [VendorController::class, 'getMyFoodItems']);
@@ -647,10 +686,17 @@ Route::middleware(function ($request, $next) {
         Route::get('/vendor/{vendorId}/gemini-report', [VendorController::class, 'getVendorGeminiReport']);
         Route::get('/vendor/analytics/gemini-order-insights', [VendorController::class, 'getMyGeminiOrderInsights']);
         Route::get('/vendor/{vendorId}/gemini-order-insights', [VendorController::class, 'getVendorGeminiOrderInsights']);
+        Route::get('/vendor/analytics/ingredient-demand', [IngredientDemandController::class, 'getIngredientDemandPrediction']);
+        Route::get('/vendor/{vendorId}/analytics/ingredient-demand', [IngredientDemandController::class, 'getIngredientDemandPrediction']);
         Route::get('/vendor/performance-metrics', [VendorPerformanceController::class, 'getVendorPerformanceMetrics']);
         Route::get('/vendor/performance', [VendorPerformanceController::class, 'getPerformance']);
+        Route::get('/vendor/sales-summary', [VendorMetricsController::class, 'getVendorSalesSummary']);
+        Route::get('/vendor/sales-trend-30-days', [VendorMetricsController::class, 'getVendorSalesTrend30Days']);
         Route::get('/vendor/recharts-sales', [VendorPerformanceController::class, 'exportSalesForRecharts']);
+        Route::get('/vendor/reports/weekly', [WeeklyReportCronController::class, 'downloadWeeklyReportPdf']);
+        Route::get('/vendor/reports/weekly/{vendorId}', [WeeklyReportCronController::class, 'downloadWeeklyReportPdf']);
         Route::get('/vendor/daily-revenue', [DailyRevenueController::class, 'getDailyRevenue']);
+        Route::get('/vendor/{vendorId}/daily-sales-revenue', [DailyRevenueController::class, 'getVendorDailyRevenue']);
         Route::post('/vendor/toggle-status', [VendorController::class, 'toggleStatus']);
 
         // Order Items Dashboard Metrics Endpoints
@@ -678,6 +724,9 @@ Route::middleware(function ($request, $next) {
         Route::post('/vendors/menu-items', [MenuItemController::class, 'store']);
         Route::put('/vendors/menu-items/{id}', [MenuItemController::class, 'update']);
         Route::delete('/vendors/menu-items/{id}', [MenuItemController::class, 'destroy']);
+
+        // Standard Resource route for Vendors to manage their specific MenuItems
+        Route::apiResource('vendor-menu-items', VendorMenuItemController::class);
     });
 
     // --- Common Authenticated Routes ---
@@ -715,11 +764,14 @@ Route::middleware(function ($request, $next) {
 
 // Automated Inventory & Availability Cron Checker routes
 Route::match(['get', 'post'], '/cron/check-availability', [InventoryCronController::class, 'checkAndNotify']);
+Route::post('/vendor/inventory/trigger-threshold', [InventoryCronController::class, 'checkItemStock']);
+Route::match(['get', 'post'], '/cron/weekly-performance-report', [WeeklyReportCronController::class, 'emailWeeklyReports']);
 
 // Menu, Standalone Menu Items, & Food Items Endpoints (Public Reads)
 Route::get('/menus', [MenuController::class, 'index']);
 Route::get('/menus/vendor/{vendorId}', [MenuController::class, 'getVendorMenu']);
 Route::get('/menu-items', [MenuController::class, 'listMenuItems']);
+Route::get('/menu-items/search', [MenuController::class, 'search']);
 Route::get('/menu-items/vendor/{vendorId}', [MenuController::class, 'getVendorMenuItems']);
 
 Route::get('/food-items', [FoodItemController::class, 'index']);
@@ -739,6 +791,11 @@ Route::get('/vendor/performance-metrics', [VendorPerformanceController::class, '
 Route::get('/vendor/performance-recharts', [VendorPerformanceController::class, 'exportSalesForRecharts']);
 Route::get('/vendor/statistics', [VendorPerformanceController::class, 'getAggregatedStatistics']);
 
+// Vendor Rating & Completion Speed Metrics Endpoints
+Route::get('/vendor/{vendorId}/metrics', [VendorMetricsController::class, 'getVendorMetrics']);
+Route::get('/vendor/{vendorId}/estimated-wait-time', [OrderController::class, 'getVendorWaitTime']);
+Route::get('/vendors/metrics', [VendorMetricsController::class, 'getAllVendorsMetrics']);
+
 Route::get('/dashboard/order-items-metrics', [OrderItemMetricsController::class, 'getDashboardMetrics']);
 Route::get('/dashboard/order-items-revenue', [OrderItemMetricsController::class, 'getDailyRevenueMetrics']);
 Route::get('/dashboard/order-items-menu-metrics', [OrderItemMetricsController::class, 'getMenuItemMetrics']);
@@ -751,6 +808,12 @@ Route::post('/feedback', [FeedbackController::class, 'store']);
 Route::get('/food-items/feedback', [FoodItemFeedbackController::class, 'index']);
 Route::get('/food-items/{foodItemId}/feedback', [FoodItemFeedbackController::class, 'getByFoodItem']);
 Route::post('/food-items/feedback', [FoodItemFeedbackController::class, 'store']);
+
+// Delivered Order Reviews & Ratings Endpoints
+Route::get('/reviews', [DeliveredOrderReviewController::class, 'index']);
+Route::get('/reviews/vendor/{vendorId}', [DeliveredOrderReviewController::class, 'getVendorReviews']);
+Route::get('/reviews/food-item/{foodItemId}', [DeliveredOrderReviewController::class, 'getFoodItemReviews']);
+Route::post('/reviews', [DeliveredOrderReviewController::class, 'store']);
 
 // Centralised Quality Assurance Traceability Audit Logs Endpoints
 Route::get('/audit-logs', [AuditLogController::class, 'index']);
