@@ -111,7 +111,7 @@ class GeminiAnalyticsRepository {
 
         val prompt = """
             You are an advanced Customer Sentiment and Linguistic Specialist for the Accra Technical University (ATU) Cafeteria Board.
-            Perform a qualitative sentiment analysis on student reviews and order comments for Vendor: '$vendorName'.
+            Perform a qualitative sentiment analysis on student reviews and order comments for Vendor: '$vendorName', and categorize vendor performance notes into actionable improvement areas.
             
             STUDENT REVIEWS & TRANSCRIPTS:
             $reviewSummary
@@ -120,8 +120,12 @@ class GeminiAnalyticsRepository {
             
             1. **📊 Sentiment Balance Breakdown**: Provide estimated percentages for Positive, Neutral, and Negative sentiments based on comments and rating distributions.
             2. **👍 Praise Highlights**: Summarize the leading aspects that students are happy about (e.g., taste, hygiene, hospitality, portion sizes).
-            3. **👎 Critical Actionable Friction Points**: Identify specific student complaints, pain points, or constructive criticism in their descriptions.
-            4. **💡 Executive Recommendation**: Give a 2-sentence summary recommendation to improve student experiences.
+            3. **👎 Categorized Performance Notes & Actionable Improvement Areas**: Group student complaints and critical performance notes into distinct, actionable categories:
+               * **Food Quality & Prep**: Specific issues and recommendations regarding flavor, temperature, or cooking consistency.
+               * **Cleanliness & Hygiene**: Issues and recommendations regarding the stall area, waste management, or food handling.
+               * **Service Speed & Queue Management**: Bottlenecks and recommendations regarding serving delays, status alerts, or line coordination.
+               * **Pricing & Value Proposition**: Feedback and suggestions regarding portions, price fairness, or special deals.
+            4. **💡 Executive Recommendation Summary**: Give a 2-sentence summary recommendation to improve student experiences.
             
             Keep the content highly structured, engaging, and professional for a mobile dashboard. Use bold markdown headers and formatting.
         """.trimIndent()

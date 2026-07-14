@@ -33,7 +33,29 @@ class OrderReadyNotification extends Notification
      */
     public function via($notifiable)
     {
-        return ['database'];
+        return ['database', 'mail'];
+    }
+
+    /**
+     * Get the mail representation of the notification.
+     *
+     * @param  mixed  $notifiable
+     * @return \Illuminate\Notifications\Messages\MailMessage
+     */
+    public function toMail($notifiable)
+    {
+        return (new \Illuminate\Notifications\Messages\MailMessage)
+            ->subject("🍔 ATU Cafeteria: Your Order #{$this->order->id} is READY!")
+            ->greeting("Hello, " . ($notifiable->fullName ?: $notifiable->username) . "!")
+            ->line("Great news! Your pre-ordered food is now ready for pickup at the counter.")
+            ->line("Order Details:")
+            ->line("• **Item:** {$this->order->food_name}")
+            ->line("• **Quantity:** {$this->order->quantity}")
+            ->line("• **Total Paid:** GH₵" . number_format($this->order->total_price, 2))
+            ->line("🔑 **Your Security Pickup PIN:** {$this->order->pickup_pin}")
+            ->line("Please show this PIN at the counter to retrieve your hot meal.")
+            ->action('View My Orders', url('/'))
+            ->line("Thank you for using Accra Technical University (ATU) Cafeteria Hub!");
     }
 
     /**

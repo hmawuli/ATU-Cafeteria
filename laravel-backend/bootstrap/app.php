@@ -39,6 +39,9 @@ return Application::configure(basePath: dirname(__DIR__))
 
         // System error database logger middleware
         $middleware->append(\App\Http\Middleware\SystemErrorLoggerMiddleware::class);
+
+        // Audit and sanitize incoming order requests middleware
+        $middleware->append(\App\Http\Middleware\AuditAndSanitizeOrderMiddleware::class);
     })
     ->withExceptions(function (Exceptions $exceptions) {
         //

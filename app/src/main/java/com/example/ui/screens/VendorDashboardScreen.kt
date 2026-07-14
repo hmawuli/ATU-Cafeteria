@@ -5757,13 +5757,13 @@ fun VendorDashboardScreen(
                                     Text("📊", fontSize = 20.sp)
                                     Column {
                                         Text(
-                                            "Business CSV Exporter",
+                                            "Administrative Sales & Performance Exporter",
                                             fontWeight = FontWeight.Bold,
                                             style = MaterialTheme.typography.titleMedium,
                                             color = MaterialTheme.colorScheme.primary
                                         )
                                         Text(
-                                            "Export your POS logs and sales trends for offline bookkeeping and spreadsheet calculations.",
+                                            "Export monthly vendor sales data, revenue trends, and performance analytics as a CSV or PDF report for administrative review.",
                                             fontSize = 11.sp,
                                             color = MaterialTheme.colorScheme.onSurfaceVariant
                                         )

@@ -1897,6 +1897,7 @@ fun StudentDashboardScreen(
 
                         val filteredFoods = allFoodItems.filter { food ->
                             val vendor = allVendors.find { it.id == food.vendorId }
+                            val vendorIsOpen = vendor?.isOpen ?: true
                             val vendorName = vendor?.fullName ?: ""
                             val vendorInfo = vendor?.info ?: ""
                             val matchesDietary = when (selectedDietaryFilter) {
@@ -1905,6 +1906,7 @@ fun StudentDashboardScreen(
                                 "Gluten-Free" -> food.description.contains("Gluten-Free", ignoreCase = true) || food.name.contains("Gluten-Free", ignoreCase = true) || food.allergens.contains("Gluten-Free", ignoreCase = true) || !food.allergens.contains("Wheat", ignoreCase = true)
                                 else -> true
                             }
+                            vendorIsOpen &&
                             matchesDietary &&
                             (selectedVendorIdFilter == null || food.vendorId == selectedVendorIdFilter) &&
                             (selectedCategory == "All" || food.category.equals(selectedCategory, ignoreCase = true)) &&
@@ -4483,7 +4485,9 @@ fun StudentDashboardScreen(
 
                         // Filtered suggestions
                         val filteredSuggestList = allFoodItems.filter { food ->
-                            when (selectedGoalFilter) {
+                            val vendor = allVendors.find { it.id == food.vendorId }
+                            val vendorIsOpen = vendor?.isOpen ?: true
+                            vendorIsOpen && when (selectedGoalFilter) {
                                 "High Protein gains" -> {
                                     val triple = getNutritionalProfile(food)
                                     triple.first >= 15f

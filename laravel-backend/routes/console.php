@@ -182,3 +182,114 @@ Artisan::command('database:backup', function () {
     return 0;
 })->purpose('Backup active database schema and dump data to local folder and cloud storage');
 
+
+/**
+ * Custom console command to calculate weekly vendor performance ratings based on order completion speed and customer feedback.
+ */
+Artisan::command('vendor:calculate-weekly-metrics', function () {
+    $this->info('Starting weekly vendor performance rating calculation...');
+    Log::info('Vendor Weekly Metrics Cron: Started calculations.');
+
+    $vendors = \App\Models\User::where('role', 'VENDOR')->orWhere('role', 'vendor')->get();
+    $cutoffDate = now()->subDays(7);
+    $processedCount = 0;
+
+    foreach ($vendors as $vendor) {
+        // 1. Gather Orders in the last 7 days
+        $ordersQuery = \App\Models\Order::where('vendor_id', $vendor->id)
+            ->where('created_at', '>=', $cutoffDate);
+
+        $totalOrders = $ordersQuery->count();
+        $completedOrdersCount = (clone $ordersQuery)->where('status', 'COMPLETED')->count();
+        $totalSales = (clone $ordersQuery)->where('status', 'COMPLETED')->sum('total_price');
+
+        // Fallback to all-time stats if zero activity in the last 7 days to avoid blank metric fields
+        if ($totalOrders === 0) {
+            $ordersQueryAllTime = \App\Models\Order::where('vendor_id', $vendor->id);
+            $totalOrders = $ordersQueryAllTime->count();
+            $completedOrdersCount = (clone $ordersQueryAllTime)->where('status', 'COMPLETED')->count();
+            $totalSales = (clone $ordersQueryAllTime)->where('status', 'COMPLETED')->sum('total_price');
+        }
+
+        // Calculate order fulfillment rate
+        $fulfillmentRate = $totalOrders > 0 ? round(($completedOrdersCount / $totalOrders) * 100, 2) : 100.0;
+
+        // Calculate average completion time in minutes (updated_at - created_at)
+        $completedOrders = \App\Models\Order::where('vendor_id', $vendor->id)
+            ->where('status', 'COMPLETED')
+            ->where('created_at', '>=', $cutoffDate)
+            ->get();
+
+        if ($completedOrders->isEmpty()) {
+            $completedOrders = \App\Models\Order::where('vendor_id', $vendor->id)
+                ->where('status', 'COMPLETED')
+                ->get();
+        }
+
+        $totalMinutes = 0;
+        $completionCount = 0;
+        foreach ($completedOrders as $order) {
+            if ($order->created_at && $order->updated_at) {
+                $diff = $order->updated_at->diffInMinutes($order->created_at);
+                $totalMinutes += $diff;
+                $completionCount++;
+            }
+        }
+        // Base fallback of 10-15 minutes if no time delta can be calculated
+        $avgCompletionTime = $completionCount > 0 ? round($totalMinutes / $completionCount, 2) : 12.5;
+
+        // 2. Gather Customer Feedback in the last 7 days (fallback to all time)
+        $feedbackQuery = \App\Models\Feedback::where('vendor_id', $vendor->id)
+            ->where('created_at', '>=', $cutoffDate);
+
+        if ($feedbackQuery->count() === 0) {
+            $feedbackQuery = \App\Models\Feedback::where('vendor_id', $vendor->id);
+        }
+
+        $avgFoodQuality = round($feedbackQuery->avg('rating_food_quality') ?? 4.0, 1);
+        $avgCleanliness = round($feedbackQuery->avg('rating_cleanliness') ?? 4.0, 1);
+        $avgServiceSpeed = round($feedbackQuery->avg('rating_service_speed') ?? 4.0, 1);
+        $avgPriceValue = round($feedbackQuery->avg('rating_price_value') ?? 4.0, 1);
+
+        // Overall rating is the average of the four categories
+        $avgOverall = round(($avgFoodQuality + $avgCleanliness + $avgServiceSpeed + $avgPriceValue) / 4, 1);
+
+        // 3. Gather top popular menu items
+        $popularItems = \App\Models\Order::where('vendor_id', $vendor->id)
+            ->where('status', 'COMPLETED')
+            ->select('food_name', \Illuminate\Support\Facades\DB::raw('COUNT(*) as order_count'))
+            ->groupBy('food_name')
+            ->orderBy('order_count', 'desc')
+            ->limit(3)
+            ->pluck('food_name')
+            ->toArray();
+
+        // 4. Save metrics report record
+        \App\Models\VendorPerformanceMetric::create([
+            'vendor_id' => $vendor->id,
+            'total_orders' => $totalOrders,
+            'total_completed_orders' => $completedOrdersCount,
+            'total_sales' => $totalSales,
+            'avg_completion_time_minutes' => $avgCompletionTime,
+            'order_fulfillment_rate' => $fulfillmentRate,
+            'rating_food_quality' => $avgFoodQuality,
+            'rating_cleanliness' => $avgCleanliness,
+            'rating_service_speed' => $avgServiceSpeed,
+            'rating_price_value' => $avgPriceValue,
+            'rating_overall' => $avgOverall,
+            'popular_menu_items' => $popularItems,
+            'calculated_at' => now(),
+        ]);
+
+        $this->info("Calculated performance ratings for vendor '{$vendor->fullName}' (ID: {$vendor->id}) -> Star Rating: {$avgOverall} | Speed: {$avgCompletionTime} mins.");
+        $processedCount++;
+    }
+
+    $this->info("Completed weekly performance calculations for {$processedCount} vendors.");
+    Log::info("Vendor Weekly Metrics Cron: Successfully updated metrics for {$processedCount} vendors.");
+})->purpose('Calculate weekly vendor performance ratings based on completion speeds and customer feedback scores');
+
+// Schedule the weekly performance rating calculator to run every week
+Schedule::command('vendor:calculate-weekly-metrics')->weekly();
+
+
