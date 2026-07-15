@@ -31,6 +31,8 @@ class CafeteriaRepository(private val db: AppDatabase) {
     val auditLogDao = db.auditLogDao()
     val walletTransactionDao = db.walletTransactionDao()
     val foodItemFeedbackDao = db.foodItemFeedbackDao()
+    val offlineOrderDao = db.offlineOrderDao()
+    val chatMessageDao = db.chatMessageDao()
 
     // Flow Accessors
     val allVendors: Flow<List<User>> = userDao.getAllVendors()
@@ -47,6 +49,15 @@ class CafeteriaRepository(private val db: AppDatabase) {
 
     fun getWalletTransactionsForUser(userId: Int): Flow<List<WalletTransaction>> =
         walletTransactionDao.getWalletTransactionsForUser(userId)
+
+    fun getMessagesForOrder(orderId: Int): Flow<List<ChatMessage>> =
+        chatMessageDao.getMessagesForOrder(orderId)
+
+    fun getMessagesForUser(userId: Int): Flow<List<ChatMessage>> =
+        chatMessageDao.getMessagesForUser(userId)
+
+    suspend fun insertChatMessage(msg: ChatMessage): Long =
+        chatMessageDao.insertMessage(msg)
 
     fun getFoodItemsForVendor(vendorId: Int): Flow<List<FoodItem>> =
         foodItemDao.getFoodItemsByVendor(vendorId)
@@ -208,7 +219,8 @@ class CafeteriaRepository(private val db: AppDatabase) {
         department: String?,
         programOfStudy: String?,
         paymentMethods: List<String>?,
-        info: String
+        info: String,
+        dietaryPreferences: String? = null
     ): Boolean = withContext(Dispatchers.IO) {
         val user = userDao.getUserSync(id) ?: return@withContext false
         val updatedUser = user.copy(
@@ -217,7 +229,8 @@ class CafeteriaRepository(private val db: AppDatabase) {
             telephone = telephone,
             email = email,
             paymentMethods = paymentMethods?.joinToString(","),
-            info = info
+            info = info,
+            dietaryPreferences = dietaryPreferences ?: user.dietaryPreferences
         )
         userDao.updateUser(updatedUser)
         insertAuditLog(id, "PROFILE_UPDATE", "User updated their email/phone profile settings & payment options.")
@@ -433,7 +446,24 @@ class CafeteriaRepository(private val db: AppDatabase) {
 
                 return@withContext roomOrder
             } catch (e: Exception) {
-                Log.e("CafeteriaRepository", "Laravel placeOrder failed - falling back to local", e)
+                Log.e("CafeteriaRepository", "Laravel placeOrder failed due to intermittent connectivity - queuing order", e)
+                try {
+                    val offlineOrder = OfflineOrder(
+                        customerId = customerId,
+                        vendorId = foodItem.vendorId,
+                        foodItemId = foodItem.id,
+                        foodName = foodItem.name,
+                        quantity = quantity,
+                        unitPrice = foodItem.price,
+                        totalPrice = finalTotal,
+                        pointsToRedeem = pointsToRedeem,
+                        estimatedPickupTime = estimatedPickupTime
+                    )
+                    offlineOrderDao.insertOfflineOrder(offlineOrder)
+                    insertAuditLog(customerId, "OFFLINE_ORDER_QUEUED", "Order for '${foodItem.name}' (QTY: $quantity) was queued locally due to intermittent connectivity.")
+                } catch (queueError: Exception) {
+                    Log.e("CafeteriaRepository", "Failed to queue offline order", queueError)
+                }
             }
         }
         // Secure pickup PIN is a random 4-digit code
@@ -846,8 +876,55 @@ class CafeteriaRepository(private val db: AppDatabase) {
     }
 
     // Multi-table sync from Laravel to Local SQLite/Room DB Cache
+    suspend fun syncOfflineOrders(): Int = withContext(Dispatchers.IO) {
+        if (!LaravelClientManager.isLaravelEnabled) return@withContext 0
+        try {
+            val queued = offlineOrderDao.getAllOfflineOrders()
+            if (queued.isEmpty()) return@withContext 0
+            Log.d("CafeteriaRepository", "Syncing ${queued.size} offline orders to Laravel...")
+            var syncedCount = 0
+            val service = LaravelClientManager.getService()
+            for (off in queued) {
+                try {
+                    val lOrder = service.createOrder(
+                        LaravelAddOrderRequest(
+                            customer_id = off.customerId,
+                            vendor_id = off.vendorId,
+                            food_item_id = off.foodItemId,
+                            food_name = off.foodName,
+                            quantity = off.quantity,
+                            unit_price = off.unitPrice,
+                            total_price = off.totalPrice,
+                            points_to_redeem = off.pointsToRedeem,
+                            estimated_pickup_time = off.estimatedPickupTime
+                        )
+                    )
+                    val roomOrder = LaravelClientManager.toRoomOrder(lOrder)
+                    orderDao.insertOrder(roomOrder)
+                    offlineOrderDao.deleteOfflineOrder(off)
+                    syncedCount++
+                    insertAuditLog(off.customerId, "OFFLINE_ORDER_SYNCED", "Offline queued order for '${off.foodName}' successfully synced to backend server.")
+                } catch (e: Exception) {
+                    Log.e("CafeteriaRepository", "Failed to sync offline order ID: ${off.id}", e)
+                    break // Stop syncing if connection is still dead/intermittent
+                }
+            }
+            return@withContext syncedCount
+        } catch (e: Exception) {
+            Log.e("CafeteriaRepository", "Error in syncOfflineOrders", e)
+            return@withContext 0
+        }
+    }
+
+    // Multi-table sync from Laravel to Local SQLite/Room DB Cache
     suspend fun syncAllFromLaravel(): Boolean = withContext(Dispatchers.IO) {
         if (!LaravelClientManager.isLaravelEnabled) return@withContext true
+        // Sync any offline queued orders first
+        try {
+            syncOfflineOrders()
+        } catch (e: Exception) {
+            Log.e("CafeteriaRepository", "Error syncing offline orders during main sync", e)
+        }
         try {
             Log.d("CafeteriaRepository", "Syncing all tables from Laravel API dynamically...")
             val service = LaravelClientManager.getService()

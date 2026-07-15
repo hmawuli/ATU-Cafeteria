@@ -735,6 +735,144 @@ class GeminiAnalyticsRepository {
         }
     }
 
+    suspend fun generateStudentMenuRecommendations(
+        studentName: String,
+        pastOrders: List<Order>,
+        dietaryPreferences: String,
+        availableFoodItems: List<FoodItem>
+    ): String = withContext(Dispatchers.IO) {
+        val apiKey = BuildConfig.GEMINI_API_KEY
+        
+        val pastFoodNames = pastOrders.map { it.foodName }.distinct()
+        val foodMenuStr = availableFoodItems.joinToString("\n") {
+            "• ${it.name} (Price: GH₵ ${it.price}, Category: ${it.category}, Calories: ${it.calories} kcal, Description: ${it.description})"
+        }
+        
+        if (apiKey.isEmpty() || apiKey == "MY_GEMINI_API_KEY") {
+            return@withContext "### 🧠 Gemini AI Student Menu Recommendations for **$studentName**\n" +
+                    "*(Offline Simulated Engine — Set up your GEMINI_API_KEY to run live models)*\n\n" +
+                    "Based on your past orders containing **${if (pastFoodNames.isEmpty()) "local cafeteria favorites" else pastFoodNames.joinToString(", ")}** and your selected dietary preference (**$dietaryPreferences**):\n\n" +
+                    "### 🍽️ Your Top 3 Recommendations:\n" +
+                    "1. **Waakye Premium Combo** (GH₵ 30.00)\n" +
+                    "   * **Why**: Perfect fit for your '$dietaryPreferences' goal. Packed with protein from eggs and fish, mirroring your fondness for rich, savory local dishes.\n" +
+                    "2. **ATU Chicken Jollof Rice** (GH₵ 25.00)\n" +
+                    "   * **Why**: Matches your historical preference for robust rice-based plates, and keeps carbs balanced for your long lectures.\n" +
+                    "3. **Zesty Ginger Sobolo** (GH₵ 10.00)\n" +
+                    "   * **Why**: A refreshing, healthy local antioxidant beverage to accompany your meals without artificial sweeteners.\n\n" +
+                    "### 💡 Dietary Insights for Student Success:\n" +
+                    "• Keep hydrated during ATU afternoon temperatures.\n" +
+                    "• High protein and fiber content in bean-based dishes like Waakye will sustain your mental focus through consecutive 2-hour lecture sessions."
+        }
+
+        val prompt = """
+            You are an advanced, empathetic AI Student Nutritionist and Culinary Recommendation Engine representing the Accra Technical University (ATU) Cafeteria Wellness Board.
+            Please generate a highly customized list of menu suggestions for the student '$studentName' based on their past orders and current dietary preference/goal.
+            
+            STUDENT PROFILE:
+            - Name: $studentName
+            - Dietary Preferences / Health Goals: $dietaryPreferences
+            - Past Ordered Food Items: ${if (pastFoodNames.isEmpty()) "No order history yet." else pastFoodNames.joinToString(", ")}
+            
+            AVAILABLE CAMPUS CAFETERIA MENU ITEMS:
+            $foodMenuStr
+            
+            Please formulate a beautifully formatted, clear, and encouraging Markdown recommendation report for the student:
+            1. **🍽️ Customized Recommendations**: Pick exactly 3 available items from the ATU cafeteria list that best match their dietary preferences and order history. Under each item, explain *why* it fits their profile in 2-3 sentences.
+            2. **💡 Health & Focus Insights for Studies**: Provide 2 useful tips about how their meal choices can support their learning, concentration, or energy management on campus.
+            
+            Make the output visually compelling with bold headers and lists, suited for a mobile screen card. Limit to 350 words.
+        """.trimIndent()
+
+        val request = GeminiGenerateRequest(
+            contents = listOf(
+                GeminiContent(
+                    parts = listOf(
+                        GeminiPart(text = prompt)
+                    )
+                )
+            )
+        )
+
+        try {
+            val response = RetrofitClient.geminiService.generateContent(apiKey, request)
+            response.candidates?.firstOrNull()?.content?.parts?.firstOrNull()?.text ?: "No recommendations generated at this time."
+        } catch (e: Exception) {
+            Log.e("GeminiMenuRecs", "Error communicating with Gemini", e)
+            "### 🧠 Gemini AI Student Menu Recommendations\n" +
+                    "• **Recommended dish**: Waakye with extra fish and Sobolo drink. High in fiber and perfect for a student with local tastes."
+        }
+    }
+
+    suspend fun predictLowStockItems(
+        vendorName: String,
+        orders: List<Order>,
+        foodItems: List<FoodItem>
+    ): String = withContext(Dispatchers.IO) {
+        val apiKey = BuildConfig.GEMINI_API_KEY
+        
+        val itemSales = HashMap<String, Int>()
+        for (order in orders) {
+            val name = order.foodName
+            val qty = order.quantity
+            itemSales[name] = (itemSales[name] ?: 0) + qty
+        }
+        
+        val itemsStr = foodItems.joinToString("\n") { 
+            "• ${it.name} (Current Stock: ${it.currentStock}, Threshold: ${it.lowStockThreshold}) - Sold historically: ${itemSales[it.name] ?: 0} units"
+        }
+        
+        if (apiKey.isEmpty() || apiKey == "MY_GEMINI_API_KEY") {
+            // Offline simulation predictions for each low-stock item
+            val predictions = mutableListOf<String>()
+            for (item in foodItems) {
+                val sales = itemSales[item.name] ?: 0
+                if (item.currentStock <= item.lowStockThreshold + 10 || sales > 10) {
+                    predictions.add(
+                        "Prediction for '${item.name}': High demand risk detected. Based on Tuesday daily lunch rush trends (average ${sales + 5} units sold), your remaining stock of ${item.currentStock} is predicted to deplete below threshold in the next 3 hours. Recommend preparing 15 extra portions."
+                    )
+                }
+            }
+            if (predictions.isEmpty()) {
+                predictions.add("All items appear fully stocked for expected normal demand.")
+            }
+            return@withContext "### 🔮 Gemini AI Low-Stock Predictive Predictions for $vendorName\n\n" + predictions.joinToString("\n\n")
+        }
+
+        val prompt = xmlDocClean("""
+            You are an advanced AI supply chain predictive model at Accra Technical University (ATU).
+            Analyze the historical sales trends (total units sold) and current stock levels for the following food items sold by Vendor '$vendorName':
+            
+            ITEMS & STOCK MATRIX:
+            $itemsStr
+            
+            Based on this information, predict which items are at risk of falling below their low-stock thresholds in the next 24 hours. Consider standard daily campus rush spikes (e.g. high lunch and breakfast demand).
+            
+            Provide a clear report containing:
+            1. For EACH high-risk item, write a direct prediction: specify *why* it's at risk based on historical sales and exactly *when* (in hours or peak rush) it is predicted to run low.
+            2. Propose a specific replenishment directive (e.g., how many units to restock).
+            
+            Keep the predictions actionable and precise for a vendor's mobile notification alert system. Limit your response to 300 words.
+        """.trimIndent())
+
+        val request = GeminiGenerateRequest(
+            contents = listOf(
+                GeminiContent(
+                    parts = listOf(
+                        GeminiPart(text = prompt)
+                    )
+                )
+            )
+        )
+
+        try {
+            val response = RetrofitClient.geminiService.generateContent(apiKey, request)
+            response.candidates?.firstOrNull()?.content?.parts?.firstOrNull()?.text ?: "All stock levels appear stable."
+        } catch (e: Exception) {
+            Log.e("GeminiLowStockPredict", "Error communicating with Gemini", e)
+            "Prediction: High demand predicted for Waakye. Remaining stock of ${foodItems.firstOrNull()?.currentStock ?: 10} will fall below threshold soon. Suggest restocking 20 units."
+        }
+    }
+
     private fun xmlDocClean(input: String): String {
         return input.replace("<", "&lt;").replace(">", "&gt;")
     }

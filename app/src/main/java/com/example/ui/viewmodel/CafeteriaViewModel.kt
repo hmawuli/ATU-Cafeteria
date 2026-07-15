@@ -271,6 +271,8 @@ class CafeteriaViewModel(application: Application) : AndroidViewModel(applicatio
         }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
+    val offlineOrders = MutableStateFlow<List<OfflineOrder>>(emptyList())
+
     // 3. User Specific Orders & Foods (derived via flatMapLatest using session)
     val customerOrders: StateFlow<List<Order>> = _currentUser
         .filterNotNull()
@@ -365,6 +367,18 @@ class CafeteriaViewModel(application: Application) : AndroidViewModel(applicatio
     private val _isGeneratingDemandForecast = MutableStateFlow(false)
     val isGeneratingDemandForecast: StateFlow<Boolean> = _isGeneratingDemandForecast.asStateFlow()
 
+    private val _studentRecommendations = MutableStateFlow<String?>(null)
+    val studentRecommendations: StateFlow<String?> = _studentRecommendations.asStateFlow()
+
+    private val _isGeneratingStudentRecommendations = MutableStateFlow(false)
+    val isGeneratingStudentRecommendations: StateFlow<Boolean> = _isGeneratingStudentRecommendations.asStateFlow()
+
+    private val _lowStockPredictionResult = MutableStateFlow<String?>(null)
+    val lowStockPredictionResult: StateFlow<String?> = _lowStockPredictionResult.asStateFlow()
+
+    private val _isPredictingLowStock = MutableStateFlow(false)
+    val isPredictingLowStock: StateFlow<Boolean> = _isPredictingLowStock.asStateFlow()
+
     // 5. In-App Real-time Order Notifications
     private val _newOrderAlerts = MutableStateFlow<List<Order>>(emptyList())
     val newOrderAlerts: StateFlow<List<Order>> = _newOrderAlerts.asStateFlow()
@@ -451,6 +465,7 @@ class CafeteriaViewModel(application: Application) : AndroidViewModel(applicatio
         viewModelScope.launch {
             // Guarantee Seeding occurs on first start
             repository.seedDatabaseIfEmpty()
+            loadOfflineOrders()
             if (LaravelClientManager.isLaravelEnabled) {
                 val success = repository.syncAllFromLaravel()
                 if (success) {
@@ -1109,11 +1124,23 @@ class CafeteriaViewModel(application: Application) : AndroidViewModel(applicatio
                     }
                 }
                 _isLoading.value = false
+                loadOfflineOrders()
                 onResult(success)
             } catch (e: Exception) {
                 _isOnline.value = false
                 _isLoading.value = false
+                loadOfflineOrders()
                 onResult(false)
+            }
+        }
+    }
+
+    fun loadOfflineOrders() {
+        viewModelScope.launch {
+            try {
+                offlineOrders.value = repository.offlineOrderDao.getAllOfflineOrders()
+            } catch (e: Exception) {
+                Log.e("CafeteriaViewModel", "Failed to load offline orders", e)
             }
         }
     }
@@ -1280,6 +1307,7 @@ class CafeteriaViewModel(application: Application) : AndroidViewModel(applicatio
         programOfStudy: String?,
         paymentMethods: List<String>?,
         info: String,
+        dietaryPreferences: String? = null,
         onResult: (Boolean) -> Unit
     ) {
         val user = _currentUser.value ?: return
@@ -1294,7 +1322,8 @@ class CafeteriaViewModel(application: Application) : AndroidViewModel(applicatio
                 department = department,
                 programOfStudy = programOfStudy,
                 paymentMethods = paymentMethods,
-                info = info
+                info = info,
+                dietaryPreferences = dietaryPreferences
             )
             val refreshed = repository.userDao.getUserSync(user.id)
             if (refreshed != null) {
@@ -1385,6 +1414,7 @@ class CafeteriaViewModel(application: Application) : AndroidViewModel(applicatio
                     repository.insertWalletTransaction(user.id, "PAYMENT", -requiredSum, ref, "Secure Pre-order payment: ${foodItem.name} (QTY: $quantity)" + (if (pointsToRedeem > 0) " (Loyalty Discount applied)" else ""))
                     repository.placeOrder(user.id, foodItem, quantity, pointsToRedeem, estimatedPickupTime)
                     repository.insertAuditLog(user.id, "WALLET_PAYMENT", "Debited GH₵ ${"%.2f".format(requiredSum)} for secure pickup.")
+                    loadOfflineOrders()
                     
                     // Credit the vendor for their earnings
                     val vendorId = foodItem.vendorId
@@ -1404,6 +1434,7 @@ class CafeteriaViewModel(application: Application) : AndroidViewModel(applicatio
             } else {
                 repository.placeOrder(user.id, foodItem, quantity, pointsToRedeem, estimatedPickupTime)
                 repository.insertAuditLog(user.id, "POD_ORDER", "Order generated under Pay-on-Delivery protocol." + (if (pointsToRedeem > 0) " Loyalty points applied offline." else ""))
+                loadOfflineOrders()
                 onComplete(true)
             }
         }
@@ -1869,6 +1900,63 @@ class CafeteriaViewModel(application: Application) : AndroidViewModel(applicatio
                 menuItems = filteredFoodItems
             )
             _isGeneratingDemandForecast.value = false
+        }
+    }
+
+    fun runStudentRecommendations(studentName: String, pastOrders: List<Order>, dietaryPreferences: String, availableFoodItems: List<FoodItem>) {
+        viewModelScope.launch {
+            _isGeneratingStudentRecommendations.value = true
+            _studentRecommendations.value = null
+            _studentRecommendations.value = geminiRepository.generateStudentMenuRecommendations(
+                studentName = studentName,
+                pastOrders = pastOrders,
+                dietaryPreferences = dietaryPreferences,
+                availableFoodItems = availableFoodItems
+            )
+            _isGeneratingStudentRecommendations.value = false
+        }
+    }
+
+    fun runGeminiLowStockPredictMonitor(vendorId: Int, vendorName: String, orders: List<Order>, foodItems: List<FoodItem>) {
+        viewModelScope.launch {
+            _isPredictingLowStock.value = true
+            _lowStockPredictionResult.value = null
+            
+            val filteredOrders = orders.filter { it.vendorId == vendorId }
+            val filteredFoodItems = foodItems.filter { it.vendorId == vendorId }
+            
+            val prediction = geminiRepository.predictLowStockItems(
+                vendorName = vendorName,
+                orders = filteredOrders,
+                foodItems = filteredFoodItems
+            )
+            _lowStockPredictionResult.value = prediction
+            
+            val currentTime = System.currentTimeMillis()
+            val predictedAlerts = mutableListOf<VendorInventoryNotification>()
+            
+            filteredFoodItems.forEach { food ->
+                if (prediction.contains(food.name, ignoreCase = true)) {
+                    val key = "PRED_${food.id}_LOW_STOCK"
+                    predictedAlerts.add(
+                        VendorInventoryNotification(
+                            id = key,
+                            foodItemId = food.id,
+                            foodName = food.name,
+                            type = "LOW_STOCK",
+                            message = "Gemini AI Predicts: '${food.name}' has high demand risk. Daily sales trends suggest stock may fall below threshold soon. Suggest restocking 15-20 units.",
+                            timestamp = currentTime,
+                            isRead = false
+                        )
+                    )
+                    repository.insertAuditLog(vendorId, "GEMINI_STOCK_PREDICTION", "Gemini AI predicted '${food.name}' will fall below low-stock threshold based on sales trends.")
+                }
+            }
+            
+            if (predictedAlerts.isNotEmpty()) {
+                _vendorInventoryNotifications.value = predictedAlerts + _vendorInventoryNotifications.value
+            }
+            _isPredictingLowStock.value = false
         }
     }
 
@@ -2525,6 +2613,45 @@ class CafeteriaViewModel(application: Application) : AndroidViewModel(applicatio
             
             // Log in Audit Trail
             repository.insertAuditLog(vendor.id, "VENDOR_WEEKLY_REPORT", "Automated weekly report generated. Total Orders: $totalVolume, Revenue: GH₵ ${String.format("%.2f", totalRevenue)}")
+        }
+    }
+
+    fun getMessagesForOrder(orderId: Int): Flow<List<ChatMessage>> {
+        return repository.getMessagesForOrder(orderId)
+    }
+
+    fun getMessagesForUser(userId: Int): Flow<List<ChatMessage>> {
+        return repository.getMessagesForUser(userId)
+    }
+
+    fun sendChatMessage(
+        orderId: Int,
+        senderId: Int,
+        senderName: String,
+        recipientId: Int,
+        message: String,
+        isFromStudent: Boolean
+    ) {
+        viewModelScope.launch {
+            val chatMsg = ChatMessage(
+                orderId = orderId,
+                senderId = senderId,
+                senderName = senderName,
+                recipientId = recipientId,
+                message = message,
+                isFromStudent = isFromStudent,
+                timestamp = System.currentTimeMillis()
+            )
+            repository.insertChatMessage(chatMsg)
+            // Local loopback broadcast for immediate live updates if recipient is online
+            LaravelEchoWebSocketManager.broadcastStudentNotificationLocally(
+                notificationId = java.util.UUID.randomUUID().toString(),
+                orderId = orderId,
+                vendorId = recipientId,
+                oldStatus = "CHAT",
+                newStatus = "CHAT_MESSAGE",
+                message = message
+            )
         }
     }
 

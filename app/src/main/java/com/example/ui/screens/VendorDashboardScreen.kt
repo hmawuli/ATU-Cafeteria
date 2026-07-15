@@ -110,6 +110,9 @@ fun VendorDashboardScreen(
     val vendorDemandForecast by viewModel.vendorDemandForecast.collectAsStateWithLifecycle()
     val isGeneratingDemandForecast by viewModel.isGeneratingDemandForecast.collectAsStateWithLifecycle()
 
+    val lowStockPredictionResult by viewModel.lowStockPredictionResult.collectAsStateWithLifecycle()
+    val isPredictingLowStock by viewModel.isPredictingLowStock.collectAsStateWithLifecycle()
+
     val todayOrders = remember(incomingOrders) {
         val cal = java.util.Calendar.getInstance().apply {
             set(java.util.Calendar.HOUR_OF_DAY, 0)
@@ -140,6 +143,7 @@ fun VendorDashboardScreen(
     var bulkSelectedOrderIds by remember { mutableStateOf(setOf<Int>()) }
     var isAddingFood by remember { mutableStateOf(false) }
     var previewTargetReceipt by remember { mutableStateOf<Order?>(null) }
+    var activeChatOrder by remember { mutableStateOf<Order?>(null) }
 
     // Low stock and procurement assistant states
     var isLowStockExpanded by remember { mutableStateOf(true) }
@@ -2178,6 +2182,21 @@ fun VendorDashboardScreen(
                                                             imageVector = Icons.Default.Print,
                                                             contentDescription = "Print Ticket",
                                                             tint = MaterialTheme.colorScheme.primary,
+                                                            modifier = Modifier.size(18.dp)
+                                                        )
+                                                    }
+
+                                                    IconButton(
+                                                        onClick = { activeChatOrder = order },
+                                                        modifier = Modifier
+                                                            .size(36.dp)
+                                                            .background(MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.5f), CircleShape)
+                                                            .testTag("vendor_chat_btn_${order.id}")
+                                                    ) {
+                                                        Icon(
+                                                            imageVector = Icons.Default.Chat,
+                                                            contentDescription = "Chat with Student",
+                                                            tint = MaterialTheme.colorScheme.secondary,
                                                             modifier = Modifier.size(18.dp)
                                                         )
                                                     }
@@ -4951,6 +4970,139 @@ fun VendorDashboardScreen(
 
                         Spacer(modifier = Modifier.height(12.dp))
 
+                        // 3g. Gemini AI Predictive Low-Stock Monitor Widget (NEW)
+                        Card(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(vertical = 4.dp)
+                                .testTag("gemini_low_stock_prediction_card"),
+                            colors = CardDefaults.cardColors(
+                                containerColor = MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.12f)
+                            ),
+                            shape = RoundedCornerShape(16.dp),
+                            border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.error.copy(alpha = 0.25f))
+                        ) {
+                            Column(modifier = Modifier.padding(16.dp)) {
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.TrendingDown,
+                                        contentDescription = "Low-Stock Predictions",
+                                        tint = MaterialTheme.colorScheme.error
+                                    )
+                                    Text(
+                                        text = "Gemini AI Low-Stock Predictive Monitor",
+                                        fontWeight = FontWeight.Bold,
+                                        style = MaterialTheme.typography.titleMedium,
+                                        color = MaterialTheme.colorScheme.error
+                                    )
+                                }
+                                
+                                Spacer(modifier = Modifier.height(4.dp))
+                                
+                                Text(
+                                    text = "Scan sales history using Google Gemini AI to predict items at risk of falling below safe stock limits over the next 24 hours. Generates real-time push alerts to prevent campus stockouts.",
+                                    fontSize = 11.sp,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+
+                                Spacer(modifier = Modifier.height(12.dp))
+
+                                if (isPredictingLowStock) {
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth().padding(vertical = 12.dp),
+                                        horizontalArrangement = Arrangement.Center,
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        CircularProgressIndicator(modifier = Modifier.size(20.dp), color = MaterialTheme.colorScheme.error)
+                                        Spacer(modifier = Modifier.width(12.dp))
+                                        Text(
+                                            text = "Running predictive stock models...",
+                                            fontSize = 12.sp,
+                                            fontWeight = FontWeight.SemiBold,
+                                            color = MaterialTheme.colorScheme.error
+                                        )
+                                    }
+                                } else {
+                                    lowStockPredictionResult?.let { predictionMsg ->
+                                        Box(
+                                            modifier = Modifier
+                                                .fillMaxWidth()
+                                                .background(
+                                                    MaterialTheme.colorScheme.surface.copy(alpha = 0.9f),
+                                                    RoundedCornerShape(12.dp)
+                                                )
+                                                .border(androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant))
+                                                .padding(14.dp)
+                                        ) {
+                                            Column {
+                                                Row(
+                                                    verticalAlignment = Alignment.CenterVertically,
+                                                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                                                    modifier = Modifier.padding(bottom = 8.dp)
+                                                ) {
+                                                    Box(
+                                                        modifier = Modifier
+                                                            .background(MaterialTheme.colorScheme.errorContainer, RoundedCornerShape(4.dp))
+                                                            .padding(horizontal = 6.dp, vertical = 2.dp)
+                                                    ) {
+                                                        Text(
+                                                            "GEMINI PREDICTIVE SAFETY MONITOR",
+                                                            color = MaterialTheme.colorScheme.onErrorContainer,
+                                                            fontSize = 9.sp,
+                                                            fontWeight = FontWeight.Bold
+                                                        )
+                                                    }
+                                                }
+                                                Text(
+                                                    text = predictionMsg,
+                                                    fontSize = 12.sp,
+                                                    lineHeight = 18.sp,
+                                                    color = MaterialTheme.colorScheme.onSurface
+                                                )
+                                            }
+                                        }
+                                        Spacer(modifier = Modifier.height(12.dp))
+                                    }
+
+                                    Button(
+                                        onClick = {
+                                            viewModel.runGeminiLowStockPredictMonitor(
+                                                vendorId = currentUser?.id ?: 0,
+                                                vendorName = currentUser?.fullName ?: "Vendor",
+                                                orders = incomingOrders,
+                                                foodItems = vendorFoods
+                                            )
+                                        },
+                                        colors = ButtonDefaults.buttonColors(
+                                            containerColor = MaterialTheme.colorScheme.error,
+                                            contentColor = MaterialTheme.colorScheme.onError
+                                        ),
+                                        shape = RoundedCornerShape(8.dp),
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .testTag("run_low_stock_prediction_button")
+                                    ) {
+                                        Icon(
+                                            Icons.Default.TrendingDown,
+                                            contentDescription = null,
+                                            modifier = Modifier.size(16.dp)
+                                        )
+                                        Spacer(modifier = Modifier.width(6.dp))
+                                        Text(
+                                            text = if (lowStockPredictionResult == null) "Run Predictive Low-Stock Analysis" else "Regenerate Low-Stock Predictions",
+                                            fontSize = 11.sp,
+                                            fontWeight = FontWeight.Bold
+                                        )
+                                    }
+                                }
+                            }
+                        }
+
+                        Spacer(modifier = Modifier.height(12.dp))
+
                         // 4. Feedback details
                         Text("Live Customer Student Feedback Log", fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.primary)
                         if (filteredFeedbackList.isEmpty()) {
@@ -7347,6 +7499,170 @@ fun VendorDashboardScreen(
             },
             shape = RoundedCornerShape(16.dp)
         )
+    }
+
+    // VENDOR CHAT WITH STUDENT DIALOG
+    activeChatOrder?.let { order ->
+        val student = allUsers.find { it.id == order.customerId }
+        val messagesFlow = remember(order.id) { viewModel.getMessagesForOrder(order.id) }
+        val chatMessages by messagesFlow.collectAsStateWithLifecycle(initialValue = emptyList())
+        var replyMessageText by remember { mutableStateOf("") }
+        val listState = rememberLazyListState()
+
+        LaunchedEffect(chatMessages.size) {
+            if (chatMessages.isNotEmpty()) {
+                listState.animateScrollToItem(chatMessages.size - 1)
+            }
+        }
+
+        Dialog(onDismissRequest = { activeChatOrder = null }) {
+            Card(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .fillMaxHeight(0.75f)
+                    .testTag("vendor_chat_dialog"),
+                shape = RoundedCornerShape(16.dp),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
+            ) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(16.dp)
+                ) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                text = "Chat with Student",
+                                style = MaterialTheme.typography.titleMedium,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.primary
+                            )
+                            Text(
+                                text = "Order #${order.id} • ${student?.fullName ?: "Student"}",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                        IconButton(
+                            onClick = { activeChatOrder = null },
+                            modifier = Modifier.testTag("vendor_chat_close_btn")
+                        ) {
+                            Icon(Icons.Default.Close, contentDescription = "Close Chat")
+                        }
+                    }
+
+                    HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
+
+                    LazyColumn(
+                        state = listState,
+                        modifier = Modifier
+                            .weight(1f)
+                            .fillMaxWidth(),
+                        verticalArrangement = Arrangement.spacedBy(8.dp),
+                        contentPadding = PaddingValues(vertical = 4.dp)
+                    ) {
+                        if (chatMessages.isEmpty()) {
+                            item {
+                                Box(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(24.dp),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Text(
+                                        text = "Send a message back to the student regarding their order inquiry.",
+                                        textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
+                                    )
+                                }
+                            }
+                        } else {
+                            items(chatMessages) { msg ->
+                                val isMe = !msg.isFromStudent
+                                val alignment = if (isMe) Alignment.End else Alignment.Start
+                                val bgContainerColor = if (isMe) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.secondaryContainer
+                                val textCol = if (isMe) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSecondaryContainer
+
+                                Column(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalAlignment = alignment
+                                ) {
+                                    Card(
+                                        colors = CardDefaults.cardColors(containerColor = bgContainerColor),
+                                        shape = RoundedCornerShape(
+                                            topStart = 12.dp,
+                                            topEnd = 12.dp,
+                                            bottomStart = if (isMe) 12.dp else 0.dp,
+                                            bottomEnd = if (isMe) 0.dp else 12.dp
+                                        )
+                                    ) {
+                                        Column(modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp)) {
+                                            Text(
+                                                text = msg.message,
+                                                color = textCol,
+                                                style = MaterialTheme.typography.bodyMedium
+                                            )
+                                            Spacer(modifier = Modifier.height(2.dp))
+                                            Text(
+                                                text = msg.senderName,
+                                                fontSize = 8.sp,
+                                                fontWeight = FontWeight.Bold,
+                                                color = textCol.copy(alpha = 0.6f)
+                                            )
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        OutlinedTextField(
+                            value = replyMessageText,
+                            onValueChange = { replyMessageText = it },
+                            placeholder = { Text("Type reply to student...") },
+                            singleLine = true,
+                            shape = RoundedCornerShape(12.dp),
+                            modifier = Modifier
+                                .weight(1f)
+                                .testTag("vendor_chat_input_field")
+                        )
+
+                        Button(
+                            onClick = {
+                                if (replyMessageText.isNotBlank()) {
+                                    val currentVendorUser = allUsers.find { it.role == "VENDOR" && it.id == order.vendorId }
+                                    viewModel.sendChatMessage(
+                                        orderId = order.id,
+                                        senderId = order.vendorId,
+                                        senderName = currentVendorUser?.fullName ?: "Vendor Booth",
+                                        recipientId = order.customerId,
+                                        message = replyMessageText.trim(),
+                                        isFromStudent = false
+                                    )
+                                    replyMessageText = ""
+                                }
+                            },
+                            shape = RoundedCornerShape(12.dp),
+                            modifier = Modifier.testTag("vendor_chat_send_btn")
+                        ) {
+                            Icon(Icons.Default.Send, contentDescription = "Send")
+                        }
+                    }
+                }
+            }
+        }
     }
 }
 }

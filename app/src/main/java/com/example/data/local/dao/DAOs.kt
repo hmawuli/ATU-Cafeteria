@@ -159,3 +159,32 @@ interface VendorOrderSummaryDao {
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertSummary(summary: VendorOrderSummary): Long
 }
+
+@Dao
+interface OfflineOrderDao {
+    @Query("SELECT * FROM offline_orders ORDER BY timestamp ASC")
+    suspend fun getAllOfflineOrders(): List<OfflineOrder>
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertOfflineOrder(order: OfflineOrder): Long
+
+    @Delete
+    suspend fun deleteOfflineOrder(order: OfflineOrder)
+
+    @Query("DELETE FROM offline_orders")
+    suspend fun clearOfflineOrders()
+}
+
+@Dao
+interface ChatMessageDao {
+    @Query("SELECT * FROM chat_messages WHERE orderId = :orderId ORDER BY timestamp ASC")
+    fun getMessagesForOrder(orderId: Int): Flow<List<ChatMessage>>
+
+    @Query("SELECT * FROM chat_messages WHERE recipientId = :userId OR senderId = :userId ORDER BY timestamp DESC")
+    fun getMessagesForUser(userId: Int): Flow<List<ChatMessage>>
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertMessage(message: ChatMessage): Long
+}
+
+

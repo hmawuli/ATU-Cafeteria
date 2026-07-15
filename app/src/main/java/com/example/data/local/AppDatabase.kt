@@ -17,9 +17,11 @@ import androidx.room.*
         WalletTransaction::class,
         FoodItemFeedback::class,
         VendorMenuAvailability::class,
-        VendorOrderSummary::class
+        VendorOrderSummary::class,
+        OfflineOrder::class,
+        ChatMessage::class
     ],
-    version = 11,
+    version = 13,
     exportSchema = false
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -32,6 +34,8 @@ abstract class AppDatabase : RoomDatabase() {
     abstract fun foodItemFeedbackDao(): FoodItemFeedbackDao
     abstract fun vendorMenuAvailabilityDao(): VendorMenuAvailabilityDao
     abstract fun vendorOrderSummaryDao(): VendorOrderSummaryDao
+    abstract fun offlineOrderDao(): OfflineOrderDao
+    abstract fun chatMessageDao(): ChatMessageDao
 
     companion object {
         @Volatile

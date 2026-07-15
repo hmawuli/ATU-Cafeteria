@@ -27,7 +27,8 @@ data class User(
     val email: String? = null,
     val paymentMethods: String? = null,
     @Json(name = "loyalty_points") val loyaltyPoints: Int = 0,
-    @Json(name = "total_spent") val totalSpent: Double = 0.0
+    @Json(name = "total_spent") val totalSpent: Double = 0.0,
+    val dietaryPreferences: String? = null
 )
 
 @Entity(
@@ -217,3 +218,32 @@ data class VendorOrderSummary(
     val totalRevenue: Double = 0.0,
     val averageRating: Double = 5.0
 )
+
+@Entity(tableName = "offline_orders")
+data class OfflineOrder(
+    @PrimaryKey(autoGenerate = true) val id: Int = 0,
+    val customerId: Int,
+    val vendorId: Int,
+    val foodItemId: Int,
+    val foodName: String,
+    val quantity: Int,
+    val unitPrice: Double,
+    val totalPrice: Double,
+    val pointsToRedeem: Int = 0,
+    val estimatedPickupTime: String = "Calculating...",
+    val timestamp: Long = System.currentTimeMillis()
+)
+
+@Entity(tableName = "chat_messages")
+data class ChatMessage(
+    @PrimaryKey(autoGenerate = true) val id: Int = 0,
+    val orderId: Int,
+    val senderId: Int,
+    val senderName: String,
+    val recipientId: Int,
+    val message: String,
+    val timestamp: Long = System.currentTimeMillis(),
+    val isFromStudent: Boolean
+)
+
+

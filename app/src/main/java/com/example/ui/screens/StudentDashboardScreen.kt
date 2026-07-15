@@ -160,6 +160,7 @@ fun StudentDashboardScreen(
 
     val acknowledgedOrders = remember { mutableStateListOf<Int>() }
     var showQrForOrder by remember { mutableStateOf<Order?>(null) }
+    var activeChatOrder by remember { mutableStateOf<Order?>(null) }
 
     var activeTab by remember { mutableIntStateOf(0) } // 0: Browse Food, 1: Orders Hub, 2: Nutrition, 3: Prep Reserves, 4: Smart Wallet & ID
     var ordersSubTab by remember { mutableIntStateOf(0) } // 0: Live Tracker, 1: Dining History, 2: Favorites
@@ -288,7 +289,7 @@ fun StudentDashboardScreen(
         if (previousStatuses.isNotEmpty()) {
             studentOrders.forEach { order ->
                 val prevStatus = previousStatuses[order.id]
-                if (prevStatus == "PREPARING" && order.status == "READY") {
+                if (prevStatus != null && prevStatus.uppercase() != "READY" && order.status.uppercase() == "READY") {
                     android.widget.Toast.makeText(
                         trackingContext,
                         "Your order of ${order.foodName} is ready for pickup!",
@@ -666,6 +667,94 @@ fun StudentDashboardScreen(
                                         style = MaterialTheme.typography.bodySmall,
                                         modifier = Modifier.weight(1f)
                                     )
+                                }
+                            }
+                        }
+
+                        // Offline Storage Queue Indicator
+                        val offlineOrders by viewModel.offlineOrders.collectAsStateWithLifecycle()
+                        if (offlineOrders.isNotEmpty()) {
+                            Card(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(horizontal = 16.dp, vertical = 6.dp)
+                                    .testTag("offline_orders_queue_banner"),
+                                colors = CardDefaults.cardColors(
+                                    containerColor = MaterialTheme.colorScheme.errorContainer
+                                ),
+                                shape = RoundedCornerShape(12.dp),
+                                border = BorderStroke(1.dp, MaterialTheme.colorScheme.error)
+                            ) {
+                                Column(
+                                    modifier = Modifier.padding(12.dp),
+                                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                                ) {
+                                    Row(
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                    ) {
+                                        Icon(
+                                            imageVector = Icons.Default.CloudOff,
+                                            contentDescription = "Offline Pending Orders",
+                                            tint = MaterialTheme.colorScheme.onErrorContainer
+                                        )
+                                        Text(
+                                            text = "Offline Queue: ${offlineOrders.size} Pending Orders",
+                                            style = MaterialTheme.typography.titleSmall,
+                                            fontWeight = FontWeight.Bold,
+                                            color = MaterialTheme.colorScheme.onErrorContainer,
+                                            modifier = Modifier.weight(1f)
+                                        )
+                                        var isSyncingNow by remember { mutableStateOf(false) }
+                                        Button(
+                                            onClick = {
+                                                isSyncingNow = true
+                                                viewModel.syncAllFromLaravel { success ->
+                                                    isSyncingNow = false
+                                                }
+                                            },
+                                            colors = ButtonDefaults.buttonColors(
+                                                containerColor = MaterialTheme.colorScheme.error,
+                                                contentColor = MaterialTheme.colorScheme.onError
+                                            ),
+                                            contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp),
+                                            modifier = Modifier.height(32.dp).testTag("sync_offline_orders_btn")
+                                        ) {
+                                            if (isSyncingNow) {
+                                                CircularProgressIndicator(
+                                                    modifier = Modifier.size(16.dp),
+                                                    strokeWidth = 2.dp,
+                                                    color = MaterialTheme.colorScheme.onError
+                                                )
+                                            } else {
+                                                Text("Sync Now", style = MaterialTheme.typography.bodySmall)
+                                            }
+                                        }
+                                    }
+                                    Text(
+                                        text = "Your pre-orders are stored safely on this device. They will automatically sync to the campus server once you are back online or press Sync Now.",
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.onErrorContainer.copy(alpha = 0.8f)
+                                    )
+                                    HorizontalDivider(color = MaterialTheme.colorScheme.onErrorContainer.copy(alpha = 0.2f))
+                                    offlineOrders.forEach { item ->
+                                        Row(
+                                            modifier = Modifier.fillMaxWidth(),
+                                            horizontalArrangement = Arrangement.SpaceBetween
+                                        ) {
+                                            Text(
+                                                text = "• ${item.foodName} (x${item.quantity})",
+                                                style = MaterialTheme.typography.bodySmall,
+                                                fontWeight = FontWeight.SemiBold,
+                                                color = MaterialTheme.colorScheme.onErrorContainer
+                                            )
+                                            Text(
+                                                text = "GH₵ ${"%.2f".format(item.totalPrice)}",
+                                                style = MaterialTheme.typography.bodySmall,
+                                                color = MaterialTheme.colorScheme.onErrorContainer
+                                            )
+                                        }
+                                    }
                                 }
                             }
                         }
@@ -1913,6 +2002,8 @@ fun StudentDashboardScreen(
                             (searchQuery.isBlank() || 
                              food.name.contains(searchQuery, ignoreCase = true) || 
                              food.description.contains(searchQuery, ignoreCase = true) ||
+                             food.category.contains(searchQuery, ignoreCase = true) ||
+                             food.allergens.contains(searchQuery, ignoreCase = true) ||
                              vendorName.contains(searchQuery, ignoreCase = true) ||
                              vendorInfo.contains(searchQuery, ignoreCase = true))
                         }
@@ -2857,6 +2948,32 @@ fun StudentDashboardScreen(
                                                      color = MaterialTheme.colorScheme.onSurfaceVariant
                                                  )
                                              }
+                                         }
+
+                                         Spacer(modifier = Modifier.height(12.dp))
+                                         Button(
+                                             onClick = { activeChatOrder = order },
+                                             modifier = Modifier
+                                                 .fillMaxWidth()
+                                                 .height(38.dp)
+                                                 .testTag("chat_with_vendor_btn_${order.id}"),
+                                             colors = ButtonDefaults.buttonColors(
+                                                 containerColor = MaterialTheme.colorScheme.primaryContainer,
+                                                 contentColor = MaterialTheme.colorScheme.onPrimaryContainer
+                                             ),
+                                             shape = RoundedCornerShape(10.dp)
+                                         ) {
+                                             Icon(
+                                                 imageVector = Icons.Default.Chat,
+                                                 contentDescription = "Chat with Vendor",
+                                                 modifier = Modifier.size(16.dp)
+                                             )
+                                             Spacer(modifier = Modifier.width(8.dp))
+                                             Text(
+                                                 text = "Chat with Vendor (Urgent Inquiry)",
+                                                 fontSize = 11.sp,
+                                                 fontWeight = FontWeight.Bold
+                                             )
                                          }
 
                                          // Real-time Simulation / Status Progression button
@@ -4460,6 +4577,146 @@ fun StudentDashboardScreen(
                             }
                         }
 
+                        // Interactive AI-driven Recommendation Engine
+                        item {
+                            Spacer(modifier = Modifier.height(16.dp))
+                            Card(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .testTag("ai_recommendations_card"),
+                                colors = CardDefaults.cardColors(
+                                    containerColor = MaterialTheme.colorScheme.tertiaryContainer.copy(alpha = 0.4f)
+                                ),
+                                shape = RoundedCornerShape(16.dp),
+                                border = BorderStroke(1.dp, MaterialTheme.colorScheme.tertiary.copy(alpha = 0.5f))
+                            ) {
+                                Column(modifier = Modifier.padding(16.dp)) {
+                                    Row(
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                    ) {
+                                        Icon(
+                                            imageVector = Icons.Default.AutoAwesome,
+                                            contentDescription = "AI Recommendations",
+                                            tint = MaterialTheme.colorScheme.tertiary
+                                        )
+                                        Text(
+                                            text = "Gemini AI Student Recommendation Engine",
+                                            style = MaterialTheme.typography.titleSmall,
+                                            fontWeight = FontWeight.Bold,
+                                            color = MaterialTheme.colorScheme.onTertiaryContainer
+                                        )
+                                    }
+                                    Spacer(modifier = Modifier.height(8.dp))
+                                    Text(
+                                        text = "Get personalized culinary recommendations curated by Gemini AI based on your past ATU cafeteria order history and your current dietary goals.",
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                    Spacer(modifier = Modifier.height(12.dp))
+                                    
+                                    Text(
+                                        text = "Select Current Dietary Goal:",
+                                        style = MaterialTheme.typography.bodySmall,
+                                        fontWeight = FontWeight.Bold,
+                                        color = MaterialTheme.colorScheme.onTertiaryContainer
+                                    )
+                                    
+                                    val prefs = listOf("High Protein / Gains", "Vegan / Plant-Based", "Low Calorie / Fitness", "Brain Focus / Studying", "Budget Friendly")
+                                    var selectedPref by remember { mutableStateOf("High Protein / Gains") }
+                                    
+                                    LazyRow(
+                                        horizontalArrangement = Arrangement.spacedBy(6.dp),
+                                        modifier = Modifier.padding(vertical = 8.dp)
+                                    ) {
+                                        items(prefs) { pref ->
+                                            FilterChip(
+                                                selected = selectedPref == pref,
+                                                onClick = { selectedPref = pref },
+                                                label = { Text(pref, fontSize = 10.sp) },
+                                                colors = FilterChipDefaults.filterChipColors(
+                                                    selectedContainerColor = MaterialTheme.colorScheme.tertiary,
+                                                    selectedLabelColor = MaterialTheme.colorScheme.onTertiary
+                                                ),
+                                                modifier = Modifier.testTag("dietary_chip_${pref.replace(" ", "_").lowercase()}")
+                                            )
+                                        }
+                                    }
+                                    
+                                    val isGeneratingRecs by viewModel.isGeneratingStudentRecommendations.collectAsStateWithLifecycle()
+                                    val recsText by viewModel.studentRecommendations.collectAsStateWithLifecycle()
+                                    
+                                    if (isGeneratingRecs) {
+                                        Row(
+                                            verticalAlignment = Alignment.CenterVertically,
+                                            horizontalArrangement = Arrangement.spacedBy(10.dp),
+                                            modifier = Modifier.fillMaxWidth().padding(vertical = 12.dp)
+                                        ) {
+                                            CircularProgressIndicator(
+                                                modifier = Modifier.size(18.dp),
+                                                strokeWidth = 2.5.dp,
+                                                color = MaterialTheme.colorScheme.tertiary
+                                            )
+                                            Text(
+                                                "Analyzing historical trends & formulating culinary recommendations...",
+                                                fontSize = 11.sp,
+                                                fontWeight = FontWeight.Medium,
+                                                color = MaterialTheme.colorScheme.tertiary
+                                            )
+                                        }
+                                    } else {
+                                        Button(
+                                            onClick = {
+                                                viewModel.runStudentRecommendations(
+                                                    studentName = currentUser?.fullName ?: "Student",
+                                                    pastOrders = studentOrders,
+                                                    dietaryPreferences = selectedPref,
+                                                    availableFoodItems = allFoodItems
+                                                )
+                                            },
+                                            shape = RoundedCornerShape(10.dp),
+                                            colors = ButtonDefaults.buttonColors(
+                                                containerColor = MaterialTheme.colorScheme.tertiary,
+                                                contentColor = MaterialTheme.colorScheme.onTertiary
+                                            ),
+                                            modifier = Modifier.fillMaxWidth().testTag("generate_ai_recs_btn")
+                                        ) {
+                                            Icon(
+                                                imageVector = Icons.Default.AutoAwesome,
+                                                contentDescription = null,
+                                                modifier = Modifier.size(16.dp)
+                                            )
+                                            Spacer(modifier = Modifier.width(6.dp))
+                                            Text("Generate AI Recommendations", fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                                        }
+                                    }
+                                    
+                                    recsText?.let { content ->
+                                        Spacer(modifier = Modifier.height(12.dp))
+                                        HorizontalDivider(color = MaterialTheme.colorScheme.tertiary.copy(alpha = 0.3f))
+                                        Spacer(modifier = Modifier.height(12.dp))
+                                        Card(
+                                            colors = CardDefaults.cardColors(
+                                                containerColor = MaterialTheme.colorScheme.surface
+                                            ),
+                                            shape = RoundedCornerShape(12.dp),
+                                            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
+                                        ) {
+                                            Column(modifier = Modifier.padding(12.dp)) {
+                                                Text(
+                                                    text = content,
+                                                    style = MaterialTheme.typography.bodySmall,
+                                                    lineHeight = 16.sp,
+                                                    color = MaterialTheme.colorScheme.onSurface,
+                                                    modifier = Modifier.fillMaxWidth().testTag("ai_recs_content")
+                                                )
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+
                         // Logging logs & suggestions header
                         item {
                             Text(
@@ -5835,6 +6092,8 @@ fun StudentDashboardScreen(
                             var editStudentId by remember { mutableStateOf(currentUser?.student_staff_id ?: "") }
                             var editTelephone by remember { mutableStateOf(currentUser?.telephone ?: "") }
                             var editEmail by remember { mutableStateOf(currentUser?.email ?: "") }
+                            var editDietaryPrefs by remember { mutableStateOf(currentUser?.dietaryPreferences ?: "") }
+                            val presetDiets = remember { listOf("Vegetarian", "Vegan", "Gluten-Free", "Halal", "Kosher", "Lactose-Free", "Nut-Free") }
                             
                             // Saved payment details (simulated using split token strings or custom state)
                             val loadedPaymentMethods = currentUser?.paymentMethods?.split(",")?.filter { it.isNotBlank() } ?: emptyList()
@@ -5853,6 +6112,7 @@ fun StudentDashboardScreen(
                                     editStudentId = it.student_staff_id ?: ""
                                     editTelephone = it.telephone ?: ""
                                     editEmail = it.email ?: ""
+                                    editDietaryPrefs = it.dietaryPreferences ?: ""
                                 }
                             }
 
@@ -5929,6 +6189,35 @@ fun StudentDashboardScreen(
                                                 headlineContent = { Text("Primary Card", fontSize = 11.sp, fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.onSurfaceVariant) },
                                                 supportingContent = { Text("Visa $creditCardNumber Exp: $cardExpiry", fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurface) },
                                                 leadingContent = { Icon(Icons.Default.CreditCard, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(18.dp)) },
+                                                colors = ListItemDefaults.colors(containerColor = Color.Transparent)
+                                            )
+                                            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f))
+                                            ListItem(
+                                                headlineContent = { Text("Dietary Preferences", fontSize = 11.sp, fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.onSurfaceVariant) },
+                                                supportingContent = {
+                                                    val prefs = currentUser?.dietaryPreferences
+                                                    if (prefs.isNullOrBlank()) {
+                                                        Text("None specified", fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurface)
+                                                    } else {
+                                                        Row(
+                                                            horizontalArrangement = Arrangement.spacedBy(4.dp),
+                                                            modifier = Modifier
+                                                                .padding(top = 4.dp)
+                                                                .horizontalScroll(rememberScrollState())
+                                                        ) {
+                                                            prefs.split(",").map { it.trim() }.filter { it.isNotEmpty() }.forEach { pref ->
+                                                                Box(
+                                                                    modifier = Modifier
+                                                                        .background(MaterialTheme.colorScheme.primaryContainer, RoundedCornerShape(6.dp))
+                                                                        .padding(horizontal = 8.dp, vertical = 4.dp)
+                                                                ) {
+                                                                    Text(pref, fontSize = 10.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onPrimaryContainer)
+                                                                }
+                                                            }
+                                                        }
+                                                    }
+                                                },
+                                                leadingContent = { Icon(Icons.Default.Restaurant, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(18.dp)) },
                                                 colors = ListItemDefaults.colors(containerColor = Color.Transparent)
                                             )
                                         }
@@ -6027,6 +6316,71 @@ fun StudentDashboardScreen(
                                                 modifier = Modifier.fillMaxWidth().testTag("profile_card_field"),
                                                 singleLine = true
                                             )
+
+                                            Spacer(modifier = Modifier.height(14.dp))
+                                            Text(
+                                                "Dietary Preferences & Health Tags",
+                                                fontWeight = FontWeight.Bold,
+                                                fontSize = 12.sp,
+                                                color = MaterialTheme.colorScheme.primary
+                                            )
+                                            Text(
+                                                "Select tags to personalize your food recommendation engine",
+                                                fontSize = 9.sp,
+                                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                                            )
+                                            Spacer(modifier = Modifier.height(8.dp))
+
+                                            val activeDietList = remember(editDietaryPrefs) {
+                                                editDietaryPrefs.split(",").map { it.trim() }.filter { it.isNotEmpty() }.toMutableList()
+                                            }
+
+                                            Row(
+                                                modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
+                                                horizontalArrangement = Arrangement.spacedBy(6.dp)
+                                            ) {
+                                                presetDiets.forEach { diet ->
+                                                    val isSelected = activeDietList.contains(diet)
+                                                    Box(
+                                                        modifier = Modifier
+                                                            .clip(RoundedCornerShape(8.dp))
+                                                            .background(
+                                                                if (isSelected) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceVariant
+                                                            )
+                                                            .border(
+                                                                1.dp,
+                                                                if (isSelected) MaterialTheme.colorScheme.primary else Color.Transparent,
+                                                                RoundedCornerShape(8.dp)
+                                                            )
+                                                            .clickable {
+                                                                if (isSelected) {
+                                                                    activeDietList.remove(diet)
+                                                                } else {
+                                                                    activeDietList.add(diet)
+                                                                }
+                                                                editDietaryPrefs = activeDietList.joinToString(",")
+                                                            }
+                                                            .padding(horizontal = 10.dp, vertical = 6.dp)
+                                                            .testTag("diet_chip_${diet.lowercase().replace("-", "_")}")
+                                                    ) {
+                                                        Text(
+                                                            text = diet,
+                                                            fontSize = 10.sp,
+                                                            fontWeight = FontWeight.Bold,
+                                                            color = if (isSelected) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurfaceVariant
+                                                        )
+                                                    }
+                                                }
+                                            }
+
+                                            Spacer(modifier = Modifier.height(8.dp))
+                                            OutlinedTextField(
+                                                value = editDietaryPrefs,
+                                                onValueChange = { editDietaryPrefs = it },
+                                                label = { Text("Custom Dietary Tags (comma-separated)") },
+                                                modifier = Modifier.fillMaxWidth().testTag("profile_diet_field"),
+                                                singleLine = true
+                                            )
                                             
                                             Spacer(modifier = Modifier.height(12.dp))
 
@@ -6046,6 +6400,7 @@ fun StudentDashboardScreen(
                                                         programOfStudy = "Campus Member",
                                                         paymentMethods = updatedPaymentList,
                                                         info = editStudentId,
+                                                        dietaryPreferences = editDietaryPrefs,
                                                         onResult = { success ->
                                                             if (success) {
                                                                 profileSaveSuccess = "Profile and payment credentials synchronized successfully!"
@@ -6965,6 +7320,169 @@ fun StudentDashboardScreen(
                                 modifier = Modifier.fillMaxWidth().testTag("student_qr_dismiss_btn")
                             ) {
                                 Text("Close Claim Code", fontWeight = FontWeight.Bold)
+                            }
+                        }
+                    }
+                }
+            }
+
+            // CHAT WITH VENDOR DIALOG
+            activeChatOrder?.let { order ->
+                val vendor = allVendors.find { it.id == order.vendorId }
+                val messagesFlow = remember(order.id) { viewModel.getMessagesForOrder(order.id) }
+                val chatMessages by messagesFlow.collectAsStateWithLifecycle(initialValue = emptyList())
+                var replyMessageText by remember { mutableStateOf("") }
+                val listState = rememberLazyListState()
+
+                LaunchedEffect(chatMessages.size) {
+                    if (chatMessages.isNotEmpty()) {
+                        listState.animateScrollToItem(chatMessages.size - 1)
+                    }
+                }
+
+                Dialog(onDismissRequest = { activeChatOrder = null }) {
+                    Card(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .fillMaxHeight(0.75f)
+                            .testTag("student_chat_dialog"),
+                        shape = RoundedCornerShape(16.dp),
+                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
+                    ) {
+                        Column(
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .padding(16.dp)
+                        ) {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Text(
+                                        text = "Chat with Vendor",
+                                        style = MaterialTheme.typography.titleMedium,
+                                        fontWeight = FontWeight.Bold,
+                                        color = MaterialTheme.colorScheme.primary
+                                    )
+                                    Text(
+                                        text = "Order #${order.id} • ${vendor?.fullName ?: "Vendor"}",
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                }
+                                IconButton(
+                                    onClick = { activeChatOrder = null },
+                                    modifier = Modifier.testTag("student_chat_close_btn")
+                                ) {
+                                    Icon(Icons.Default.Close, contentDescription = "Close Chat")
+                                }
+                            }
+
+                            HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
+
+                            LazyColumn(
+                                state = listState,
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .fillMaxWidth(),
+                                verticalArrangement = Arrangement.spacedBy(8.dp),
+                                contentPadding = PaddingValues(vertical = 4.dp)
+                            ) {
+                                if (chatMessages.isEmpty()) {
+                                    item {
+                                        Box(
+                                            modifier = Modifier
+                                                .fillMaxWidth()
+                                                .padding(24.dp),
+                                            contentAlignment = Alignment.Center
+                                        ) {
+                                            Text(
+                                                text = "Send an urgent inquiry directly to the vendor.",
+                                                textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+                                                style = MaterialTheme.typography.bodySmall,
+                                                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
+                                            )
+                                        }
+                                    }
+                                } else {
+                                    items(chatMessages) { msg ->
+                                        val isMe = msg.isFromStudent
+                                        val alignment = if (isMe) Alignment.End else Alignment.Start
+                                        val bgContainerColor = if (isMe) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.secondaryContainer
+                                        val textCol = if (isMe) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSecondaryContainer
+
+                                        Column(
+                                            modifier = Modifier.fillMaxWidth(),
+                                            horizontalAlignment = alignment
+                                        ) {
+                                            Card(
+                                                colors = CardDefaults.cardColors(containerColor = bgContainerColor),
+                                                shape = RoundedCornerShape(
+                                                    topStart = 12.dp,
+                                                    topEnd = 12.dp,
+                                                    bottomStart = if (isMe) 12.dp else 0.dp,
+                                                    bottomEnd = if (isMe) 0.dp else 12.dp
+                                                )
+                                            ) {
+                                                Column(modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp)) {
+                                                    Text(
+                                                        text = msg.message,
+                                                        color = textCol,
+                                                        style = MaterialTheme.typography.bodyMedium
+                                                    )
+                                                    Spacer(modifier = Modifier.height(2.dp))
+                                                    Text(
+                                                        text = msg.senderName,
+                                                        fontSize = 8.sp,
+                                                        fontWeight = FontWeight.Bold,
+                                                        color = textCol.copy(alpha = 0.6f)
+                                                    )
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+
+                            HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
+
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                OutlinedTextField(
+                                    value = replyMessageText,
+                                    onValueChange = { replyMessageText = it },
+                                    placeholder = { Text("Type urgent message...") },
+                                    singleLine = true,
+                                    shape = RoundedCornerShape(12.dp),
+                                    modifier = Modifier
+                                        .weight(1f)
+                                        .testTag("student_chat_input_field")
+                                )
+
+                                Button(
+                                    onClick = {
+                                        if (replyMessageText.isNotBlank() && currentUser != null) {
+                                            viewModel.sendChatMessage(
+                                                orderId = order.id,
+                                                senderId = currentUser!!.id,
+                                                senderName = currentUser!!.fullName,
+                                                recipientId = order.vendorId,
+                                                message = replyMessageText.trim(),
+                                                isFromStudent = true
+                                            )
+                                            replyMessageText = ""
+                                        }
+                                    },
+                                    shape = RoundedCornerShape(12.dp),
+                                    modifier = Modifier.testTag("student_chat_send_btn")
+                                ) {
+                                    Icon(Icons.Default.Send, contentDescription = "Send")
+                                }
                             }
                         }
                     }
