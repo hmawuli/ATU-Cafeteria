@@ -253,14 +253,25 @@ HTML;
 
             $food->order_volume = (int)$orderVolume;
             $food->remaining_stock = max(0, (int)$food->initial_stock - (int)$orderVolume);
-            $food->is_low_stock = $food->remaining_stock <= (int)$food->low_stock_threshold;
+
+            // Calculate recent 24-hour order frequency (precision check)
+            $timestamp24hAgo = (time() - 24 * 60 * 60) * 1000;
+            $orderFrequency24h = (int) \App\Models\Order::where('food_item_id', $food->id)
+                ->whereNotIn(\Illuminate\Support\Facades\DB::raw('UPPER(status)'), ['CANCELLED', 'DECLINED'])
+                ->where('order_timestamp', '>=', $timestamp24hAgo)
+                ->sum('quantity');
+
+            $suggestedThresholdFromFrequency = (int) round($orderFrequency24h * 0.40);
+            $effectiveThreshold = max((int)$food->low_stock_threshold, $suggestedThresholdFromFrequency);
+
+            $food->is_low_stock = $food->remaining_stock <= $effectiveThreshold;
 
             if ($food->is_low_stock && $food->is_available) {
                 $lowStockItems[] = [
                     'id' => $food->id,
                     'name' => $food->name,
                     'remaining' => $food->remaining_stock,
-                    'threshold' => $food->low_stock_threshold,
+                    'threshold' => $effectiveThreshold,
                     'initial' => $food->initial_stock,
                 ];
             }
@@ -297,11 +308,65 @@ HTML;
             }
         }
 
-        // Fetch vendor's orders history
-        $orders = \App\Models\Order::where('vendor_id', $user->id)
-            ->with(['customer', 'student', 'user'])
-            ->orderBy('id', 'desc')
+        // 30-Day revenue trend aggregation for Chart.js
+        $monthlySalesData = [];
+        for ($i = 29; $i >= 0; $i--) {
+            $dateStr = now()->subDays($i)->format('Y-m-d');
+            $dayLabel = now()->subDays($i)->format('M d'); // e.g. Jul 15
+            $monthlySalesData[$dateStr] = [
+                'day' => $dayLabel,
+                'sales' => 0.0,
+                'order_count' => 0
+            ];
+        }
+
+        $thirtyDaysAgo = now()->subDays(29)->startOfDay();
+        $ordersLastThirtyDays = \App\Models\Order::where('vendor_id', $user->id)
+            ->whereIn('status', ['COMPLETED', 'DELIVERED'])
+            ->where('created_at', '>=', $thirtyDaysAgo)
+            ->select(\Illuminate\Support\Facades\DB::raw('DATE(created_at) as date_val'), \Illuminate\Support\Facades\DB::raw('SUM(total_price) as total_sales'), \Illuminate\Support\Facades\DB::raw('COUNT(*) as total_orders'))
+            ->groupBy('date_val')
             ->get();
+
+        foreach ($ordersLastThirtyDays as $orderSales) {
+            $dateKey = $orderSales->date_val;
+            if (isset($monthlySalesData[$dateKey])) {
+                $monthlySalesData[$dateKey]['sales'] = (float)$orderSales->total_sales;
+                $monthlySalesData[$dateKey]['order_count'] = (int)$orderSales->total_orders;
+            }
+        }
+
+        // Fetch vendor's orders history with search & filter
+        $ordersQuery = \App\Models\Order::where('vendor_id', $user->id)
+            ->with(['customer', 'student', 'user']);
+
+        $orderSearch = $request->query('order_search');
+        if (!empty($orderSearch)) {
+            $ordersQuery->where(function($q) use ($orderSearch) {
+                if (is_numeric($orderSearch)) {
+                    $q->where('id', $orderSearch);
+                }
+                $q->orWhere('food_name', 'LIKE', '%' . $orderSearch . '%');
+                $q->orWhereHas('customer', function($sub) use ($orderSearch) {
+                    $sub->where('fullName', 'LIKE', '%' . $orderSearch . '%')
+                       ->orWhere('username', 'LIKE', '%' . $orderSearch . '%');
+                })->orWhereHas('student', function($sub) use ($orderSearch) {
+                    $sub->where('fullName', 'LIKE', '%' . $orderSearch . '%')
+                       ->orWhere('username', 'LIKE', '%' . $orderSearch . '%');
+                });
+            });
+        }
+
+        $startDate = $request->query('start_date');
+        $endDate = $request->query('end_date');
+        if (!empty($startDate)) {
+            $ordersQuery->whereDate('created_at', '>=', $startDate);
+        }
+        if (!empty($endDate)) {
+            $ordersQuery->whereDate('created_at', '<=', $endDate);
+        }
+
+        $orders = $ordersQuery->orderBy('id', 'desc')->get();
 
         // Calculate top performing food items based on completed order quantity/volume
         $topPerformingItems = \App\Models\Order::where('vendor_id', $user->id)
@@ -325,7 +390,11 @@ HTML;
             'foodItems' => $foodItems,
             'metrics' => $metrics,
             'search' => $search,
+            'order_search' => $orderSearch,
+            'start_date' => $startDate,
+            'end_date' => $endDate,
             'weeklySales' => array_values($weeklySalesData),
+            'monthlySales' => array_values($monthlySalesData),
             'orders' => $orders,
             'topPerformingItems' => $topPerformingItems,
             'lowStockItems' => $lowStockItems,

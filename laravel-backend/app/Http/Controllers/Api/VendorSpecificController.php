@@ -373,13 +373,110 @@ class VendorSpecificController extends Controller
                 'updates_log' => $updatesLog
             ], 200);
 
-        } catch (\Exception $e) {
-            DB::rollBack();
+         } catch (\Exception $e) {
+             DB::rollBack();
+             return response()->json([
+                 'success' => false,
+                 'message' => 'Server error while performing bulk update from JSON.',
+                 'error' => $e->getMessage()
+             ], 500);
+         }
+     }
+
+    /**
+     * Get dynamic sales and revenue trends for Chart.js based on date range.
+     */
+    public function getAnalyticsTrends(Request $request)
+    {
+        $user = $request->user();
+        if (!$user) {
             return response()->json([
                 'success' => false,
-                'message' => 'Server error while performing bulk update from JSON.',
-                'error' => $e->getMessage()
-            ], 500);
+                'message' => 'Unauthenticated.'
+            ], 401);
         }
+
+        $vendorId = $user->id;
+        // If Admin, they can view trends of any vendor by passing vendor_id
+        if (strtoupper($user->role) === 'ADMIN' && $request->has('vendor_id')) {
+            $vendorId = $request->input('vendor_id');
+        }
+
+        $startDateStr = $request->input('start_date');
+        $endDateStr = $request->input('end_date');
+
+        if (!$startDateStr || !$endDateStr) {
+            // Default to last 30 days
+            $startDate = now()->subDays(29)->startOfDay();
+            $endDate = now()->endOfDay();
+        } else {
+            try {
+                $startDate = Carbon::parse($startDateStr)->startOfDay();
+                $endDate = Carbon::parse($endDateStr)->endOfDay();
+            } catch (\Exception $e) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Invalid date format. Use Y-m-d.'
+                ], 400);
+            }
+        }
+
+        // Limit range to 365 days
+        if ($startDate->diffInDays($endDate) > 365) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Date range cannot exceed 365 days.'
+            ], 400);
+        }
+
+        // Initialize array for every date in range
+        $trends = [];
+        $currentDate = clone $startDate;
+        while ($currentDate->lte($endDate)) {
+            $dateStr = $currentDate->format('Y-m-d');
+            $dayLabel = $currentDate->format('M d'); // e.g. Jul 15
+            $trends[$dateStr] = [
+                'date' => $dateStr,
+                'label' => $dayLabel,
+                'sales' => 0.0,
+                'order_count' => 0
+            ];
+            $currentDate->addDay();
+        }
+
+        // Query sales from DB
+        $orders = Order::where('vendor_id', $vendorId)
+            ->whereIn('status', ['COMPLETED', 'DELIVERED', 'READY'])
+            ->whereBetween('created_at', [$startDate, $endDate])
+            ->select(
+                DB::raw('DATE(created_at) as date_val'),
+                DB::raw('SUM(total_price) as total_sales'),
+                DB::raw('COUNT(*) as total_orders')
+            )
+            ->groupBy('date_val')
+            ->get();
+
+        foreach ($orders as $orderSales) {
+            $dateKey = $orderSales->date_val;
+            if (isset($trends[$dateKey])) {
+                $trends[$dateKey]['sales'] = (float)$orderSales->total_sales;
+                $trends[$dateKey]['order_count'] = (int)$orderSales->total_orders;
+            }
+        }
+
+        $trendsList = array_values($trends);
+        $labels = array_map(function ($item) { return $item['label']; }, $trendsList);
+        $sales = array_map(function ($item) { return $item['sales']; }, $trendsList);
+        $orderCounts = array_map(function ($item) { return $item['order_count']; }, $trendsList);
+
+        return response()->json([
+            'success' => true,
+            'start_date' => $startDate->format('Y-m-d'),
+            'end_date' => $endDate->format('Y-m-d'),
+            'labels' => $labels,
+            'sales' => $sales,
+            'order_counts' => $orderCounts,
+            'raw_trends' => $trendsList
+        ], 200);
     }
 }

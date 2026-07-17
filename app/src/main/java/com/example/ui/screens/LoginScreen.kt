@@ -76,6 +76,16 @@ fun LoginScreen(
     val loginError by viewModel.loginError.collectAsStateWithLifecycle()
     val isLoading by viewModel.isLoading.collectAsStateWithLifecycle()
 
+    val context = androidx.compose.ui.platform.LocalContext.current
+    val sharedPrefs = remember { context.getSharedPreferences("cafeteria_cache", android.content.Context.MODE_PRIVATE) }
+    var biometricEnabledSetup by remember { mutableStateOf(sharedPrefs.getBoolean("biometric_enabled", false)) }
+    val savedBiometricUser = remember { sharedPrefs.getString("biometric_username", "") ?: "" }
+    val savedBiometricPin = remember { sharedPrefs.getString("biometric_pin", "") ?: "" }
+    val hasStoredBiometrics = remember(savedBiometricUser, savedBiometricPin) {
+        savedBiometricUser.isNotBlank() && savedBiometricPin.isNotBlank()
+    }
+    var biometricErrorText by remember { mutableStateOf<String?>(null) }
+
     Scaffold(
         topBar = {
             TopAppBar(
@@ -186,6 +196,44 @@ fun LoginScreen(
                         singleLine = true
                     )
 
+                    Spacer(modifier = Modifier.height(10.dp))
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.weight(1f)) {
+                            Icon(
+                                imageVector = Icons.Default.Fingerprint,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.size(20.dp)
+                            )
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text(
+                                "Biometric Fast-Login",
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.SemiBold,
+                                color = MaterialTheme.colorScheme.onSurface
+                            )
+                        }
+                        Switch(
+                            checked = biometricEnabledSetup,
+                            onCheckedChange = { checked ->
+                                biometricEnabledSetup = checked
+                                if (!checked) {
+                                    sharedPrefs.edit()
+                                        .remove("biometric_username")
+                                        .remove("biometric_pin")
+                                        .putBoolean("biometric_enabled", false)
+                                        .apply()
+                                }
+                            },
+                            modifier = Modifier.testTag("biometric_login_toggle")
+                        )
+                    }
+
                     if (isSessionTimedOut) {
                         Spacer(modifier = Modifier.height(12.dp))
                         Card(
@@ -233,34 +281,101 @@ fun LoginScreen(
                         )
                     }
 
+                    biometricErrorText?.let {
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Text(
+                            text = it,
+                            color = MaterialTheme.colorScheme.error,
+                            style = MaterialTheme.typography.bodySmall,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
+
                     Spacer(modifier = Modifier.height(20.dp))
 
                     if (isLoading) {
                         CircularProgressIndicator(modifier = Modifier.align(Alignment.CenterHorizontally))
                     } else {
-                        Button(
-                            onClick = {
-                                if (username.isNotBlank() && pinCode.isNotBlank()) {
-                                    viewModel.loginUser(username.trim().lowercase(), pinCode) { success ->
-                                        if (success) {
-                                            val u = viewModel.currentUser.value
-                                            if (u != null) {
-                                                when (u.role) {
-                                                    "STUDENT" -> navController.navigate("student_home") { popUpTo(0) }
-                                                    "VENDOR" -> navController.navigate("vendor_home") { popUpTo(0) }
-                                                    "ADMIN" -> navController.navigate("admin_home") { popUpTo(0) }
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Button(
+                                onClick = {
+                                    if (username.isNotBlank() && pinCode.isNotBlank()) {
+                                        viewModel.loginUser(username.trim().lowercase(), pinCode) { success ->
+                                            if (success) {
+                                                if (biometricEnabledSetup) {
+                                                    sharedPrefs.edit()
+                                                        .putString("biometric_username", username.trim().lowercase())
+                                                        .putString("biometric_pin", pinCode)
+                                                        .putBoolean("biometric_enabled", true)
+                                                        .apply()
+                                                }
+                                                val u = viewModel.currentUser.value
+                                                if (u != null) {
+                                                    when (u.role) {
+                                                        "STUDENT" -> navController.navigate("student_home") { popUpTo(0) }
+                                                        "VENDOR" -> navController.navigate("vendor_home") { popUpTo(0) }
+                                                        "ADMIN" -> navController.navigate("admin_home") { popUpTo(0) }
+                                                    }
                                                 }
                                             }
                                         }
                                     }
+                                },
+                                modifier = Modifier.weight(1f),
+                                shape = RoundedCornerShape(8.dp)
+                            ) {
+                                Icon(Icons.Default.Lock, contentDescription = null, modifier = Modifier.size(18.dp))
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Text("Secure Login")
+                            }
+
+                            if (hasStoredBiometrics && biometricEnabledSetup) {
+                                FilledIconButton(
+                                    onClick = {
+                                        val activity = com.example.ui.util.BiometricHelper.findActivity(context)
+                                        if (activity != null) {
+                                            com.example.ui.util.BiometricHelper.showBiometricPrompt(
+                                                activity = activity,
+                                                title = "ATU Cafeteria Hub Login",
+                                                subtitle = "Scan fingerprint/face to access account",
+                                                onSuccess = {
+                                                    viewModel.loginUser(savedBiometricUser, savedBiometricPin) { success ->
+                                                        if (success) {
+                                                            val u = viewModel.currentUser.value
+                                                            if (u != null) {
+                                                                when (u.role) {
+                                                                    "STUDENT" -> navController.navigate("student_home") { popUpTo(0) }
+                                                                    "VENDOR" -> navController.navigate("vendor_home") { popUpTo(0) }
+                                                                    "ADMIN" -> navController.navigate("admin_home") { popUpTo(0) }
+                                                                }
+                                                            }
+                                                        } else {
+                                                            biometricErrorText = "Auto-biometric login failed."
+                                                        }
+                                                    }
+                                                },
+                                                onError = { err ->
+                                                    biometricErrorText = err
+                                                }
+                                            )
+                                        } else {
+                                            biometricErrorText = "Device biometric capability not found."
+                                        }
+                                    },
+                                    modifier = Modifier.size(48.dp).testTag("biometric_login_btn"),
+                                    shape = RoundedCornerShape(8.dp),
+                                    colors = IconButtonDefaults.filledIconButtonColors(
+                                        containerColor = MaterialTheme.colorScheme.tertiary,
+                                        contentColor = MaterialTheme.colorScheme.onTertiary
+                                    )
+                                ) {
+                                    Icon(Icons.Default.Fingerprint, contentDescription = "Biometric Login", modifier = Modifier.size(24.dp))
                                 }
-                            },
-                            modifier = Modifier.fillMaxWidth(),
-                            shape = RoundedCornerShape(8.dp)
-                        ) {
-                            Icon(Icons.Default.Lock, contentDescription = null, modifier = Modifier.size(18.dp))
-                            Spacer(modifier = Modifier.width(8.dp))
-                            Text("Secure Login")
+                            }
                         }
                     }
                 }

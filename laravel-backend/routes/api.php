@@ -304,6 +304,33 @@ Route::post('/vendor/food-items', function (\Illuminate\Http\Request $request) {
     return redirect()->back()->with('success', "Food item '{$food->name}' added successfully!");
 });
 
+Route::post('/vendor/food-items/{id}/update-inventory', function (\Illuminate\Http\Request $request, $id) {
+    $food = \App\Models\FoodItem::findOrFail($id);
+    
+    $validator = \Illuminate\Support\Facades\Validator::make($request->all(), [
+        'initial_stock' => 'required|integer|min:1',
+        'low_stock_threshold' => 'required|integer|min:0',
+    ]);
+
+    if ($validator->fails()) {
+        return redirect()->back()->withErrors($validator)->withInput();
+    }
+
+    $food->initial_stock = (int)$request->input('initial_stock');
+    $food->low_stock_threshold = (int)$request->input('low_stock_threshold');
+    $food->save();
+
+    // Create audit log
+    \App\Models\AuditLog::create([
+        'user_id' => $food->vendor_id,
+        'timestamp' => time() * 1000,
+        'action' => 'MENU_ITEM_UPDATED',
+        'details' => "Updated inventory thresholds for '{$food->name}': Stock set to {$food->initial_stock}, Alert threshold set to {$food->low_stock_threshold} via Blade Dashboard.",
+    ]);
+
+    return redirect()->back()->with('success', "Inventory levels for '{$food->name}' updated successfully!");
+});
+
 Route::post('/vendor/food-items/{id}/delete', function ($id) {
     $food = \App\Models\FoodItem::find($id);
     if ($food) {
@@ -679,6 +706,7 @@ Route::middleware(function ($request, $next) {
         Route::delete('/food-items/{id}', [FoodItemController::class, 'destroy']);
 
         // Protected Vendor Pre-Orders & Hand-offs
+        Route::post('/orders/bulk-update', [OrderController::class, 'bulkUpdateStatus']);
         Route::put('/orders/{id}/status', [OrderController::class, 'updateStatus']);
         Route::patch('/orders/{id}/status', [OrderController::class, 'patchStatus']);
         Route::post('/orders/{id}/verify-pickup', [OrderController::class, 'verifyAndCompletePickup']);
@@ -718,6 +746,7 @@ Route::middleware(function ($request, $next) {
         Route::post('/system/logs/clear', [VendorController::class, 'clearDiagnosticLogs']);
 
         // Vendor Specific endpoints
+        Route::get('/vendor/analytics/trends', [VendorSpecificController::class, 'getAnalyticsTrends']);
         Route::put('/vendor/menu/availability', [VendorSpecificController::class, 'updateMenuAvailability']);
         Route::get('/vendor/orders/summary', [VendorSpecificController::class, 'getOrderSummary']);
         Route::post('/vendor/menu/bulk-update', [VendorSpecificController::class, 'bulkUpdateMenu']);
@@ -789,6 +818,7 @@ Route::get('/food-items/vendor/{vendorId}', [FoodItemController::class, 'getVend
 // Pre-Orders & Transactions Endpoints
 Route::get('/orders', [OrderController::class, 'index']);
 Route::get('/orders/{id}', [OrderController::class, 'show']);
+Route::get('/orders/{id}/receipt', [OrderController::class, 'downloadReceipt']);
 Route::get('/orders/customer/{customerId}', [OrderController::class, 'getCustomerOrders']);
 Route::get('/orders/student/{studentId}', [OrderController::class, 'getCustomerOrders']);
 Route::get('/orders/history/{studentId}', [OrderController::class, 'getCustomerOrders']);

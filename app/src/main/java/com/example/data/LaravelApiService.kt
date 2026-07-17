@@ -637,7 +637,55 @@ interface LaravelApiService {
 
     @POST("api/user/profile")
     suspend fun updateProfile(@Body request: LaravelUpdateProfileRequest): LaravelGeneralResponse
+
+    @GET("api/student/loyalty/summary")
+    suspend fun getLoyaltySummary(): LaravelLoyaltySummaryResponse
+
+    @POST("api/student/loyalty/preview-discount")
+    suspend fun previewDiscount(@Body request: LaravelPreviewDiscountRequest): LaravelPreviewDiscountResponse
 }
+
+@JsonClass(generateAdapter = true)
+data class LaravelLoyaltyHistoryItem(
+    val order_id: Int,
+    val food_name: String,
+    val type: String,
+    val points: Int,
+    val discount_applied: Double,
+    val description: String,
+    val status: String,
+    val date: String,
+    val timestamp_ms: Long
+)
+
+@JsonClass(generateAdapter = true)
+data class LaravelLoyaltySummaryResponse(
+    val success: Boolean,
+    val loyalty_points_balance: Int,
+    val equivalent_cashback_value: Double,
+    val tier: String,
+    val next_tier: String,
+    val points_needed_for_next_tier: Int,
+    val total_spent_all_time: Double,
+    val conversion_rule: String,
+    val earning_rule: String,
+    val history: List<LaravelLoyaltyHistoryItem>,
+    val generated_at: String? = null
+)
+
+@JsonClass(generateAdapter = true)
+data class LaravelPreviewDiscountRequest(
+    val points_to_redeem: Int
+)
+
+@JsonClass(generateAdapter = true)
+data class LaravelPreviewDiscountResponse(
+    val success: Boolean,
+    val points_to_redeem: Int,
+    val discount_value: Double,
+    val currency: String,
+    val remaining_points: Int
+)
 
 @JsonClass(generateAdapter = true)
 data class LaravelUpdateProfileRequest(

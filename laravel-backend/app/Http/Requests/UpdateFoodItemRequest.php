@@ -29,6 +29,8 @@ class UpdateFoodItemRequest extends FormRequest
             'description' => 'nullable|string|min:10|max:1000',
             'image_url' => 'nullable|string',
             'is_available' => 'nullable|boolean',
+            'initial_stock' => 'nullable|integer|min:1',
+            'low_stock_threshold' => 'nullable|integer|min:0',
         ];
     }
 

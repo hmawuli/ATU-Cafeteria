@@ -29,6 +29,8 @@ class StoreFoodItemRequest extends FormRequest
             'category' => 'required|string',
             'description' => 'required|string|min:10|max:1000',
             'image_url' => 'nullable|string',
+            'initial_stock' => 'nullable|integer|min:1',
+            'low_stock_threshold' => 'nullable|integer|min:0',
         ];
     }
 

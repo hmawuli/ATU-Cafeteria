@@ -9,6 +9,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Facades\DB;
 use App\Events\OrderStatusCompleted;
+use App\Http\Resources\OrderResource;
 
 class OrderController extends Controller
 {
@@ -17,8 +18,8 @@ class OrderController extends Controller
      */
     public function index()
     {
-        $orders = Order::orderBy('order_timestamp', 'desc')->get();
-        return response()->json($orders, 200);
+        $orders = Order::with(['customer', 'vendor', 'foodItem', 'menuItem', 'feedback'])->orderBy('order_timestamp', 'desc')->get();
+        return response()->json(OrderResource::collection($orders)->resolve(), 200);
     }
 
     /**
@@ -26,14 +27,41 @@ class OrderController extends Controller
      */
     public function show($id)
     {
-        $order = Order::find($id);
+        $order = Order::with(['customer', 'vendor', 'foodItem', 'menuItem', 'feedback'])->find($id);
         if (!$order) {
             return response()->json([
                 'success' => false,
                 'message' => 'Order not found.'
             ], 404);
         }
-        return response()->json($order, 200);
+        return response()->json(new OrderResource($order), 200);
+    }
+
+    /**
+     * Generate and download the printable PDF receipt for a completed order.
+     */
+    public function downloadReceipt($id)
+    {
+        $order = Order::with(['customer', 'vendor', 'foodItem', 'menuItem'])->find($id);
+        if (!$order) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Order not found.'
+            ], 404);
+        }
+
+        $pdfWriter = new \App\Services\ReceiptPdfWriter();
+        $pdfContent = $pdfWriter->generate($order);
+
+        $fileName = "receipt-order-{$id}.pdf";
+
+        return response($pdfContent, 200, [
+            'Content-Type' => 'application/pdf',
+            'Content-Disposition' => 'attachment; filename="' . $fileName . '"',
+            'Content-Length' => strlen($pdfContent),
+            'Cache-Control' => 'private, max-age=0, must-revalidate',
+            'Pragma' => 'public'
+        ]);
     }
 
     /**
@@ -515,6 +543,132 @@ class OrderController extends Controller
         }
 
         return response()->json($updatedOrder, 200);
+    }
+
+    /**
+     * Bulk update statuses for multiple selected orders.
+     * Secured with Sanctum and validated to ensure the authenticated vendor owns the selected orders.
+     */
+    public function bulkUpdateStatus(Request $request)
+    {
+        $user = $request->user();
+        if (!$user) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Unauthenticated.'
+            ], 401);
+        }
+
+        $role = strtoupper($user->role);
+        if ($role !== 'VENDOR' && $role !== 'ADMIN') {
+            return response()->json([
+                'success' => false,
+                'message' => 'Unauthorized. This resource requires VENDOR or ADMIN privileges.'
+            ], 403);
+        }
+
+        $statusInput = $request->input('status');
+        if ($statusInput) {
+            $normalized = strtoupper(trim($statusInput));
+            if ($normalized === 'READY FOR PICKUP' || $normalized === 'READY_FOR_PICKUP' || $normalized === 'READY') {
+                $statusInput = 'READY';
+            } elseif ($normalized === 'PREPARING') {
+                $statusInput = 'PREPARING';
+            } elseif ($normalized === 'PENDING' || $normalized === 'ORDER PLACED' || $normalized === 'ORDER_PLACED') {
+                $statusInput = 'ORDER_PLACED';
+            } elseif ($normalized === 'OUT FOR DELIVERY' || $normalized === 'OUT_FOR_DELIVERY') {
+                $statusInput = 'OUT_FOR_DELIVERY';
+            } elseif ($normalized === 'DELIVERED') {
+                $statusInput = 'DELIVERED';
+            } elseif ($normalized === 'COMPLETED') {
+                $statusInput = 'COMPLETED';
+            } elseif ($normalized === 'DECLINED') {
+                $statusInput = 'DECLINED';
+            } elseif ($normalized === 'CANCELLED' || $normalized === 'CANCEL' || $normalized === 'CANCELED') {
+                $statusInput = 'CANCELLED';
+            }
+            $request->merge(['status' => $statusInput]);
+        }
+
+        $validator = Validator::make($request->all(), [
+            'order_ids' => 'required|array',
+            'order_ids.*' => 'integer|exists:orders,id',
+            'status' => 'required|string|in:PENDING,ORDER_PLACED,PREPARING,READY,OUT_FOR_DELIVERY,DELIVERED,COMPLETED,DECLINED,CANCELLED',
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Valid status and order IDs are required.',
+                'errors' => $validator->errors()
+            ], 400);
+        }
+
+        $orderIds = $request->input('order_ids');
+        $newStatus = $request->input('status');
+
+        $orders = Order::whereIn('id', $orderIds)->get();
+
+        // Security check: ensure vendor owns all selected orders
+        if ($role === 'VENDOR') {
+            foreach ($orders as $order) {
+                if ($order->vendor_id !== $user->id) {
+                    return response()->json([
+                        'success' => false,
+                        'message' => 'Unauthorized. One or more selected orders do not belong to you.'
+                    ], 403);
+                }
+            }
+        }
+
+        $updatedOrders = [];
+        DB::transaction(function () use ($orders, $request, $newStatus, &$updatedOrders) {
+            foreach ($orders as $order) {
+                $oldStatus = $order->status;
+                $order->status = $newStatus;
+                $order->order_status = $newStatus;
+                $order->save();
+
+                // Register Audit Log
+                \App\Models\AuditLog::create([
+                    'user_id' => $request->user()->id,
+                    'timestamp' => time() * 1000,
+                    'action' => 'ORDER_STATUS_CHANGED',
+                    'details' => "Order #{$order->id} status moved from '{$oldStatus}' to '{$newStatus}' via bulk update by {$request->user()->fullName}.",
+                ]);
+
+                $updatedOrders[] = $order;
+
+                // Notify student of status change
+                $studentId = $order->customer_id ?? $order->student_id;
+                if ($studentId) {
+                    $student = \App\Models\User::find($studentId);
+                    if ($student) {
+                        try {
+                            $student->notify(new \App\Notifications\OrderStatusChangedNotification($order, $oldStatus, $newStatus));
+                            event(new \App\Events\OrderStatusUpdatedBroadcast($order, $oldStatus, $newStatus));
+                        } catch (\Exception $e) {
+                            \Illuminate\Support\Facades\Log::error("Failed to notify student {$studentId} in bulk status change: " . $e->getMessage());
+                        }
+                    }
+                }
+
+                if (strtoupper($newStatus) === 'COMPLETED') {
+                    event(new OrderStatusCompleted($order));
+                }
+
+                if ((strtoupper($oldStatus) === 'PENDING' || strtoupper($oldStatus) === 'ORDER_PLACED') && strtoupper($newStatus) === 'READY') {
+                    event(new \App\Events\OrderStatusReady($order));
+                }
+            }
+        });
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Bulk update completed successfully.',
+            'updated_count' => count($updatedOrders),
+            'orders' => $updatedOrders
+        ], 200);
     }
 
     /**

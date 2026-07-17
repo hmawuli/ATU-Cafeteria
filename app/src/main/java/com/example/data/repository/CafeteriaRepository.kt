@@ -1009,6 +1009,28 @@ class CafeteriaRepository(private val db: AppDatabase) {
         }
     }
 
+    suspend fun getLoyaltySummary(): LaravelLoyaltySummaryResponse? = withContext(Dispatchers.IO) {
+        if (LaravelClientManager.isLaravelEnabled) {
+            try {
+                return@withContext LaravelClientManager.getService().getLoyaltySummary()
+            } catch (e: Exception) {
+                Log.e("CafeteriaRepository", "Failed to fetch loyalty summary", e)
+            }
+        }
+        null
+    }
+
+    suspend fun previewDiscount(pointsToRedeem: Int): LaravelPreviewDiscountResponse? = withContext(Dispatchers.IO) {
+        if (LaravelClientManager.isLaravelEnabled) {
+            try {
+                return@withContext LaravelClientManager.getService().previewDiscount(LaravelPreviewDiscountRequest(pointsToRedeem))
+            } catch (e: Exception) {
+                Log.e("CafeteriaRepository", "Failed to preview discount", e)
+            }
+        }
+        null
+    }
+
     // ==========================================
     // SEED INITIAL SAMPLE DATA
     // ==========================================

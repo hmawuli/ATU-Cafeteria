@@ -11,6 +11,19 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 
+private val HighContrastColorScheme =
+  darkColorScheme(
+    primary = Color(0xFFFFFFFF),
+    secondary = Color(0xFFFFD600),
+    tertiary = Color(0xFFFFD600),
+    background = Color(0xFF000000),
+    surface = Color(0xFF121212),
+    onPrimary = Color.Black,
+    onSecondary = Color.Black,
+    onBackground = Color.White,
+    onSurface = Color.White
+  )
+
 private val DarkColorScheme =
   darkColorScheme(
     primary = AtuDarkNavy,
@@ -40,12 +53,14 @@ private val LightColorScheme =
 @Composable
 fun MyApplicationTheme(
   darkTheme: Boolean = isSystemInDarkTheme(),
+  highContrast: Boolean = false,
   // Dynamic color is available on Android 12+
   dynamicColor: Boolean = false,
   content: @Composable () -> Unit,
 ) {
   val colorScheme =
     when {
+      highContrast -> HighContrastColorScheme
       dynamicColor && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S -> {
         val context = LocalContext.current
         if (darkTheme) dynamicDarkColorScheme(context) else dynamicLightColorScheme(context)

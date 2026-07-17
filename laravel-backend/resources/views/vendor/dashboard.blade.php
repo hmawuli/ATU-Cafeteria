@@ -353,7 +353,7 @@
             <div class="lg:col-span-2 flex flex-col gap-6">
 
                 <!-- Incoming Orders & Fulfillment Console -->
-                <div class="bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden mb-2">
+                <div id="incoming-orders-console" class="bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden mb-2">
                     <div class="px-6 py-5 border-b border-slate-100 flex flex-col md:flex-row md:items-center justify-between gap-4">
                         <div>
                             <h3 class="text-lg font-bold text-slate-900 flex items-center gap-2">
@@ -365,6 +365,48 @@
                         <span class="px-3 py-1 bg-indigo-50 text-indigo-700 text-xs font-bold rounded-lg code-font">
                             {{ count($orders) }} Total Orders
                         </span>
+                    </div>
+
+                    <!-- Search & Filter Bar -->
+                    <div class="px-6 py-4 bg-slate-50 border-b border-slate-100">
+                        <form action="" method="GET" class="grid grid-cols-1 sm:grid-cols-4 gap-3 items-end">
+                            <input type="hidden" name="vendor_id" value="{{ $vendor->id }}">
+                            
+                            <!-- Search query input -->
+                            <div class="flex flex-col gap-1">
+                                <label class="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Search Orders</label>
+                                <div class="relative">
+                                    <input type="text" name="order_search" value="{{ $order_search ?? '' }}" placeholder="Order ID or Student Name..." class="pl-8 pr-3 py-1.5 text-xs rounded-xl border border-slate-300 focus:ring-2 focus:ring-indigo-500 outline-none w-full transition-all">
+                                    <svg class="w-3.5 h-3.5 text-slate-400 absolute left-2.5 top-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path>
+                                    </svg>
+                                </div>
+                            </div>
+
+                            <!-- Start Date -->
+                            <div class="flex flex-col gap-1">
+                                <label class="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Start Date</label>
+                                <input type="date" name="start_date" value="{{ $start_date ?? '' }}" class="px-3 py-1.5 text-xs rounded-xl border border-slate-300 focus:ring-2 focus:ring-indigo-500 outline-none w-full text-slate-700 transition-all">
+                            </div>
+
+                            <!-- End Date -->
+                            <div class="flex flex-col gap-1">
+                                <label class="text-[10px] font-bold text-slate-500 uppercase tracking-wider">End Date</label>
+                                <input type="date" name="end_date" value="{{ $end_date ?? '' }}" class="px-3 py-1.5 text-xs rounded-xl border border-slate-300 focus:ring-2 focus:ring-indigo-500 outline-none w-full text-slate-700 transition-all">
+                            </div>
+
+                            <!-- Actions -->
+                            <div class="flex items-center gap-2">
+                                <button type="submit" class="flex-1 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold rounded-xl shadow transition-all flex items-center justify-center gap-1.5">
+                                    <span>🔍</span> Filter
+                                </button>
+                                @if(!empty($order_search) || !empty($start_date) || !empty($end_date))
+                                    <a href="?vendor_id={{ $vendor->id }}" class="py-1.5 px-3 bg-slate-200 hover:bg-slate-300 text-slate-700 text-xs font-bold rounded-xl transition-all text-center">
+                                        Reset
+                                    </a>
+                                @endif
+                            </div>
+                        </form>
                     </div>
 
                     <!-- Desktop-only view table -->
@@ -428,7 +470,7 @@
                                                 {{ $order->status }}
                                             </span>
                                         </td>
-                                        <td class="py-4 px-6 text-center">
+                                        <td class="py-4 px-6 text-center flex items-center justify-center gap-1.5">
                                             <!-- Simple dropdown action form for state update -->
                                             <form action="/api/vendor/orders/{{ $order->id }}/update-status" method="POST" class="inline-flex items-center gap-1">
                                                 @csrf
@@ -440,6 +482,13 @@
                                                     <option value="DECLINED" {{ $currStatus === 'DECLINED' ? 'selected' : '' }}>Declined</option>
                                                 </select>
                                             </form>
+                                            
+                                            <!-- Printable PDF receipt download -->
+                                            <a href="/api/orders/{{ $order->id }}/receipt" target="_blank" title="Download Printable PDF Receipt" class="inline-flex items-center justify-center p-1.5 text-slate-500 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors border border-slate-200 hover:border-indigo-200">
+                                                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+                                                </svg>
+                                            </a>
                                         </td>
                                     </tr>
                                 @empty
@@ -529,16 +578,23 @@
                                     </div>
                                     <div class="bg-white p-2.5 rounded-xl border border-slate-200/60 flex items-center justify-between gap-2 mt-2 shadow-3xs">
                                         <span class="text-[11px] font-bold text-slate-500">Action:</span>
-                                        <form action="/api/vendor/orders/{{ $order->id }}/update-status" method="POST" class="flex-grow max-w-[160px]" id="status-form-{{ $order->id }}">
-                                            @csrf
-                                            <select name="status" onchange="this.form.submit()" class="w-full px-2 py-1.5 text-xs rounded-lg border border-slate-300 bg-slate-50 text-slate-700 font-bold focus:outline-none focus:ring-2 focus:ring-indigo-500 transition-all cursor-pointer">
-                                                <option value="ORDER_PLACED" {{ $currStatus === 'ORDER_PLACED' ? 'selected' : '' }}>Pending</option>
-                                                <option value="PREPARING" {{ $currStatus === 'PREPARING' ? 'selected' : '' }}>Preparing</option>
-                                                <option value="READY" {{ $currStatus === 'READY' ? 'selected' : '' }}>Ready</option>
-                                                <option value="COMPLETED" {{ $currStatus === 'COMPLETED' ? 'selected' : '' }}>Completed</option>
-                                                <option value="DECLINED" {{ $currStatus === 'DECLINED' ? 'selected' : '' }}>Declined</option>
-                                            </select>
-                                        </form>
+                                        <div class="flex items-center gap-1.5 flex-grow justify-end">
+                                            <form action="/api/vendor/orders/{{ $order->id }}/update-status" method="POST" class="max-w-[130px]" id="status-form-{{ $order->id }}">
+                                                @csrf
+                                                <select name="status" onchange="this.form.submit()" class="w-full px-2 py-1.5 text-xs rounded-lg border border-slate-300 bg-slate-50 text-slate-700 font-bold focus:outline-none focus:ring-2 focus:ring-indigo-500 transition-all cursor-pointer">
+                                                    <option value="ORDER_PLACED" {{ $currStatus === 'ORDER_PLACED' ? 'selected' : '' }}>Pending</option>
+                                                    <option value="PREPARING" {{ $currStatus === 'PREPARING' ? 'selected' : '' }}>Preparing</option>
+                                                    <option value="READY" {{ $currStatus === 'READY' ? 'selected' : '' }}>Ready</option>
+                                                    <option value="COMPLETED" {{ $currStatus === 'COMPLETED' ? 'selected' : '' }}>Completed</option>
+                                                    <option value="DECLINED" {{ $currStatus === 'DECLINED' ? 'selected' : '' }}>Declined</option>
+                                                </select>
+                                            </form>
+                                            <a href="/api/orders/{{ $order->id }}/receipt" target="_blank" title="Download Printable PDF Receipt" class="inline-flex items-center justify-center p-2 text-slate-500 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors border border-slate-200 hover:border-indigo-200">
+                                                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+                                                </svg>
+                                            </a>
+                                        </div>
                                     </div>
                                 </div>
                             </div>
@@ -643,6 +699,13 @@
                                         </td>
                                         <td class="py-4 px-6 text-center">
                                             <div class="inline-flex items-center gap-1.5">
+                                                <!-- Adjust Inventory Thresholds button -->
+                                                <button type="button" onclick="openInventoryModal('{{ $food->id }}', '{{ addslashes($food->name) }}', '{{ $food->initial_stock }}', '{{ $food->low_stock_threshold }}')" class="p-1.5 bg-slate-100 text-slate-600 hover:bg-emerald-50 hover:text-emerald-700 rounded-lg border border-slate-200 hover:border-emerald-200 transition-all shadow-sm flex items-center justify-center" title="Adjust Inventory Thresholds">
+                                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4"></path>
+                                                    </svg>
+                                                </button>
+
                                                 <!-- Generate QR Code action button -->
                                                 <button type="button" onclick="generateFoodItemQr('{{ $food->id }}', '{{ addslashes($food->name) }}', '{{ $food->price }}')" class="p-1.5 bg-indigo-50 text-indigo-600 hover:bg-indigo-100 hover:text-indigo-700 rounded-lg border border-indigo-200 transition-all shadow-sm flex items-center justify-center" title="Generate Customer Scan QR Code">
                                                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
@@ -717,6 +780,14 @@
 
                                     <!-- Touch actions buttons -->
                                     <div class="flex items-center gap-2">
+                                        <!-- Adjust Inventory Thresholds button -->
+                                        <button type="button" onclick="openInventoryModal('{{ $food->id }}', '{{ addslashes($food->name) }}', '{{ $food->initial_stock }}', '{{ $food->low_stock_threshold }}')" class="px-2.5 py-1.5 bg-slate-50 text-slate-600 border border-slate-200 text-xs font-bold rounded-xl flex items-center gap-1 transition-all" style="min-height: 40px;">
+                                            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4"></path>
+                                            </svg>
+                                            <span>Stock</span>
+                                        </button>
+
                                         <!-- QR Code Button -->
                                         <button type="button" onclick="generateFoodItemQr('{{ $food->id }}', '{{ addslashes($food->name) }}', '{{ $food->price }}')" class="px-2.5 py-1.5 bg-indigo-50 text-indigo-600 border border-indigo-200 text-xs font-bold rounded-xl flex items-center gap-1 transition-all" style="min-height: 40px;">
                                             <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -1048,6 +1119,38 @@
                     </div>
                     <div class="relative w-full h-[240px] mt-4">
                         <canvas id="fulfillmentStatusChart"></canvas>
+                    </div>
+                </div>
+
+                <!-- Chart 5: Dynamic Revenue & Volume Trend Chart with Date Range Picker -->
+                <div class="bg-white rounded-3xl border border-slate-200 shadow-sm p-6 flex flex-col justify-between lg:col-span-2">
+                    <div class="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 border-b border-slate-100 pb-4 mb-4">
+                        <div>
+                            <h3 class="text-base font-bold text-slate-900 flex items-center gap-2">
+                                <span>📅</span> Dynamic Revenue & Volume Trend Chart
+                            </h3>
+                            <p class="text-xs text-slate-400 mt-0.5 font-medium">Aggregated daily sales revenue and order volumes across any custom date range.</p>
+                        </div>
+                        <!-- Date Range Picker Component -->
+                        <div class="flex flex-wrap items-center gap-2">
+                            <div class="flex items-center gap-1.5 bg-slate-50 border border-slate-200 rounded-xl px-2.5 py-1.5 shadow-xs">
+                                <span class="text-[10px] text-slate-400 font-bold uppercase tracking-wider">From</span>
+                                <input type="date" id="chart-start-date" value="{{ now()->subDays(29)->format('Y-m-d') }}" onchange="applyChartDateRange()" class="bg-transparent border-none text-xs text-slate-800 font-bold focus:ring-0 outline-none code-font p-0" style="width: 105px;">
+                            </div>
+                            <div class="flex items-center gap-1.5 bg-slate-50 border border-slate-200 rounded-xl px-2.5 py-1.5 shadow-xs">
+                                <span class="text-[10px] text-slate-400 font-bold uppercase tracking-wider">To</span>
+                                <input type="date" id="chart-end-date" value="{{ now()->format('Y-m-d') }}" onchange="applyChartDateRange()" class="bg-transparent border-none text-xs text-slate-800 font-bold focus:ring-0 outline-none code-font p-0" style="width: 105px;">
+                            </div>
+                            <button type="button" onclick="applyChartDateRange()" class="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold rounded-xl shadow-md transition-all flex items-center gap-1.5" style="min-height: 34px;" title="Update Chart Data">
+                                <svg class="w-3.5 h-3.5 animate-spin-hover" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 1121.21 15H19"></path>
+                                </svg>
+                                <span class="hidden sm:inline">Refresh</span>
+                            </button>
+                        </div>
+                    </div>
+                    <div class="relative w-full h-[280px]">
+                        <canvas id="monthlyRevenueTrendChart"></canvas>
                     </div>
                 </div>
 
@@ -1565,6 +1668,100 @@
                     }
                 }
             });
+
+            // 5. 30-Day Revenue Trend Line Chart
+            const monthlySalesData = @json($monthlySales);
+            const monthlyLabels = monthlySalesData.map(item => item.day);
+            const monthlyValues = monthlySalesData.map(item => item.sales);
+            
+            const monthlyRevenueCtx = document.getElementById('monthlyRevenueTrendChart').getContext('2d');
+            window.monthlyRevenueTrendChartInstance = new Chart(monthlyRevenueCtx, {
+                type: 'line',
+                data: {
+                    labels: monthlyLabels,
+                    datasets: [{
+                        label: 'Sales Revenue (GH₵)',
+                        data: monthlyValues,
+                        borderColor: '#10b981', // emerald-500
+                        backgroundColor: 'rgba(16, 185, 129, 0.05)',
+                        borderWidth: 2.5,
+                        pointBackgroundColor: '#10b981',
+                        pointHoverBackgroundColor: '#4f46e5', // indigo-600
+                        pointHoverRadius: 6,
+                        tension: 0.3,
+                        fill: true
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            display: false
+                        },
+                        tooltip: {
+                            callbacks: {
+                                label: function(context) {
+                                    return ` Daily Sales: GH₵ ${context.parsed.y.toFixed(2)}`;
+                                }
+                            }
+                        }
+                    },
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            grid: {
+                                color: 'rgba(241, 245, 249, 1)'
+                            },
+                            ticks: {
+                                callback: function(value) {
+                                    return 'GH₵ ' + value;
+                                },
+                                font: {
+                                    family: 'JetBrains Mono',
+                                    size: 10
+                                }
+                            }
+                        },
+                        x: {
+                            grid: {
+                                display: false
+                            },
+                            ticks: {
+                                font: {
+                                    family: 'Plus Jakarta Sans',
+                                    size: 9
+                                },
+                                maxRotation: 45,
+                                minRotation: 45
+                            }
+                        }
+                    }
+                }
+            });
+
+            // Auto-refresh the incoming orders console every 10 seconds via background AJAX polling
+            setInterval(() => {
+                // Skip if the user is currently interacting with any select elements inside the console
+                const activeEl = document.activeElement;
+                if (activeEl && activeEl.tagName === 'SELECT' && activeEl.closest('#incoming-orders-console')) {
+                    return;
+                }
+                
+                fetch(window.location.href)
+                    .then(response => response.text())
+                    .then(html => {
+                        const parser = new DOMParser();
+                        const doc = parser.parseFromString(html, 'text/html');
+                        const newConsole = doc.getElementById('incoming-orders-console');
+                        const oldConsole = document.getElementById('incoming-orders-console');
+                        
+                        if (newConsole && oldConsole) {
+                            oldConsole.innerHTML = newConsole.innerHTML;
+                        }
+                    })
+                    .catch(err => console.warn('Order polling failed:', err));
+            }, 10000);
         });
     </script>
 
@@ -1692,10 +1889,120 @@
         </div>
     </div>
 
+    <!-- Inventory Thresholds Adjustment Modal -->
+    <div id="inventory-modal" class="fixed inset-0 z-50 overflow-y-auto hidden" aria-labelledby="modal-title" role="dialog" aria-modal="true">
+        <div class="flex items-end justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:block sm:p-0">
+            <!-- Background backdrop -->
+            <div class="fixed inset-0 bg-slate-900 bg-opacity-75 transition-opacity" aria-hidden="true" onclick="closeInventoryModal()"></div>
+            <!-- Center modal content -->
+            <span class="hidden sm:inline-block sm:align-middle sm:h-screen" aria-hidden="true">&#8203;</span>
+            <div class="inline-block align-bottom bg-white rounded-3xl text-left overflow-hidden shadow-2xl transform transition-all sm:my-8 sm:align-middle sm:max-w-md sm:w-full border border-slate-200">
+                <div class="bg-gradient-to-r from-slate-900 via-indigo-950 to-slate-900 px-6 py-4 flex items-center justify-between text-white">
+                    <div class="flex items-center gap-2">
+                        <span class="text-xl">📦</span>
+                        <div>
+                            <h3 class="text-base font-bold" id="inventory-modal-title">Adjust Inventory Levels</h3>
+                            <p class="text-[11px] text-slate-300">Update stock parameters and alerts</p>
+                        </div>
+                    </div>
+                    <button type="button" onclick="closeInventoryModal()" class="text-slate-300 hover:text-white transition-colors outline-none focus:outline-none">
+                        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                        </svg>
+                    </button>
+                </div>
+                <form id="inventory-modal-form" method="POST" action="">
+                    @csrf
+                    <div class="p-6 bg-slate-50 space-y-4">
+                        <div>
+                            <label class="block text-xs font-bold text-slate-600 uppercase tracking-wider mb-1">Daily Prep Limit (Stock)</label>
+                            <input type="number" id="modal-initial-stock" name="initial_stock" required min="1" class="w-full px-4 py-2.5 text-sm rounded-xl border border-slate-300 focus:ring-2 focus:ring-indigo-500 outline-none transition-all code-font">
+                            <p class="text-[10px] text-slate-400 mt-1">Defines the starting daily stock level prepared for this food item.</p>
+                        </div>
+                        <div>
+                            <label class="block text-xs font-bold text-slate-600 uppercase tracking-wider mb-1">Low Stock Alert Level</label>
+                            <input type="number" id="modal-low-stock-threshold" name="low_stock_threshold" required min="0" class="w-full px-4 py-2.5 text-sm rounded-xl border border-slate-300 focus:ring-2 focus:ring-indigo-500 outline-none transition-all code-font">
+                            <p class="text-[10px] text-slate-400 mt-1">Triggers low-stock alerts when remaining stock drops below this value.</p>
+                        </div>
+                    </div>
+                    <div class="bg-slate-100 px-6 py-4 flex justify-end gap-3 border-t border-slate-200">
+                        <button type="button" onclick="closeInventoryModal()" class="px-4 py-2 bg-slate-200 hover:bg-slate-300 text-slate-800 text-xs font-bold rounded-xl transition-all">
+                            Cancel
+                        </button>
+                        <button type="submit" class="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold rounded-xl transition-all shadow-xs">
+                            Save Settings
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
     <!-- JavaScript Helpers for Modals & PWA Notifications -->
     <script>
         let qrCodeInstance = null;
         let qrCodeLink = "";
+
+        function openInventoryModal(id, name, initialStock, lowStockThreshold) {
+            document.getElementById('inventory-modal-title').textContent = `Adjust Inventory: ${name}`;
+            document.getElementById('inventory-modal-form').action = `/api/vendor/food-items/${id}/update-inventory`;
+            document.getElementById('modal-initial-stock').value = initialStock;
+            document.getElementById('modal-low-stock-threshold').value = lowStockThreshold;
+            document.getElementById('inventory-modal').classList.remove('hidden');
+        }
+
+        function closeInventoryModal() {
+            document.getElementById('inventory-modal').classList.add('hidden');
+        }
+
+        function applyChartDateRange() {
+            const startDate = document.getElementById('chart-start-date').value;
+            const endDate = document.getElementById('chart-end-date').value;
+
+            if (!startDate || !endDate) {
+                alert('Please select both start and end dates.');
+                return;
+            }
+
+            // Show a loading style or spin the refresh button icon
+            const btn = document.querySelector('button[onclick="applyChartDateRange()"]');
+            const svg = btn ? btn.querySelector('svg') : null;
+            if (svg) svg.classList.add('animate-spin');
+
+            const url = `/api/vendor/analytics/trends?start_date=${startDate}&end_date=${endDate}`;
+
+            fetch(url, {
+                headers: {
+                    'Accept': 'application/json'
+                }
+            })
+            .then(res => {
+                if (!res.ok) {
+                    throw new Error('Network response was not OK');
+                }
+                return res.json();
+            })
+            .then(data => {
+                if (data.success) {
+                    // Update monthlyRevenueTrendChartInstance with new labels and datasets!
+                    if (window.monthlyRevenueTrendChartInstance) {
+                        window.monthlyRevenueTrendChartInstance.data.labels = data.labels;
+                        window.monthlyRevenueTrendChartInstance.data.datasets[0].data = data.sales;
+                        window.monthlyRevenueTrendChartInstance.update();
+                    }
+                    console.log('Successfully updated trend charts via API.');
+                } else {
+                    alert('Error updating trends: ' + (data.message || 'Unknown error'));
+                }
+            })
+            .catch(err => {
+                console.error('Error fetching trends:', err);
+                alert('Error fetching dynamic trends. Please verify connectivity.');
+            })
+            .finally(() => {
+                if (svg) svg.classList.remove('animate-spin');
+            });
+        }
 
         // Touch gesture state tracking for swipe-to-complete
         const swipeData = {};

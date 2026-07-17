@@ -55,6 +55,8 @@ class FoodItemController extends Controller
                 'description' => $request->input('description') ?? '',
                 'image_url' => $request->input('image_url') ?? '',
                 'is_available' => true,
+                'initial_stock' => $request->input('initial_stock', 50),
+                'low_stock_threshold' => $request->input('low_stock_threshold', 10),
             ]);
 
             // Register Audit Log
@@ -94,7 +96,7 @@ class FoodItemController extends Controller
 
         $updatedFood = DB::transaction(function () use ($food, $request) {
             // We allow partial updates
-            $data = $request->only(['name', 'price', 'category', 'description', 'image_url', 'is_available']);
+            $data = $request->only(['name', 'price', 'category', 'description', 'image_url', 'is_available', 'initial_stock', 'low_stock_threshold']);
             $food->update($data);
 
             // Register Audit Log

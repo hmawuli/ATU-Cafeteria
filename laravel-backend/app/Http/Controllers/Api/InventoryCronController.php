@@ -51,12 +51,13 @@ class InventoryCronController extends Controller
                         ->where('order_timestamp', '>=', (time() - 12 * 60 * 60) * 1000) // Today's cycle
                         ->sum('quantity');
                     
-                    $startingLimit = 35; // Standard cafeteria batch size
+                    $startingLimit = $item->initial_stock ?? 50;
                     $remainingStock = max(0, $startingLimit - $totalTodaySum);
 
-                    // Dynamic threshold algorithm: High velocity items warrant a larger safety stock margin
-                    // If an item sells 15 portions a day, threshold warning should trigger earlier!
-                    $lowStockThreshold = max(4, (int) round($orderFrequency24h * 0.40));
+                    // Vendor defined threshold combined with dynamic threshold based on order frequency
+                    $vendorDefinedThreshold = $item->low_stock_threshold ?? 10;
+                    $suggestedThresholdFromFrequency = (int) round($orderFrequency24h * 0.40);
+                    $lowStockThreshold = max($vendorDefinedThreshold, $suggestedThresholdFromFrequency);
 
                     if ($remainingStock <= $lowStockThreshold) {
                         // Prevent identical spam notifications (check last 12 hours)

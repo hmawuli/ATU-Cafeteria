@@ -1,6 +1,7 @@
 package com.example.ui.screens
 import com.example.ui.util.generatePdfReceipt
 import com.example.ui.util.generatePdfOrderHistoryReport
+import com.example.ui.util.HapticHelper
 
 import androidx.compose.animation.*
 import androidx.compose.animation.core.*
@@ -149,8 +150,11 @@ fun StudentDashboardScreen(
     val vendorAnnouncement by viewModel.vendorAnnouncement.collectAsStateWithLifecycle()
     val isAdminActing by viewModel.isAdminActing.collectAsStateWithLifecycle()
     val redeemedPoints by viewModel.redeemedLoyaltyPoints.collectAsStateWithLifecycle()
+    val loyaltySummary by viewModel.loyaltySummaryResponse.collectAsStateWithLifecycle()
     val allOrdersSnapshot by viewModel.allOrdersSnapshot.collectAsStateWithLifecycle()
     val auditLogs by viewModel.auditLogs.collectAsStateWithLifecycle()
+    val popularTodayContent by viewModel.popularTodayContent.collectAsStateWithLifecycle()
+    val isPopularTodayLoading by viewModel.isPopularTodayLoading.collectAsStateWithLifecycle()
     val currentTotalPoints = remember(studentOrders) {
         studentOrders.sumOf { order ->
             if (order.status.uppercase() == "COMPLETED") 25 else 10
@@ -160,7 +164,49 @@ fun StudentDashboardScreen(
 
     val acknowledgedOrders = remember { mutableStateListOf<Int>() }
     var showQrForOrder by remember { mutableStateOf<Order?>(null) }
+    var showScannerForOrder by remember { mutableStateOf<Order?>(null) }
+    var showGeneralCheckInScanner by remember { mutableStateOf(false) }
     var activeChatOrder by remember { mutableStateOf<Order?>(null) }
+    var isTtsEnabled by remember { mutableStateOf(false) }
+
+    val context = androidx.compose.ui.platform.LocalContext.current
+    val tts = remember {
+        var textToSpeech: android.speech.tts.TextToSpeech? = null
+        textToSpeech = android.speech.tts.TextToSpeech(context) { status ->
+            if (status == android.speech.tts.TextToSpeech.SUCCESS) {
+                textToSpeech?.setLanguage(java.util.Locale.US)
+            }
+        }
+        textToSpeech
+    }
+
+    DisposableEffect(Unit) {
+        onDispose {
+            try {
+                tts.shutdown()
+            } catch (e: Exception) {
+                e.printStackTrace()
+            }
+        }
+    }
+
+    val activeOrdersList = remember(studentOrders) {
+        studentOrders.filter { it.status == "PENDING" || it.status == "PREPARING" || it.status == "READY" }
+    }
+    val activeOrderStatusStr = remember(activeOrdersList) {
+        activeOrdersList.joinToString { "Order for ${it.foodName} is ${it.status}" }
+    }
+
+    LaunchedEffect(activeOrderStatusStr) {
+        if (isTtsEnabled && activeOrderStatusStr.isNotEmpty()) {
+            tts?.speak(
+                "Active order update: $activeOrderStatusStr",
+                android.speech.tts.TextToSpeech.QUEUE_FLUSH,
+                null,
+                null
+            )
+        }
+    }
 
     var activeTab by remember { mutableIntStateOf(0) } // 0: Browse Food, 1: Orders Hub, 2: Nutrition, 3: Prep Reserves, 4: Smart Wallet & ID
     var ordersSubTab by remember { mutableIntStateOf(0) } // 0: Live Tracker, 1: Dining History, 2: Favorites
@@ -215,6 +261,8 @@ fun StudentDashboardScreen(
     var vendorSearchQuery by remember { mutableStateOf("") }
     var showQualityRatingsLeaderboard by remember { mutableStateOf(false) }
     var showNotificationCenter by remember { mutableStateOf(false) }
+    var showEditBudgetDialog by remember { mutableStateOf(false) }
+    val monthlyBudgetLimit by viewModel.monthlyBudgetLimit.collectAsStateWithLifecycle()
     val studentAlerts by viewModel.activeStudentAlerts.collectAsStateWithLifecycle()
     val studentNotifications by viewModel.studentNotifications.collectAsStateWithLifecycle()
 
@@ -274,6 +322,8 @@ fun StudentDashboardScreen(
     // Real-time order status tracking via polling
     LaunchedEffect(currentUser) {
         if (currentUser != null) {
+            viewModel.loadPopularTodaySuggestions()
+            viewModel.fetchLoyaltySummary()
             while (true) {
                 delay(8000) // Poll every 8 seconds
                 if (isOnline) {
@@ -539,16 +589,23 @@ fun StudentDashboardScreen(
                                 .padding(4.dp),
                             horizontalArrangement = Arrangement.spacedBy(4.dp)
                         ) {
-                            listOf("Dishes Menu", "Vendor Directory").forEach { tabName ->
+                            listOf("Dishes Menu", "Vendor Directory", "Campus Map").forEach { tabName ->
                                 val selected = (tabName == "Dishes Menu" && browseSelectionTab == "Dishes") || 
-                                               (tabName == "Vendor Directory" && browseSelectionTab == "Vendors")
+                                               (tabName == "Vendor Directory" && browseSelectionTab == "Vendors") ||
+                                               (tabName == "Campus Map" && browseSelectionTab == "Map")
                                 Box(
                                     modifier = Modifier
                                         .weight(1f)
                                         .height(36.dp)
                                         .clip(RoundedCornerShape(20.dp))
                                         .background(if (selected) MaterialTheme.colorScheme.primary else Color.Transparent)
-                                        .bounceClickable { browseSelectionTab = if (tabName == "Dishes Menu") "Dishes" else "Vendors" }
+                                        .bounceClickable { 
+                                            browseSelectionTab = when (tabName) {
+                                                "Dishes Menu" -> "Dishes"
+                                                "Vendor Directory" -> "Vendors"
+                                                else -> "Map"
+                                            }
+                                        }
                                         .testTag("browse_selection_tab_${tabName.replace(" ", "_").lowercase()}"),
                                     contentAlignment = Alignment.Center
                                 ) {
@@ -980,18 +1037,22 @@ fun StudentDashboardScreen(
                                                 ) {
                                                     Button(
                                                         onClick = {
-                                                            viewModel.simulateAdvanceOrderStatus(currentActiveOrder.id)
+                                                            if (currentActiveOrder.status.uppercase() == "READY") {
+                                                                showScannerForOrder = currentActiveOrder
+                                                            } else {
+                                                                viewModel.simulateAdvanceOrderStatus(currentActiveOrder.id)
+                                                            }
                                                         },
                                                         modifier = Modifier.weight(1f).height(36.dp).testTag("dashboard_simulate_advance"),
                                                         colors = ButtonDefaults.buttonColors(
-                                                            containerColor = statusColor,
+                                                            containerColor = if (currentActiveOrder.status.uppercase() == "READY") Color(0xFF2E7D32) else statusColor,
                                                             contentColor = Color.White
                                                         ),
                                                         contentPadding = PaddingValues(horizontal = 12.dp),
                                                         shape = RoundedCornerShape(18.dp)
                                                     ) {
                                                         Icon(
-                                                            Icons.Default.AutoAwesome,
+                                                            if (currentActiveOrder.status.uppercase() == "READY") Icons.Default.QrCodeScanner else Icons.Default.AutoAwesome,
                                                             contentDescription = "Simulate Tick",
                                                             modifier = Modifier.size(13.dp),
                                                             tint = Color.White
@@ -1001,7 +1062,7 @@ fun StudentDashboardScreen(
                                                             text = when (currentActiveOrder.status.uppercase()) {
                                                                 "PENDING" -> "Simulate: Start Prep"
                                                                 "PREPARING" -> "Simulate: Ready"
-                                                                "READY" -> "Simulate: Complete"
+                                                                "READY" -> "Scan Counter QR"
                                                                 else -> "Advance Live Status"
                                                             },
                                                             fontSize = 10.sp,
@@ -1415,6 +1476,83 @@ fun StudentDashboardScreen(
                             }
                         }
 
+                        item {
+                            Card(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .testTag("popular_today_gemini_card"),
+                                shape = RoundedCornerShape(16.dp),
+                                colors = CardDefaults.cardColors(
+                                    containerColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.15f)
+                                ),
+                                border = androidx.compose.foundation.BorderStroke(1.2.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.25f))
+                            ) {
+                                Column(modifier = Modifier.padding(16.dp)) {
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        horizontalArrangement = Arrangement.SpaceBetween,
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        Row(verticalAlignment = Alignment.CenterVertically) {
+                                            Text("🔥", fontSize = 20.sp)
+                                            Spacer(modifier = Modifier.width(8.dp))
+                                            Column {
+                                                Text(
+                                                    text = "Popular Today",
+                                                    fontWeight = FontWeight.Bold,
+                                                    style = MaterialTheme.typography.titleMedium,
+                                                    color = MaterialTheme.colorScheme.primary
+                                                )
+                                                Text(
+                                                    text = "AI-Powered Trending Analytics",
+                                                    fontSize = 10.sp,
+                                                    color = MaterialTheme.colorScheme.primary.copy(alpha = 0.7f)
+                                                )
+                                            }
+                                        }
+                                        
+                                        IconButton(
+                                            onClick = { viewModel.loadPopularTodaySuggestions() },
+                                            modifier = Modifier.size(28.dp).testTag("refresh_popular_today_btn")
+                                        ) {
+                                            Icon(
+                                                imageVector = Icons.Default.Refresh,
+                                                contentDescription = "Refresh",
+                                                tint = MaterialTheme.colorScheme.primary,
+                                                modifier = Modifier.size(18.dp)
+                                            )
+                                        }
+                                    }
+
+                                    Spacer(modifier = Modifier.height(12.dp))
+
+                                    if (isPopularTodayLoading) {
+                                        Box(
+                                            modifier = Modifier.fillMaxWidth().height(100.dp),
+                                            contentAlignment = Alignment.Center
+                                        ) {
+                                            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                                CircularProgressIndicator(modifier = Modifier.size(24.dp))
+                                                Spacer(modifier = Modifier.height(8.dp))
+                                                Text(
+                                                    text = "Gemini is calculating real-time cafeteria demand...",
+                                                    fontSize = 10.sp,
+                                                    color = MaterialTheme.colorScheme.outline
+                                                )
+                                            }
+                                        }
+                                    } else {
+                                        Text(
+                                            text = popularTodayContent.ifEmpty { "No order trends logged yet today." },
+                                            style = MaterialTheme.typography.bodySmall,
+                                            lineHeight = 16.sp,
+                                            color = MaterialTheme.colorScheme.onSurface
+                                        )
+                                    }
+                                }
+                            }
+                        }
+
                         // Real-time preparation hours/minutes alerts from vendor
                         val preparingOrders = studentOrders.filter { it.status == "PREPARING" }
                         if (preparingOrders.isNotEmpty()) {
@@ -1654,6 +1792,36 @@ fun StudentDashboardScreen(
                                                         )
                                                     }
                                                 }
+
+                                                if (v.isOpen) {
+                                                    Spacer(modifier = Modifier.height(6.dp))
+                                                    val activeOrdersForVendor = allOrdersSnapshot.filter { it.vendorId == v.id && com.example.ui.util.WaitTimeService.isOrderActiveInQueue(it.status) }
+                                                    val activeCount = activeOrdersForVendor.size
+                                                    val (busyLabel, busyColor) = when {
+                                                        activeCount <= 1 -> Pair("Quiet", Color(0xFF2E7D32))
+                                                        activeCount <= 4 -> Pair("Moderate", Color(0xFFF57C00))
+                                                        else -> Pair("Busy", Color(0xFFD32F2F))
+                                                    }
+                                                    val waitMinutes = com.example.ui.util.WaitTimeService.calculateEstimatedWaitTime(activeOrdersForVendor)
+
+                                                    Row(
+                                                        modifier = Modifier.fillMaxWidth(),
+                                                        horizontalArrangement = Arrangement.spacedBy(4.dp),
+                                                        verticalAlignment = Alignment.CenterVertically
+                                                    ) {
+                                                        Box(
+                                                            modifier = Modifier
+                                                                .size(6.dp)
+                                                                .background(busyColor, androidx.compose.foundation.shape.CircleShape)
+                                                        )
+                                                        Text(
+                                                            text = "$busyLabel • ${waitMinutes}m wait",
+                                                            fontSize = 8.5.sp,
+                                                            fontWeight = FontWeight.Bold,
+                                                            color = busyColor
+                                                        )
+                                                    }
+                                                }
                                             }
                                         }
                                     }
@@ -1875,6 +2043,78 @@ fun StudentDashboardScreen(
                                                     tint = Color.White,
                                                     modifier = Modifier.size(16.dp)
                                                 )
+                                            }
+                                        }
+
+                                        // LIVE QUEUE & WAIT-TIME TRACKING BANNER
+                                        val vendorActiveOrders = remember(allOrdersSnapshot, selectedVendor.id) {
+                                            allOrdersSnapshot.filter { it.vendorId == selectedVendor.id && com.example.ui.util.WaitTimeService.isOrderActiveInQueue(it.status) }
+                                        }
+                                        val activeQueueSize = vendorActiveOrders.size
+                                        val estWaitMinutes = com.example.ui.util.WaitTimeService.calculateEstimatedWaitTime(vendorActiveOrders)
+
+                                        val (busyLevelText, busyLevelColor, busyLevelIcon) = when {
+                                            activeQueueSize <= 1 -> Triple("Quiet (Instant Service)", Color(0xFF2E7D32), Icons.Default.CheckCircle)
+                                            activeQueueSize <= 4 -> Triple("Moderate (Normal Prep)", Color(0xFFF57C00), Icons.Default.AccessTime)
+                                            else -> Triple("High Demand (Expect Delays)", Color(0xFFD32F2F), Icons.Default.Warning)
+                                        }
+
+                                        Card(
+                                            modifier = Modifier
+                                                .fillMaxWidth()
+                                                .padding(12.dp)
+                                                .testTag("vendor_queue_status_card"),
+                                            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                                            shape = RoundedCornerShape(12.dp),
+                                            border = androidx.compose.foundation.BorderStroke(1.dp, busyLevelColor.copy(alpha = 0.4f))
+                                        ) {
+                                            Row(
+                                                modifier = Modifier
+                                                    .padding(12.dp)
+                                                    .fillMaxWidth(),
+                                                verticalAlignment = Alignment.CenterVertically,
+                                                horizontalArrangement = Arrangement.SpaceBetween
+                                            ) {
+                                                Column(modifier = Modifier.weight(1f)) {
+                                                    Row(
+                                                        verticalAlignment = Alignment.CenterVertically,
+                                                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                                                    ) {
+                                                        Icon(
+                                                            imageVector = busyLevelIcon,
+                                                            contentDescription = "Busy level",
+                                                            tint = busyLevelColor,
+                                                            modifier = Modifier.size(16.dp)
+                                                        )
+                                                        Text(
+                                                            text = busyLevelText,
+                                                            fontWeight = FontWeight.Bold,
+                                                            fontSize = 12.sp,
+                                                            color = busyLevelColor
+                                                        )
+                                                    }
+                                                    Spacer(modifier = Modifier.height(4.dp))
+                                                    Text(
+                                                        text = "Active orders in queue: $activeQueueSize",
+                                                        fontSize = 10.sp,
+                                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                                    )
+                                                }
+
+                                                Column(horizontalAlignment = Alignment.End) {
+                                                    Text(
+                                                        text = "Est. Wait Time",
+                                                        fontSize = 10.sp,
+                                                        fontWeight = FontWeight.Bold,
+                                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                                    )
+                                                    Text(
+                                                        text = "$estWaitMinutes mins",
+                                                        fontSize = 18.sp,
+                                                        fontWeight = FontWeight.Black,
+                                                        color = busyLevelColor
+                                                    )
+                                                }
                                             }
                                         }
 
@@ -2334,7 +2574,7 @@ fun StudentDashboardScreen(
                             }
                         }
                     }
-                    } else {
+                    } else if (browseSelectionTab == "Vendors") {
                             LazyColumn(
                                 modifier = Modifier.fillMaxSize().weight(1f),
                                 contentPadding = PaddingValues(16.dp),
@@ -2413,6 +2653,8 @@ fun StudentDashboardScreen(
                                     }
                                 }
                             }
+                        } else {
+                            CampusMapScreen(currentUser = currentUser, modifier = Modifier.weight(1f))
                         }
                     }
                 }
@@ -2553,9 +2795,9 @@ fun StudentDashboardScreen(
 
                                             // Status tag
                                             val badgeColor = when (order.status.uppercase()) {
-                                                "PENDING" -> Color(0xFFF9A825) // Amber
+                                                "PENDING", "ORDER_PLACED" -> Color(0xFFF9A825) // Amber
                                                 "PREPARING" -> Color(0xFF1976D2) // Blue
-                                                "READY" -> Color(0xFF2E7D32) // Green
+                                                "READY", "OUT_FOR_DELIVERY" -> Color(0xFF2E7D32) // Green
                                                 "COMPLETED", "DELIVERED" -> Color(0xFF4CAF50) // Emerald Green
                                                 else -> MaterialTheme.colorScheme.primary
                                             }
@@ -2567,9 +2809,9 @@ fun StudentDashboardScreen(
                                             ) {
                                                 Text(
                                                     text = when (order.status.uppercase()) {
-                                                        "PENDING" -> "Order Received"
+                                                        "PENDING", "ORDER_PLACED" -> "Order Received"
                                                         "PREPARING" -> "Preparing"
-                                                        "READY" -> "Ready for Pickup/Delivery"
+                                                        "READY", "OUT_FOR_DELIVERY" -> "Out for Delivery"
                                                         "COMPLETED", "DELIVERED" -> "Delivered"
                                                         else -> order.status
                                                     },
@@ -2585,11 +2827,11 @@ fun StudentDashboardScreen(
                                         Spacer(modifier = Modifier.height(12.dp))
 
                                         // Stepper progress timeline helper
-                                        val steps = listOf("Order Received", "Preparing", "Ready for Pickup/Delivery", "Delivered")
+                                        val steps = listOf("Order Received", "Preparing", "Out for Delivery", "Delivered")
                                         val activeStep = when (order.status.uppercase()) {
-                                            "PENDING" -> 0
+                                            "PENDING", "ORDER_PLACED" -> 0
                                             "PREPARING" -> 1
-                                            "READY" -> 2
+                                            "READY", "OUT_FOR_DELIVERY" -> 2
                                             "COMPLETED", "DELIVERED" -> 3
                                             else -> 0
                                         }
@@ -2979,16 +3221,22 @@ fun StudentDashboardScreen(
                                          // Real-time Simulation / Status Progression button
                                          Spacer(modifier = Modifier.height(12.dp))
                                          Button(
-                                             onClick = { viewModel.simulateAdvanceOrderStatus(order.id) },
+                                             onClick = {
+                                                 if (order.status.uppercase() == "READY") {
+                                                     showScannerForOrder = order
+                                                 } else {
+                                                     viewModel.simulateAdvanceOrderStatus(order.id)
+                                                 }
+                                             },
                                              modifier = Modifier.fillMaxWidth().testTag("simulate_status_btn_${order.id}"),
                                              colors = ButtonDefaults.buttonColors(
-                                                 containerColor = MaterialTheme.colorScheme.secondary,
-                                                 contentColor = MaterialTheme.colorScheme.onSecondary
+                                                 containerColor = if (order.status.uppercase() == "READY") Color(0xFF2E7D32) else MaterialTheme.colorScheme.secondary,
+                                                 contentColor = if (order.status.uppercase() == "READY") Color.White else MaterialTheme.colorScheme.onSecondary
                                              ),
                                              shape = RoundedCornerShape(10.dp)
                                          ) {
                                              Icon(
-                                                 imageVector = Icons.Default.AutoAwesome,
+                                                 imageVector = if (order.status.uppercase() == "READY") Icons.Default.QrCodeScanner else Icons.Default.AutoAwesome,
                                                  contentDescription = "Simulate Progression",
                                                  modifier = Modifier.size(16.dp)
                                              )
@@ -2997,7 +3245,7 @@ fun StudentDashboardScreen(
                                                  text = when (order.status.uppercase()) {
                                                      "PENDING" -> "Simulate: Start Preparing"
                                                      "PREPARING" -> "Simulate: Set Ready for Pickup"
-                                                     "READY" -> "Simulate: Finalize Fulfill (Completed)"
+                                                     "READY" -> "Scan Counter QR"
                                                      else -> "Simulate: Reset Order to Pending"
                                                  },
                                                  fontSize = 11.sp,
@@ -3818,7 +4066,7 @@ fun StudentDashboardScreen(
 
                                                     Column(horizontalAlignment = Alignment.End) {
                                                         val statusColors = when (order.status) {
-                                                            "COMPLETED" -> Color(0xFFE8F5E9) to Color(0xFF2E7D32)
+                                                            "COMPLETED", "DELIVERED" -> Color(0xFFE8F5E9) to Color(0xFF2E7D32)
                                                             "DECLINED" -> Color(0xFFFFEBEE) to Color(0xFFC62828)
                                                             "CANCELLED" -> Color(0xFFECEFF1) to Color(0xFF37474F)
                                                             else -> Color(0xFFFFF8E1) to Color(0xFFF9A825)
@@ -3942,6 +4190,7 @@ fun StudentDashboardScreen(
                                                         ) {
                                                             Button(
                                                                 onClick = {
+                                                                    HapticHelper.impact(context, "LIGHT")
                                                                     val matchedFood = allFoodItems.find { it.id == order.foodItemId } ?: FoodItem(
                                                                         id = order.foodItemId,
                                                                         vendorId = order.vendorId,
@@ -3973,7 +4222,7 @@ fun StudentDashboardScreen(
                                                                 Text("Reorder", fontSize = 11.sp, fontWeight = FontWeight.Bold)
                                                             }
 
-                                                            if (order.status == "COMPLETED") {
+                                                            if (order.status == "COMPLETED" || order.status == "DELIVERED") {
                                                                 Row(
                                                                     verticalAlignment = Alignment.CenterVertically,
                                                                     horizontalArrangement = Arrangement.spacedBy(8.dp)
@@ -4246,10 +4495,12 @@ fun StudentDashboardScreen(
                                                                  submissionIsProcessing = false
                                                                  showSubmissionConfirmation = false
                                                                  if (success) {
+                                                                     HapticHelper.notification(context, "SUCCESS")
                                                                      reorderFeedbackMessage = "Successfully pre-ordered ${food.name} with 1-Click!"
                                                                      isErrorFeedback = false
                                                                      ordersSubTab = 0
                                                                  } else {
+                                                                     HapticHelper.notification(context, "ERROR")
                                                                      reorderFeedbackMessage = "Failed to place order. Connection busy."
                                                                      isErrorFeedback = true
                                                                  }
@@ -5413,9 +5664,60 @@ fun StudentDashboardScreen(
                             }
                         }
 
+                        // 1a. ATU Counter Check-In Card (Capacitor Barcode Scanner Plugin)
+                        item {
+                            Card(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clickable { showGeneralCheckInScanner = true }
+                                    .testTag("counter_checkin_scanner_card"),
+                                shape = RoundedCornerShape(16.dp),
+                                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
+                                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
+                            ) {
+                                Row(
+                                    modifier = Modifier.padding(16.dp),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(16.dp)
+                                ) {
+                                    Box(
+                                        modifier = Modifier
+                                            .size(48.dp)
+                                            .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.1f), CircleShape),
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        Icon(
+                                            imageVector = Icons.Default.QrCodeScanner,
+                                            contentDescription = "Scan Counter QR",
+                                            tint = MaterialTheme.colorScheme.primary,
+                                            modifier = Modifier.size(24.dp)
+                                        )
+                                    }
+                                    Column(modifier = Modifier.weight(1f)) {
+                                        Text(
+                                            "Self Check-In at Counter",
+                                            fontWeight = FontWeight.Bold,
+                                            style = MaterialTheme.typography.titleSmall,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                                        )
+                                        Text(
+                                            "Verify presence or register check-in using the Capacitor Barcode Scanner plugin.",
+                                            fontSize = 11.sp,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.8f)
+                                        )
+                                    }
+                                    Icon(
+                                        imageVector = Icons.Default.KeyboardArrowRight,
+                                        contentDescription = "Open Scanner",
+                                        tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
+                                    )
+                                }
+                            }
+                        }
+
                         // 1b. Loyalty Point Club Card
                         item {
-                            val availableLoyaltyPoints = availablePoints
+                            val liveAvailablePoints = loyaltySummary?.loyalty_points_balance ?: availablePoints
 
                             Card(
                                 modifier = Modifier.fillMaxWidth().testTag("loyalty_club_card"),
@@ -5455,24 +5757,52 @@ fun StudentDashboardScreen(
                                     val nextPointsNeeded: Int
                                     val progressPercentage: Float
 
-                                    if (availableLoyaltyPoints < 100) {
-                                        tierLabel = "Bronze Tier"
-                                        tierBadgeIcon = "🥉"
-                                        tierColorVal = Color(0xFFCD7F32)
-                                        nextPointsNeeded = 100
-                                        progressPercentage = availableLoyaltyPoints / 100f
-                                    } else if (availableLoyaltyPoints < 300) {
-                                        tierLabel = "Silver Tier"
-                                        tierBadgeIcon = "🥈"
-                                        tierColorVal = Color(0xFF9E9E9E)
-                                        nextPointsNeeded = 300
-                                        progressPercentage = (availableLoyaltyPoints - 100) / 200f
+                                    val remoteTier = loyaltySummary?.tier
+                                    if (remoteTier != null) {
+                                        tierLabel = remoteTier
+                                        if (remoteTier.contains("Platinum", ignoreCase = true)) {
+                                            tierBadgeIcon = "🏆"
+                                            tierColorVal = Color(0xFF3F51B5)
+                                            nextPointsNeeded = loyaltySummary?.points_needed_for_next_tier ?: 0
+                                            progressPercentage = 1.0f
+                                        } else if (remoteTier.contains("Gold", ignoreCase = true)) {
+                                            tierBadgeIcon = "🥇"
+                                            tierColorVal = Color(0xFFFFB300)
+                                            nextPointsNeeded = loyaltySummary?.points_needed_for_next_tier ?: 0
+                                            val earnedInTier = liveAvailablePoints - 250
+                                            progressPercentage = (earnedInTier / 250f).coerceIn(0f, 1f)
+                                        } else if (remoteTier.contains("Silver", ignoreCase = true)) {
+                                            tierBadgeIcon = "🥈"
+                                            tierColorVal = Color(0xFF9E9E9E)
+                                            nextPointsNeeded = loyaltySummary?.points_needed_for_next_tier ?: 0
+                                            val earnedInTier = liveAvailablePoints - 100
+                                            progressPercentage = (earnedInTier / 150f).coerceIn(0f, 1f)
+                                        } else {
+                                            tierBadgeIcon = "🥉"
+                                            tierColorVal = Color(0xFFCD7F32)
+                                            nextPointsNeeded = loyaltySummary?.points_needed_for_next_tier ?: 0
+                                            progressPercentage = (liveAvailablePoints / 100f).coerceIn(0f, 1f)
+                                        }
                                     } else {
-                                        tierLabel = "Gold Tier"
-                                        tierBadgeIcon = "🥇"
-                                        tierColorVal = Color(0xFFFFB300)
-                                        nextPointsNeeded = 300
-                                        progressPercentage = 1.0f
+                                        if (liveAvailablePoints < 100) {
+                                            tierLabel = "Bronze Tier"
+                                            tierBadgeIcon = "🥉"
+                                            tierColorVal = Color(0xFFCD7F32)
+                                            nextPointsNeeded = 100
+                                            progressPercentage = liveAvailablePoints / 100f
+                                        } else if (liveAvailablePoints < 300) {
+                                            tierLabel = "Silver Tier"
+                                            tierBadgeIcon = "🥈"
+                                            tierColorVal = Color(0xFF9E9E9E)
+                                            nextPointsNeeded = 300
+                                            progressPercentage = (liveAvailablePoints - 100) / 200f
+                                        } else {
+                                            tierLabel = "Gold Tier"
+                                            tierBadgeIcon = "🥇"
+                                            tierColorVal = Color(0xFFFFB300)
+                                            nextPointsNeeded = 300
+                                            progressPercentage = 1.0f
+                                        }
                                     }
 
                                     Row(
@@ -5497,14 +5827,18 @@ fun StudentDashboardScreen(
                                                     color = tierColorVal
                                                 )
                                                 Text(
-                                                    text = if (availableLoyaltyPoints < 300) "${(progressPercentage * 100).toInt()}%" else "Max Level",
+                                                    text = if (remoteTier != null) {
+                                                        if (nextPointsNeeded == 0) "Max Level" else "${(progressPercentage * 100).toInt()}%"
+                                                    } else if (liveAvailablePoints < 300) "${(progressPercentage * 100).toInt()}%" else "Max Level",
                                                     fontSize = 11.sp,
                                                     fontWeight = FontWeight.Bold,
                                                     color = tierColorVal
                                                 )
                                             }
-                                            val progressLabelText = if (availableLoyaltyPoints < 300) {
-                                                "$availableLoyaltyPoints / $nextPointsNeeded pts to next tier"
+                                            val progressLabelText = if (remoteTier != null) {
+                                                if (nextPointsNeeded == 0) "Ultimate tier achieved!" else "$liveAvailablePoints / ${liveAvailablePoints + nextPointsNeeded} pts to next tier"
+                                            } else if (liveAvailablePoints < 300) {
+                                                "$liveAvailablePoints / $nextPointsNeeded pts to next tier"
                                             } else {
                                                 "Ultimate Gold status achieved!"
                                             }
@@ -5540,7 +5874,7 @@ fun StudentDashboardScreen(
                                         Column {
                                             Text("Net Redeemable Balance", fontSize = 10.sp, color = MaterialTheme.colorScheme.onTertiaryContainer.copy(alpha = 0.7f))
                                             Text(
-                                                text = "$availableLoyaltyPoints Points",
+                                                text = "$liveAvailablePoints Points",
                                                 fontWeight = FontWeight.ExtraBold,
                                                 fontSize = 24.sp,
                                                 color = MaterialTheme.colorScheme.tertiary
@@ -5548,8 +5882,11 @@ fun StudentDashboardScreen(
                                         }
 
                                         Button(
-                                            onClick = { viewModel.redeemLoyaltyPoints(100) },
-                                            enabled = availableLoyaltyPoints >= 100,
+                                            onClick = { 
+                                                HapticHelper.notification(context, "SUCCESS")
+                                                viewModel.redeemLoyaltyPoints(100) 
+                                            },
+                                            enabled = liveAvailablePoints >= 100,
                                             colors = ButtonDefaults.buttonColors(
                                                 containerColor = MaterialTheme.colorScheme.tertiary,
                                                 contentColor = MaterialTheme.colorScheme.onTertiary
@@ -5570,8 +5907,9 @@ fun StudentDashboardScreen(
                                         horizontalArrangement = Arrangement.SpaceBetween,
                                         verticalAlignment = Alignment.CenterVertically
                                     ) {
-                                        Text("Total points earned historically: $currentTotalPoints pts", fontSize = 9.sp, color = MaterialTheme.colorScheme.onTertiaryContainer.copy(alpha = 0.6f))
-                                        Text("Spent/Redeemed: $redeemedPoints pts", fontSize = 9.sp, color = MaterialTheme.colorScheme.onTertiaryContainer.copy(alpha = 0.6f))
+                                        val totalEarnedText = loyaltySummary?.total_spent_all_time?.let { "Total spent: GH₵ ${"%.2f".format(it)}" } ?: "Total points earned historically: $currentTotalPoints pts"
+                                        Text(totalEarnedText, fontSize = 9.sp, color = MaterialTheme.colorScheme.onTertiaryContainer.copy(alpha = 0.6f))
+                                        Text("Spent/Redeemed: ${loyaltySummary?.history?.filter { it.type == "REDEEM" }?.sumOf { it.points } ?: redeemedPoints} pts", fontSize = 9.sp, color = MaterialTheme.colorScheme.onTertiaryContainer.copy(alpha = 0.6f))
                                     }
                                 }
                             }
@@ -5624,39 +5962,66 @@ fun StudentDashboardScreen(
                                     }
                                     Spacer(modifier = Modifier.height(10.dp))
                                     
-                                    val completedOrders = studentOrders.filter { it.status.uppercase() == "COMPLETED" }
-                                    if (completedOrders.isEmpty()) {
-                                        Box(
-                                            modifier = Modifier.fillMaxWidth().padding(vertical = 16.dp),
-                                            contentAlignment = Alignment.Center
-                                        ) {
-                                            Text(
-                                                "No completed orders yet. Complete an order to earn 25 pts!",
-                                                fontSize = 11.sp,
-                                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                                            )
-                                        }
-                                    } else {
-                                        completedOrders.forEach { order ->
+                                    val historyItems = loyaltySummary?.history
+                                    if (historyItems != null && historyItems.isNotEmpty()) {
+                                        historyItems.forEach { item ->
                                             Row(
                                                 modifier = Modifier.fillMaxWidth().padding(vertical = 6.dp),
                                                 horizontalArrangement = Arrangement.SpaceBetween,
                                                 verticalAlignment = Alignment.CenterVertically
                                             ) {
                                                 Column(modifier = Modifier.weight(1f)) {
-                                                    Text("Order #${order.id} • ${order.foodName}", fontSize = 11.sp, fontWeight = FontWeight.SemiBold)
+                                                    Text(item.description, fontSize = 11.sp, fontWeight = FontWeight.SemiBold)
                                                     Text(
-                                                        text = java.text.SimpleDateFormat("dd MMM, hh:mm a", java.util.Locale.US).format(java.util.Date(order.orderTimestamp)),
+                                                        text = item.date,
                                                         fontSize = 9.sp,
                                                         color = MaterialTheme.colorScheme.onSurfaceVariant
                                                     )
                                                 }
                                                 Column(horizontalAlignment = Alignment.End) {
-                                                    Text("+25 PTS", fontWeight = FontWeight.Bold, fontSize = 11.sp, color = MaterialTheme.colorScheme.tertiary)
-                                                    Text("Completed", fontSize = 9.sp, color = androidx.compose.ui.graphics.Color(0xFF2E7D32))
+                                                    val sign = if (item.type.uppercase() == "REDEEM") "-" else "+"
+                                                    val color = if (item.type.uppercase() == "REDEEM") MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.tertiary
+                                                    Text("$sign${item.points} PTS", fontWeight = FontWeight.Bold, fontSize = 11.sp, color = color)
+                                                    Text(item.status, fontSize = 9.sp, color = if (item.status.uppercase() == "COMPLETED") androidx.compose.ui.graphics.Color(0xFF2E7D32) else MaterialTheme.colorScheme.onSurfaceVariant)
                                                 }
                                             }
                                             HorizontalDivider(modifier = Modifier.padding(vertical = 4.dp), color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
+                                        }
+                                    } else {
+                                        val completedOrders = studentOrders.filter { it.status.uppercase() == "COMPLETED" }
+                                        if (completedOrders.isEmpty()) {
+                                            Box(
+                                                modifier = Modifier.fillMaxWidth().padding(vertical = 16.dp),
+                                                contentAlignment = Alignment.Center
+                                            ) {
+                                                Text(
+                                                    "No completed orders yet. Complete an order to earn 25 pts!",
+                                                    fontSize = 11.sp,
+                                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                                )
+                                            }
+                                        } else {
+                                            completedOrders.forEach { order ->
+                                                Row(
+                                                    modifier = Modifier.fillMaxWidth().padding(vertical = 6.dp),
+                                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                                    verticalAlignment = Alignment.CenterVertically
+                                                ) {
+                                                    Column(modifier = Modifier.weight(1f)) {
+                                                        Text("Order #${order.id} • ${order.foodName}", fontSize = 11.sp, fontWeight = FontWeight.SemiBold)
+                                                        Text(
+                                                            text = java.text.SimpleDateFormat("dd MMM, hh:mm a", java.util.Locale.US).format(java.util.Date(order.orderTimestamp)),
+                                                            fontSize = 9.sp,
+                                                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                                                        )
+                                                    }
+                                                    Column(horizontalAlignment = Alignment.End) {
+                                                        Text("+25 PTS", fontWeight = FontWeight.Bold, fontSize = 11.sp, color = MaterialTheme.colorScheme.tertiary)
+                                                        Text("Completed", fontSize = 9.sp, color = androidx.compose.ui.graphics.Color(0xFF2E7D32))
+                                                    }
+                                                }
+                                                HorizontalDivider(modifier = Modifier.padding(vertical = 4.dp), color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
+                                            }
                                         }
                                     }
                                 }
@@ -5799,6 +6164,271 @@ fun StudentDashboardScreen(
                                             modifier = Modifier.weight(1f)
                                         ) {
                                             Text("Sync Account", fontSize = 11.sp)
+                                        }
+                                    }
+                                }
+                            }
+                        }
+
+                        // MONTHLY BUDGET & SPENDING TRACKER DASHBOARD
+                        item {
+                            val monthlyBudgetLimit by viewModel.monthlyBudgetLimit.collectAsStateWithLifecycle()
+                            val spentThisMonth = remember(studentOrders) {
+                                val cal = java.util.Calendar.getInstance()
+                                val currentMonth = cal.get(java.util.Calendar.MONTH)
+                                val currentYear = cal.get(java.util.Calendar.YEAR)
+
+                                studentOrders.filter { o ->
+                                    if (o.status.uppercase() == "COMPLETED") {
+                                        val oCal = java.util.Calendar.getInstance()
+                                        oCal.timeInMillis = o.orderTimestamp
+                                        val oMonth = oCal.get(java.util.Calendar.MONTH)
+                                        val oYear = oCal.get(java.util.Calendar.YEAR)
+                                        currentMonth == oMonth && currentYear == oYear
+                                    } else {
+                                        false
+                                    }
+                                }.sumOf { it.totalPrice }
+                            }
+
+                            val budgetPercentage = if (monthlyBudgetLimit > 0.0) spentThisMonth / monthlyBudgetLimit else 0.0
+                            val isLimitExceeded = budgetPercentage >= 1.0
+                            val isNearLimit = budgetPercentage >= 0.8 && budgetPercentage < 1.0
+
+                            val statusLabel = when {
+                                isLimitExceeded -> "Budget Exceeded 🚨"
+                                isNearLimit -> "Near Budget Limit ⚠️"
+                                else -> "Within Budget 🟢"
+                            }
+
+                            val statusColor = when {
+                                isLimitExceeded -> MaterialTheme.colorScheme.error
+                                isNearLimit -> Color(0xFFF57C00) // Orange
+                                else -> Color(0xFF2E7D32) // Green
+                            }
+
+                            val adviceText = when {
+                                isLimitExceeded -> "💡 Smart Tip: You've exceeded your budget limit of GH₵ ${"%.2f".format(monthlyBudgetLimit)}! Avoid purchasing extra sides and focus on essential low-cost meal combos."
+                                isNearLimit -> "💡 Smart Tip: You've spent 80%+ of your budget. Consider swapping premium protein selections for nutritious budget-friendly alternatives like beans or local eggs."
+                                else -> "💡 Smart Tip: You are doing great! Keep planning your meals ahead of time and tracking your cafeteria spending."
+                            }
+
+                            Card(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .testTag("monthly_budget_tracker_card"),
+                                shape = RoundedCornerShape(16.dp),
+                                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
+                            ) {
+                                Column(modifier = Modifier.padding(16.dp)) {
+                                    // Header
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        horizontalArrangement = Arrangement.SpaceBetween,
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        Row(verticalAlignment = Alignment.CenterVertically) {
+                                            Icon(
+                                                imageVector = Icons.Default.Info,
+                                                contentDescription = null,
+                                                tint = MaterialTheme.colorScheme.primary,
+                                                modifier = Modifier.size(20.dp)
+                                            )
+                                            Spacer(modifier = Modifier.width(8.dp))
+                                            Text(
+                                                "Monthly Spending & Budget",
+                                                fontWeight = FontWeight.Bold,
+                                                style = MaterialTheme.typography.titleSmall
+                                            )
+                                        }
+
+                                        IconButton(
+                                            onClick = {
+                                                showEditBudgetDialog = true
+                                            },
+                                            modifier = Modifier.size(24.dp).testTag("edit_budget_button")
+                                        ) {
+                                            Icon(
+                                                imageVector = Icons.Default.Edit,
+                                                contentDescription = "Edit Budget",
+                                                tint = MaterialTheme.colorScheme.primary,
+                                                modifier = Modifier.size(16.dp)
+                                            )
+                                        }
+                                    }
+
+                                    Spacer(modifier = Modifier.height(16.dp))
+
+                                    // Budget Figures
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        horizontalArrangement = Arrangement.SpaceBetween
+                                    ) {
+                                        Column {
+                                            Text("Spent this month", fontSize = 10.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                            Text(
+                                                "GH₵ ${"%.2f".format(spentThisMonth)}",
+                                                fontWeight = FontWeight.Bold,
+                                                fontSize = 20.sp,
+                                                color = statusColor
+                                            )
+                                        }
+
+                                        Column(horizontalAlignment = Alignment.End) {
+                                            Text("Monthly Budget Limit", fontSize = 10.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                            Text(
+                                                "GH₵ ${"%.2f".format(monthlyBudgetLimit)}",
+                                                fontWeight = FontWeight.Bold,
+                                                fontSize = 20.sp,
+                                                color = MaterialTheme.colorScheme.primary
+                                            )
+                                        }
+                                    }
+
+                                    Spacer(modifier = Modifier.height(12.dp))
+
+                                    // Progress Bar
+                                    LinearProgressIndicator(
+                                        progress = { budgetPercentage.toFloat().coerceIn(0.0f, 1.0f) },
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .height(8.dp)
+                                            .clip(RoundedCornerShape(4.dp)),
+                                        color = statusColor,
+                                        trackColor = MaterialTheme.colorScheme.outlineVariant
+                                    )
+
+                                    Row(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .padding(top = 4.dp),
+                                        horizontalArrangement = Arrangement.SpaceBetween
+                                    ) {
+                                        Text(
+                                            text = "Status: $statusLabel",
+                                            fontSize = 9.5.sp,
+                                            fontWeight = FontWeight.Bold,
+                                            color = statusColor
+                                        )
+                                        val percentageText = (budgetPercentage * 100).toInt()
+                                        Text(
+                                            text = "$percentageText% used",
+                                            fontSize = 9.5.sp,
+                                            fontWeight = FontWeight.Bold,
+                                            color = statusColor
+                                        )
+                                    }
+
+                                    Spacer(modifier = Modifier.height(12.dp))
+
+                                    // Advice Alert Box
+                                    Box(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .background(
+                                                color = statusColor.copy(alpha = 0.08f),
+                                                shape = RoundedCornerShape(8.dp)
+                                            )
+                                            .padding(8.dp)
+                                    ) {
+                                        Text(
+                                            text = adviceText,
+                                            fontSize = 10.sp,
+                                            lineHeight = 13.sp,
+                                            color = statusColor
+                                        )
+                                    }
+
+                                    Spacer(modifier = Modifier.height(16.dp))
+
+                                    // Category Spending Breakdown Section
+                                    val monthlyCompletedOrders = remember(studentOrders) {
+                                        studentOrders.filter { o ->
+                                            if (o.status.uppercase() == "COMPLETED") {
+                                                val oCal = java.util.Calendar.getInstance()
+                                                oCal.timeInMillis = o.orderTimestamp
+                                                val oMonth = oCal.get(java.util.Calendar.MONTH)
+                                                val oYear = oCal.get(java.util.Calendar.YEAR)
+                                                val currentMonth = java.util.Calendar.getInstance().get(java.util.Calendar.MONTH)
+                                                val currentYear = java.util.Calendar.getInstance().get(java.util.Calendar.YEAR)
+                                                currentMonth == oMonth && currentYear == oYear
+                                            } else {
+                                                false
+                                            }
+                                        }
+                                    }
+
+                                    val categorySpending = remember(monthlyCompletedOrders, allFoodItems) {
+                                        val map = mutableMapOf<String, Double>()
+                                        monthlyCompletedOrders.forEach { order ->
+                                            val foodItem = allFoodItems.find { it.id == order.foodItemId }
+                                            val cat = foodItem?.category?.ifBlank { "Uncategorized" } ?: "Main Course"
+                                            map[cat] = (map[cat] ?: 0.0) + order.totalPrice
+                                        }
+                                        map.toList().sortedByDescending { it.second }
+                                    }
+
+                                    if (categorySpending.isNotEmpty()) {
+                                        HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
+                                        Spacer(modifier = Modifier.height(12.dp))
+                                        Text(
+                                            "Spending by Category",
+                                            fontWeight = FontWeight.Bold,
+                                            fontSize = 11.sp,
+                                            color = MaterialTheme.colorScheme.primary
+                                        )
+                                        Spacer(modifier = Modifier.height(8.dp))
+
+                                        categorySpending.forEach { (cat, amt) ->
+                                            val catPercentage = if (spentThisMonth > 0) amt / spentThisMonth else 0.0
+                                            Row(
+                                                modifier = Modifier
+                                                    .fillMaxWidth()
+                                                    .padding(vertical = 4.dp),
+                                                horizontalArrangement = Arrangement.SpaceBetween,
+                                                verticalAlignment = Alignment.CenterVertically
+                                            ) {
+                                                Row(
+                                                    verticalAlignment = Alignment.CenterVertically,
+                                                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                                                ) {
+                                                    val emoji = when (cat.uppercase()) {
+                                                        "BREAKFAST" -> "🍳"
+                                                        "DRINKS" -> "🥤"
+                                                        "SNACKS" -> "🍪"
+                                                        "DESSERT" -> "🍰"
+                                                        else -> "🍛"
+                                                    }
+                                                    Text(emoji, fontSize = 12.sp)
+                                                    Text(cat, fontSize = 10.5.sp, fontWeight = FontWeight.SemiBold)
+                                                }
+                                                Row(
+                                                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                                    verticalAlignment = Alignment.CenterVertically
+                                                ) {
+                                                    Text(
+                                                        "GH₵ ${"%.2f".format(amt)}",
+                                                        fontSize = 10.5.sp,
+                                                        fontWeight = FontWeight.Bold
+                                                    )
+                                                    Box(
+                                                        modifier = Modifier
+                                                            .background(
+                                                                color = MaterialTheme.colorScheme.primaryContainer,
+                                                                shape = RoundedCornerShape(4.dp)
+                                                            )
+                                                            .padding(horizontal = 4.dp, vertical = 2.dp)
+                                                    ) {
+                                                        Text(
+                                                            text = "${(catPercentage * 100).toInt()}%",
+                                                            fontSize = 8.sp,
+                                                            fontWeight = FontWeight.Black,
+                                                            color = MaterialTheme.colorScheme.onPrimaryContainer
+                                                        )
+                                                    }
+                                                }
+                                            }
                                         }
                                     }
                                 }
@@ -6113,6 +6743,280 @@ fun StudentDashboardScreen(
                                     editTelephone = it.telephone ?: ""
                                     editEmail = it.email ?: ""
                                     editDietaryPrefs = it.dietaryPreferences ?: ""
+                                }
+                            }
+
+                            // ♿ ATU ACCESSIBILITY & INCLUSIVITY CENTER CARD
+                            val highContrastEnabled by viewModel.isHighContrastMode.collectAsStateWithLifecycle()
+                            Card(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(vertical = 8.dp)
+                                    .testTag("atu_accessibility_center_card"),
+                                shape = RoundedCornerShape(16.dp),
+                                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                                border = BorderStroke(1.2.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.5f))
+                            ) {
+                                Column(modifier = Modifier.padding(16.dp)) {
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        horizontalArrangement = Arrangement.SpaceBetween,
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        Row(verticalAlignment = Alignment.CenterVertically) {
+                                            Text("♿", fontSize = 22.sp)
+                                            Spacer(modifier = Modifier.width(8.dp))
+                                            Column {
+                                                Text(
+                                                    "ATU Accessibility & Inclusivity Hub",
+                                                    fontWeight = FontWeight.Bold,
+                                                    style = MaterialTheme.typography.titleSmall,
+                                                    color = MaterialTheme.colorScheme.primary
+                                                )
+                                                Text(
+                                                    "Accra Technical University Inclusive Learning Initiative",
+                                                    fontSize = 10.sp,
+                                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                                )
+                                            }
+                                        }
+                                    }
+                                    
+                                    Spacer(modifier = Modifier.height(12.dp))
+                                    HorizontalDivider(color = MaterialTheme.colorScheme.primary.copy(alpha = 0.15f))
+                                    Spacer(modifier = Modifier.height(12.dp))
+                                    
+                                    // High Contrast Mode Toggle
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        horizontalArrangement = Arrangement.SpaceBetween,
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        Column(modifier = Modifier.weight(1f).padding(end = 8.dp)) {
+                                            Text(
+                                                "High-Contrast Display",
+                                                fontWeight = FontWeight.Bold,
+                                                fontSize = 12.sp,
+                                                color = MaterialTheme.colorScheme.onSurface
+                                            )
+                                            Text(
+                                                "Boosts legibility with optimal light and dark elements for students with visual challenges.",
+                                                fontSize = 10.sp,
+                                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                                            )
+                                        }
+                                        Switch(
+                                            checked = highContrastEnabled,
+                                            onCheckedChange = { 
+                                                viewModel.toggleHighContrastMode()
+                                                val text = if (!highContrastEnabled) "High Contrast Display Enabled" else "High Contrast Display Disabled"
+                                                tts?.speak(text, android.speech.tts.TextToSpeech.QUEUE_FLUSH, null, null)
+                                            },
+                                            modifier = Modifier.testTag("toggle_high_contrast_btn")
+                                        )
+                                    }
+                                    
+                                    Spacer(modifier = Modifier.height(12.dp))
+                                    HorizontalDivider(color = MaterialTheme.colorScheme.primary.copy(alpha = 0.15f))
+                                    Spacer(modifier = Modifier.height(12.dp))
+                                    
+                                    // Screen Reader Assist Mode Toggle
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        horizontalArrangement = Arrangement.SpaceBetween,
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        Column(modifier = Modifier.weight(1f).padding(end = 8.dp)) {
+                                            Text(
+                                                "Vocal Screen Reader Assist",
+                                                fontWeight = FontWeight.Bold,
+                                                fontSize = 12.sp,
+                                                color = MaterialTheme.colorScheme.onSurface
+                                            )
+                                            Text(
+                                                "Vocally announces active meal preparation and pickup status updates in real-time.",
+                                                fontSize = 10.sp,
+                                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                                            )
+                                        }
+                                        Switch(
+                                            checked = isTtsEnabled,
+                                            onCheckedChange = { 
+                                                isTtsEnabled = it
+                                                val text = if (it) "Vocal Screen Reader Assist Enabled" else "Vocal Screen Reader Assist Disabled"
+                                                tts?.speak(text, android.speech.tts.TextToSpeech.QUEUE_FLUSH, null, null)
+                                            },
+                                            modifier = Modifier.testTag("toggle_tts_btn")
+                                        )
+                                    }
+                                    
+                                    if (isTtsEnabled) {
+                                        Spacer(modifier = Modifier.height(12.dp))
+                                        
+                                        Button(
+                                            onClick = {
+                                                val textToSpeak = if (activeOrdersList.isEmpty()) {
+                                                    "You currently have no active orders in preparation at Accra Technical University Cafeteria."
+                                                } else {
+                                                    "You have ${activeOrdersList.size} active order updates: $activeOrderStatusStr"
+                                                }
+                                                tts?.speak(textToSpeak, android.speech.tts.TextToSpeech.QUEUE_FLUSH, null, null)
+                                            },
+                                            colors = ButtonDefaults.buttonColors(
+                                                containerColor = MaterialTheme.colorScheme.secondary,
+                                                contentColor = MaterialTheme.colorScheme.onSecondary
+                                            ),
+                                            shape = RoundedCornerShape(8.dp),
+                                            modifier = Modifier.fillMaxWidth().testTag("announce_status_btn")
+                                        ) {
+                                            Icon(Icons.Default.VolumeUp, contentDescription = "Listen to Statuses", modifier = Modifier.size(16.dp))
+                                            Spacer(modifier = Modifier.width(6.dp))
+                                            Text("Vocalize Current Active Order Statuses", fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                                        }
+                                    }
+                                    
+                                    Spacer(modifier = Modifier.height(12.dp))
+                                    Card(
+                                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.05f)),
+                                        shape = RoundedCornerShape(8.dp)
+                                    ) {
+                                        Row(
+                                            modifier = Modifier.padding(10.dp),
+                                            verticalAlignment = Alignment.CenterVertically,
+                                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                        ) {
+                                            Text("💡", fontSize = 14.sp)
+                                            Text(
+                                                "Tip: Screen Reader Assist will vocalize when your order status updates to PREPARING, READY, or completed.",
+                                                fontSize = 9.5.sp,
+                                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                                lineHeight = 12.sp
+                                            )
+                                        }
+                                    }
+
+                                    Spacer(modifier = Modifier.height(12.dp))
+                                    HorizontalDivider(color = MaterialTheme.colorScheme.primary.copy(alpha = 0.15f))
+                                    Spacer(modifier = Modifier.height(12.dp))
+                                    
+                                    // 🔐 BIOMETRIC LOGIN TOGGLE IN DASHBOARD
+                                    val bioPrefs = remember { context.getSharedPreferences("cafeteria_cache", android.content.Context.MODE_PRIVATE) }
+                                    var biometricEnabled by remember { mutableStateOf(bioPrefs.getBoolean("biometric_enabled", false)) }
+                                    var showPinConfirmDialog by remember { mutableStateOf(false) }
+                                    var pinConfirmationInput by remember { mutableStateOf("") }
+                                    var pinConfirmationError by remember { mutableStateOf<String?>(null) }
+
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        horizontalArrangement = Arrangement.SpaceBetween,
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        Column(modifier = Modifier.weight(1f).padding(end = 8.dp)) {
+                                            Text(
+                                                "Biometric Account Access",
+                                                fontWeight = FontWeight.Bold,
+                                                fontSize = 12.sp,
+                                                color = MaterialTheme.colorScheme.onSurface
+                                            )
+                                            Text(
+                                                "Enable rapid fingerprint or face scan login to secure and access your student account instantly.",
+                                                fontSize = 10.sp,
+                                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                                            )
+                                        }
+                                        Switch(
+                                            checked = biometricEnabled,
+                                            onCheckedChange = { checked ->
+                                                if (checked) {
+                                                    showPinConfirmDialog = true
+                                                } else {
+                                                    biometricEnabled = false
+                                                    bioPrefs.edit()
+                                                        .remove("biometric_username")
+                                                        .remove("biometric_pin")
+                                                        .putBoolean("biometric_enabled", false)
+                                                        .apply()
+                                                }
+                                            },
+                                            modifier = Modifier.testTag("student_dashboard_biometric_switch")
+                                        )
+                                    }
+
+                                    if (showPinConfirmDialog) {
+                                        AlertDialog(
+                                            onDismissRequest = { 
+                                                showPinConfirmDialog = false 
+                                                pinConfirmationInput = ""
+                                                pinConfirmationError = null
+                                            },
+                                            title = { Text("Confirm PIN for Biometrics", fontWeight = FontWeight.Bold, fontSize = 16.sp) },
+                                            text = {
+                                                Column {
+                                                    Text(
+                                                        "Please confirm your current Access PIN to securely register your biometric credentials.",
+                                                        fontSize = 12.sp,
+                                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                                        modifier = Modifier.padding(bottom = 12.dp)
+                                                    )
+                                                    OutlinedTextField(
+                                                        value = pinConfirmationInput,
+                                                        onValueChange = { pinConfirmationInput = it },
+                                                        label = { Text("Access PIN") },
+                                                        visualTransformation = PasswordVisualTransformation(),
+                                                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.NumberPassword),
+                                                        modifier = Modifier.fillMaxWidth()
+                                                    )
+                                                    pinConfirmationError?.let {
+                                                        Text(
+                                                            text = it,
+                                                            color = MaterialTheme.colorScheme.error,
+                                                            fontSize = 10.sp,
+                                                            fontWeight = FontWeight.Bold,
+                                                            modifier = Modifier.padding(top = 4.dp)
+                                                        )
+                                                    }
+                                                }
+                                            },
+                                            confirmButton = {
+                                                Button(
+                                                    onClick = {
+                                                        if (pinConfirmationInput.isNotBlank()) {
+                                                            val hashed = java.security.MessageDigest.getInstance("SHA-256")
+                                                                .digest(pinConfirmationInput.toByteArray())
+                                                                .fold("") { str, it -> str + "%02x".format(it) }
+                                                            val curUser = currentUser
+                                                            if (curUser != null && curUser.passwordHash == hashed) {
+                                                                bioPrefs.edit()
+                                                                    .putString("biometric_username", curUser.username)
+                                                                    .putString("biometric_pin", pinConfirmationInput)
+                                                                    .putBoolean("biometric_enabled", true)
+                                                                    .apply()
+                                                                biometricEnabled = true
+                                                                showPinConfirmDialog = false
+                                                                pinConfirmationInput = ""
+                                                                pinConfirmationError = null
+                                                            } else {
+                                                                pinConfirmationError = "Invalid PIN. Please try again."
+                                                            }
+                                                        }
+                                                    }
+                                                ) {
+                                                    Text("Confirm")
+                                                }
+                                            },
+                                            dismissButton = {
+                                                TextButton(
+                                                    onClick = { 
+                                                        showPinConfirmDialog = false 
+                                                        pinConfirmationInput = ""
+                                                        pinConfirmationError = null
+                                                    }
+                                                ) {
+                                                    Text("Cancel")
+                                                }
+                                            }
+                                        )
+                                    }
                                 }
                             }
 
@@ -7326,6 +8230,355 @@ fun StudentDashboardScreen(
                 }
             }
 
+            // STUDENT QR SCANNER SIMULATOR DIALOG
+            showScannerForOrder?.let { order ->
+                var isScanning by remember { mutableStateOf(false) }
+                var scanError by remember { mutableStateOf<String?>(null) }
+                var scanSuccess by remember { mutableStateOf(false) }
+                val coroutineScope = rememberCoroutineScope()
+                
+                Dialog(onDismissRequest = { 
+                    if (!isScanning) {
+                        showScannerForOrder = null 
+                    }
+                }) {
+                    Card(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(16.dp)
+                            .testTag("student_qr_scanner_dialog"),
+                        shape = RoundedCornerShape(24.dp),
+                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                        border = BorderStroke(1.5.dp, MaterialTheme.colorScheme.primary)
+                    ) {
+                        Column(
+                            modifier = Modifier
+                                .padding(24.dp)
+                                .fillMaxWidth(),
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            verticalArrangement = Arrangement.spacedBy(16.dp)
+                        ) {
+                            Text(
+                                "ATU Counter QR Scanner",
+                                style = MaterialTheme.typography.titleMedium,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.primary
+                            )
+                            
+                            Text(
+                                "Point camera at the official QR code on the vendor counter to instantly verify custody hand-off and complete pickup.",
+                                fontSize = 11.sp,
+                                textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                            
+                            // Visual Camera Viewport / Scanning Overlay
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .height(180.dp)
+                                    .background(Color.Black, RoundedCornerShape(12.dp))
+                                    .border(2.dp, if (scanSuccess) Color.Green else MaterialTheme.colorScheme.primary, RoundedCornerShape(12.dp)),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                if (isScanning) {
+                                    // Laser sweeping animation
+                                    val infiniteTransition = androidx.compose.animation.core.rememberInfiniteTransition(label = "laser")
+                                    val laserY by infiniteTransition.animateFloat(
+                                        initialValue = 10f,
+                                        targetValue = 170f,
+                                        animationSpec = androidx.compose.animation.core.infiniteRepeatable(
+                                            animation = androidx.compose.animation.core.tween(1200, easing = androidx.compose.animation.core.LinearEasing),
+                                            repeatMode = androidx.compose.animation.core.RepeatMode.Reverse
+                                        ),
+                                        label = "laserY"
+                                    )
+                                    
+                                    Box(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .height(2.dp)
+                                            .align(Alignment.TopCenter)
+                                            .offset(y = laserY.dp)
+                                            .background(Color.Red)
+                                    )
+                                    
+                                    CircularProgressIndicator(
+                                        color = Color.White,
+                                        modifier = Modifier.size(36.dp)
+                                    )
+                                } else if (scanSuccess) {
+                                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                        Icon(
+                                            imageVector = Icons.Default.CheckCircle,
+                                            contentDescription = "Scan Success",
+                                            tint = Color.Green,
+                                            modifier = Modifier.size(48.dp)
+                                        )
+                                        Spacer(modifier = Modifier.height(8.dp))
+                                        Text("PICKUP VERIFIED", color = Color.Green, fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                                    }
+                                } else {
+                                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                        Icon(
+                                            imageVector = Icons.Default.QrCodeScanner,
+                                            contentDescription = "Scanner Idle",
+                                            tint = Color.White.copy(alpha = 0.6f),
+                                            modifier = Modifier.size(48.dp)
+                                        )
+                                        Spacer(modifier = Modifier.height(8.dp))
+                                        Text("CAMERA READY", color = Color.White.copy(alpha = 0.6f), fontSize = 10.sp, fontWeight = FontWeight.Bold)
+                                    }
+                                }
+                                
+                                // Decorative corners
+                                Box(modifier = Modifier.size(16.dp).align(Alignment.TopStart).border(2.dp, Color.Green, RoundedCornerShape(topStart = 4.dp)))
+                                Box(modifier = Modifier.size(16.dp).align(Alignment.TopEnd).border(2.dp, Color.Green, RoundedCornerShape(topEnd = 4.dp)))
+                                Box(modifier = Modifier.size(16.dp).align(Alignment.BottomStart).border(2.dp, Color.Green, RoundedCornerShape(bottomStart = 4.dp)))
+                                Box(modifier = Modifier.size(16.dp).align(Alignment.BottomEnd).border(2.dp, Color.Green, RoundedCornerShape(bottomEnd = 4.dp)))
+                            }
+                            
+                            scanError?.let { err ->
+                                Text(
+                                    text = err,
+                                    color = MaterialTheme.colorScheme.error,
+                                    fontSize = 11.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    textAlign = androidx.compose.ui.text.style.TextAlign.Center
+                                )
+                            }
+                            
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(12.dp)
+                            ) {
+                                OutlinedButton(
+                                    onClick = { showScannerForOrder = null },
+                                    modifier = Modifier.weight(1f).testTag("scanner_cancel_btn"),
+                                    shape = RoundedCornerShape(12.dp),
+                                    enabled = !isScanning
+                                ) {
+                                    Text("Cancel", fontWeight = FontWeight.Bold)
+                                }
+                                
+                                Button(
+                                    onClick = {
+                                        isScanning = true
+                                        scanError = null
+                                        coroutineScope.launch {
+                                            delay(1500) // simulate camera analysis
+                                            val validCode = "ATU-COUNTER-${order.vendorId}"
+                                            viewModel.studentVerifyPickupViaQr(order.id, validCode) { success ->
+                                                isScanning = false
+                                                if (success) {
+                                                    HapticHelper.notification(context, "SUCCESS")
+                                                    scanSuccess = true
+                                                    coroutineScope.launch {
+                                                        delay(1000)
+                                                        showScannerForOrder = null
+                                                    }
+                                                } else {
+                                                    HapticHelper.notification(context, "ERROR")
+                                                    scanError = "Verification failed. Check the vendor QR code."
+                                                }
+                                            }
+                                        }
+                                    },
+                                    modifier = Modifier.weight(1.5f).testTag("simulate_counter_scan_btn"),
+                                    shape = RoundedCornerShape(12.dp),
+                                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary),
+                                    enabled = !isScanning && !scanSuccess
+                                ) {
+                                    Icon(Icons.Default.PhotoCamera, contentDescription = null, modifier = Modifier.size(16.dp))
+                                    Spacer(modifier = Modifier.width(6.dp))
+                                    Text("Scan QR Code", fontWeight = FontWeight.Bold)
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            // GENERAL COUNTER CHECK-IN SCANNER DIALOG (CAPACITOR BARCODE SCANNER PLUGIN SIMULATOR)
+            if (showGeneralCheckInScanner) {
+                var isScanning by remember { mutableStateOf(false) }
+                var scanError by remember { mutableStateOf<String?>(null) }
+                var scanSuccess by remember { mutableStateOf(false) }
+                var scanSuccessMessage by remember { mutableStateOf("") }
+                val coroutineScope = rememberCoroutineScope()
+                
+                Dialog(onDismissRequest = { 
+                    if (!isScanning) {
+                        showGeneralCheckInScanner = false 
+                    }
+                }) {
+                    Card(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(16.dp)
+                            .testTag("general_counter_scanner_dialog"),
+                        shape = RoundedCornerShape(24.dp),
+                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                        border = BorderStroke(1.5.dp, MaterialTheme.colorScheme.primary)
+                    ) {
+                        Column(
+                            modifier = Modifier
+                                .padding(24.dp)
+                                .fillMaxWidth(),
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            verticalArrangement = Arrangement.spacedBy(16.dp)
+                        ) {
+                            Text(
+                                "ATU Counter Check-In",
+                                style = MaterialTheme.typography.titleMedium,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.primary
+                            )
+                            
+                            Text(
+                                "Point camera at the official ATU Cafeteria counter QR code or barcode to quickly check-in and claim your spot.",
+                                fontSize = 11.sp,
+                                textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                            
+                            // Camera Frame Overlay
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .height(180.dp)
+                                    .background(Color.Black, RoundedCornerShape(12.dp))
+                                    .border(2.dp, if (scanSuccess) Color.Green else MaterialTheme.colorScheme.primary, RoundedCornerShape(12.dp)),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                if (isScanning) {
+                                    val infiniteTransition = androidx.compose.animation.core.rememberInfiniteTransition(label = "laser_gen")
+                                    val laserY by infiniteTransition.animateFloat(
+                                        initialValue = 10f,
+                                        targetValue = 170f,
+                                        animationSpec = androidx.compose.animation.core.infiniteRepeatable(
+                                            animation = androidx.compose.animation.core.tween(1200, easing = androidx.compose.animation.core.LinearEasing),
+                                            repeatMode = androidx.compose.animation.core.RepeatMode.Reverse
+                                        ),
+                                        label = "laserY_gen"
+                                    )
+                                    
+                                    Box(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .height(2.dp)
+                                            .align(Alignment.TopCenter)
+                                            .offset(y = laserY.dp)
+                                            .background(Color.Red)
+                                    )
+                                    
+                                    CircularProgressIndicator(
+                                        color = Color.White,
+                                        modifier = Modifier.size(36.dp)
+                                    )
+                                } else if (scanSuccess) {
+                                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                        Icon(
+                                            imageVector = Icons.Default.CheckCircle,
+                                            contentDescription = "Check-In Success",
+                                            tint = Color.Green,
+                                            modifier = Modifier.size(48.dp)
+                                        )
+                                        Spacer(modifier = Modifier.height(8.dp))
+                                        Text("CHECK-IN SUCCESSFUL", color = Color.Green, fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                                    }
+                                } else {
+                                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                        Icon(
+                                            imageVector = Icons.Default.QrCodeScanner,
+                                            contentDescription = "Scanner Idle",
+                                            tint = Color.White.copy(alpha = 0.6f),
+                                            modifier = Modifier.size(48.dp)
+                                        )
+                                        Spacer(modifier = Modifier.height(8.dp))
+                                        Text("CAMERA READY (CAPACITOR BARCODE)", color = Color.White.copy(alpha = 0.6f), fontSize = 10.sp, fontWeight = FontWeight.Bold)
+                                    }
+                                }
+                                
+                                // Decorative corners
+                                Box(modifier = Modifier.size(16.dp).align(Alignment.TopStart).border(2.dp, Color.Green, RoundedCornerShape(topStart = 4.dp)))
+                                Box(modifier = Modifier.size(16.dp).align(Alignment.TopEnd).border(2.dp, Color.Green, RoundedCornerShape(topEnd = 4.dp)))
+                                Box(modifier = Modifier.size(16.dp).align(Alignment.BottomStart).border(2.dp, Color.Green, RoundedCornerShape(bottomStart = 4.dp)))
+                                Box(modifier = Modifier.size(16.dp).align(Alignment.BottomEnd).border(2.dp, Color.Green, RoundedCornerShape(bottomEnd = 4.dp)))
+                            }
+                            
+                            scanError?.let { err ->
+                                Text(
+                                    text = err,
+                                    color = MaterialTheme.colorScheme.error,
+                                    fontSize = 11.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    textAlign = androidx.compose.ui.text.style.TextAlign.Center
+                                )
+                            }
+                            
+                            if (scanSuccess && scanSuccessMessage.isNotEmpty()) {
+                                Text(
+                                    text = scanSuccessMessage,
+                                    color = Color.Green,
+                                    fontSize = 11.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    textAlign = androidx.compose.ui.text.style.TextAlign.Center
+                                )
+                            }
+                            
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(12.dp)
+                            ) {
+                                OutlinedButton(
+                                    onClick = { showGeneralCheckInScanner = false },
+                                    modifier = Modifier.weight(1f).testTag("general_scanner_cancel_btn"),
+                                    shape = RoundedCornerShape(12.dp),
+                                    enabled = !isScanning
+                                ) {
+                                    Text("Cancel", fontWeight = FontWeight.Bold)
+                                }
+                                
+                                Button(
+                                    onClick = {
+                                        isScanning = true
+                                        scanError = null
+                                        coroutineScope.launch {
+                                            delay(1500) // Simulating scanning time of Capacitor Barcode Scanner
+                                            val validCode = "ATU-COUNTER-1" // Simulate scanning Counter #1
+                                            viewModel.studentCounterCheckIn(validCode) { success, msg ->
+                                                isScanning = false
+                                                if (success) {
+                                                    HapticHelper.notification(context, "SUCCESS")
+                                                    scanSuccess = true
+                                                    scanSuccessMessage = msg
+                                                    coroutineScope.launch {
+                                                        delay(1200)
+                                                        showGeneralCheckInScanner = false
+                                                    }
+                                                } else {
+                                                    HapticHelper.notification(context, "ERROR")
+                                                    scanError = msg
+                                                }
+                                            }
+                                        }
+                                    },
+                                    modifier = Modifier.weight(1.5f).testTag("general_scanner_simulate_scan_btn"),
+                                    shape = RoundedCornerShape(12.dp),
+                                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary),
+                                    enabled = !isScanning && !scanSuccess
+                                ) {
+                                    Icon(Icons.Default.PhotoCamera, contentDescription = null, modifier = Modifier.size(16.dp))
+                                    Spacer(modifier = Modifier.width(6.dp))
+                                    Text("Simulate Counter Scan", fontWeight = FontWeight.Bold, fontSize = 10.sp)
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
             // CHAT WITH VENDOR DIALOG
             activeChatOrder?.let { order ->
                 val vendor = allVendors.find { it.id == order.vendorId }
@@ -8208,9 +9461,11 @@ fun StudentDashboardScreen(
                                                             submissionIsProcessing = false
                                                             showSubmissionConfirmation = false
                                                             if (success) {
+                                                                HapticHelper.notification(context, "SUCCESS")
                                                                 selectedFoodForOrder = null
                                                                 activeTab = 1
                                                             } else {
+                                                                HapticHelper.notification(context, "ERROR")
                                                                 orderPlacementError = "Deduction failed. Check system link."
                                                             }
                                                         }
@@ -8227,9 +9482,11 @@ fun StudentDashboardScreen(
                                                             submissionIsProcessing = false
                                                             showSubmissionConfirmation = false
                                                             if (success) {
+                                                                HapticHelper.notification(context, "SUCCESS")
                                                                 selectedFoodForOrder = null
                                                                 activeTab = 1
                                                             } else {
+                                                                HapticHelper.notification(context, "ERROR")
                                                                 orderPlacementError = "Failed to compile POD order."
                                                             }
                                                         }
@@ -8324,9 +9581,11 @@ fun StudentDashboardScreen(
                                                              showSubmissionConfirmation = false
                                                             isGatewayProcessing = false
                                                             if (success) {
+                                                                HapticHelper.notification(context, "SUCCESS")
                                                                 selectedFoodForOrder = null
                                                                 activeTab = 1
                                                             } else {
+                                                                HapticHelper.notification(context, "ERROR")
                                                                 orderPlacementError = "Direct checkout failed. Balance updated, place order via wallet."
                                                               }
                                                          }
@@ -8634,6 +9893,53 @@ fun StudentDashboardScreen(
                                         }
                                     }
 
+                                    val conflicts = remember(currentUser?.dietaryPreferences, cartItems) {
+                                        checkDietaryConflicts(currentUser?.dietaryPreferences ?: "", cartItems)
+                                    }
+
+                                    if (conflicts.isNotEmpty()) {
+                                        Card(
+                                            colors = CardDefaults.cardColors(
+                                                containerColor = MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.95f)
+                                            ),
+                                            shape = RoundedCornerShape(10.dp),
+                                            modifier = Modifier
+                                                .fillMaxWidth()
+                                                .padding(vertical = 4.dp)
+                                                .testTag("dietary_conflict_warning_card")
+                                        ) {
+                                            Row(
+                                                modifier = Modifier.padding(12.dp),
+                                                verticalAlignment = Alignment.CenterVertically,
+                                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                            ) {
+                                                Icon(
+                                                    imageVector = Icons.Default.Warning,
+                                                    contentDescription = "Dietary Warning",
+                                                    tint = MaterialTheme.colorScheme.onErrorContainer,
+                                                    modifier = Modifier.size(20.dp)
+                                                )
+                                                Column {
+                                                    Text(
+                                                        text = "Dietary Preference Warning!",
+                                                        fontWeight = FontWeight.Bold,
+                                                        fontSize = 11.sp,
+                                                        color = MaterialTheme.colorScheme.onErrorContainer
+                                                    )
+                                                    conflicts.forEach { conflict ->
+                                                        Text(
+                                                            text = "• $conflict",
+                                                            fontSize = 9.5.sp,
+                                                            color = MaterialTheme.colorScheme.onErrorContainer,
+                                                            lineHeight = 12.sp
+                                                        )
+                                                    }
+                                                }
+                                            }
+                                        }
+                                        Spacer(modifier = Modifier.height(8.dp))
+                                    }
+
                                     cartCheckoutError?.let { err ->
                                         Text(err, color = MaterialTheme.colorScheme.error, fontSize = 11.sp, fontWeight = FontWeight.Bold)
                                         Spacer(modifier = Modifier.height(8.dp))
@@ -8642,11 +9948,19 @@ fun StudentDashboardScreen(
                                     if (cartCheckoutProcessing) {
                                         CircularProgressIndicator(modifier = Modifier.size(24.dp).align(Alignment.CenterHorizontally))
                                     } else {
+                                        val context = androidx.compose.ui.platform.LocalContext.current
                                         Button(
                                             onClick = {
                                                 if (cartPaymentMode == "WALLET" && studentWalletBalance < cartTotalSum) {
                                                     cartCheckoutError = "Insufficient smart balance. Top up your virtual ID Wallet!"
                                                 } else {
+                                                    if (conflicts.isNotEmpty()) {
+                                                        android.widget.Toast.makeText(
+                                                            context,
+                                                            "⚠️ Dietary Warning: ${conflicts.first()}",
+                                                            android.widget.Toast.LENGTH_LONG
+                                                        ).show()
+                                                    }
                                                     cartCheckoutProcessing = true
                                                     cartCheckoutError = null
                                                     viewModel.checkoutCart(
@@ -8655,9 +9969,11 @@ fun StudentDashboardScreen(
                                                     ) { success ->
                                                         cartCheckoutProcessing = false
                                                         if (success) {
-                                                            animateCartTrigger = false
+                                                             HapticHelper.notification(context, "SUCCESS")
+                                                             animateCartTrigger = false
                                                         } else {
-                                                            cartCheckoutError = "Checkout transaction failed. Try again."
+                                                             HapticHelper.notification(context, "ERROR")
+                                                             cartCheckoutError = "Checkout transaction failed. Try again."
                                                         }
                                                     }
                                                 }
@@ -9550,9 +10866,155 @@ fun StudentDashboardScreen(
                     }
                 }
             }
+
+            EditBudgetDialog(
+                showDialog = showEditBudgetDialog,
+                onDismiss = { showEditBudgetDialog = false },
+                initialValue = monthlyBudgetLimit,
+                onSave = { limit ->
+                    viewModel.setMonthlyBudgetLimit(limit)
+                    showEditBudgetDialog = false
+                }
+            )
         }
     }
 }
+}
+
+@Composable
+fun EditBudgetDialog(
+    showDialog: Boolean,
+    onDismiss: () -> Unit,
+    initialValue: Double,
+    onSave: (Double) -> Unit
+) {
+    if (!showDialog) return
+
+    var editBudgetInput by remember { mutableStateOf(initialValue.toString()) }
+
+    Dialog(onDismissRequest = onDismiss) {
+        Card(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp)
+                .testTag("edit_budget_dialog"),
+            shape = RoundedCornerShape(16.dp),
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
+        ) {
+            Column(
+                modifier = Modifier.padding(16.dp),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                Text(
+                    text = "Set Monthly Budget Limit",
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.primary
+                )
+
+                Spacer(modifier = Modifier.height(12.dp))
+
+                OutlinedTextField(
+                    value = editBudgetInput,
+                    onValueChange = { editBudgetInput = it },
+                    label = { Text("Budget Limit (GH₵)") },
+                    placeholder = { Text("e.g. 200.00") },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth().testTag("budget_limit_input_field"),
+                    shape = RoundedCornerShape(8.dp),
+                    keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(
+                        keyboardType = androidx.compose.ui.text.input.KeyboardType.Number
+                    )
+                )
+
+                Spacer(modifier = Modifier.height(16.dp))
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    OutlinedButton(
+                        onClick = onDismiss,
+                        modifier = Modifier.weight(1f)
+                    ) {
+                        Text("Cancel")
+                    }
+
+                    Button(
+                        onClick = {
+                            val limit = editBudgetInput.toDoubleOrNull() ?: 0.0
+                            if (limit >= 0.0) {
+                                onSave(limit)
+                            }
+                        },
+                        modifier = Modifier.weight(1f).testTag("save_budget_button")
+                    ) {
+                        Text("Save Limit")
+                    }
+                }
+            }
+        }
+    }
+}
+
+fun checkDietaryConflicts(dietaryPrefs: String, cartItems: List<com.example.ui.viewmodel.CartItem>): List<String> {
+    if (dietaryPrefs.isBlank()) return emptyList()
+    val conflicts = mutableListOf<String>()
+    val activePrefs = dietaryPrefs.split(",").map { it.trim().lowercase() }.filter { it.isNotEmpty() }
+    
+    for (item in cartItems) {
+        val name = item.foodItem.name.lowercase()
+        val desc = item.foodItem.description.lowercase()
+        val allergens = item.foodItem.allergens.lowercase()
+        
+        for (pref in activePrefs) {
+            when {
+                pref.contains("vegetarian") -> {
+                    val meatKeywords = listOf("beef", "chicken", "pork", "fish", "meat", "mutton", "sausage", "kebab", "bacon", "turkey", "lamb")
+                    if (meatKeywords.any { name.contains(it) || desc.contains(it) }) {
+                        conflicts.add("'${item.foodItem.name}' contains ingredients not matching your Vegetarian preference.")
+                    }
+                }
+                pref.contains("vegan") -> {
+                    val animalKeywords = listOf("beef", "chicken", "pork", "fish", "meat", "egg", "cheese", "milk", "butter", "honey", "yogurt", "cream", "mutton", "sausage", "kebab", "bacon", "turkey", "lamb", "mayonnaise")
+                    if (animalKeywords.any { name.contains(it) || desc.contains(it) }) {
+                        conflicts.add("'${item.foodItem.name}' contains ingredients not matching your Vegan preference.")
+                    }
+                }
+                pref.contains("gluten-free") -> {
+                    val glutenKeywords = listOf("wheat", "flour", "bread", "spaghetti", "noodle", "pasta", "gluten", "batter", "biscuit", "cake", "cookie")
+                    if (glutenKeywords.any { name.contains(it) || desc.contains(it) } || allergens.contains("gluten")) {
+                        conflicts.add("'${item.foodItem.name}' contains gluten, which conflicts with your Gluten-Free preference.")
+                    }
+                }
+                pref.contains("lactose-free") -> {
+                    val dairyKeywords = listOf("milk", "cheese", "butter", "cream", "lactose", "yogurt", "mayo")
+                    if (dairyKeywords.any { name.contains(it) || desc.contains(it) } || allergens.contains("dairy") || allergens.contains("lactose")) {
+                        conflicts.add("'${item.foodItem.name}' contains dairy, which conflicts with your Lactose-Free preference.")
+                    }
+                }
+                pref.contains("nut-free") -> {
+                    val nutKeywords = listOf("nut", "peanut", "cashew", "almond", "walnut")
+                    if (nutKeywords.any { name.contains(it) || desc.contains(it) } || allergens.contains("nut") || allergens.contains("peanut")) {
+                        conflicts.add("'${item.foodItem.name}' contains nuts, which conflicts with your Nut-Free preference.")
+                    }
+                }
+                pref.contains("halal") -> {
+                    val porkKeywords = listOf("pork", "bacon", "ham", "lard", "alcohol", "beer", "wine")
+                    if (porkKeywords.any { name.contains(it) || desc.contains(it) }) {
+                        conflicts.add("'${item.foodItem.name}' contains non-Halal ingredients.")
+                    }
+                }
+                pref.contains("kosher") -> {
+                    val porkKeywords = listOf("pork", "bacon", "ham", "shrimp", "crab", "shellfish", "lard")
+                    if (porkKeywords.any { name.contains(it) || desc.contains(it) }) {
+                        conflicts.add("'${item.foodItem.name}' contains non-Kosher ingredients.")
+                    }
+                }
+            }
+        }
+    }
+    return conflicts
 }
 
 // ==========================================

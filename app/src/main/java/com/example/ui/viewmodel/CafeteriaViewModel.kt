@@ -84,6 +84,31 @@ class CafeteriaViewModel(application: Application) : AndroidViewModel(applicatio
         _lastSyncTime.value = timestamp
     }
 
+    private val _isHighContrastMode = MutableStateFlow(
+        getApplication<Application>().getSharedPreferences("cafeteria_accessibility", Context.MODE_PRIVATE)
+            .getBoolean("high_contrast", false)
+    )
+    val isHighContrastMode: StateFlow<Boolean> = _isHighContrastMode.asStateFlow()
+
+    private val _monthlyBudgetLimit = MutableStateFlow(
+        getApplication<Application>().getSharedPreferences("atu_budget_prefs", Context.MODE_PRIVATE)
+            .getFloat("monthly_budget_limit", 200f).toDouble()
+    )
+    val monthlyBudgetLimit: StateFlow<Double> = _monthlyBudgetLimit.asStateFlow()
+
+    fun setMonthlyBudgetLimit(limit: Double) {
+        getApplication<Application>().getSharedPreferences("atu_budget_prefs", Context.MODE_PRIVATE)
+            .edit().putFloat("monthly_budget_limit", limit.toFloat()).apply()
+        _monthlyBudgetLimit.value = limit
+    }
+
+    fun toggleHighContrastMode() {
+        val nextVal = !_isHighContrastMode.value
+        getApplication<Application>().getSharedPreferences("cafeteria_accessibility", Context.MODE_PRIVATE)
+            .edit().putBoolean("high_contrast", nextVal).apply()
+        _isHighContrastMode.value = nextVal
+    }
+
     private val networkCallback = object : ConnectivityManager.NetworkCallback() {
         override fun onAvailable(network: android.net.Network) {
             _isOnline.value = true
@@ -96,6 +121,9 @@ class CafeteriaViewModel(application: Application) : AndroidViewModel(applicatio
     // 1. Session State managers
     private val _currentUser = MutableStateFlow<User?>(null)
     val currentUser: StateFlow<User?> = _currentUser.asStateFlow()
+
+    private val _loyaltySummaryResponse = MutableStateFlow<com.example.data.LaravelLoyaltySummaryResponse?>(null)
+    val loyaltySummaryResponse: StateFlow<com.example.data.LaravelLoyaltySummaryResponse?> = _loyaltySummaryResponse.asStateFlow()
 
     private val _loginError = MutableStateFlow<String?>(null)
     val loginError: StateFlow<String?> = _loginError.asStateFlow()
@@ -378,6 +406,12 @@ class CafeteriaViewModel(application: Application) : AndroidViewModel(applicatio
 
     private val _isPredictingLowStock = MutableStateFlow(false)
     val isPredictingLowStock: StateFlow<Boolean> = _isPredictingLowStock.asStateFlow()
+
+    private val _popularTodayContent = MutableStateFlow("")
+    val popularTodayContent: StateFlow<String> = _popularTodayContent.asStateFlow()
+
+    private val _isPopularTodayLoading = MutableStateFlow(false)
+    val isPopularTodayLoading: StateFlow<Boolean> = _isPopularTodayLoading.asStateFlow()
 
     // 5. In-App Real-time Order Notifications
     private val _newOrderAlerts = MutableStateFlow<List<Order>>(emptyList())
@@ -1105,6 +1139,32 @@ class CafeteriaViewModel(application: Application) : AndroidViewModel(applicatio
         }
     }
 
+    fun fetchLoyaltySummary() {
+        val user = _currentUser.value ?: return
+        if (user.role.uppercase() != "STUDENT") return
+        viewModelScope.launch {
+            if (com.example.data.LaravelClientManager.isLaravelEnabled) {
+                try {
+                    val summary = repository.getLoyaltySummary()
+                    if (summary != null) {
+                        _loyaltySummaryResponse.value = summary
+                        val refreshedUser = repository.userDao.getUserSync(user.id)
+                        if (refreshedUser != null) {
+                            val updatedUser = refreshedUser.copy(
+                                loyaltyPoints = summary.loyalty_points_balance,
+                                totalSpent = summary.total_spent_all_time
+                            )
+                            repository.userDao.updateUser(updatedUser)
+                            _currentUser.value = updatedUser
+                        }
+                    }
+                } catch (e: Exception) {
+                    Log.e("CafeteriaViewModel", "fetchLoyaltySummary failed", e)
+                }
+            }
+        }
+    }
+
     fun syncAllFromLaravel(onResult: (Boolean) -> Unit) {
         viewModelScope.launch {
             _isLoading.value = true
@@ -1113,6 +1173,7 @@ class CafeteriaViewModel(application: Application) : AndroidViewModel(applicatio
                 if (success) {
                     saveLastSyncTime(System.currentTimeMillis())
                     _isOnline.value = true
+                    fetchLoyaltySummary()
                 } else {
                     _isOnline.value = false
                 }
@@ -1427,6 +1488,7 @@ class CafeteriaViewModel(application: Application) : AndroidViewModel(applicatio
                     if (refreshed != null) {
                         _currentUser.value = refreshed
                     }
+                    fetchLoyaltySummary()
                     onComplete(true)
                 } else {
                     onComplete(false)
@@ -1435,6 +1497,7 @@ class CafeteriaViewModel(application: Application) : AndroidViewModel(applicatio
                 repository.placeOrder(user.id, foodItem, quantity, pointsToRedeem, estimatedPickupTime)
                 repository.insertAuditLog(user.id, "POD_ORDER", "Order generated under Pay-on-Delivery protocol." + (if (pointsToRedeem > 0) " Loyalty points applied offline." else ""))
                 loadOfflineOrders()
+                fetchLoyaltySummary()
                 onComplete(true)
             }
         }
@@ -1741,6 +1804,43 @@ class CafeteriaViewModel(application: Application) : AndroidViewModel(applicatio
         }
     }
 
+    fun studentVerifyPickupViaQr(orderId: Int, counterQrCode: String, onResult: (Boolean) -> Unit) {
+        viewModelScope.launch {
+            val order = repository.orderDao.getOrderById(orderId)
+            if (order != null && order.status.uppercase() == "READY" && counterQrCode.startsWith("ATU-COUNTER-")) {
+                val vendorIdFromQr = counterQrCode.removePrefix("ATU-COUNTER-").toIntOrNull()
+                if (vendorIdFromQr == order.vendorId) {
+                    repository.updateOrderStatus(order.vendorId, orderId, "DELIVERED", null)
+                    repository.insertAuditLog(order.customerId, "PICKUP_VALIDATED_QR", "Student verified order #${orderId} secure counter QR scan and marked Delivered.")
+                    onResult(true)
+                } else {
+                    onResult(false)
+                }
+            } else {
+                onResult(false)
+            }
+        }
+    }
+
+    fun studentCounterCheckIn(counterQrCode: String, onResult: (Boolean, String) -> Unit) {
+        viewModelScope.launch {
+            val user = _currentUser.value
+            if (user == null) {
+                onResult(false, "User session not active.")
+                return@launch
+            }
+            if (counterQrCode.startsWith("ATU-COUNTER-")) {
+                val vendorId = counterQrCode.removePrefix("ATU-COUNTER-").toIntOrNull()
+                val vendor = if (vendorId != null) repository.userDao.getUserSync(vendorId) else null
+                val vendorName = vendor?.fullName ?: "Accra Tech counter"
+                repository.insertAuditLog(user.id, "COUNTER_CHECK_IN", "Checked in at $vendorName. Ready to collect meals.")
+                onResult(true, "Successfully checked in at $vendorName counter!")
+            } else {
+                onResult(false, "Invalid counter QR code. Please scan a valid ATU Counter QR.")
+            }
+        }
+    }
+
     // ==========================================
     // DATA ANALYTICS METRIC EXTRACTION
     // ==========================================
@@ -1914,6 +2014,22 @@ class CafeteriaViewModel(application: Application) : AndroidViewModel(applicatio
                 availableFoodItems = availableFoodItems
             )
             _isGeneratingStudentRecommendations.value = false
+        }
+    }
+
+    fun loadPopularTodaySuggestions() {
+        viewModelScope.launch {
+            _isPopularTodayLoading.value = true
+            try {
+                val orders = allOrdersSnapshot.value
+                val foods = allFoodItems.value
+                val response = geminiRepository.generatePopularTodaySuggestions(orders, foods)
+                _popularTodayContent.value = response
+            } catch (e: Exception) {
+                _popularTodayContent.value = "Unable to fetch popular suggestions today. Please try again later."
+            } finally {
+                _isPopularTodayLoading.value = false
+            }
         }
     }
 

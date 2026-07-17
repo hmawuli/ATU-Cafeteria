@@ -32,8 +32,21 @@ import com.example.ui.screens.VendorDashboardScreen
 import com.example.ui.screens.AdminDashboardScreen
 import com.example.ui.theme.MyApplicationTheme
 import com.example.ui.viewmodel.CafeteriaViewModel
+import androidx.compose.material.icons.filled.CloudOff
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutVertically
 
-class MainActivity : ComponentActivity() {
+import androidx.fragment.app.FragmentActivity
+
+class MainActivity : FragmentActivity() {
     private val viewModel: CafeteriaViewModel by viewModels()
 
     override fun dispatchTouchEvent(ev: android.view.MotionEvent?): Boolean {
@@ -46,13 +59,15 @@ class MainActivity : ComponentActivity() {
         com.example.ui.util.NotificationHelper.createNotificationChannels(this)
         enableEdgeToEdge()
         setContent {
-            MyApplicationTheme {
+            val highContrast by viewModel.isHighContrastMode.collectAsState()
+            MyApplicationTheme(highContrast = highContrast) {
                 Surface(
                     modifier = Modifier.fillMaxSize(),
                     color = MaterialTheme.colorScheme.background
                 ) {
                     val navController = rememberNavController()
                     val currentUser by viewModel.currentUser.collectAsState()
+                    val isOnline by viewModel.isOnline.collectAsState()
                     val currentBackStackEntry by navController.currentBackStackEntryAsState()
                     val currentRoute = currentBackStackEntry?.destination?.route
 
@@ -116,6 +131,47 @@ class MainActivity : ComponentActivity() {
                                     viewModel = viewModel,
                                     navController = navController
                                 )
+                            }
+                        }
+
+                        // Friendly "Offline" Banner Overlay
+                        AnimatedVisibility(
+                            visible = !isOnline,
+                            enter = fadeIn() + slideInVertically(initialOffsetY = { -it }),
+                            exit = fadeOut() + slideOutVertically(targetOffsetY = { -it }),
+                            modifier = Modifier.align(androidx.compose.ui.Alignment.TopCenter)
+                        ) {
+                            androidx.compose.material3.Card(
+                                colors = androidx.compose.material3.CardDefaults.cardColors(
+                                    containerColor = MaterialTheme.colorScheme.errorContainer,
+                                    contentColor = MaterialTheme.colorScheme.onErrorContainer
+                                ),
+                                shape = androidx.compose.foundation.shape.RoundedCornerShape(bottomStart = 16.dp, bottomEnd = 16.dp),
+                                elevation = androidx.compose.material3.CardDefaults.cardElevation(defaultElevation = 6.dp),
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .testTag("offline_banner")
+                            ) {
+                                Row(
+                                    modifier = Modifier
+                                        .statusBarsPadding()
+                                        .padding(horizontal = 16.dp, vertical = 12.dp)
+                                        .fillMaxWidth(),
+                                    verticalAlignment = androidx.compose.ui.Alignment.CenterVertically,
+                                    horizontalArrangement = androidx.compose.foundation.layout.Arrangement.Center
+                                ) {
+                                    androidx.compose.material3.Icon(
+                                        imageVector = androidx.compose.material.icons.Icons.Default.CloudOff,
+                                        contentDescription = "Offline Mode Active",
+                                        modifier = Modifier.size(20.dp)
+                                    )
+                                    Spacer(modifier = Modifier.width(8.dp))
+                                    androidx.compose.material3.Text(
+                                        text = "Offline Mode • Running on local database cache",
+                                        style = MaterialTheme.typography.labelMedium,
+                                        fontWeight = androidx.compose.ui.text.font.FontWeight.Bold
+                                    )
+                                }
                             }
                         }
 
