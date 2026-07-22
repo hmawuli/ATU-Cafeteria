@@ -90,6 +90,19 @@ class CafeteriaViewModel(application: Application) : AndroidViewModel(applicatio
     )
     val isHighContrastMode: StateFlow<Boolean> = _isHighContrastMode.asStateFlow()
 
+    private val _isDarkMode = MutableStateFlow(
+        getApplication<Application>().getSharedPreferences("cafeteria_accessibility", Context.MODE_PRIVATE)
+            .getBoolean("dark_mode", false)
+    )
+    val isDarkMode: StateFlow<Boolean> = _isDarkMode.asStateFlow()
+
+    fun toggleDarkMode() {
+        val nextVal = !_isDarkMode.value
+        getApplication<Application>().getSharedPreferences("cafeteria_accessibility", Context.MODE_PRIVATE)
+            .edit().putBoolean("dark_mode", nextVal).apply()
+        _isDarkMode.value = nextVal
+    }
+
     private val _monthlyBudgetLimit = MutableStateFlow(
         getApplication<Application>().getSharedPreferences("atu_budget_prefs", Context.MODE_PRIVATE)
             .getFloat("monthly_budget_limit", 200f).toDouble()
@@ -412,6 +425,12 @@ class CafeteriaViewModel(application: Application) : AndroidViewModel(applicatio
 
     private val _isPopularTodayLoading = MutableStateFlow(false)
     val isPopularTodayLoading: StateFlow<Boolean> = _isPopularTodayLoading.asStateFlow()
+
+    private val _dishNutritionText = MutableStateFlow<String?>(null)
+    val dishNutritionText: StateFlow<String?> = _dishNutritionText.asStateFlow()
+
+    private val _isAnalyzingDishNutrition = MutableStateFlow(false)
+    val isAnalyzingDishNutrition: StateFlow<Boolean> = _isAnalyzingDishNutrition.asStateFlow()
 
     // 5. In-App Real-time Order Notifications
     private val _newOrderAlerts = MutableStateFlow<List<Order>>(emptyList())
@@ -2338,6 +2357,26 @@ class CafeteriaViewModel(application: Application) : AndroidViewModel(applicatio
                 _isAnalyzingNutrition.value = false
             }
         }
+    }
+
+    fun getMenuItemNutrition(foodName: String, foodDescription: String) {
+        viewModelScope.launch {
+            _isAnalyzingDishNutrition.value = true
+            _dishNutritionText.value = null
+            try {
+                _dishNutritionText.value = geminiRepository.analyzeMenuItemNutrition(foodName, foodDescription)
+            } catch (e: Exception) {
+                Log.e("CafeteriaViewModel", "analyzeMenuItemNutrition failed", e)
+                _dishNutritionText.value = "Failed to parse nutritional values. Default: 480 kcal."
+            } finally {
+                _isAnalyzingDishNutrition.value = false
+            }
+        }
+    }
+
+    fun clearMenuItemNutrition() {
+        _dishNutritionText.value = null
+        _isAnalyzingDishNutrition.value = false
     }
 
     // ==========================================

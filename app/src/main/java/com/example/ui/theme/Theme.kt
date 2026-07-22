@@ -31,10 +31,12 @@ private val DarkColorScheme =
     tertiary = AtuCrimson,
     background = AtuDarkBg,
     surface = AtuDarkSurface,
-    onPrimary = Color.White,
-    onSecondary = Color.Black,
-    onBackground = Color(0xFF1E293B),
-    onSurface = Color(0xFF1E293B)
+    onPrimary = Color(0xFF0F172A),
+    onSecondary = Color(0xFF0F172A),
+    onBackground = Color(0xFFF1F5F9),
+    onSurface = Color(0xFFF1F5F9),
+    surfaceVariant = Color(0xFF334155),
+    onSurfaceVariant = Color(0xFFCBD5E1)
   )
 
 private val LightColorScheme =

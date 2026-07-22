@@ -3,6 +3,8 @@ import com.example.ui.util.generatePdfReceipt
 import com.example.ui.util.generatePdfOrderHistoryReport
 import com.example.ui.util.HapticHelper
 
+import androidx.compose.material3.pulltorefresh.PullToRefreshBox
+import androidx.compose.material3.pulltorefresh.rememberPullToRefreshState
 import androidx.compose.animation.*
 import androidx.compose.animation.core.*
 import androidx.compose.ui.composed
@@ -155,6 +157,7 @@ fun StudentDashboardScreen(
     val auditLogs by viewModel.auditLogs.collectAsStateWithLifecycle()
     val popularTodayContent by viewModel.popularTodayContent.collectAsStateWithLifecycle()
     val isPopularTodayLoading by viewModel.isPopularTodayLoading.collectAsStateWithLifecycle()
+    val isLoading by viewModel.isLoading.collectAsStateWithLifecycle()
     val currentTotalPoints = remember(studentOrders) {
         studentOrders.sumOf { order ->
             if (order.status.uppercase() == "COMPLETED") 25 else 10
@@ -163,6 +166,7 @@ fun StudentDashboardScreen(
     val availablePoints = currentUser?.loyaltyPoints ?: (currentTotalPoints - redeemedPoints)
 
     val acknowledgedOrders = remember { mutableStateListOf<Int>() }
+    var showOrderPlacedConfetti by remember { mutableStateOf(false) }
     var showQrForOrder by remember { mutableStateOf<Order?>(null) }
     var showScannerForOrder by remember { mutableStateOf<Order?>(null) }
     var showGeneralCheckInScanner by remember { mutableStateOf(false) }
@@ -265,6 +269,7 @@ fun StudentDashboardScreen(
     val monthlyBudgetLimit by viewModel.monthlyBudgetLimit.collectAsStateWithLifecycle()
     val studentAlerts by viewModel.activeStudentAlerts.collectAsStateWithLifecycle()
     val studentNotifications by viewModel.studentNotifications.collectAsStateWithLifecycle()
+    val isDarkMode by viewModel.isDarkMode.collectAsStateWithLifecycle()
 
     // Advanced features state managers
     val scheduledReservations = remember { mutableStateListOf<ScheduledMeal>() }
@@ -314,6 +319,21 @@ fun StudentDashboardScreen(
     var foodItemComment by remember { mutableStateOf("") }
 
     var searchQuery by remember { mutableStateOf("") }
+
+    // Voice-controlled search Speech Recognition Launcher
+    val speechRecognizerLauncher = androidx.activity.compose.rememberLauncherForActivityResult(
+        contract = androidx.activity.result.contract.ActivityResultContracts.StartActivityForResult()
+    ) { result ->
+        if (result.resultCode == android.app.Activity.RESULT_OK) {
+            val data = result.data
+            val results = data?.getStringArrayListExtra(android.speech.RecognizerIntent.EXTRA_RESULTS)
+            if (!results.isNullOrEmpty()) {
+                searchQuery = results[0]
+                android.widget.Toast.makeText(context, "Voice Search: ${results[0]}", android.widget.Toast.LENGTH_SHORT).show()
+            }
+        }
+    }
+
     var selectedCategory by remember { mutableStateOf("All") }
     val categories = listOf("All", "Breakfast", "Local Dish", "Fast Food", "Drinks", "Snacks")
     var selectedDietaryFilter by remember { mutableStateOf("All") }
@@ -407,6 +427,21 @@ fun StudentDashboardScreen(
                 },
                 actions = {
                     val cartCountVal by viewModel.cartCount.collectAsStateWithLifecycle()
+
+                    IconButton(
+                        onClick = {
+                            viewModel.toggleDarkMode()
+                            val text = if (!isDarkMode) "Dark theme enabled" else "Light theme enabled"
+                            tts?.speak(text, android.speech.tts.TextToSpeech.QUEUE_FLUSH, null, null)
+                        },
+                        modifier = Modifier.testTag("student_top_theme_toggle_button")
+                    ) {
+                        Text(
+                            text = if (isDarkMode) "☀️" else "🌙",
+                            fontSize = 18.sp
+                        )
+                    }
+
                     IconButton(
                         onClick = { showCartCheckoutDialog = true },
                         modifier = Modifier.testTag("student_top_cart_button")
@@ -579,7 +614,19 @@ fun StudentDashboardScreen(
                 when (targetTab) {
                 0 -> {
                     // Browse Menu tab
-                    Column(modifier = Modifier.fillMaxSize()) {
+                    var isRefreshingHome by remember { mutableStateOf(false) }
+                    PullToRefreshBox(
+                        isRefreshing = isRefreshingHome,
+                        onRefresh = {
+                            isRefreshingHome = true
+                            viewModel.syncAllFromLaravel { success ->
+                                isRefreshingHome = false
+                                HapticHelper.notification(context, if (success) "SUCCESS" else "ERROR")
+                            }
+                        },
+                        modifier = Modifier.fillMaxSize().testTag("home_pull_to_refresh")
+                    ) {
+                        Column(modifier = Modifier.fillMaxSize()) {
                         // Sub-Tab Segment Switcher
                         Row(
                             modifier = Modifier
@@ -1633,9 +1680,33 @@ fun StudentDashboardScreen(
                                 onValueChange = { searchQuery = it },
                                 leadingIcon = { Icon(Icons.Default.Search, contentDescription = "Search", tint = MaterialTheme.colorScheme.primary) },
                                 trailingIcon = {
-                                    if (searchQuery.isNotEmpty()) {
-                                        IconButton(onClick = { searchQuery = "" }) {
-                                            Icon(Icons.Default.Clear, contentDescription = "Clear")
+                                    Row(verticalAlignment = Alignment.CenterVertically) {
+                                        IconButton(
+                                            onClick = {
+                                                HapticHelper.impact(context, "LIGHT")
+                                                val intent = android.content.Intent(android.speech.RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
+                                                    putExtra(android.speech.RecognizerIntent.EXTRA_LANGUAGE_MODEL, android.speech.RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
+                                                    putExtra(android.speech.RecognizerIntent.EXTRA_LANGUAGE, java.util.Locale.getDefault())
+                                                    putExtra(android.speech.RecognizerIntent.EXTRA_PROMPT, "Speak now to search menus hands-free...")
+                                                }
+                                                try {
+                                                    speechRecognizerLauncher.launch(intent)
+                                                } catch (e: Exception) {
+                                                    android.widget.Toast.makeText(context, "Voice Search not supported.", android.widget.Toast.LENGTH_SHORT).show()
+                                                }
+                                            },
+                                            modifier = Modifier.testTag("voice_search_button")
+                                        ) {
+                                            Icon(
+                                                imageVector = Icons.Default.Mic,
+                                                contentDescription = "Voice Search",
+                                                tint = MaterialTheme.colorScheme.primary
+                                            )
+                                        }
+                                        if (searchQuery.isNotEmpty()) {
+                                            IconButton(onClick = { searchQuery = "" }) {
+                                                Icon(Icons.Default.Clear, contentDescription = "Clear")
+                                            }
                                         }
                                     }
                                 },
@@ -2247,7 +2318,11 @@ fun StudentDashboardScreen(
                              vendorName.contains(searchQuery, ignoreCase = true) ||
                              vendorInfo.contains(searchQuery, ignoreCase = true))
                         }
-                        if (filteredFoods.isEmpty()) {
+                        if (isLoading) {
+                            items(4) {
+                                MenuSkeletonItem()
+                            }
+                        } else if (filteredFoods.isEmpty()) {
                             item {
                                 Box(
                                     modifier = Modifier
@@ -2657,6 +2732,7 @@ fun StudentDashboardScreen(
                             CampusMapScreen(currentUser = currentUser, modifier = Modifier.weight(1f))
                         }
                     }
+                    }
                 }
                 1 -> {
                     // Merged tracking and history hub
@@ -2668,8 +2744,20 @@ fun StudentDashboardScreen(
                     var pastOrdersSortBy by remember { mutableStateOf("Newest First") }
                     var pastOrdersShowFilters by remember { mutableStateOf(false) }
                     val expandedOrderIds = remember { mutableStateMapOf<Int, Boolean>() }
+                    var isRefreshingOrders by remember { mutableStateOf(false) }
                     
-                    Column(modifier = Modifier.fillMaxSize()) {
+                    PullToRefreshBox(
+                        isRefreshing = isRefreshingOrders,
+                        onRefresh = {
+                            isRefreshingOrders = true
+                            viewModel.syncAllFromLaravel { success ->
+                                isRefreshingOrders = false
+                                HapticHelper.notification(context, if (success) "SUCCESS" else "ERROR")
+                            }
+                        },
+                        modifier = Modifier.fillMaxSize().testTag("orders_pull_to_refresh")
+                    ) {
+                        Column(modifier = Modifier.fillMaxSize()) {
                         TabRow(selectedTabIndex = ordersSubTab) {
                             Tab(
                                 selected = ordersSubTab == 0,
@@ -2793,32 +2881,44 @@ fun StudentDashboardScreen(
                                                 )
                                             }
 
-                                            // Status tag
-                                            val badgeColor = when (order.status.uppercase()) {
-                                                "PENDING", "ORDER_PLACED" -> Color(0xFFF9A825) // Amber
-                                                "PREPARING" -> Color(0xFF1976D2) // Blue
-                                                "READY", "OUT_FOR_DELIVERY" -> Color(0xFF2E7D32) // Green
-                                                "COMPLETED", "DELIVERED" -> Color(0xFF4CAF50) // Emerald Green
-                                                else -> MaterialTheme.colorScheme.primary
-                                            }
+                                            // Status tag with smooth animated color transition
+                                            val animatedBadgeColor by animateColorAsState(
+                                                targetValue = when (order.status.uppercase()) {
+                                                    "PENDING", "ORDER_PLACED" -> Color(0xFFF9A825) // Amber
+                                                    "PREPARING" -> Color(0xFF1976D2) // Blue
+                                                    "READY", "OUT_FOR_DELIVERY" -> Color(0xFF2E7D32) // Green
+                                                    "COMPLETED", "DELIVERED" -> Color(0xFF4CAF50) // Emerald Green
+                                                    else -> MaterialTheme.colorScheme.primary
+                                                },
+                                                animationSpec = tween(durationMillis = 400),
+                                                label = "BadgeColorAnimation"
+                                            )
                                             Box(
                                                 modifier = Modifier
                                                     .clip(RoundedCornerShape(8.dp))
-                                                    .background(badgeColor)
+                                                    .background(animatedBadgeColor)
                                                     .padding(horizontal = 10.dp, vertical = 5.dp)
                                             ) {
-                                                Text(
-                                                    text = when (order.status.uppercase()) {
-                                                        "PENDING", "ORDER_PLACED" -> "Order Received"
-                                                        "PREPARING" -> "Preparing"
-                                                        "READY", "OUT_FOR_DELIVERY" -> "Out for Delivery"
-                                                        "COMPLETED", "DELIVERED" -> "Delivered"
-                                                        else -> order.status
+                                                AnimatedContent(
+                                                    targetState = order.status.uppercase(),
+                                                    transitionSpec = {
+                                                        fadeIn(animationSpec = tween(300)) togetherWith fadeOut(animationSpec = tween(300))
                                                     },
-                                                    color = Color.White,
-                                                    fontWeight = FontWeight.Bold,
-                                                    fontSize = 10.sp
-                                                )
+                                                    label = "StatusTextTransition"
+                                                ) { targetStatus ->
+                                                    Text(
+                                                        text = when (targetStatus) {
+                                                            "PENDING", "ORDER_PLACED" -> "Order Received"
+                                                            "PREPARING" -> "Preparing"
+                                                            "READY", "OUT_FOR_DELIVERY" -> "Out for Delivery"
+                                                            "COMPLETED", "DELIVERED" -> "Delivered"
+                                                            else -> targetStatus
+                                                        },
+                                                        color = Color.White,
+                                                        fontWeight = FontWeight.Bold,
+                                                        fontSize = 10.sp
+                                                    )
+                                                }
                                             }
                                         }
 
@@ -3995,7 +4095,11 @@ fun StudentDashboardScreen(
                                      }
                                  }
 
-                                if (filteredPastOrders.isEmpty()) {
+                                if (isLoading) {
+                                    items(3) {
+                                        OrderHistorySkeletonItem()
+                                    }
+                                } else if (filteredPastOrders.isEmpty()) {
                                     item {
                                         Card(
                                             modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
@@ -4062,6 +4166,36 @@ fun StudentDashboardScreen(
                                                                 modifier = Modifier.size(20.dp)
                                                             )
                                                         }
+
+                                                        // One-click Quick Re-order Button directly on Card
+                                                        IconButton(
+                                                            onClick = {
+                                                                HapticHelper.impact(context, "LIGHT")
+                                                                val matchedFood = allFoodItems.find { it.id == order.foodItemId } ?: FoodItem(
+                                                                    id = order.foodItemId,
+                                                                    vendorId = order.vendorId,
+                                                                    name = order.foodName,
+                                                                    price = order.unitPrice,
+                                                                    category = "Reordered",
+                                                                    imageUrl = "",
+                                                                    description = "Archived culinary selection from past transactions"
+                                                                )
+                                                                viewModel.addToCart(matchedFood, order.quantity)
+                                                                android.widget.Toast.makeText(
+                                                                    context,
+                                                                    "${order.foodName} added to shopping cart!",
+                                                                    android.widget.Toast.LENGTH_SHORT
+                                                                ).show()
+                                                            },
+                                                            modifier = Modifier.size(36.dp).testTag("quick_reorder_${order.id}")
+                                                        ) {
+                                                            Icon(
+                                                                imageVector = Icons.Default.Refresh,
+                                                                contentDescription = "Quick Reorder",
+                                                                tint = MaterialTheme.colorScheme.primary,
+                                                                modifier = Modifier.size(20.dp)
+                                                            )
+                                                        }
                                                     }
 
                                                     Column(horizontalAlignment = Alignment.End) {
@@ -4110,7 +4244,7 @@ fun StudentDashboardScreen(
                                                     ) {
                                                         Icon(
                                                             imageVector = Icons.Default.DateRange,
-                                                            contentDescription = null,
+                                                            contentDescription = "Order creation timestamp",
                                                             tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
                                                             modifier = Modifier.size(12.dp)
                                                         )
@@ -4130,7 +4264,7 @@ fun StudentDashboardScreen(
                                                         )
                                                         Icon(
                                                             imageVector = if (isExpanded) Icons.Default.KeyboardArrowUp else Icons.Default.KeyboardArrowDown,
-                                                            contentDescription = null,
+                                                            contentDescription = if (isExpanded) "Collapse detailed information" else "Expand detailed information",
                                                             modifier = Modifier.size(16.dp).testTag("expand_order_details_${order.id}"),
                                                             tint = MaterialTheme.colorScheme.primary
                                                         )
@@ -4544,6 +4678,7 @@ fun StudentDashboardScreen(
                                 }
                             }
                         }
+                    }
                     }
                 }
                 2 -> {
@@ -6748,6 +6883,7 @@ fun StudentDashboardScreen(
 
                             // ♿ ATU ACCESSIBILITY & INCLUSIVITY CENTER CARD
                             val highContrastEnabled by viewModel.isHighContrastMode.collectAsStateWithLifecycle()
+                            val darkModeEnabled by viewModel.isDarkMode.collectAsStateWithLifecycle()
                             Card(
                                 modifier = Modifier
                                     .fillMaxWidth()
@@ -6813,6 +6949,40 @@ fun StudentDashboardScreen(
                                                 tts?.speak(text, android.speech.tts.TextToSpeech.QUEUE_FLUSH, null, null)
                                             },
                                             modifier = Modifier.testTag("toggle_high_contrast_btn")
+                                        )
+                                    }
+                                    
+                                    Spacer(modifier = Modifier.height(12.dp))
+                                    HorizontalDivider(color = MaterialTheme.colorScheme.primary.copy(alpha = 0.15f))
+                                    Spacer(modifier = Modifier.height(12.dp))
+
+                                    // Dark Mode Theme Toggle
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        horizontalArrangement = Arrangement.SpaceBetween,
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        Column(modifier = Modifier.weight(1f).padding(end = 8.dp)) {
+                                            Text(
+                                                "Dark Mode Theme",
+                                                fontWeight = FontWeight.Bold,
+                                                fontSize = 12.sp,
+                                                color = MaterialTheme.colorScheme.onSurface
+                                            )
+                                            Text(
+                                                "Toggles dark and light mode settings to reduce eye fatigue under variable lighting conditions.",
+                                                fontSize = 10.sp,
+                                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                                            )
+                                        }
+                                        Switch(
+                                            checked = darkModeEnabled,
+                                            onCheckedChange = { 
+                                                viewModel.toggleDarkMode()
+                                                val text = if (!darkModeEnabled) "Dark Mode Enabled" else "Dark Mode Disabled"
+                                                tts?.speak(text, android.speech.tts.TextToSpeech.QUEUE_FLUSH, null, null)
+                                            },
+                                            modifier = Modifier.testTag("toggle_dark_mode_btn")
                                         )
                                     }
                                     
@@ -7124,6 +7294,68 @@ fun StudentDashboardScreen(
                                                 leadingContent = { Icon(Icons.Default.Restaurant, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(18.dp)) },
                                                 colors = ListItemDefaults.colors(containerColor = Color.Transparent)
                                             )
+                                            
+                                            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f), modifier = Modifier.padding(vertical = 8.dp))
+                                            
+                                            // Dedicated Loyalty Points Tracker Card in Profile Settings
+                                            Card(
+                                                modifier = Modifier
+                                                    .fillMaxWidth()
+                                                    .padding(vertical = 6.dp)
+                                                    .testTag("profile_loyalty_points_tracker_card"),
+                                                shape = RoundedCornerShape(14.dp),
+                                                colors = CardDefaults.cardColors(
+                                                    containerColor = MaterialTheme.colorScheme.tertiaryContainer.copy(alpha = 0.35f)
+                                                ),
+                                                border = BorderStroke(1.dp, MaterialTheme.colorScheme.tertiary.copy(alpha = 0.3f))
+                                            ) {
+                                                Column(modifier = Modifier.padding(14.dp)) {
+                                                    Row(
+                                                        modifier = Modifier.fillMaxWidth(),
+                                                        horizontalArrangement = Arrangement.SpaceBetween,
+                                                        verticalAlignment = Alignment.CenterVertically
+                                                    ) {
+                                                        Row(verticalAlignment = Alignment.CenterVertically) {
+                                                            Icon(Icons.Default.Star, contentDescription = "Loyalty Points", tint = Color(0xFFFFB300), modifier = Modifier.size(20.dp))
+                                                            Spacer(modifier = Modifier.width(8.dp))
+                                                            Column {
+                                                                Text("Student Loyalty Points Tracker", fontWeight = FontWeight.Bold, fontSize = 12.sp, color = MaterialTheme.colorScheme.onTertiaryContainer)
+                                                                Text("Earn 25 points for every order completed!", fontSize = 10.sp, color = MaterialTheme.colorScheme.onTertiaryContainer.copy(alpha = 0.7f))
+                                                            }
+                                                        }
+                                                        
+                                                        val livePoints = loyaltySummary?.loyalty_points_balance ?: currentTotalPoints
+                                                        Box(
+                                                            modifier = Modifier
+                                                                .clip(RoundedCornerShape(8.dp))
+                                                                .background(MaterialTheme.colorScheme.tertiary)
+                                                                .padding(horizontal = 10.dp, vertical = 4.dp)
+                                                        ) {
+                                                            Text("$livePoints PTS", fontWeight = FontWeight.Black, fontSize = 12.sp, color = MaterialTheme.colorScheme.onTertiary)
+                                                        }
+                                                    }
+                                                    
+                                                    Spacer(modifier = Modifier.height(10.dp))
+                                                    
+                                                    val ptsVal = loyaltySummary?.loyalty_points_balance ?: currentTotalPoints
+                                                    val tierName = when {
+                                                        ptsVal >= 500 -> "Platinum Member"
+                                                        ptsVal >= 250 -> "Gold Member"
+                                                        ptsVal >= 100 -> "Silver Member"
+                                                        else -> "Bronze Member"
+                                                    }
+                                                    val cashValue = ptsVal * 0.10
+                                                    
+                                                    Row(
+                                                        modifier = Modifier.fillMaxWidth(),
+                                                        horizontalArrangement = Arrangement.SpaceBetween,
+                                                        verticalAlignment = Alignment.CenterVertically
+                                                    ) {
+                                                        Text("Current Tier: $tierName", fontSize = 11.sp, fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.onTertiaryContainer)
+                                                        Text("Discount Credit: GH₵ ${"%.2f".format(cashValue)}", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = Color(0xFF2E7D32))
+                                                    }
+                                                }
+                                            }
                                         }
                                     } else {
                                         // Edit Form Inputs
@@ -8579,6 +8811,13 @@ fun StudentDashboardScreen(
                 }
             }
 
+            if (showOrderPlacedConfetti) {
+                ConfettiOverlay(
+                    isVisible = true,
+                    onFinished = { showOrderPlacedConfetti = false }
+                )
+            }
+
             // CHAT WITH VENDOR DIALOG
             activeChatOrder?.let { order ->
                 val vendor = allVendors.find { it.id == order.vendorId }
@@ -8745,6 +8984,19 @@ fun StudentDashboardScreen(
             // ORDER PLACEMENT DIALOG
             selectedFoodForOrder?.let { food ->
                 val scope = rememberCoroutineScope()
+                val dishNutritionText by viewModel.dishNutritionText.collectAsStateWithLifecycle()
+                val isAnalyzingDishNutrition by viewModel.isAnalyzingDishNutrition.collectAsStateWithLifecycle()
+
+                LaunchedEffect(food) {
+                    viewModel.getMenuItemNutrition(food.name, food.description)
+                }
+
+                DisposableEffect(food) {
+                    onDispose {
+                        viewModel.clearMenuItemNutrition()
+                    }
+                }
+
                 var checkoutPaymentMode by remember { mutableStateOf("WALLET") } // "WALLET", "POD", "GATEWAY"
                 var selectedGatewayPayMethod by remember { mutableStateOf("MOMO") } // "MOMO", "CARD", "BANK", "PAYPAL"
                 var selectedMomoOperator by remember { mutableStateOf("MTN MoMo") }
@@ -8819,6 +9071,59 @@ fun StudentDashboardScreen(
                                     Column {
                                         Text("Allergens", fontSize = 9.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
                                         Text(food.allergens, fontSize = 11.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.error)
+                                    }
+                                }
+                            }
+
+                            Spacer(modifier = Modifier.height(8.dp))
+
+                            // Gemini AI Nutrition Breakdown Card
+                            Card(
+                                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.15f)),
+                                border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.25f)),
+                                shape = RoundedCornerShape(12.dp),
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(vertical = 4.dp)
+                                    .testTag("dynamic_nutrition_card")
+                            ) {
+                                Column(modifier = Modifier.padding(12.dp)) {
+                                    Row(
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                                    ) {
+                                        Text("✨", fontSize = 14.sp)
+                                        Text(
+                                            "Gemini AI Dynamic Nutrition Breakdown",
+                                            style = MaterialTheme.typography.labelMedium,
+                                            fontWeight = FontWeight.Bold,
+                                            color = MaterialTheme.colorScheme.primary
+                                        )
+                                    }
+                                    Spacer(modifier = Modifier.height(6.dp))
+
+                                    if (isAnalyzingDishNutrition) {
+                                        Row(
+                                            verticalAlignment = Alignment.CenterVertically,
+                                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                            modifier = Modifier.fillMaxWidth().padding(vertical = 6.dp)
+                                        ) {
+                                            CircularProgressIndicator(modifier = Modifier.size(16.dp), strokeWidth = 2.dp)
+                                            Text(
+                                                "Gemini parsing recipe macros...",
+                                                style = MaterialTheme.typography.bodySmall,
+                                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                                            )
+                                        }
+                                    } else {
+                                        val nutritionContent = dishNutritionText ?: "Analyzing culinary ingredients..."
+                                        Text(
+                                            text = nutritionContent,
+                                            style = MaterialTheme.typography.bodySmall,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                            lineHeight = 16.sp,
+                                            modifier = Modifier.padding(vertical = 2.dp)
+                                        )
                                     }
                                 }
                             }
@@ -9462,6 +9767,7 @@ fun StudentDashboardScreen(
                                                             showSubmissionConfirmation = false
                                                             if (success) {
                                                                 HapticHelper.notification(context, "SUCCESS")
+                                                                showOrderPlacedConfetti = true
                                                                 selectedFoodForOrder = null
                                                                 activeTab = 1
                                                             } else {
@@ -9483,6 +9789,7 @@ fun StudentDashboardScreen(
                                                             showSubmissionConfirmation = false
                                                             if (success) {
                                                                 HapticHelper.notification(context, "SUCCESS")
+                                                                showOrderPlacedConfetti = true
                                                                 selectedFoodForOrder = null
                                                                 activeTab = 1
                                                             } else {
@@ -9970,6 +10277,7 @@ fun StudentDashboardScreen(
                                                         cartCheckoutProcessing = false
                                                         if (success) {
                                                              HapticHelper.notification(context, "SUCCESS")
+                                                             showOrderPlacedConfetti = true
                                                              animateCartTrigger = false
                                                         } else {
                                                              HapticHelper.notification(context, "ERROR")
@@ -11017,4 +11325,268 @@ fun checkDietaryConflicts(dietaryPrefs: String, cartItems: List<com.example.ui.v
     return conflicts
 }
 
+// ==========================
+// SKELETON LOADING PATTERNS
+// ==========================
+
+@Composable
+fun Modifier.pulseAnimation(): Modifier {
+    val transition = rememberInfiniteTransition(label = "pulse")
+    val alpha by transition.animateFloat(
+        initialValue = 0.3f,
+        targetValue = 0.9f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(1000, easing = LinearEasing),
+            repeatMode = RepeatMode.Reverse
+        ),
+        label = "alpha"
+    )
+    return this.graphicsLayer { this.alpha = alpha }
+}
+
+@Composable
+fun MenuSkeletonItem() {
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .pulseAnimation(),
+        shape = RoundedCornerShape(12.dp),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.2f))
+    ) {
+        Row(
+            modifier = Modifier
+                .padding(12.dp)
+                .fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(80.dp)
+                    .clip(RoundedCornerShape(8.dp))
+                    .background(MaterialTheme.colorScheme.onSurface.copy(alpha = 0.08f))
+            )
+            
+            Spacer(modifier = Modifier.width(12.dp))
+            
+            Column(
+                modifier = Modifier.weight(1f),
+                verticalArrangement = Arrangement.spacedBy(6.dp)
+            ) {
+                Box(
+                    modifier = Modifier
+                        .height(14.dp)
+                        .fillMaxWidth(0.6f)
+                        .clip(RoundedCornerShape(4.dp))
+                        .background(MaterialTheme.colorScheme.onSurface.copy(alpha = 0.12f))
+                )
+                Box(
+                    modifier = Modifier
+                        .height(10.dp)
+                        .fillMaxWidth(0.85f)
+                        .clip(RoundedCornerShape(4.dp))
+                        .background(MaterialTheme.colorScheme.onSurface.copy(alpha = 0.06f))
+                )
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .height(12.dp)
+                            .width(60.dp)
+                            .clip(RoundedCornerShape(4.dp))
+                            .background(MaterialTheme.colorScheme.onSurface.copy(alpha = 0.12f))
+                    )
+                    Box(
+                        modifier = Modifier
+                            .height(16.dp)
+                            .width(80.dp)
+                            .clip(RoundedCornerShape(8.dp))
+                            .background(MaterialTheme.colorScheme.onSurface.copy(alpha = 0.06f))
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun OrderHistorySkeletonItem() {
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .pulseAnimation(),
+        shape = RoundedCornerShape(12.dp),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.2f))
+    ) {
+        Column(modifier = Modifier.padding(14.dp)) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Row(
+                    modifier = Modifier.weight(1f),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                        Box(
+                            modifier = Modifier
+                                .height(14.dp)
+                                .fillMaxWidth(0.5f)
+                                .clip(RoundedCornerShape(4.dp))
+                                .background(MaterialTheme.colorScheme.onSurface.copy(alpha = 0.12f))
+                        )
+                        Box(
+                            modifier = Modifier
+                                .height(10.dp)
+                                .fillMaxWidth(0.35f)
+                                .clip(RoundedCornerShape(4.dp))
+                                .background(MaterialTheme.colorScheme.onSurface.copy(alpha = 0.06f))
+                        )
+                    }
+                    Box(
+                        modifier = Modifier
+                            .size(36.dp)
+                            .clip(RoundedCornerShape(18.dp))
+                            .background(MaterialTheme.colorScheme.onSurface.copy(alpha = 0.06f))
+                    )
+                }
+
+                Column(horizontalAlignment = Alignment.End, verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                    Box(
+                        modifier = Modifier
+                            .height(20.dp)
+                            .width(70.dp)
+                            .clip(RoundedCornerShape(10.dp))
+                            .background(MaterialTheme.colorScheme.onSurface.copy(alpha = 0.08f))
+                    )
+                    Box(
+                        modifier = Modifier
+                            .height(12.dp)
+                            .width(50.dp)
+                            .clip(RoundedCornerShape(4.dp))
+                            .background(MaterialTheme.colorScheme.onSurface.copy(alpha = 0.12f))
+                    )
+                }
+            }
+            
+            Spacer(modifier = Modifier.height(10.dp))
+            HorizontalDivider(color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.05f))
+            Spacer(modifier = Modifier.height(10.dp))
+            
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Box(
+                    modifier = Modifier
+                        .height(10.dp)
+                        .width(120.dp)
+                        .clip(RoundedCornerShape(4.dp))
+                        .background(MaterialTheme.colorScheme.onSurface.copy(alpha = 0.06f))
+                )
+                Box(
+                    modifier = Modifier
+                        .height(24.dp)
+                        .width(90.dp)
+                        .clip(RoundedCornerShape(12.dp))
+                        .background(MaterialTheme.colorScheme.onSurface.copy(alpha = 0.1f))
+                )
+            }
+        }
+    }
+}
+
 // ==========================================
+// 🥳 CELEBRATORY ORDER CONFETTI ANIMATION OVERLAY
+// ==========================================
+@Composable
+fun ConfettiOverlay(
+    isVisible: Boolean,
+    onFinished: () -> Unit = {}
+) {
+    if (!isVisible) return
+
+    val particles = remember {
+        val colors = listOf(
+            Color(0xFFFF1744), Color(0xFFFF9100), Color(0xFFFFEA00),
+            Color(0xFF00E676), Color(0xFF00E5FF), Color(0xFFD500F9)
+        )
+        List(75) {
+            ConfettiParticle(
+                x = (10..90).random() / 100f,
+                y = -0.05f - (0..30).random() / 100f,
+                vx = (-25..25).random() / 1000f,
+                vy = (15..45).random() / 1000f,
+                size = (6..14).random().dp,
+                color = colors.random()
+            )
+        }
+    }
+
+    val transition = rememberInfiniteTransition(label = "ConfettiTransition")
+    val progress by transition.animateFloat(
+        initialValue = 0f,
+        targetValue = 1f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(2800, easing = LinearEasing),
+            repeatMode = RepeatMode.Restart
+        ),
+        label = "ConfettiProgress"
+    )
+
+    LaunchedEffect(Unit) {
+        delay(3600)
+        onFinished()
+    }
+
+    androidx.compose.ui.window.Dialog(
+        onDismissRequest = onFinished,
+        properties = androidx.compose.ui.window.DialogProperties(
+            usePlatformDefaultWidth = false,
+            dismissOnBackPress = true,
+            dismissOnClickOutside = true
+        )
+    ) {
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(Color.Transparent)
+                .clickable { onFinished() }
+        ) {
+            androidx.compose.foundation.Canvas(
+                modifier = Modifier.fillMaxSize()
+            ) {
+                val canvasWidth = size.width
+                val canvasHeight = size.height
+
+                particles.forEach { particle ->
+                    val curY = ((particle.y + particle.vy * progress * 40f) % 1.2f) * canvasHeight
+                    val curX = (particle.x + particle.vx * progress * 20f).coerceIn(0f, 1f) * canvasWidth
+                    if (curY in 0f..canvasHeight) {
+                        drawCircle(
+                            color = particle.color,
+                            radius = particle.size.toPx(),
+                            center = androidx.compose.ui.geometry.Offset(curX, curY)
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
+private data class ConfettiParticle(
+    val x: Float,
+    val y: Float,
+    val vx: Float,
+    val vy: Float,
+    val size: androidx.compose.ui.unit.Dp,
+    val color: Color
+)

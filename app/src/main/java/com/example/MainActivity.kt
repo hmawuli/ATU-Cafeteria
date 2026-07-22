@@ -60,7 +60,8 @@ class MainActivity : FragmentActivity() {
         enableEdgeToEdge()
         setContent {
             val highContrast by viewModel.isHighContrastMode.collectAsState()
-            MyApplicationTheme(highContrast = highContrast) {
+            val darkMode by viewModel.isDarkMode.collectAsState()
+            MyApplicationTheme(darkTheme = darkMode, highContrast = highContrast) {
                 Surface(
                     modifier = Modifier.fillMaxSize(),
                     color = MaterialTheme.colorScheme.background

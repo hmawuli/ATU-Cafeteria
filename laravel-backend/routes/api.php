@@ -100,46 +100,110 @@ Route::get('/manifest.json', function() {
 // PWA Service Worker route
 Route::get('/service-worker.js', function() {
     $sw = <<<JS
-const CACHE_NAME = 'atu-vendor-cache-v1';
-const urlsToCache = [
-    '/api/manifest.json',
-    'https://cdn.tailwindcss.com',
-    'https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap'
-];
+// Import Workbox from Google CDN
+importScripts('https://storage.googleapis.com/workbox-cdn/releases/6.4.1/workbox-sw.js');
 
-self.addEventListener('install', event => {
-    event.waitUntil(
-        caches.open(CACHE_NAME).then(cache => {
-            return cache.addAll(urlsToCache);
-        })
-    );
-    self.skipWaiting();
-});
-
-self.addEventListener('activate', event => {
-    event.waitUntil(
-        caches.keys().then(cacheNames => {
-            return Promise.all(
-                cacheNames.map(cacheName => {
-                    if (cacheName !== CACHE_NAME) {
-                        return caches.delete(cacheName);
-                    }
-                })
-            );
-        })
-    );
-    self.clients.claim();
-});
-
-self.addEventListener('fetch', event => {
-    if (event.request.method !== 'GET') return;
+if (self.workbox) {
+    console.log('Workbox loaded successfully');
     
-    event.respondWith(
-        fetch(event.request).catch(() => {
-            return caches.match(event.request);
+    // Force immediate takeover of service worker clients
+    self.workbox.core.skipWaiting();
+    self.workbox.core.clientsClaim();
+
+    // 1. Caching static assets with CacheFirst strategy (Tailwind, Fonts, Icons)
+    self.workbox.routing.registerRoute(
+        ({request}) => request.destination === 'style' || 
+                       request.destination === 'script' || 
+                       request.destination === 'font' || 
+                       request.destination === 'image',
+        new self.workbox.strategies.CacheFirst({
+            cacheName: 'atu-static-assets',
+            plugins: [
+                new self.workbox.expiration.ExpirationPlugin({
+                    maxEntries: 50,
+                    maxAgeSeconds: 30 * 24 * 60 * 60, // 30 Days
+                }),
+            ],
         })
     );
-});
+
+    // 2. NetworkFirst strategy for Cafeteria Menu / Food Items
+    self.workbox.routing.registerRoute(
+        ({url}) => url.pathname.includes('/food-items') || url.pathname.includes('/menus'),
+        new self.workbox.strategies.NetworkFirst({
+            cacheName: 'atu-cafeteria-menu-cache',
+            plugins: [
+                new self.workbox.expiration.ExpirationPlugin({
+                    maxEntries: 100,
+                    maxAgeSeconds: 24 * 60 * 60, // 1 Day
+                }),
+            ],
+        })
+    );
+
+    // 3. NetworkFirst strategy for Student / User Profiles
+    self.workbox.routing.registerRoute(
+        ({url}) => url.pathname.includes('/user/profile') || url.pathname.includes('/users'),
+        new self.workbox.strategies.NetworkFirst({
+            cacheName: 'atu-user-profile-cache',
+            plugins: [
+                new self.workbox.expiration.ExpirationPlugin({
+                    maxEntries: 10,
+                    maxAgeSeconds: 7 * 24 * 60 * 60, // 7 Days
+                }),
+            ],
+        })
+    );
+
+    // Generic GET offline fallback
+    self.workbox.routing.registerRoute(
+        ({request}) => request.method === 'GET',
+        new self.workbox.strategies.NetworkFirst({
+            cacheName: 'atu-general-get-cache',
+        })
+    );
+} else {
+    console.log('Workbox failed to load. Falling back to manual cache strategies.');
+    const CACHE_NAME = 'atu-vendor-cache-v1';
+    const urlsToCache = [
+        '/api/manifest.json',
+        'https://cdn.tailwindcss.com',
+        'https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap'
+    ];
+
+    self.addEventListener('install', event => {
+        event.waitUntil(
+            caches.open(CACHE_NAME).then(cache => {
+                return cache.addAll(urlsToCache);
+            })
+        );
+        self.skipWaiting();
+    });
+
+    self.addEventListener('activate', event => {
+        event.waitUntil(
+            caches.keys().then(cacheNames => {
+                return Promise.all(
+                    cacheNames.map(cacheName => {
+                        if (cacheName !== CACHE_NAME) {
+                            return caches.delete(cacheName);
+                        }
+                    })
+                );
+            })
+        );
+        self.clients.claim();
+    });
+
+    self.addEventListener('fetch', event => {
+        if (event.request.method !== 'GET') return;
+        event.respondWith(
+            fetch(event.request).catch(() => {
+                return caches.match(event.request);
+            })
+        );
+    });
+}
 
 // Listener for background or foreground client page notifications
 self.addEventListener('message', event => {

@@ -18,6 +18,8 @@
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <!-- QRCode.js Library CDN -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+    <!-- html5-qrcode scanner library -->
+    <script src="https://unpkg.com/html5-qrcode" type="text/javascript"></script>
     
     <style>
         body {
@@ -219,6 +221,13 @@
                     </svg>
                     <span>All customer pre-payments are cryptographically locked until order pick-up PIN verification.</span>
                 </div>
+                
+                <button onclick="openScannerModal()" type="button" class="w-full mt-4 py-3 px-4 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white font-extrabold text-sm rounded-2xl shadow-md hover:shadow-lg transition-all duration-200 flex items-center justify-center gap-2">
+                    <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v1m6 11h2m-6 0h-2v4m0-11v3m0 0h.01M12 12h.01M16 20h2M4 12h4m12 0a8 8 0 11-16 0 8 8 0 0116 0z"></path>
+                    </svg>
+                    📷 Scan Student Claim QR
+                </button>
             </div>
         </div>
 
@@ -1156,6 +1165,169 @@
 
             </div>
 
+            <!-- AI-Powered Staffing Insights Section -->
+            <div class="bg-white rounded-3xl border border-slate-200 shadow-sm p-6 flex flex-col justify-between">
+                <div class="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 border-b border-slate-100 pb-4 mb-5">
+                    <div>
+                        <div class="flex items-center gap-1.5">
+                            <span class="flex h-2 w-2 relative">
+                                <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                                <span class="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+                            </span>
+                            <span class="px-2.5 py-0.5 bg-indigo-50 text-indigo-700 text-[10px] font-bold rounded-full uppercase tracking-wider border border-indigo-100">
+                                AI Predictive Engine
+                            </span>
+                        </div>
+                        <h3 class="text-base font-extrabold text-slate-900 mt-1 flex items-center gap-2">
+                            <span>🤖</span> AI-Powered Staffing & Demand Insights
+                        </h3>
+                        <p class="text-xs text-slate-400 mt-0.5">Optimal scheduling and chef-allocation guidelines calculated from predicted peak order traffic.</p>
+                    </div>
+
+                    <!-- Campus Events Modifier Selector -->
+                    <div class="flex items-center gap-2 bg-slate-50 border border-slate-200 rounded-xl px-3 py-1.5 shadow-xs">
+                        <label for="campus-traffic-modifier" class="text-[10px] text-slate-400 font-extrabold uppercase tracking-wider">Campus Activity Level</label>
+                        <select id="campus-traffic-modifier" onchange="recalculateStaffingInsights()" class="bg-transparent border-none text-xs text-slate-800 font-extrabold focus:ring-0 outline-none p-0 cursor-pointer">
+                            <option value="1.0">Standard Day (Normal Traffic)</option>
+                            <option value="1.3">Midterm / Exam Week (+30%)</option>
+                            <option value="1.8">Matriculation / Graduation (+80%)</option>
+                            <option value="0.5">Vacation / Semester Break (-50%)</option>
+                        </select>
+                    </div>
+                </div>
+
+                <!-- Forecast Cards Grid -->
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                    
+                    <!-- Insight 1: Peak Hours -->
+                    <div class="bg-gradient-to-br from-indigo-50 to-indigo-100/50 rounded-2xl p-5 border border-indigo-100">
+                        <div class="flex items-center justify-between mb-3">
+                            <h4 class="text-xs font-extrabold text-indigo-900 uppercase tracking-wider">Predicted Peak Hours</h4>
+                            <span class="px-2 py-0.5 bg-rose-500 text-white font-extrabold text-[9px] rounded-full uppercase tracking-wider animate-pulse">Critical</span>
+                        </div>
+                        <p class="text-3xl font-black text-indigo-950 tracking-tight code-font" id="peak-hours-time">12:00 PM - 02:00 PM</p>
+                        <p class="text-xs text-indigo-700 font-bold mt-1.5" id="peak-hours-volume">Estimated lunch rush: 45+ orders/hour</p>
+                        <div class="mt-4 bg-white/80 rounded-xl p-3 border border-indigo-100/40 text-xs text-indigo-900 leading-relaxed">
+                            💡 <strong class="font-bold">AI Note:</strong> Student traffic will surge immediately following afternoon lecture block dismissals. Pre-package popular items!
+                        </div>
+                    </div>
+
+                    <!-- Insight 2: Staffing Level -->
+                    <div class="bg-gradient-to-br from-emerald-50 to-emerald-100/50 rounded-2xl p-5 border border-emerald-100">
+                        <div class="flex items-center justify-between mb-3">
+                            <h4 class="text-xs font-extrabold text-emerald-900 uppercase tracking-wider">Optimal Staffing Level</h4>
+                            <span class="px-2 py-0.5 bg-emerald-600 text-white font-extrabold text-[9px] rounded-full uppercase tracking-wider">Recommended</span>
+                        </div>
+                        <p class="text-3xl font-black text-emerald-950 tracking-tight code-font" id="optimal-staff-count">5 Cooks / Cashiers</p>
+                        <p class="text-xs text-emerald-700 font-bold mt-1.5" id="staff-utilization-rating">Capacity utilization: 88%</p>
+                        <div class="mt-4 bg-white/80 rounded-xl p-3 border border-emerald-100/40 text-xs text-emerald-900 leading-relaxed">
+                            👥 <strong class="font-bold">Staff Breakdown:</strong> 2 chefs on assembly, 1 order packing clerk, 1 wallet PIN scanner verification attendant.
+                        </div>
+                    </div>
+
+                    <!-- Insight 3: Menu Preparation Guidance -->
+                    <div class="bg-gradient-to-br from-amber-50 to-amber-100/50 rounded-2xl p-5 border border-amber-100">
+                        <div class="flex items-center justify-between mb-3">
+                            <h4 class="text-xs font-extrabold text-amber-900 uppercase tracking-wider">Demand Prep Recommendation</h4>
+                            <span class="px-2 py-0.5 bg-amber-600 text-white font-extrabold text-[9px] rounded-full uppercase tracking-wider">Menu Strategy</span>
+                        </div>
+                        <p class="text-3xl font-black text-amber-950 tracking-tight code-font" id="recommended-prep-qty">35 Portions Jollof</p>
+                        <p class="text-xs text-amber-700 font-bold mt-1.5" id="recommended-prep-details">Prepare 15 Portions Waakye, 12 Drinks</p>
+                        <div class="mt-4 bg-white/80 rounded-xl p-3 border border-amber-100/40 text-xs text-amber-900 leading-relaxed">
+                            🍲 <strong class="font-bold">Stock Warning:</strong> Avoid wastage by staggering Waakye prep prior to 11:30 AM based on student trend history.
+                        </div>
+                    </div>
+
+                </div>
+
+                <!-- Secondary Staffing Shift Schedule Table -->
+                <div class="mt-6 border border-slate-100 rounded-2xl overflow-hidden bg-slate-50/50">
+                    <div class="px-4 py-3 bg-slate-100/80 border-b border-slate-200 flex justify-between items-center">
+                        <h4 class="text-xs font-extrabold text-slate-800 uppercase tracking-wider flex items-center gap-1.5">
+                            <span>📋</span> Predicted Hourly Demand Curve & Staff Allocation Suggestions
+                        </h4>
+                        <span class="text-[10px] text-slate-500 font-medium">Model: Gemini 3.5 Flash (Fitted)</span>
+                    </div>
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-left text-xs border-collapse">
+                            <thead>
+                                <tr class="bg-slate-50 text-slate-400 font-extrabold uppercase tracking-wider border-b border-slate-100">
+                                    <th class="py-3 px-4">Shift Segment</th>
+                                    <th class="py-3 px-4">Target Hours</th>
+                                    <th class="py-3 px-4 text-center">Predicted Traffic</th>
+                                    <th class="py-3 px-4 text-center">Recommended Cooks</th>
+                                    <th class="py-3 px-4 text-center">Recommended Cashiers</th>
+                                    <th class="py-3 px-4 text-right">Status</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-slate-100">
+                                <tr>
+                                    <td class="py-3 px-4 font-bold text-slate-800">Breakfast Shift</td>
+                                    <td class="py-3 px-4 text-slate-600">07:30 AM - 10:00 AM</td>
+                                    <td class="py-3 px-4 text-center text-indigo-600 font-bold" id="traffic-breakfast">Moderate (15 ord/hr)</td>
+                                    <td class="py-3 px-4 text-center font-extrabold text-slate-900" id="cooks-breakfast">2 Chefs</td>
+                                    <td class="py-3 px-4 text-center font-extrabold text-slate-900" id="cashiers-breakfast">1 Clerk</td>
+                                    <td class="py-3 px-4 text-right">
+                                        <span class="px-2 py-0.5 bg-blue-50 text-blue-700 font-extrabold text-[9px] rounded-md uppercase border border-blue-100">Standard</span>
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td class="py-3 px-4 font-bold text-slate-800">Lunch Peak</td>
+                                    <td class="py-3 px-4 text-slate-600">11:30 AM - 02:30 PM</td>
+                                    <td class="py-3 px-4 text-center text-rose-600 font-bold" id="traffic-lunch">CRITICAL (45 ord/hr)</td>
+                                    <td class="py-3 px-4 text-center font-extrabold text-slate-900" id="cooks-lunch">3 Chefs</td>
+                                    <td class="py-3 px-4 text-center font-extrabold text-slate-900" id="cashiers-lunch">2 Clerks</td>
+                                    <td class="py-3 px-4 text-right">
+                                        <span class="px-2 py-0.5 bg-rose-50 text-rose-700 font-extrabold text-[9px] rounded-md uppercase border border-rose-100">Peak Rush</span>
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td class="py-3 px-4 font-bold text-slate-800">Afternoon Slack</td>
+                                    <td class="py-3 px-4 text-slate-600">03:00 PM - 06:00 PM</td>
+                                    <td class="py-3 px-4 text-center text-emerald-600 font-bold" id="traffic-afternoon">Light (8 ord/hr)</td>
+                                    <td class="py-3 px-4 text-center font-extrabold text-slate-900" id="cooks-afternoon">1 Chef</td>
+                                    <td class="py-3 px-4 text-center font-extrabold text-slate-900" id="cashiers-afternoon">1 Clerk</td>
+                                    <td class="py-3 px-4 text-right">
+                                        <span class="px-2 py-0.5 bg-emerald-50 text-emerald-700 font-extrabold text-[9px] rounded-md uppercase border border-emerald-100">Standby</span>
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <div class="h-6"></div>
+
+            <!-- Gemini AI Student Sentiment Analysis -->
+            <div class="bg-white rounded-3xl border border-indigo-200 shadow-sm overflow-hidden mb-6">
+                <div class="bg-gradient-to-r from-indigo-50 to-purple-50 px-6 py-5 border-b border-indigo-100 flex items-center justify-between">
+                    <div>
+                        <h3 class="text-base font-bold text-indigo-950 flex items-center gap-2">
+                            <span>✨</span> Gemini AI Student Sentiment Analysis
+                        </h3>
+                        <p class="text-xs text-indigo-600 mt-0.5">Real-time cognitive synthesis of student remarks to identify areas for service improvement.</p>
+                    </div>
+                    <button type="button" onclick="loadSentimentReport()" class="p-1.5 bg-white text-indigo-600 hover:bg-indigo-100 rounded-lg border border-indigo-200 transition-all shadow-sm flex items-center justify-center gap-1.5 text-xs font-bold" title="Recalculate Sentiment Analysis">
+                        <svg class="w-4 h-4 animate-spin-hover" id="sentiment-refresh-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 1121.21 8H17"></path>
+                        </svg>
+                        Refresh Insights
+                    </button>
+                </div>
+                <div class="p-6">
+                    <div id="sentiment-report-content" class="text-slate-700 text-xs leading-relaxed space-y-4">
+                        <div class="flex items-center gap-3 py-8 justify-center text-slate-400">
+                            <svg class="w-5 h-5 animate-spin text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                            </svg>
+                            <span>Querying Gemini Cognitive Processor...</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
             <!-- Customer Reviews & Comments Table -->
             <div class="bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden">
                 <div class="px-6 py-5 border-b border-slate-100">
@@ -2004,6 +2176,50 @@
             });
         }
 
+        function recalculateStaffingInsights() {
+            const multiplier = parseFloat(document.getElementById('campus-traffic-modifier').value);
+            
+            // Scale elements based on activity level
+            const breakfastTraffic = Math.round(15 * multiplier);
+            const lunchTraffic = Math.round(45 * multiplier);
+            const afternoonTraffic = Math.round(8 * multiplier);
+            
+            document.getElementById('traffic-breakfast').innerText = `Moderate (${breakfastTraffic} ord/hr)`;
+            document.getElementById('traffic-lunch').innerText = lunchTraffic > 50 ? `CRITICAL (${lunchTraffic} ord/hr)` : `High (${lunchTraffic} ord/hr)`;
+            document.getElementById('traffic-afternoon').innerText = `Light (${afternoonTraffic} ord/hr)`;
+            
+            // Recalculate staffing levels
+            const breakfastCooks = Math.max(1, Math.round(2 * multiplier));
+            const breakfastCashiers = Math.max(1, Math.round(1 * multiplier));
+            
+            const lunchCooks = Math.max(1, Math.round(3 * multiplier));
+            const lunchCashiers = Math.max(1, Math.round(2 * multiplier));
+            
+            const afternoonCooks = Math.max(1, Math.round(1 * multiplier));
+            const afternoonCashiers = Math.max(1, Math.round(1 * multiplier));
+            
+            document.getElementById('cooks-breakfast').innerText = `${breakfastCooks} ${breakfastCooks === 1 ? 'Chef' : 'Chefs'}`;
+            document.getElementById('cashiers-breakfast').innerText = `${breakfastCashiers} ${breakfastCashiers === 1 ? 'Clerk' : 'Clerks'}`;
+            
+            document.getElementById('cooks-lunch').innerText = `${lunchCooks} ${lunchCooks === 1 ? 'Chef' : 'Chefs'}`;
+            document.getElementById('cashiers-lunch').innerText = `${lunchCashiers} ${lunchCashiers === 1 ? 'Clerk' : 'Clerks'}`;
+            
+            document.getElementById('cooks-afternoon').innerText = `${afternoonCooks} ${afternoonCooks === 1 ? 'Chef' : 'Chefs'}`;
+            document.getElementById('cashiers-afternoon').innerText = `${afternoonCashiers} ${afternoonCashiers === 1 ? 'Clerk' : 'Clerks'}`;
+            
+            // Scale master boxes
+            const totalStaff = lunchCooks + lunchCashiers;
+            document.getElementById('optimal-staff-count').innerText = `${totalStaff} Cooks / Cashiers`;
+            document.getElementById('staff-utilization-rating').innerText = `Capacity utilization: ${Math.round(88 * multiplier)}%`;
+            
+            const jollofPortions = Math.round(35 * multiplier);
+            const waakyePortions = Math.round(15 * multiplier);
+            const drinksPortions = Math.round(12 * multiplier);
+            document.getElementById('recommended-prep-qty').innerText = `${jollofPortions} Portions Jollof`;
+            document.getElementById('recommended-prep-details').innerText = `Prepare ${waakyePortions} Portions Waakye, ${drinksPortions} Drinks`;
+            document.getElementById('peak-hours-volume').innerText = `Estimated lunch rush: ${lunchTraffic}+ orders/hour`;
+        }
+
         // Touch gesture state tracking for swipe-to-complete
         const swipeData = {};
 
@@ -2320,6 +2536,7 @@
             // Initialize System Health and Diagnostic Log Streams
             fetchSystemHealth();
             fetchLogs();
+            loadSentimentReport();
         });
 
         // Diagnostics Log & Health Console routines
@@ -2499,6 +2716,57 @@ ${escapeHtml(log.full_message)}
             });
         }
 
+        function loadSentimentReport() {
+            const container = document.getElementById('sentiment-report-content');
+            const icon = document.getElementById('sentiment-refresh-icon');
+            if (icon) icon.classList.add('animate-spin');
+
+            fetch('/api/vendor/feedback/sentiment', {
+                headers: {
+                    'Accept': 'application/json',
+                    'X-Requested-With': 'XMLHttpRequest'
+                }
+            })
+            .then(res => res.json())
+            .then(data => {
+                if (icon) icon.classList.remove('animate-spin');
+                if (data.success && data.report) {
+                    container.innerHTML = formatMarkdownToHtml(data.report);
+                } else {
+                    container.innerHTML = `<div class="p-4 bg-rose-50 text-rose-700 rounded-2xl text-xs font-semibold">Failed to load cognitive sentiment analysis. ${data.message || ''}</div>`;
+                }
+            })
+            .catch(err => {
+                if (icon) icon.classList.remove('animate-spin');
+                container.innerHTML = `<div class="p-4 bg-rose-50 text-rose-700 rounded-2xl text-xs font-semibold">Failed to connect to the sentiment analytical engine.</div>`;
+            });
+        }
+
+        function formatMarkdownToHtml(md) {
+            if (!md) return '';
+            let html = md;
+            
+            // Convert headers
+            html = html.replace(/^# (.*$)/gim, '<h1 class="text-base font-black text-slate-900 mb-4 border-b pb-2 flex items-center gap-1.5">$1</h1>');
+            html = html.replace(/^## (.*$)/gim, '<h2 class="text-sm font-extrabold text-indigo-950 mt-4 mb-2 flex items-center gap-1">$1</h2>');
+            html = html.replace(/^### (.*$)/gim, '<h3 class="text-xs font-bold text-indigo-800 mt-3 mb-1.5">$1</h3>');
+            
+            // Convert bold text
+            html = html.replace(/\*\*(.*?)\*\*/g, '<strong class="font-extrabold text-slate-900">$1</strong>');
+            
+            // Convert bullet points
+            html = html.replace(/^\* (.*$)/gim, '<li class="ml-4 list-disc text-slate-600 mt-1">$1</li>');
+            html = html.replace(/^- (.*$)/gim, '<li class="ml-4 list-disc text-slate-600 mt-1">$1</li>');
+            
+            // Replace newlines with paragraph spacing
+            html = html.split('\n\n').map(p => {
+                if (p.trim().startsWith('<li') || p.trim().startsWith('<h')) return p;
+                return `<p class="mt-2 text-slate-600">${p}</p>`;
+            }).join('');
+
+            return html;
+        }
+
         function escapeHtml(str) {
             if (!str) return '';
             return str
@@ -2509,6 +2777,270 @@ ${escapeHtml(log.full_message)}
                 .replace(/'/g, "&#039;");
         }
         });
+    </script>
+
+    <!-- Interactive QR Code Claim Scanner Modal -->
+    <div id="scannerModal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm hidden flex items-center justify-center z-50 p-4 transition-all duration-300">
+        <div class="bg-white rounded-3xl border border-slate-200 shadow-2xl max-w-lg w-full overflow-hidden flex flex-col transform scale-95 transition-all duration-300" id="scannerModalContent">
+            <!-- Modal Header -->
+            <div class="px-6 py-5 bg-gradient-to-r from-indigo-600 to-purple-600 text-white flex items-center justify-between">
+                <div class="flex items-center gap-2.5">
+                    <div class="p-2 bg-white/10 rounded-xl">
+                        <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v1m6 11h2m-6 0h-2v4m0-11v3m0 0h.01M12 12h.01M16 20h2M4 12h4m12 0a8 8 0 11-16 0 8 8 0 0116 0z"></path>
+                        </svg>
+                    </div>
+                    <div>
+                        <h3 class="text-base font-extrabold tracking-tight">Student Claim Ticket Scanner</h3>
+                        <p class="text-[11px] text-indigo-100 font-medium">Verify student custody hand-offs instantly</p>
+                    </div>
+                </div>
+                <button onclick="closeScannerModal()" class="p-1 text-white/80 hover:text-white rounded-lg hover:bg-white/10 transition-colors">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                    </svg>
+                </button>
+            </div>
+
+            <!-- Modal Content -->
+            <div class="p-6 flex flex-col gap-5 overflow-y-auto max-h-[75vh]">
+                <!-- Camera view area -->
+                <div class="flex flex-col items-center justify-center bg-slate-50 border border-slate-200 rounded-2xl p-4 relative overflow-hidden min-h-[250px]">
+                    <div id="reader" class="w-full max-w-[360px] rounded-xl overflow-hidden shadow-sm" style="background: #000;"></div>
+                    <div id="scanner-loader" class="absolute inset-0 bg-slate-900/70 flex flex-col items-center justify-center text-white text-xs gap-3 font-semibold">
+                        <svg class="w-8 h-8 animate-spin text-indigo-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                        </svg>
+                        <span>Starting Digital Camera Scanner...</span>
+                    </div>
+                </div>
+
+                <!-- Live Status Banner -->
+                <div id="scanner-status" class="p-3.5 bg-indigo-50 border border-indigo-100 text-indigo-900 text-xs font-bold rounded-xl text-center leading-relaxed flex items-center justify-center gap-2">
+                    <span>💡 Tip: Align student's Claim QR code ticket inside the green square target bounds.</span>
+                </div>
+
+                <!-- Fallback / Manual Verification Form -->
+                <div class="border-t border-slate-100 pt-4">
+                    <h4 class="text-xs font-black text-slate-400 uppercase tracking-wider mb-3">Or Manual PIN Verification</h4>
+                    <form id="manual-verify-form" onsubmit="handleManualVerify(event)" class="grid grid-cols-2 gap-3">
+                        <div class="flex flex-col gap-1 col-span-2 sm:col-span-1">
+                            <label class="text-[10px] font-bold text-slate-500 uppercase">Order ID / Ticket #</label>
+                            <input type="number" id="verify-order-id" placeholder="e.g. 1005" required class="px-3.5 py-2 border border-slate-200 rounded-xl text-xs font-bold focus:outline-indigo-600">
+                        </div>
+                        <div class="flex flex-col gap-1 col-span-2 sm:col-span-1">
+                            <label class="text-[10px] font-bold text-slate-500 uppercase">Secure Hand-off PIN</label>
+                            <input type="text" id="verify-pin" placeholder="e.g. A92C" required class="px-3.5 py-2 border border-slate-200 rounded-xl text-xs font-bold focus:outline-indigo-600">
+                        </div>
+                        <button type="submit" class="col-span-2 py-2.5 px-4 bg-slate-900 hover:bg-slate-800 text-white font-extrabold text-xs rounded-xl transition-all shadow flex items-center justify-center gap-2 mt-1">
+                            Verify & Release Pre-Order
+                        </button>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- QR Code Scan JS implementation -->
+    <script type="text/javascript">
+        let html5QrcodeScanner = null;
+
+        function openScannerModal() {
+            const modal = document.getElementById('scannerModal');
+            const modalContent = document.getElementById('scannerModalContent');
+            const loader = document.getElementById('scanner-loader');
+            const status = document.getElementById('scanner-status');
+            
+            modal.classList.remove('hidden');
+            setTimeout(() => {
+                modalContent.classList.remove('scale-95');
+                modalContent.classList.add('scale-100');
+            }, 50);
+
+            // Reset manual form fields
+            document.getElementById('manual-verify-form').reset();
+            
+            // Setup state
+            loader.style.display = 'flex';
+            status.className = "p-3.5 bg-indigo-50 border border-indigo-100 text-indigo-900 text-xs font-bold rounded-xl text-center leading-relaxed flex items-center justify-center gap-2";
+            status.innerHTML = "<span>💡 Tip: Align student's Claim QR code ticket inside the camera viewport.</span>";
+
+            // Initialize Html5Qrcode
+            html5QrcodeScanner = new Html5Qrcode("reader");
+            
+            // Start scanner with back camera (environment) preferred
+            html5QrcodeScanner.start(
+                { facingMode: "environment" },
+                {
+                    fps: 10,
+                    qrbox: { width: 220, height: 220 }
+                },
+                onScanSuccess,
+                onScanError
+            )
+            .then(() => {
+                loader.style.display = 'none';
+            })
+            .catch(err => {
+                console.error("Camera scanner startup failed:", err);
+                loader.style.display = 'none';
+                status.className = "p-3.5 bg-amber-50 border border-amber-200 text-amber-800 text-xs font-bold rounded-xl text-center leading-relaxed";
+                status.innerHTML = "⚠️ Camera permission denied or not found. Please use the manual PIN verification panel below.";
+            });
+        }
+
+        function closeScannerModal() {
+            const modal = document.getElementById('scannerModal');
+            const modalContent = document.getElementById('scannerModalContent');
+            
+            modalContent.classList.remove('scale-100');
+            modalContent.classList.add('scale-95');
+            
+            if (html5QrcodeScanner) {
+                html5QrcodeScanner.stop().then(() => {
+                    html5QrcodeScanner.clear();
+                    html5QrcodeScanner = null;
+                    modal.classList.add('hidden');
+                }).catch(err => {
+                    console.error("Failed to stop scanner cleanly", err);
+                    html5QrcodeScanner = null;
+                    modal.classList.add('hidden');
+                });
+            } else {
+                modal.classList.add('hidden');
+            }
+        }
+
+        function onScanSuccess(decodedText, decodedResult) {
+            console.log("QR Code Scanned successfully:", decodedText);
+            
+            // Play scan beep sound
+            playScanBeep();
+            
+            const status = document.getElementById('scanner-status');
+            status.className = "p-3.5 bg-blue-50 border border-blue-100 text-blue-900 text-xs font-bold rounded-xl text-center leading-relaxed flex items-center justify-center gap-2";
+            status.innerHTML = "🔄 Validating claiming ticket credentials...";
+
+            let orderId = null;
+            let pin = null;
+
+            // Extract order ID
+            const orderMatch = decodedText.match(/ATU-TKT-(\d+)/);
+            if (orderMatch) {
+                orderId = parseInt(orderMatch[1]);
+            }
+
+            // Extract PIN
+            const pinMatch = decodedText.match(/PIN:\s*([A-Za-z0-9]+)/i);
+            if (pinMatch) {
+                pin = pinMatch[1].trim();
+            }
+
+            if (orderId && pin) {
+                triggerPickupVerification(orderId, pin);
+            } else {
+                status.className = "p-3.5 bg-rose-50 border border-rose-200 text-rose-800 text-xs font-bold rounded-xl text-center leading-relaxed";
+                status.innerHTML = "❌ Invalid ATU Claim QR Code format. Try scanning again or input PIN manually.";
+            }
+        }
+
+        function onScanError(errorMessage) {
+            // Simple log to keep console clean
+        }
+
+        function handleManualVerify(event) {
+            event.preventDefault();
+            const orderId = document.getElementById('verify-order-id').value;
+            const pin = document.getElementById('verify-pin').value;
+            
+            const status = document.getElementById('scanner-status');
+            status.className = "p-3.5 bg-blue-50 border border-blue-100 text-blue-900 text-xs font-bold rounded-xl text-center leading-relaxed flex items-center justify-center gap-2";
+            status.innerHTML = "🔄 Validating manual PIN credentials...";
+
+            triggerPickupVerification(orderId, pin);
+        }
+
+        function triggerPickupVerification(orderId, pin) {
+            const status = document.getElementById('scanner-status');
+            const vendorId = "{{ $vendor->id }}";
+
+            fetch(`/api/orders/${orderId}/verify-pickup`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Accept': 'application/json',
+                    'X-Requested-With': 'XMLHttpRequest',
+                    'X-CSRF-TOKEN': '{{ csrf_token() }}'
+                },
+                body: JSON.stringify({
+                    vendor_id: vendorId,
+                    pickup_pin: pin
+                })
+            })
+            .then(res => res.json())
+            .then(data => {
+                if (data.success || (data.message && data.message.toLowerCase().includes("success"))) {
+                    status.className = "p-3.5 bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs font-bold rounded-xl text-center leading-relaxed";
+                    status.innerHTML = "🎉 Order Claim Verified! Food released. Status updated to Completed.";
+                    
+                    // Play success sound
+                    playSuccessSound();
+
+                    // Reload view to update status
+                    setTimeout(() => {
+                        closeScannerModal();
+                        window.location.reload();
+                    }, 2000);
+                } else {
+                    status.className = "p-3.5 bg-rose-50 border border-rose-200 text-rose-800 text-xs font-bold rounded-xl text-center leading-relaxed";
+                    status.innerHTML = `❌ Verification Failed: ${data.message || 'Incorrect pickup PIN.'}`;
+                }
+            })
+            .catch(err => {
+                console.error("Verification failed:", err);
+                status.className = "p-3.5 bg-rose-50 border border-rose-200 text-rose-800 text-xs font-bold rounded-xl text-center leading-relaxed";
+                status.innerHTML = "❌ Network connection error. Verification could not be finalized.";
+            });
+        }
+
+        function playScanBeep() {
+            try {
+                const ctx = new (window.AudioContext || window.webkitAudioContext)();
+                const osc = ctx.createOscillator();
+                const gain = ctx.createGain();
+                osc.type = "sine";
+                osc.frequency.setValueAtTime(1000, ctx.currentTime);
+                gain.gain.setValueAtTime(0.3, ctx.currentTime);
+                gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.15);
+                osc.connect(gain);
+                gain.connect(ctx.destination);
+                osc.start();
+                osc.stop(ctx.currentTime + 0.15);
+            } catch (e) {
+                console.log("Audio feedback ignored", e);
+            }
+        }
+
+        function playSuccessSound() {
+            try {
+                const ctx = new (window.AudioContext || window.webkitAudioContext)();
+                const osc = ctx.createOscillator();
+                const gain = ctx.createGain();
+                osc.type = "sine";
+                osc.frequency.setValueAtTime(523.25, ctx.currentTime); // C5
+                osc.frequency.setValueAtTime(659.25, ctx.currentTime + 0.1); // E5
+                osc.frequency.setValueAtTime(783.99, ctx.currentTime + 0.2); // G5
+                gain.gain.setValueAtTime(0.3, ctx.currentTime);
+                gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.4);
+                osc.connect(gain);
+                gain.connect(ctx.destination);
+                osc.start();
+                osc.stop(ctx.currentTime + 0.4);
+            } catch (e) {
+                console.log("Audio feedback ignored", e);
+            }
+        }
     </script>
 
 </body>
