@@ -98,131 +98,133 @@ class MainActivity : FragmentActivity() {
                         }
                     }
 
-                    androidx.compose.foundation.layout.Box(modifier = Modifier.fillMaxSize()) {
-                        NavHost(
-                            navController = navController,
-                            startDestination = "login"
-                        ) {
-                            composable("login") {
-                                LoginScreen(
-                                    viewModel = viewModel,
-                                    navController = navController
-                                )
-                            }
-                            composable("register") {
-                                RegisterScreen(
-                                    viewModel = viewModel,
-                                    navController = navController
-                                )
-                            }
-                            composable("student_home") {
-                                StudentDashboardScreen(
-                                    viewModel = viewModel,
-                                    navController = navController
-                                )
-                            }
-                            composable("vendor_home") {
-                                VendorDashboardScreen(
-                                    viewModel = viewModel,
-                                    navController = navController
-                                )
-                            }
-                            composable("admin_home") {
-                                AdminDashboardScreen(
-                                    viewModel = viewModel,
-                                    navController = navController
-                                )
-                            }
-                        }
-
-                        // Friendly "Offline" Banner Overlay
-                        AnimatedVisibility(
-                            visible = !isOnline,
-                            enter = fadeIn() + slideInVertically(initialOffsetY = { -it }),
-                            exit = fadeOut() + slideOutVertically(targetOffsetY = { -it }),
-                            modifier = Modifier.align(androidx.compose.ui.Alignment.TopCenter)
-                        ) {
-                            androidx.compose.material3.Card(
-                                colors = androidx.compose.material3.CardDefaults.cardColors(
-                                    containerColor = MaterialTheme.colorScheme.errorContainer,
-                                    contentColor = MaterialTheme.colorScheme.onErrorContainer
-                                ),
-                                shape = androidx.compose.foundation.shape.RoundedCornerShape(bottomStart = 16.dp, bottomEnd = 16.dp),
-                                elevation = androidx.compose.material3.CardDefaults.cardElevation(defaultElevation = 6.dp),
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .testTag("offline_banner")
+                    com.example.ui.components.AppErrorBoundary(viewModel = viewModel) {
+                        androidx.compose.foundation.layout.Box(modifier = Modifier.fillMaxSize()) {
+                            NavHost(
+                                navController = navController,
+                                startDestination = "login"
                             ) {
-                                Row(
+                                composable("login") {
+                                    LoginScreen(
+                                        viewModel = viewModel,
+                                        navController = navController
+                                    )
+                                }
+                                composable("register") {
+                                    RegisterScreen(
+                                        viewModel = viewModel,
+                                        navController = navController
+                                    )
+                                }
+                                composable("student_home") {
+                                    StudentDashboardScreen(
+                                        viewModel = viewModel,
+                                        navController = navController
+                                    )
+                                }
+                                composable("vendor_home") {
+                                    VendorDashboardScreen(
+                                        viewModel = viewModel,
+                                        navController = navController
+                                    )
+                                }
+                                composable("admin_home") {
+                                    AdminDashboardScreen(
+                                        viewModel = viewModel,
+                                        navController = navController
+                                    )
+                                }
+                            }
+
+                            // Friendly "Offline" Banner Overlay
+                            AnimatedVisibility(
+                                visible = !isOnline,
+                                enter = fadeIn() + slideInVertically(initialOffsetY = { -it }),
+                                exit = fadeOut() + slideOutVertically(targetOffsetY = { -it }),
+                                modifier = Modifier.align(androidx.compose.ui.Alignment.TopCenter)
+                            ) {
+                                androidx.compose.material3.Card(
+                                    colors = androidx.compose.material3.CardDefaults.cardColors(
+                                        containerColor = MaterialTheme.colorScheme.errorContainer,
+                                        contentColor = MaterialTheme.colorScheme.onErrorContainer
+                                    ),
+                                    shape = androidx.compose.foundation.shape.RoundedCornerShape(bottomStart = 16.dp, bottomEnd = 16.dp),
+                                    elevation = androidx.compose.material3.CardDefaults.cardElevation(defaultElevation = 6.dp),
                                     modifier = Modifier
-                                        .statusBarsPadding()
-                                        .padding(horizontal = 16.dp, vertical = 12.dp)
-                                        .fillMaxWidth(),
-                                    verticalAlignment = androidx.compose.ui.Alignment.CenterVertically,
-                                    horizontalArrangement = androidx.compose.foundation.layout.Arrangement.Center
+                                        .fillMaxWidth()
+                                        .testTag("offline_banner")
                                 ) {
-                                    androidx.compose.material3.Icon(
-                                        imageVector = androidx.compose.material.icons.Icons.Default.CloudOff,
-                                        contentDescription = "Offline Mode Active",
-                                        modifier = Modifier.size(20.dp)
-                                    )
-                                    Spacer(modifier = Modifier.width(8.dp))
-                                    androidx.compose.material3.Text(
-                                        text = "Offline Mode • Running on local database cache",
-                                        style = MaterialTheme.typography.labelMedium,
-                                        fontWeight = androidx.compose.ui.text.font.FontWeight.Bold
-                                    )
+                                    Row(
+                                        modifier = Modifier
+                                            .statusBarsPadding()
+                                            .padding(horizontal = 16.dp, vertical = 12.dp)
+                                            .fillMaxWidth(),
+                                        verticalAlignment = androidx.compose.ui.Alignment.CenterVertically,
+                                        horizontalArrangement = androidx.compose.foundation.layout.Arrangement.Center
+                                    ) {
+                                        androidx.compose.material3.Icon(
+                                            imageVector = androidx.compose.material.icons.Icons.Default.CloudOff,
+                                            contentDescription = "Offline Mode Active",
+                                            modifier = Modifier.size(20.dp)
+                                        )
+                                        Spacer(modifier = Modifier.width(8.dp))
+                                        androidx.compose.material3.Text(
+                                            text = "Offline Mode • Running on local database cache",
+                                            style = MaterialTheme.typography.labelMedium,
+                                            fontWeight = androidx.compose.ui.text.font.FontWeight.Bold
+                                        )
+                                    }
                                 }
                             }
-                        }
 
-                        // Floating Orientation Toggler overlay
-                        val context = androidx.compose.ui.platform.LocalContext.current
-                        val activity = context as? android.app.Activity
-                        
-                        val sharedPrefs = androidx.compose.runtime.remember {
-                            context.getSharedPreferences("screen_settings", android.content.Context.MODE_PRIVATE)
-                        }
-                        var rotationMode by androidx.compose.runtime.remember {
-                            val saved = sharedPrefs.getString("rotation_mode", "SENSOR") ?: "SENSOR"
-                            androidx.compose.runtime.mutableStateOf(
-                                try { ScreenRotationMode.valueOf(saved) } catch (e: Exception) { ScreenRotationMode.SENSOR }
-                            )
-                        }
-
-                        androidx.compose.runtime.LaunchedEffect(rotationMode) {
-                            activity?.requestedOrientation = rotationMode.info
-                        }
-
-                        androidx.compose.material3.FloatingActionButton(
-                            onClick = {
-                                val nextMode = when (rotationMode) {
-                                    ScreenRotationMode.SENSOR -> ScreenRotationMode.PORTRAIT
-                                    ScreenRotationMode.PORTRAIT -> ScreenRotationMode.LANDSCAPE
-                                    ScreenRotationMode.LANDSCAPE -> ScreenRotationMode.SENSOR
-                                }
-                                rotationMode = nextMode
-                                sharedPrefs.edit().putString("rotation_mode", nextMode.name).apply()
-                                android.widget.Toast.makeText(context, "Orientation: ${nextMode.label}", android.widget.Toast.LENGTH_SHORT).show()
-                            },
-                            containerColor = MaterialTheme.colorScheme.tertiaryContainer.copy(alpha = 0.85f),
-                            contentColor = MaterialTheme.colorScheme.onTertiaryContainer,
-                            modifier = Modifier
-                                .align(androidx.compose.ui.Alignment.BottomStart)
-                                .padding(start = 20.dp, bottom = 90.dp)
-                                .size(54.dp)
-                                .testTag("screen_rotation_fab")
-                        ) {
-                            val icon = when (rotationMode) {
-                                ScreenRotationMode.SENSOR -> androidx.compose.material.icons.Icons.Default.ScreenRotation
-                                ScreenRotationMode.PORTRAIT -> androidx.compose.material.icons.Icons.Default.StayCurrentPortrait
-                                ScreenRotationMode.LANDSCAPE -> androidx.compose.material.icons.Icons.Default.StayCurrentLandscape
+                            // Floating Orientation Toggler overlay
+                            val context = androidx.compose.ui.platform.LocalContext.current
+                            val activity = context as? android.app.Activity
+                            
+                            val sharedPrefs = androidx.compose.runtime.remember {
+                                context.getSharedPreferences("screen_settings", android.content.Context.MODE_PRIVATE)
                             }
-                            androidx.compose.material3.Icon(
-                                imageVector = icon,
-                                contentDescription = "Toggle Screen Orientation: ${rotationMode.label}",
-                                modifier = Modifier.size(24.dp)
-                            )
+                            var rotationMode by androidx.compose.runtime.remember {
+                                val saved = sharedPrefs.getString("rotation_mode", "SENSOR") ?: "SENSOR"
+                                androidx.compose.runtime.mutableStateOf(
+                                    try { ScreenRotationMode.valueOf(saved) } catch (e: Exception) { ScreenRotationMode.SENSOR }
+                                )
+                            }
+
+                            androidx.compose.runtime.LaunchedEffect(rotationMode) {
+                                activity?.requestedOrientation = rotationMode.info
+                            }
+
+                            androidx.compose.material3.FloatingActionButton(
+                                onClick = {
+                                    val nextMode = when (rotationMode) {
+                                        ScreenRotationMode.SENSOR -> ScreenRotationMode.PORTRAIT
+                                        ScreenRotationMode.PORTRAIT -> ScreenRotationMode.LANDSCAPE
+                                        ScreenRotationMode.LANDSCAPE -> ScreenRotationMode.SENSOR
+                                    }
+                                    rotationMode = nextMode
+                                    sharedPrefs.edit().putString("rotation_mode", nextMode.name).apply()
+                                    android.widget.Toast.makeText(context, "Orientation: ${nextMode.label}", android.widget.Toast.LENGTH_SHORT).show()
+                                },
+                                containerColor = MaterialTheme.colorScheme.tertiaryContainer.copy(alpha = 0.85f),
+                                contentColor = MaterialTheme.colorScheme.onTertiaryContainer,
+                                modifier = Modifier
+                                    .align(androidx.compose.ui.Alignment.BottomStart)
+                                    .padding(start = 20.dp, bottom = 90.dp)
+                                    .size(54.dp)
+                                    .testTag("screen_rotation_fab")
+                            ) {
+                                val icon = when (rotationMode) {
+                                    ScreenRotationMode.SENSOR -> androidx.compose.material.icons.Icons.Default.ScreenRotation
+                                    ScreenRotationMode.PORTRAIT -> androidx.compose.material.icons.Icons.Default.StayCurrentPortrait
+                                    ScreenRotationMode.LANDSCAPE -> androidx.compose.material.icons.Icons.Default.StayCurrentLandscape
+                                }
+                                androidx.compose.material3.Icon(
+                                    imageVector = icon,
+                                    contentDescription = "Toggle Screen Orientation: ${rotationMode.label}",
+                                    modifier = Modifier.size(24.dp)
+                                )
+                            }
                         }
                     }
                 }

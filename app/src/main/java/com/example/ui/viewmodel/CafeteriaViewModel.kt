@@ -141,6 +141,17 @@ class CafeteriaViewModel(application: Application) : AndroidViewModel(applicatio
     private val _loginError = MutableStateFlow<String?>(null)
     val loginError: StateFlow<String?> = _loginError.asStateFlow()
 
+    private val _globalApiError = MutableStateFlow<String?>(null)
+    val globalApiError: StateFlow<String?> = _globalApiError.asStateFlow()
+
+    fun emitGlobalError(message: String) {
+        _globalApiError.value = message
+    }
+
+    fun clearGlobalError() {
+        _globalApiError.value = null
+    }
+
     private val _registrationSuccess = MutableStateFlow<Boolean>(false)
     val registrationSuccess: StateFlow<Boolean> = _registrationSuccess.asStateFlow()
 
