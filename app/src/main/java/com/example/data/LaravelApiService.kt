@@ -733,11 +733,25 @@ object LaravelClientManager {
             if (!token.isNullOrBlank()) {
                 requestBuilder.addHeader("Authorization", "Bearer $token")
             }
-            val response = chain.proceed(requestBuilder.build())
+            val response: okhttp3.Response
+            try {
+                response = chain.proceed(requestBuilder.build())
+            } catch (e: Exception) {
+                // Network or connection timeout exception
+                throw e
+            }
+
             val serverToken = response.header("X-Auth-Token")
             if (!serverToken.isNullOrBlank()) {
                 authToken = serverToken
             }
+
+            if (!response.isSuccessful) {
+                val statusCode = response.code
+                val peekBody = try { response.peekBody(1024).string() } catch (_: Exception) { "" }
+                android.util.Log.w("LaravelApiService", "HTTP $statusCode error: $peekBody")
+            }
+
             response
         }
         .build()

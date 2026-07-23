@@ -32,5 +32,17 @@ class AppServiceProvider extends ServiceProvider
         RateLimiter::for('auth', function (Request $request) {
             return Limit::perMinute(10)->by($request->ip());
         });
+
+        // Define rate limiting specifically for Gemini AI recommendation routes (10 requests per minute per user/IP)
+        RateLimiter::for('gemini', function (Request $request) {
+            return Limit::perMinute(10)->by($request->user()?->id ?: $request->ip())->response(function (Request $request, array $headers) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Too many Gemini AI recommendation requests. Please wait a moment before trying again.',
+                    'error_code' => 'GEMINI_RATE_LIMIT_EXCEEDED',
+                    'status_code' => 429
+                ], 429, $headers);
+            });
+        });
     }
 }

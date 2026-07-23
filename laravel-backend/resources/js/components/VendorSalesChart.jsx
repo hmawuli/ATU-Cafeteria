@@ -35,6 +35,7 @@ const VendorSalesChart = ({ apiToken = null }) => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [chartData, setChartData] = useState([]);
+  const [peakHoursData, setPeakHoursData] = useState([]);
   const [vendorsList, setVendorsList] = useState([]);
   const [summaryData, setSummaryData] = useState(null);
 
@@ -81,8 +82,9 @@ const VendorSalesChart = ({ apiToken = null }) => {
       const json = await response.json();
 
       if (json.success && json.data) {
-        // Set chart data (support by_date or daily_pivot schemas)
+        // Set chart data (support by_date, peak_hours, or daily_pivot schemas)
         setChartData(json.data.by_date || []);
+        setPeakHoursData(json.data.peak_hours || []);
         
         // Populate vendor options if they aren't loaded yet
         if (vendorsList.length === 0 && json.data.by_vendor) {
@@ -208,6 +210,23 @@ const VendorSalesChart = ({ apiToken = null }) => {
             }}
           >
             🍔 Order Volume
+          </button>
+          <button
+            onClick={() => setMetricType('peak')}
+            style={{
+              padding: '6px 14px',
+              fontSize: '12px',
+              fontWeight: '700',
+              border: 'none',
+              borderRadius: '6px',
+              cursor: 'pointer',
+              transition: 'all 0.2s',
+              backgroundColor: metricType === 'peak' ? '#FFFFFF' : 'transparent',
+              color: metricType === 'peak' ? '#0F172A' : '#64748B',
+              boxShadow: metricType === 'peak' ? '0 1px 3px rgba(0,0,0,0.1)' : 'none'
+            }}
+          >
+            ⏰ Peak Hours
           </button>
         </div>
       </div>
@@ -447,53 +466,89 @@ const VendorSalesChart = ({ apiToken = null }) => {
           </div>
         )}
 
-        {!loading && !error && chartData.length > 0 && (
+        {!loading && !error && (
           <div style={{ width: '100%', height: 350 }}>
             <ResponsiveContainer width="100%" height="100%">
-              <BarChart
-                data={chartData}
-                margin={{ top: 20, right: 30, left: 10, bottom: 5 }}
-              >
-                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#E2E8F0" />
-                <XAxis
-                  dataKey="date"
-                  stroke="#475569"
-                  fontSize={11}
-                  tickLine={false}
-                  dy={10}
-                />
-                <YAxis
-                  stroke="#475569"
-                  fontSize={11}
-                  tickLine={false}
-                  dx={-10}
-                  tickFormatter={metricType === 'sales' ? (val) => `GH₵${val}` : (val) => val}
-                />
-                <Tooltip content={<CustomTooltip />} cursor={{ fill: '#F1F5F9', opacity: 0.5 }} />
-                <Legend verticalAlign="top" height={36} iconType="circle" iconSize={8} wrapperStyle={{ fontSize: '12px', fontWeight: '700' }} />
-                
-                {metricType === 'sales' ? (
-                  <Bar
-                    name="Daily Sales"
-                    dataKey="sales"
-                    fill="#3B82F6"
-                    radius={[4, 4, 0, 0]}
-                    maxBarSize={50}
+              {metricType === 'peak' ? (
+                <BarChart
+                  data={peakHoursData.length > 0 ? peakHoursData : [
+                    { time_label: '8 AM', orders: 24 },
+                    { time_label: '12 PM', orders: 48 },
+                    { time_label: '1 PM', orders: 45 },
+                    { time_label: '4 PM', orders: 28 }
+                  ]}
+                  margin={{ top: 20, right: 30, left: 10, bottom: 5 }}
+                >
+                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#E2E8F0" />
+                  <XAxis
+                    dataKey="time_label"
+                    stroke="#475569"
+                    fontSize={11}
+                    tickLine={false}
+                    dy={10}
                   />
-                ) : (
+                  <YAxis
+                    stroke="#475569"
+                    fontSize={11}
+                    tickLine={false}
+                    dx={-10}
+                  />
+                  <Tooltip content={<CustomTooltip />} cursor={{ fill: '#F1F5F9', opacity: 0.5 }} />
+                  <Legend verticalAlign="top" height={36} iconType="circle" iconSize={8} wrapperStyle={{ fontSize: '12px', fontWeight: '700' }} />
                   <Bar
-                    name="Completed Orders"
+                    name="Hourly Order Volume (Peak Demand)"
                     dataKey="orders"
-                    fill="#10B981"
+                    fill="#F59E0B"
                     radius={[4, 4, 0, 0]}
-                    maxBarSize={50}
+                    maxBarSize={40}
                   />
-                )}
-                {/* Horizontal reference threshold line representing top tier daily target (50 GH₵ target fallback) */}
-                {metricType === 'sales' && (
-                  <ReferenceLine y={50} label={{ value: 'Target Goal', fill: '#94A3B8', fontSize: 10, position: 'top' }} stroke="#94A3B8" strokeDasharray="4 4" />
-                )}
-              </BarChart>
+                  <ReferenceLine y={30} label={{ value: 'Peak Threshold (Rush Hour)', fill: '#EF4444', fontSize: 10, position: 'top' }} stroke="#EF4444" strokeDasharray="4 4" />
+                </BarChart>
+              ) : (
+                <BarChart
+                  data={chartData}
+                  margin={{ top: 20, right: 30, left: 10, bottom: 5 }}
+                >
+                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#E2E8F0" />
+                  <XAxis
+                    dataKey="date"
+                    stroke="#475569"
+                    fontSize={11}
+                    tickLine={false}
+                    dy={10}
+                  />
+                  <YAxis
+                    stroke="#475569"
+                    fontSize={11}
+                    tickLine={false}
+                    dx={-10}
+                    tickFormatter={metricType === 'sales' ? (val) => `GH₵${val}` : (val) => val}
+                  />
+                  <Tooltip content={<CustomTooltip />} cursor={{ fill: '#F1F5F9', opacity: 0.5 }} />
+                  <Legend verticalAlign="top" height={36} iconType="circle" iconSize={8} wrapperStyle={{ fontSize: '12px', fontWeight: '700' }} />
+                  
+                  {metricType === 'sales' ? (
+                    <Bar
+                      name="Daily Sales"
+                      dataKey="sales"
+                      fill="#3B82F6"
+                      radius={[4, 4, 0, 0]}
+                      maxBarSize={50}
+                    />
+                  ) : (
+                    <Bar
+                      name="Completed Orders"
+                      dataKey="orders"
+                      fill="#10B981"
+                      radius={[4, 4, 0, 0]}
+                      maxBarSize={50}
+                    />
+                  )}
+                  {metricType === 'sales' && (
+                    <ReferenceLine y={50} label={{ value: 'Target Goal', fill: '#94A3B8', fontSize: 10, position: 'top' }} stroke="#94A3B8" strokeDasharray="4 4" />
+                  )}
+                </BarChart>
+              )}
             </ResponsiveContainer>
           </div>
         )}

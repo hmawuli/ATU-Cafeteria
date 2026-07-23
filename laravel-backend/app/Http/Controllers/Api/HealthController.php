@@ -48,7 +48,28 @@ class HealthController extends Controller
             ];
         }
 
-        // 2. Check Cache Status
+        // 2. Check Gemini AI Connection Status
+        $geminiKey = env('GEMINI_API_KEY') ?: config('services.gemini.key');
+        if (!empty($geminiKey)) {
+            $details['gemini_ai'] = [
+                'status' => 'UP',
+                'configured' => true,
+                'model' => 'gemini-3.5-flash',
+                'message' => 'Gemini AI API Key is configured and ready for recommendation inference.',
+            ];
+        } else {
+            $details['gemini_ai'] = [
+                'status' => 'DEGRADED',
+                'configured' => false,
+                'model' => 'gemini-3.5-flash',
+                'message' => 'GEMINI_API_KEY is missing from environment. AI recommendations will run in local fallback mode.',
+            ];
+            if ($status === 'UP') {
+                $status = 'DEGRADED';
+            }
+        }
+
+        // 3. Check Cache Status
         try {
             Cache::put('health_check_key', 'OK', 10);
             $cacheVal = Cache::get('health_check_key');

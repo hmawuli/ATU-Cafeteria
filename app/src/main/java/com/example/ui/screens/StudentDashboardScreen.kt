@@ -3,6 +3,8 @@ import com.example.ui.util.generatePdfReceipt
 import com.example.ui.util.generatePdfOrderHistoryReport
 import com.example.ui.util.HapticHelper
 
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.material3.pulltorefresh.rememberPullToRefreshState
 import androidx.compose.animation.*
@@ -7187,6 +7189,75 @@ fun StudentDashboardScreen(
                                             }
                                         )
                                     }
+
+                                    // 🔔 ORDER STATUS NOTIFICATION CHANNEL CONFIGURATION
+                                    var notifSoundEnabled by remember { mutableStateOf(com.example.ui.util.NotificationHelper.isSoundEnabled(context)) }
+                                    var notifVibrationEnabled by remember { mutableStateOf(com.example.ui.util.NotificationHelper.isVibrationEnabled(context)) }
+
+                                    Spacer(modifier = Modifier.height(12.dp))
+                                    HorizontalDivider(color = MaterialTheme.colorScheme.primary.copy(alpha = 0.15f))
+                                    Spacer(modifier = Modifier.height(12.dp))
+
+                                    Column(modifier = Modifier.fillMaxWidth()) {
+                                        Text(
+                                            "🔔 Order Status Notification Channel Settings",
+                                            fontWeight = FontWeight.Bold,
+                                            fontSize = 12.sp,
+                                            color = MaterialTheme.colorScheme.primary
+                                        )
+                                        Text(
+                                            "Customize notification alert sounds and vibration patterns for real-time order status updates.",
+                                            fontSize = 10.sp,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                                        )
+                                        Spacer(modifier = Modifier.height(8.dp))
+
+                                        Row(
+                                            modifier = Modifier.fillMaxWidth(),
+                                            horizontalArrangement = Arrangement.SpaceBetween,
+                                            verticalAlignment = Alignment.CenterVertically
+                                        ) {
+                                            Text("Notification Alert Sounds", fontSize = 11.sp, fontWeight = FontWeight.SemiBold)
+                                            Switch(
+                                                checked = notifSoundEnabled,
+                                                onCheckedChange = { enabled ->
+                                                    notifSoundEnabled = enabled
+                                                    com.example.ui.util.NotificationHelper.setSoundEnabled(context, enabled)
+                                                },
+                                                modifier = Modifier.testTag("toggle_notif_sound_switch")
+                                            )
+                                        }
+
+                                        Row(
+                                            modifier = Modifier.fillMaxWidth(),
+                                            horizontalArrangement = Arrangement.SpaceBetween,
+                                            verticalAlignment = Alignment.CenterVertically
+                                        ) {
+                                            Text("Notification Haptic Vibration", fontSize = 11.sp, fontWeight = FontWeight.SemiBold)
+                                            Switch(
+                                                checked = notifVibrationEnabled,
+                                                onCheckedChange = { enabled ->
+                                                    notifVibrationEnabled = enabled
+                                                    com.example.ui.util.NotificationHelper.setVibrationEnabled(context, enabled)
+                                                },
+                                                modifier = Modifier.testTag("toggle_notif_vibration_switch")
+                                            )
+                                        }
+
+                                        Spacer(modifier = Modifier.height(8.dp))
+
+                                        OutlinedButton(
+                                            onClick = {
+                                                com.example.ui.util.NotificationHelper.openChannelSettings(context, com.example.ui.util.NotificationHelper.CHANNEL_ORDERS)
+                                            },
+                                            shape = RoundedCornerShape(8.dp),
+                                            modifier = Modifier.fillMaxWidth().testTag("open_system_notif_channel_btn")
+                                        ) {
+                                            Icon(Icons.Default.Settings, contentDescription = "System Notification Settings", modifier = Modifier.size(16.dp))
+                                            Spacer(modifier = Modifier.width(6.dp))
+                                            Text("Configure Channel in System Settings", fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                                        }
+                                    }
                                 }
                             }
 
@@ -10505,43 +10576,42 @@ fun StudentDashboardScreen(
                             Text("Rate '${order.foodName}' vendor and share your experience:", fontSize = 11.sp)
                             Spacer(modifier = Modifier.height(16.dp))
 
-                            // 1. Food Quality Slider
-                            Text("🍔 Food Culinary Quality ($foodQualityRating/5)", fontWeight = FontWeight.SemiBold, fontSize = 12.sp)
-                            Slider(
-                                value = foodQualityRating.toFloat(),
-                                onValueChange = { foodQualityRating = it.toInt() },
-                                valueRange = 1f..5f,
-                                steps = 3
+                            // 1. Food Quality Star Rating
+                            InteractiveStarRatingBar(
+                                rating = foodQualityRating,
+                                onRatingChanged = { foodQualityRating = it },
+                                label = "🍔 Food Culinary Quality",
+                                starSize = 28.dp
                             )
-
-                            // 2. Sanitation
-                            Text("🫧 Booth Hygiene & Cleanliness ($cleanlinessRating/5)", fontWeight = FontWeight.SemiBold, fontSize = 12.sp)
-                            Slider(
-                                value = cleanlinessRating.toFloat(),
-                                onValueChange = { cleanlinessRating = it.toInt() },
-                                valueRange = 1f..5f,
-                                steps = 3
-                            )
-
-                            // 3. Service Speed
-                            Text("⚡ Processing Speed ($speedRating/5)", fontWeight = FontWeight.SemiBold, fontSize = 12.sp)
-                            Slider(
-                                value = speedRating.toFloat(),
-                                onValueChange = { speedRating = it.toInt() },
-                                valueRange = 1f..5f,
-                                steps = 3
-                            )
-
-                            // 4. Value
-                            Text("💰 Price-to-Portion Value Ratio ($priceRating/5)", fontWeight = FontWeight.SemiBold, fontSize = 12.sp)
-                            Slider(
-                                value = priceRating.toFloat(),
-                                onValueChange = { priceRating = it.toInt() },
-                                valueRange = 1f..5f,
-                                steps = 3
-                            )
-
                             Spacer(modifier = Modifier.height(8.dp))
+
+                            // 2. Sanitation Star Rating
+                            InteractiveStarRatingBar(
+                                rating = cleanlinessRating,
+                                onRatingChanged = { cleanlinessRating = it },
+                                label = "🫧 Booth Hygiene & Cleanliness",
+                                starSize = 28.dp
+                            )
+                            Spacer(modifier = Modifier.height(8.dp))
+
+                            // 3. Service Speed Star Rating
+                            InteractiveStarRatingBar(
+                                rating = speedRating,
+                                onRatingChanged = { speedRating = it },
+                                label = "⚡ Processing Speed",
+                                starSize = 28.dp
+                            )
+                            Spacer(modifier = Modifier.height(8.dp))
+
+                            // 4. Price-to-Portion Value Star Rating
+                            InteractiveStarRatingBar(
+                                rating = priceRating,
+                                onRatingChanged = { priceRating = it },
+                                label = "💰 Price-to-Portion Value",
+                                starSize = 28.dp
+                            )
+
+                            Spacer(modifier = Modifier.height(12.dp))
 
                             OutlinedTextField(
                                 value = feedbackComment,
@@ -10563,30 +10633,16 @@ fun StudentDashboardScreen(
                             Text("Rate the specific food item '${order.foodName}' specifically:", fontSize = 11.sp)
                             Spacer(modifier = Modifier.height(12.dp))
 
-                            // Star Rating Selection
-                            Text("Rating ($foodItemRating/5 Stars)", fontWeight = FontWeight.SemiBold, fontSize = 12.sp)
-                            Row(
-                                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                                verticalAlignment = Alignment.CenterVertically,
-                                modifier = Modifier.padding(vertical = 4.dp)
-                            ) {
-                                for (star in 1..5) {
-                                    val isSelected = star <= foodItemRating
-                                    IconButton(
-                                        onClick = { foodItemRating = star },
-                                        modifier = Modifier.size(36.dp)
-                                    ) {
-                                        Icon(
-                                            imageVector = Icons.Default.Star,
-                                            contentDescription = "$star Stars",
-                                            tint = if (isSelected) Color(0xFFFFB300) else MaterialTheme.colorScheme.outline.copy(alpha = 0.4f),
-                                            modifier = Modifier.size(28.dp)
-                                        )
-                                    }
-                                }
-                            }
+                            // Specific Food Item Star Rating
+                            InteractiveStarRatingBar(
+                                rating = foodItemRating,
+                                onRatingChanged = { foodItemRating = it },
+                                label = "Dish Star Rating",
+                                starSize = 32.dp
+                            )
 
                             Spacer(modifier = Modifier.height(8.dp))
+
 
                             OutlinedTextField(
                                 value = foodItemComment,
@@ -11590,3 +11646,54 @@ private data class ConfettiParticle(
     val size: androidx.compose.ui.unit.Dp,
     val color: Color
 )
+
+// ==========================================
+// ⭐ REUSABLE ACCESSIBLE STAR-RATING INPUT COMPONENT
+// ==========================================
+@Composable
+fun InteractiveStarRatingBar(
+    rating: Int,
+    onRatingChanged: (Int) -> Unit,
+    modifier: Modifier = Modifier,
+    maxStars: Int = 5,
+    starSize: androidx.compose.ui.unit.Dp = 28.dp,
+    label: String? = null
+) {
+    Column(modifier = modifier) {
+        if (!label.isNullOrBlank()) {
+            Text(
+                text = "$label ($rating/$maxStars Stars)",
+                fontWeight = FontWeight.SemiBold,
+                fontSize = 12.sp,
+                color = MaterialTheme.colorScheme.onSurface
+            )
+            Spacer(modifier = Modifier.height(4.dp))
+        }
+        Row(
+            horizontalArrangement = Arrangement.spacedBy(4.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            modifier = Modifier.padding(vertical = 2.dp)
+        ) {
+            for (star in 1..maxStars) {
+                val isSelected = star <= rating
+                IconButton(
+                    onClick = { onRatingChanged(star) },
+                    modifier = Modifier
+                        .size(starSize + 10.dp)
+                        .testTag("star_rating_${label?.lowercase()?.replace(" ", "_") ?: "item"}_$star")
+                        .semantics {
+                            contentDescription = "Rate $star out of $maxStars stars for ${label ?: "item"}"
+                        }
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Star,
+                        contentDescription = "$star Stars rating option",
+                        tint = if (isSelected) Color(0xFFFFB300) else MaterialTheme.colorScheme.outline.copy(alpha = 0.25f),
+                        modifier = Modifier.size(starSize)
+                    )
+                }
+            }
+        }
+    }
+}
+
