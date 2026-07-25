@@ -14,10 +14,14 @@ import androidx.core.app.NotificationManagerCompat
 object NotificationHelper {
     const val CHANNEL_ORDERS = "atu_orders_channel"
     const val CHANNEL_PROMO = "atu_promotions_channel"
+    const val CHANNEL_INVENTORY = "atu_vendor_inventory_channel"
 
     private const val PREFS_NAME = "atu_notification_prefs"
     private const val KEY_SOUND_ENABLED = "key_notif_sound_enabled"
     private const val KEY_VIBRATION_ENABLED = "key_notif_vibration_enabled"
+    private const val KEY_ORDER_STATUS_ALERTS = "key_order_status_alerts"
+    private const val KEY_PROMO_ALERTS = "key_promo_alerts"
+    private const val KEY_VENDOR_INVENTORY_PREFIX = "key_vendor_inventory_notif_"
 
     fun isSoundEnabled(context: Context): Boolean {
         return context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE).getBoolean(KEY_SOUND_ENABLED, true)
@@ -35,6 +39,30 @@ object NotificationHelper {
     fun setVibrationEnabled(context: Context, enabled: Boolean) {
         context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE).edit().putBoolean(KEY_VIBRATION_ENABLED, enabled).apply()
         createNotificationChannels(context)
+    }
+
+    fun isOrderStatusAlertsEnabled(context: Context): Boolean {
+        return context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE).getBoolean(KEY_ORDER_STATUS_ALERTS, true)
+    }
+
+    fun setOrderStatusAlertsEnabled(context: Context, enabled: Boolean) {
+        context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE).edit().putBoolean(KEY_ORDER_STATUS_ALERTS, enabled).apply()
+    }
+
+    fun isPromotionalAlertsEnabled(context: Context): Boolean {
+        return context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE).getBoolean(KEY_PROMO_ALERTS, true)
+    }
+
+    fun setPromotionalAlertsEnabled(context: Context, enabled: Boolean) {
+        context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE).edit().putBoolean(KEY_PROMO_ALERTS, enabled).apply()
+    }
+
+    fun isVendorInventoryAlertsEnabled(context: Context, vendorId: Int): Boolean {
+        return context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE).getBoolean(KEY_VENDOR_INVENTORY_PREFIX + vendorId, true)
+    }
+
+    fun setVendorInventoryAlertsEnabled(context: Context, vendorId: Int, enabled: Boolean) {
+        context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE).edit().putBoolean(KEY_VENDOR_INVENTORY_PREFIX + vendorId, enabled).apply()
     }
 
     fun createNotificationChannels(context: Context) {
@@ -82,9 +110,27 @@ object NotificationHelper {
                 }
             }
 
+            val inventoryChannel = NotificationChannel(
+                CHANNEL_INVENTORY,
+                "Vendor Inventory Low Stock Alerts",
+                NotificationManager.IMPORTANCE_HIGH
+            ).apply {
+                description = "Real-time push alerts sent when cafeteria menu item stock falls below safety thresholds"
+                enableVibration(vibrationOn)
+                if (vibrationOn) {
+                    vibrationPattern = longArrayOf(0, 400, 200, 400)
+                }
+                if (soundUri != null) {
+                    setSound(soundUri, audioAttributes)
+                } else {
+                    setSound(null, null)
+                }
+            }
+
             val manager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
             manager.createNotificationChannel(ordersChannel)
             manager.createNotificationChannel(promoChannel)
+            manager.createNotificationChannel(inventoryChannel)
         }
     }
 
@@ -104,6 +150,7 @@ object NotificationHelper {
     }
 
     fun sendOrderStatusNotification(context: Context, orderId: Int, title: String, text: String) {
+        if (!isOrderStatusAlertsEnabled(context)) return
         val soundOn = isSoundEnabled(context)
         val vibrationOn = isVibrationEnabled(context)
 
@@ -135,6 +182,7 @@ object NotificationHelper {
     }
 
     fun sendPromotionalNotification(context: Context, notificationId: Int, title: String, text: String) {
+        if (!isPromotionalAlertsEnabled(context)) return
         val soundOn = isSoundEnabled(context)
         val vibrationOn = isVibrationEnabled(context)
 
@@ -160,6 +208,48 @@ object NotificationHelper {
         try {
             val manager = NotificationManagerCompat.from(context)
             manager.notify(notificationId, builder.build())
+        } catch (e: SecurityException) {
+            e.printStackTrace()
+        }
+    }
+
+    fun sendVendorInventoryAlertNotification(
+        context: Context,
+        foodId: Int,
+        itemName: String,
+        currentStock: Int,
+        threshold: Int,
+        vendorId: Int = 1
+    ) {
+        if (!isVendorInventoryAlertsEnabled(context, vendorId)) return
+        val soundOn = isSoundEnabled(context)
+        val vibrationOn = isVibrationEnabled(context)
+
+        val title = "⚠️ LOW STOCK ALERT: $itemName"
+        val text = "Current inventory ($currentStock units) is at or below threshold ($threshold units). Restock recommended!"
+
+        val builder = NotificationCompat.Builder(context, CHANNEL_INVENTORY)
+            .setSmallIcon(android.R.drawable.stat_sys_warning)
+            .setContentTitle(title)
+            .setContentText(text)
+            .setPriority(NotificationCompat.PRIORITY_HIGH)
+            .setAutoCancel(true)
+
+        if (soundOn) {
+            builder.setSound(RingtoneManager.getDefaultUri(RingtoneManager.TYPE_NOTIFICATION))
+        } else {
+            builder.setSound(null)
+        }
+
+        if (vibrationOn) {
+            builder.setVibrate(longArrayOf(0, 400, 200, 400))
+        } else {
+            builder.setVibrate(longArrayOf(0))
+        }
+
+        try {
+            val manager = NotificationManagerCompat.from(context)
+            manager.notify(90000 + foodId, builder.build())
         } catch (e: SecurityException) {
             e.printStackTrace()
         }

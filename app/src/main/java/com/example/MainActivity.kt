@@ -46,6 +46,9 @@ import androidx.compose.animation.slideOutVertically
 
 import androidx.fragment.app.FragmentActivity
 
+import com.example.ui.screens.CentralizedSettingsScreen
+import com.example.ui.screens.StudentFeedbackScreen
+
 class MainActivity : FragmentActivity() {
     private val viewModel: CafeteriaViewModel by viewModels()
 
@@ -55,9 +58,15 @@ class MainActivity : FragmentActivity() {
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
+        com.example.ui.util.PerformanceMonitoringHelper.startTrace("app_launch_startup")
         super.onCreate(savedInstanceState)
+        com.example.di.ServiceLocator.initAppServices(applicationContext)
         com.example.ui.util.NotificationHelper.createNotificationChannels(this)
+        com.example.worker.MenuAndOrdersSyncWorker.schedulePeriodicSync(this)
+        com.example.worker.OrderArchiverWorker.schedulePeriodicArchive(this)
+        com.example.ui.util.InAppUpdateHelper.checkForUpdates(this, this) { _, _ -> }
         enableEdgeToEdge()
+        com.example.ui.util.PerformanceMonitoringHelper.stopTrace("app_launch_startup")
         setContent {
             val highContrast by viewModel.isHighContrastMode.collectAsState()
             val darkMode by viewModel.isDarkMode.collectAsState()
@@ -116,7 +125,17 @@ class MainActivity : FragmentActivity() {
                                         navController = navController
                                     )
                                 }
-                                composable("student_home") {
+                                composable(
+                                    route = "student_home",
+                                    deepLinks = listOf(
+                                        androidx.navigation.navDeepLink { uriPattern = "atucafeteria://order/{orderId}" },
+                                        androidx.navigation.navDeepLink { uriPattern = "http://atucafeteria.com/order/{orderId}" },
+                                        androidx.navigation.navDeepLink { uriPattern = "https://atucafeteria.com/order/{orderId}" },
+                                        androidx.navigation.navDeepLink { uriPattern = "atucafeteria://menu/{foodId}" },
+                                        androidx.navigation.navDeepLink { uriPattern = "http://atucafeteria.com/menu/{foodId}" },
+                                        androidx.navigation.navDeepLink { uriPattern = "https://atucafeteria.com/menu/{foodId}" }
+                                    )
+                                ) {
                                     StudentDashboardScreen(
                                         viewModel = viewModel,
                                         navController = navController
@@ -132,6 +151,27 @@ class MainActivity : FragmentActivity() {
                                     AdminDashboardScreen(
                                         viewModel = viewModel,
                                         navController = navController
+                                    )
+                                }
+                                composable("app_settings") {
+                                    CentralizedSettingsScreen(
+                                        isDarkMode = darkMode,
+                                        onToggleDarkMode = { viewModel.toggleDarkMode() },
+                                        isHighContrastMode = highContrast,
+                                        onToggleHighContrastMode = { viewModel.toggleHighContrastMode() },
+                                        onClearCacheClick = { viewModel.clearLocalDatabaseCache() },
+                                        onBackClick = { navController.popBackStack() },
+                                        onLogoutClick = { viewModel.logout() }
+                                    )
+                                }
+                                composable("student_feedback") {
+                                    StudentFeedbackScreen(
+                                        onBackClick = { navController.popBackStack() },
+                                        onSubmitFeedback = { foodQuality, cleanliness, speed, priceValue, overallStar, comment, recommend, tags ->
+                                            viewModel.submitOrderFeedback(
+                                                101, 1, foodQuality, cleanliness, speed, priceValue, comment
+                                            ) { navController.popBackStack() }
+                                        }
                                     )
                                 }
                             }

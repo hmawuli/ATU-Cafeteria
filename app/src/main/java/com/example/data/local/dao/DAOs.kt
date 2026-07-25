@@ -66,6 +66,9 @@ interface OrderDao {
     @Query("SELECT * FROM orders ORDER BY orderTimestamp DESC")
     fun getAllOrders(): Flow<List<Order>>
 
+    @Query("SELECT * FROM orders")
+    suspend fun getAllOrdersSync(): List<Order>
+
     @Query("SELECT * FROM orders WHERE customerId = :customerId ORDER BY orderTimestamp DESC")
     fun getOrdersForCustomer(customerId: Int): Flow<List<Order>>
 

@@ -760,6 +760,8 @@ object LaravelClientManager {
         .add(KotlinJsonAdapterFactory())
         .build()
 
+    fun getOkHttpClient(): OkHttpClient = okHttpClient
+
     fun getService(): LaravelApiService {
         val current = cachedService
         if (current != null) return current

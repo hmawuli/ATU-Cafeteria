@@ -1,5 +1,6 @@
 package com.example.ui.screens
 import com.example.ui.util.generatePdfReceipt
+import com.example.ui.theme.VendorHighContrastTheme
 
 import androidx.compose.animation.*
 import androidx.compose.animation.core.*
@@ -2557,9 +2558,18 @@ fun VendorDashboardScreen(
                             } else {
                                 items(vendorFoods) { food ->
                                     var isEditingFoodDetails by remember { mutableStateOf(false) }
+                                    val isDark = androidx.compose.foundation.isSystemInDarkTheme()
                                     Card(
-                                        modifier = Modifier.fillMaxWidth().testTag("food_item_card_${food.id}"),
-                                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .testTag("food_item_card_${food.id}"),
+                                        colors = CardDefaults.cardColors(
+                                            containerColor = VendorHighContrastTheme.cardBackground(isDark = isDark, highContrast = true)
+                                        ),
+                                        border = BorderStroke(
+                                            1.dp,
+                                            VendorHighContrastTheme.cardBorder(isDark = isDark, highContrast = true)
+                                        )
                                     ) {
                                         Column(modifier = Modifier.padding(16.dp)) {
                                             Row(
@@ -2567,11 +2577,25 @@ fun VendorDashboardScreen(
                                                 horizontalArrangement = Arrangement.SpaceBetween
                                             ) {
                                                 Column(modifier = Modifier.weight(1f)) {
-                                                    Text(food.name, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleMedium)
-                                                    Text("Category: ${food.category}", fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                                    Text(
+                                                        food.name,
+                                                        fontWeight = FontWeight.Bold,
+                                                        style = MaterialTheme.typography.titleMedium,
+                                                        color = VendorHighContrastTheme.primaryText(isDark = isDark, highContrast = true)
+                                                    )
+                                                    Text(
+                                                        "Category: ${food.category}",
+                                                        fontSize = 11.sp,
+                                                        color = VendorHighContrastTheme.secondaryText(isDark = isDark, highContrast = true)
+                                                    )
                                                 }
                                                 Row(verticalAlignment = Alignment.CenterVertically) {
-                                                    Text("GH₵ ${"%.2f".format(food.price)}", fontWeight = FontWeight.Bold, fontSize = 16.sp)
+                                                    Text(
+                                                        "GH₵ ${"%.2f".format(food.price)}",
+                                                        fontWeight = FontWeight.ExtraBold,
+                                                        fontSize = 16.sp,
+                                                        color = VendorHighContrastTheme.priceTagColor(isDark = isDark, highContrast = true)
+                                                    )
                                                     Spacer(modifier = Modifier.width(6.dp))
                                                     IconButton(
                                                         onClick = { isEditingFoodDetails = true },

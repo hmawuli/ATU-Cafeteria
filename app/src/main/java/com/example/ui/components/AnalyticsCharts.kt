@@ -3,10 +3,13 @@ package com.example.ui.components
 import android.webkit.WebView
 import android.webkit.WebViewClient
 import androidx.compose.ui.viewinterop.AndroidView
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.ui.draw.clip
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -2338,8 +2341,401 @@ fun D3DashboardChart(
     }
 }
 
+/**
+ * D3.js Data Visualization Component for Monthly Cafeteria Food Purchase Trends.
+ * Plots student spending patterns and dish volume over monthly intervals.
+ */
+@Composable
+fun D3MonthlySpendingChart(
+    orders: List<Order>,
+    modifier: Modifier = Modifier
+) {
+    val completedOrders = remember(orders) { orders.filter { it.status == "COMPLETED" || it.status == "DELIVERED" } }
+
+    val monthlyDataJson = remember(completedOrders) {
+        val list = mutableListOf<String>()
+        val sdfMonth = SimpleDateFormat("MMM yyyy", Locale.US)
+        val sdfShortMonth = SimpleDateFormat("MMM", Locale.US)
+        val cal = Calendar.getInstance()
+
+        // Past 6 months
+        for (i in 5 downTo 0) {
+            val monthCal = Calendar.getInstance().apply {
+                add(Calendar.MONTH, -i)
+                set(Calendar.DAY_OF_MONTH, 1)
+                set(Calendar.HOUR_OF_DAY, 0)
+                set(Calendar.MINUTE, 0)
+                set(Calendar.SECOND, 0)
+                set(Calendar.MILLISECOND, 0)
+            }
+            val startMs = monthCal.timeInMillis
+
+            val nextMonthCal = (monthCal.clone() as Calendar).apply {
+                add(Calendar.MONTH, 1)
+            }
+            val endMs = nextMonthCal.timeInMillis - 1
+
+            val monthLabel = sdfShortMonth.format(monthCal.time)
+            val fullLabel = sdfMonth.format(monthCal.time)
+
+            val monthOrders = completedOrders.filter { it.orderTimestamp in startMs..endMs }
+            var totalSpent = monthOrders.sumOf { it.totalPrice }
+            var dishCount = monthOrders.sumOf { it.quantity }
+
+            // Ensure baseline illustrative data if new user has no historical records
+            if (completedOrders.isEmpty()) {
+                val dummySpends = listOf(145.50, 182.00, 210.25, 195.00, 240.50, 285.00)
+                val dummyDishes = listOf(12, 15, 18, 16, 21, 24)
+                totalSpent = dummySpends[5 - i]
+                dishCount = dummyDishes[5 - i]
+            }
+
+            val avgMeal = if (dishCount > 0) totalSpent / dishCount else 0.0
+
+            list.add(
+                """{"month": "$monthLabel", "fullLabel": "$fullLabel", "spend": ${String.format(Locale.US, "%.2f", totalSpent)}, "dishes": $dishCount, "avg": ${String.format(Locale.US, "%.2f", avgMeal)}}"""
+            )
+        }
+        list.joinToString(prefix = "[", postfix = "]", separator = ",")
+    }
+
+    val totalYtd = remember(completedOrders) {
+        if (completedOrders.isEmpty()) 1258.25 else completedOrders.sumOf { it.totalPrice }
+    }
+    val monthlyAvg = remember(totalYtd) { totalYtd / 6.0 }
+
+    val htmlContent = remember(monthlyDataJson) {
+        """
+        <!DOCTYPE html>
+        <html>
+        <head>
+            <meta charset="UTF-8">
+            <meta name="viewport" content="width=device-width, initial-scale=1.0">
+            <script src="https://d3js.org/d3.v7.min.js"></script>
+            <style>
+                body {
+                    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+                    margin: 0;
+                    padding: 8px;
+                    background-color: #121212;
+                    color: #ffffff;
+                }
+                .chart-container {
+                    background: #1e1e2d;
+                    border-radius: 14px;
+                    padding: 14px;
+                    box-shadow: 0 4px 12px rgba(0,0,0,0.4);
+                    border: 1px solid #2d2d44;
+                }
+                .axis text {
+                    fill: #a0a0c0;
+                    font-size: 9px;
+                    font-weight: 500;
+                }
+                .axis path, .axis line {
+                    stroke: #2e2e48;
+                }
+                .grid line {
+                    stroke: #2e2e48;
+                    stroke-dasharray: 2,2;
+                    stroke-opacity: 0.7;
+                }
+                .tooltip {
+                    position: absolute;
+                    background-color: rgba(26, 26, 42, 0.96);
+                    border: 1px solid #4d4d73;
+                    color: #ffffff;
+                    padding: 8px 12px;
+                    border-radius: 8px;
+                    pointer-events: none;
+                    font-size: 11px;
+                    opacity: 0;
+                    transition: opacity 0.15s;
+                    z-index: 9999;
+                    box-shadow: 0 6px 16px rgba(0,0,0,0.6);
+                    line-height: 1.5;
+                }
+                .legend {
+                    display: flex;
+                    gap: 16px;
+                    font-size: 9px;
+                    color: #b0b0d0;
+                    margin-top: 8px;
+                    justify-content: center;
+                }
+                .legend-item {
+                    display: flex;
+                    align-items: center;
+                    gap: 6px;
+                }
+                .legend-color {
+                    width: 10px;
+                    height: 10px;
+                    border-radius: 3px;
+                }
+            </style>
+        </head>
+        <body>
+            <div class="chart-container">
+                <div id="monthly-chart"></div>
+                <div class="legend">
+                    <div class="legend-item">
+                        <div class="legend-color" style="background: linear-gradient(180deg, #6200EE, #BB86FC);"></div>
+                        <span>Monthly Expenditure (GH₵)</span>
+                    </div>
+                    <div class="legend-item">
+                        <div class="legend-color" style="background: #03DAC6;"></div>
+                        <span>Dishes Purchased</span>
+                    </div>
+                </div>
+            </div>
+            <div class="tooltip" id="tooltip"></div>
+
+            <script>
+                const data = $monthlyDataJson;
+                const margin = {top: 20, right: 35, bottom: 30, left: 40};
+                const width = window.innerWidth - margin.left - margin.right - 28;
+                const height = 180 - margin.top - margin.bottom;
+
+                const tooltip = d3.select("#tooltip");
+
+                function showTooltip(html, x, y) {
+                    tooltip.style("opacity", 1)
+                        .html(html)
+                        .style("left", Math.min(x + 12, window.innerWidth - 150) + "px")
+                        .style("top", (y - 12) + "px");
+                }
+
+                function hideTooltip() {
+                    tooltip.style("opacity", 0);
+                }
+
+                const svg = d3.select("#monthly-chart")
+                    .append("svg")
+                    .attr("width", width + margin.left + margin.right)
+                    .attr("height", height + margin.top + margin.bottom)
+                    .append("g")
+                    .attr("transform", "translate(" + margin.left + "," + margin.top + ")");
+
+                // Defs & Gradients
+                const defs = svg.append("defs");
+                const grad = defs.append("linearGradient")
+                    .attr("id", "barGrad")
+                    .attr("x1", "0%").attr("y1", "0%")
+                    .attr("x2", "0%").attr("y2", "100%");
+                grad.append("stop").attr("offset", "0%").attr("stop-color", "#BB86FC").attr("stop-opacity", 0.9);
+                grad.append("stop").attr("offset", "100%").attr("stop-color", "#3700B3").attr("stop-opacity", 0.4);
+
+                // Scales
+                const x = d3.scaleBand()
+                    .domain(data.map(d => d.month))
+                    .range([0, width])
+                    .padding(0.35);
+
+                const maxSpend = d3.max(data, d => d.spend) || 300;
+                const yLeft = d3.scaleLinear()
+                    .domain([0, maxSpend * 1.15])
+                    .range([height, 0]);
+
+                const maxDishes = d3.max(data, d => d.dishes) || 30;
+                const yRight = d3.scaleLinear()
+                    .domain([0, maxDishes * 1.2])
+                    .range([height, 0]);
+
+                // Grid lines
+                svg.append("g")
+                    .attr("class", "grid")
+                    .call(d3.axisLeft(yLeft).ticks(4).tickSize(-width).tickFormat(""));
+
+                // Axes
+                svg.append("g")
+                    .attr("class", "axis")
+                    .attr("transform", "translate(0," + height + ")")
+                    .call(d3.axisBottom(x));
+
+                svg.append("g")
+                    .attr("class", "axis")
+                    .call(d3.axisLeft(yLeft).ticks(4).tickFormat(d => "GH₵" + d));
+
+                svg.append("g")
+                    .attr("class", "axis")
+                    .attr("transform", "translate(" + width + ",0)")
+                    .call(d3.axisRight(yRight).ticks(4));
+
+                // Bars (Monthly Spend)
+                svg.selectAll(".bar")
+                    .data(data)
+                    .enter().append("rect")
+                    .attr("class", "bar")
+                    .attr("x", d => x(d.month))
+                    .attr("y", d => yLeft(d.spend))
+                    .attr("width", x.bandwidth())
+                    .attr("height", d => height - yLeft(d.spend))
+                    .attr("rx", 4)
+                    .attr("fill", "url(#barGrad)")
+                    .on("mouseover touchstart", function(event, d) {
+                        const [px, py] = d3.pointer(event, document.body);
+                        showTooltip("<strong>" + d.fullLabel + "</strong><br/>" +
+                                    "💰 Spend: <strong>GH₵ " + d.spend.toFixed(2) + "</strong><br/>" +
+                                    "🍲 Meals: <strong>" + d.dishes + " plates</strong><br/>" +
+                                    "📊 Avg/Dish: <strong>GH₵ " + d.avg.toFixed(2) + "</strong>", px, py);
+                    })
+                    .on("mousemove", function(event) {
+                        const [px, py] = d3.pointer(event, document.body);
+                        tooltip.style("left", Math.min(px + 12, window.innerWidth - 150) + "px").style("top", (py - 12) + "px");
+                    })
+                    .on("mouseout touchend", hideTooltip);
+
+                // Line (Dish Count Trend)
+                const line = d3.line()
+                    .x(d => x(d.month) + x.bandwidth() / 2)
+                    .y(d => yRight(d.dishes))
+                    .curve(d3.curveMonotoneX);
+
+                svg.append("path")
+                    .datum(data)
+                    .attr("fill", "none")
+                    .attr("stroke", "#03DAC6")
+                    .attr("stroke-width", 2.5)
+                    .attr("d", line);
+
+                // Line Dots
+                svg.selectAll(".dot")
+                    .data(data)
+                    .enter().append("circle")
+                    .attr("cx", d => x(d.month) + x.bandwidth() / 2)
+                    .attr("cy", d => yRight(d.dishes))
+                    .attr("r", 4)
+                    .attr("fill", "#03DAC6")
+                    .attr("stroke", "#121212")
+                    .attr("stroke-width", 2)
+                    .on("mouseover touchstart", function(event, d) {
+                        const [px, py] = d3.pointer(event, document.body);
+                        showTooltip("<strong>" + d.fullLabel + "</strong><br/>" +
+                                    "🍲 Total Volume: <strong>" + d.dishes + " dishes</strong>", px, py);
+                    })
+                    .on("mouseout touchend", hideTooltip);
+            </script>
+        </body>
+        </html>
+        """.trimIndent()
+    }
+
+    Card(
+        modifier = modifier
+            .fillMaxWidth()
+            .testTag("d3_monthly_spending_chart"),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+        shape = RoundedCornerShape(16.dp),
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
+    ) {
+        Column(modifier = Modifier.padding(16.dp)) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween,
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .size(36.dp)
+                            .clip(CircleShape)
+                            .background(MaterialTheme.colorScheme.primaryContainer),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text("📊", fontSize = 18.sp)
+                    }
+                    Column {
+                        Text(
+                            text = "D3.js Monthly Purchase Trends",
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.primary
+                        )
+                        Text(
+                            text = "Cafeteria expenditure & plate volume trends over time",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                }
+            }
+
+            Spacer(modifier = Modifier.height(14.dp))
+
+            // Metric Overview Badges
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                Card(
+                    modifier = Modifier.weight(1f),
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.4f)),
+                    shape = RoundedCornerShape(12.dp)
+                ) {
+                    Column(modifier = Modifier.padding(10.dp)) {
+                        Text("YTD Spent", fontSize = 10.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSecondaryContainer)
+                        Text(
+                            text = "GH₵ ${"%.2f".format(totalYtd)}",
+                            fontSize = 14.sp,
+                            fontWeight = FontWeight.ExtraBold,
+                            color = MaterialTheme.colorScheme.primary
+                        )
+                    }
+                }
+                Card(
+                    modifier = Modifier.weight(1f),
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.tertiaryContainer.copy(alpha = 0.4f)),
+                    shape = RoundedCornerShape(12.dp)
+                ) {
+                    Column(modifier = Modifier.padding(10.dp)) {
+                        Text("Monthly Avg", fontSize = 10.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onTertiaryContainer)
+                        Text(
+                            text = "GH₵ ${"%.2f".format(monthlyAvg)}",
+                            fontSize = 14.sp,
+                            fontWeight = FontWeight.ExtraBold,
+                            color = MaterialTheme.colorScheme.tertiary
+                        )
+                    }
+                }
+            }
+
+            Spacer(modifier = Modifier.height(12.dp))
+
+            AndroidView(
+                factory = { context ->
+                    android.webkit.WebView(context).apply {
+                        settings.javaScriptEnabled = true
+                        webViewClient = android.webkit.WebViewClient()
+                        settings.domStorageEnabled = true
+                        settings.useWideViewPort = true
+                        settings.loadWithOverviewMode = true
+                        setBackgroundColor(android.graphics.Color.TRANSPARENT)
+                        setOnTouchListener { v, event ->
+                            if (event.action == android.view.MotionEvent.ACTION_MOVE) {
+                                v.parent?.requestDisallowInterceptTouchEvent(false)
+                            }
+                            false
+                        }
+                    }
+                },
+                update = { webView ->
+                    webView.loadDataWithBaseURL("https://localhost", htmlContent, "text/html", "UTF-8", null)
+                },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(260.dp)
+            )
+        }
+    }
+}
+
 @Composable
 fun RechartsDashboardChart(
+
     orders: List<Order>,
     modifier: Modifier = Modifier
 ) {

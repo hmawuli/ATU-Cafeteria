@@ -1376,6 +1376,9 @@ fun VendorDirectoryCard(
     val speed = metrics["speed"] ?: 0.0
     val priceValue = metrics["priceValue"] ?: 0.0
     val reviewsCount = remember(vendor.id, allFeedback) { allFeedback.count { it.vendorId == vendor.id } }
+    val vHoursInfo = remember(vendor.id, vendor.isOpen) {
+        com.example.ui.util.VendorOperatingHoursHelper.getOperatingHoursInfo(vendor.id, vendor.isOpen)
+    }
 
     Card(
         modifier = Modifier
@@ -1415,12 +1418,12 @@ fun VendorDirectoryCard(
                         .align(Alignment.TopEnd)
                         .padding(12.dp)
                         .background(
-                            if (vendor.isOpen) Color(0xFFE8F5E9) else Color(0xFFFFEBEE),
+                            if (vHoursInfo.isCurrentlyOpen) Color(0xFFE8F5E9) else Color(0xFFFFEBEE),
                             shape = RoundedCornerShape(8.dp)
                         )
                         .border(
                             width = 1.dp,
-                            color = if (vendor.isOpen) Color(0xFF4CAF50).copy(alpha = 0.5f) else Color(0xFFF44336).copy(alpha = 0.5f),
+                            color = if (vHoursInfo.isCurrentlyOpen) Color(0xFF4CAF50).copy(alpha = 0.5f) else Color(0xFFF44336).copy(alpha = 0.5f),
                             shape = RoundedCornerShape(8.dp)
                         )
                         .padding(horizontal = 8.dp, vertical = 4.dp)
@@ -1433,13 +1436,13 @@ fun VendorDirectoryCard(
                             modifier = Modifier
                                 .size(6.dp)
                                 .background(
-                                    if (vendor.isOpen) Color(0xFF2E7D32) else Color(0xFFC62828),
+                                    if (vHoursInfo.isCurrentlyOpen) Color(0xFF2E7D32) else Color(0xFFC62828),
                                     shape = androidx.compose.foundation.shape.CircleShape
                                 )
                         )
                         Text(
-                            text = if (vendor.isOpen) "OPEN" else "CLOSED",
-                            color = if (vendor.isOpen) Color(0xFF2E7D32) else Color(0xFFC62828),
+                            text = vHoursInfo.statusLabel,
+                            color = if (vHoursInfo.isCurrentlyOpen) Color(0xFF2E7D32) else Color(0xFFC62828),
                             fontSize = 9.sp,
                             fontWeight = FontWeight.ExtraBold,
                             letterSpacing = 0.5.sp
@@ -1501,6 +1504,24 @@ fun VendorDirectoryCard(
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(4.dp)
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.Schedule,
+                                    contentDescription = "Operating Hours",
+                                    tint = if (vHoursInfo.isCurrentlyOpen) Color(0xFF2E7D32) else Color(0xFFC62828),
+                                    modifier = Modifier.size(12.dp)
+                                )
+                                Text(
+                                    text = "${vHoursInfo.scheduleText} • ${vHoursInfo.statusDetail}",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    fontSize = 11.sp,
+                                    color = if (vHoursInfo.isCurrentlyOpen) Color(0xFF2E7D32) else Color(0xFFC62828),
+                                    fontWeight = FontWeight.Medium
+                                )
+                            }
                         }
                     }
 

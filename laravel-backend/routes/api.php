@@ -31,6 +31,7 @@ use App\Http\Controllers\Api\IngredientDemandController;
 use App\Http\Controllers\Api\StudentBudgetController;
 use App\Http\Controllers\Api\LoyaltyController;
 use App\Http\Controllers\Api\GroupOrderController;
+use App\Http\Controllers\Api\AdminReportController;
 use App\Http\Controllers\Api\HealthController;
 use App\Http\Controllers\Api\SwaggerController;
 
@@ -923,6 +924,10 @@ Route::post('/reviews', [DeliveredOrderReviewController::class, 'store']);
 // Centralised Quality Assurance Traceability Audit Logs Endpoints
 Route::get('/audit-logs', [AuditLogController::class, 'index']);
 Route::post('/audit-logs', [AuditLogController::class, 'store']);
+
+// Admin Reporting & CSV Export Endpoints
+Route::get('/admin/export-sales-csv', [AdminReportController::class, 'exportVendorSalesAndOrdersCsv']);
+Route::get('/admin/export-student-orders-csv', [AdminReportController::class, 'exportStudentOrdersCsv']);
 
 // System Status Monitoring (JSON health check of DB & Cache)
 Route::get('/system/status', [VendorController::class, 'getSystemHealth']);

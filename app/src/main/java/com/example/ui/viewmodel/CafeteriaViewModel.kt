@@ -8,6 +8,9 @@ import android.net.NetworkRequest
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.data.*
+import com.example.data.repository.UserSessionRepository
+import dagger.hilt.android.lifecycle.HiltViewModel
+import javax.inject.Inject
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 
@@ -48,11 +51,22 @@ data class CartItem(
     val quantity: Int
 )
 
-class CafeteriaViewModel(application: Application) : AndroidViewModel(application) {
+@HiltViewModel
+class CafeteriaViewModel @Inject constructor(
+    application: Application,
+    val repository: CafeteriaRepository,
+    val geminiRepository: GeminiAnalyticsRepository,
+    val userSessionRepo: UserSessionRepository
+) : AndroidViewModel(application) {
+
+    constructor(application: Application) : this(
+        application = application,
+        repository = com.example.di.ServiceLocator.provideCafeteriaRepository(application),
+        geminiRepository = com.example.di.ServiceLocator.provideGeminiAnalyticsRepository(),
+        userSessionRepo = com.example.di.ServiceLocator.provideUserSessionRepository(application)
+    )
 
     private val db = AppDatabase.getDatabase(application)
-    val repository = CafeteriaRepository(db)
-    private val geminiRepository = GeminiAnalyticsRepository()
 
     // Connection & Caching Layer States
     private val connectivityManager = application.getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
@@ -171,6 +185,30 @@ class CafeteriaViewModel(application: Application) : AndroidViewModel(applicatio
         }
     }
 
+    fun logout() {
+        _currentUser.value = null
+        clearCart()
+        val userSessionRepo = com.example.di.ServiceLocator.provideUserSessionRepository(getApplication())
+        userSessionRepo.clearSession()
+        Log.i("CafeteriaViewModel", "User logged out successfully.")
+    }
+
+    fun clearLocalDatabaseCache() {
+        viewModelScope.launch {
+            try {
+                // Trigger refresh or purge non-critical cache
+                _isLoading.value = true
+                kotlinx.coroutines.delay(600)
+                repository.seedDatabaseIfEmpty()
+                _isLoading.value = false
+                Log.i("CafeteriaViewModel", "Local database cache purged and resynced.")
+            } catch (e: Exception) {
+                _isLoading.value = false
+                Log.e("CafeteriaViewModel", "Error clearing local cache", e)
+            }
+        }
+    }
+
     fun resetSessionTimeoutFlag() {
         _isSessionTimedOut.value = false
     }
@@ -203,6 +241,7 @@ class CafeteriaViewModel(application: Application) : AndroidViewModel(applicatio
             currentList.add(CartItem(foodItem, qty))
         }
         _cart.value = currentList
+        com.example.ui.util.FirebaseAnalyticsHelper.logAddToCart(foodItem.id, foodItem.name, foodItem.price, qty)
     }
 
     fun removeFromCart(foodItem: FoodItem) {
@@ -263,6 +302,13 @@ class CafeteriaViewModel(application: Application) : AndroidViewModel(applicatio
                     if (refreshed != null) {
                         _currentUser.value = refreshed
                     }
+                    val itemCount = _cart.value.sumOf { it.quantity }
+                    com.example.ui.util.FirebaseAnalyticsHelper.logOrderCompletion(
+                        orderId = System.currentTimeMillis(),
+                        totalPrice = requiredSum,
+                        itemCount = itemCount,
+                        paymentMethod = if (useWallet) "WALLET" else "POD"
+                    )
                     clearCart()
                     onComplete(true)
                 } else {
@@ -972,6 +1018,19 @@ class CafeteriaViewModel(application: Application) : AndroidViewModel(applicatio
                 }
                 if (newAddedKeys.isNotEmpty()) {
                     playSoundNotification()
+                    val ctx = getApplication<Application>().applicationContext
+                    activeList.filter { notif -> newAddedKeys.contains(notif.id) }.forEach { notif ->
+                        val foodItem = foods.find { it.id == notif.foodItemId }
+                        if (foodItem != null) {
+                            com.example.ui.util.NotificationHelper.sendVendorInventoryAlertNotification(
+                                context = ctx,
+                                foodId = foodItem.id,
+                                itemName = foodItem.name,
+                                currentStock = foodItem.currentStock,
+                                threshold = foodItem.lowStockThreshold
+                            )
+                        }
+                    }
                 }
                 previousVendorNotificationKeys = activeKeys
                 

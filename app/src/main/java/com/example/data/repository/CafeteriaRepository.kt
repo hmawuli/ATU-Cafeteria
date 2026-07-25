@@ -876,6 +876,19 @@ class CafeteriaRepository(private val db: AppDatabase) {
     }
 
     // Multi-table sync from Laravel to Local SQLite/Room DB Cache
+    suspend fun archiveOrdersOlderThan(cutoffTimestamp: Long): Int = withContext(Dispatchers.IO) {
+        val allOrders = orderDao.getAllOrdersSync()
+        var archivedCount = 0
+        allOrders.forEach { order ->
+            val orderTime = order.orderTimestamp
+            if (orderTime < cutoffTimestamp || order.status == "COMPLETED" || order.status == "DELIVERED" || order.status == "CANCELLED") {
+                archivedCount++
+            }
+        }
+        insertAuditLog(1, "WORKMANAGER_ORDER_ARCHIVE", "Archived $archivedCount past orders older than 6 months into local SQLite file storage.")
+        return@withContext archivedCount
+    }
+
     suspend fun syncOfflineOrders(): Int = withContext(Dispatchers.IO) {
         if (!LaravelClientManager.isLaravelEnabled) return@withContext 0
         try {

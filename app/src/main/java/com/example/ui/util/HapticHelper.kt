@@ -94,6 +94,27 @@ object HapticHelper {
     }
 
     /**
+     * Vibrate device for order success pattern
+     */
+    fun orderSuccess(context: Context) {
+        notification(context, "SUCCESS")
+    }
+
+    /**
+     * Vibrate device for payment confirmation pattern
+     */
+    fun paymentConfirmation(context: Context) {
+        impact(context, "HEAVY")
+    }
+
+    /**
+     * Vibrate device for error state pattern
+     */
+    fun errorState(context: Context) {
+        notification(context, "ERROR")
+    }
+
+    /**
      * Standard device vibration simulation
      */
     fun vibrate(context: Context, durationMs: Long = 200L) {
