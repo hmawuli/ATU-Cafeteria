@@ -210,6 +210,13 @@ class CafeteriaRepository(private val db: AppDatabase) {
         userDao.updateUser(user)
     }
 
+    suspend fun updateVendorIsOpen(vendorId: Int, isOpen: Boolean) = withContext(Dispatchers.IO) {
+        val vendor = userDao.getUserSync(vendorId)
+        if (vendor != null) {
+            userDao.updateUser(vendor.copy(isOpen = isOpen))
+        }
+    }
+
     suspend fun updateUserProfile(
         id: Int,
         fullName: String,

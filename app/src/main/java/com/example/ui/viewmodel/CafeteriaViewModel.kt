@@ -9,6 +9,7 @@ import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.data.*
 import com.example.data.repository.UserSessionRepository
+import com.example.data.sync.FirestoreVendorStatusManager
 import dagger.hilt.android.lifecycle.HiltViewModel
 import javax.inject.Inject
 import kotlinx.coroutines.flow.*
@@ -222,6 +223,9 @@ class CafeteriaViewModel @Inject constructor(
 
     private val _isStoreClosed = MutableStateFlow(false)
     val isStoreClosed: StateFlow<Boolean> = _isStoreClosed.asStateFlow()
+
+    // Real-time vendor status map (Open/Busy/Closed) synced via Firestore
+    val vendorStatusMap: StateFlow<Map<Int, String>> = FirestoreVendorStatusManager.vendorStatusMap
 
     // --- Dynamic Shopping Cart States & Controls ---
     private val _cart = MutableStateFlow<List<CartItem>>(emptyList())
@@ -563,6 +567,7 @@ class CafeteriaViewModel @Inject constructor(
     private var vendorMetricsPollingJob: kotlinx.coroutines.Job? = null
 
     init {
+        FirestoreVendorStatusManager.startRealtimeStatusListener()
         try {
             val request = NetworkRequest.Builder()
                 .addCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET)
@@ -1619,6 +1624,11 @@ class CafeteriaViewModel @Inject constructor(
 
     fun setStoreClosedState(isClosed: Boolean) {
         _isStoreClosed.value = isClosed
+        val currentVendor = _currentUser.value
+        if (currentVendor != null) {
+            val newStatus = if (isClosed) "CLOSED" else "OPEN"
+            FirestoreVendorStatusManager.updateVendorStatus(currentVendor.id, newStatus, currentVendor.fullName)
+        }
         if (LaravelClientManager.isLaravelEnabled) {
             viewModelScope.launch {
                 try {
@@ -1632,6 +1642,37 @@ class CafeteriaViewModel @Inject constructor(
                     Log.e("CafeteriaViewModel", "Failed to sync store status to Laravel", e)
                 }
             }
+        }
+    }
+
+    /**
+     * Administrative override to toggle vendor status (OPEN / BUSY / CLOSED) in real-time via Firestore.
+     */
+    fun setVendorStatusByAdmin(vendorId: Int, status: String, vendorName: String = "") {
+        viewModelScope.launch {
+            val uppercaseStatus = status.uppercase()
+            // Real-time Firestore sync
+            FirestoreVendorStatusManager.updateVendorStatus(vendorId, uppercaseStatus, vendorName)
+
+            // Update local Room database
+            val isOpen = uppercaseStatus != "CLOSED"
+            repository.updateVendorIsOpen(vendorId, isOpen)
+
+            // Sync with remote server if active
+            if (LaravelClientManager.isLaravelEnabled) {
+                try {
+                    val service = LaravelClientManager.getService()
+                    service.toggleVendorStatus(isOpen)
+                } catch (e: Exception) {
+                    Log.w("CafeteriaViewModel", "Laravel status sync warning: ${e.message}")
+                }
+            }
+
+            repository.insertAuditLog(
+                userId = _currentUser.value?.id ?: 0,
+                action = "ADMIN_TOGGLED_VENDOR_STATUS",
+                details = "Admin set vendor #$vendorId ($vendorName) status to $uppercaseStatus via Firestore real-time sync."
+            )
         }
     }
 

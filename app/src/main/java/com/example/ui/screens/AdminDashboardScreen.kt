@@ -114,6 +114,7 @@ fun AdminDashboardScreen(
     var selectedVendorForAiReview by remember { mutableStateOf<User?>(null) }
     val aiAnalysiResultText by viewModel.aiAnalysisText.collectAsStateWithLifecycle()
     val isAnalyzingUiState by viewModel.isAnalyzing.collectAsStateWithLifecycle()
+    val vendorStatusMap by viewModel.vendorStatusMap.collectAsStateWithLifecycle()
 
     Scaffold(
         topBar = {
@@ -398,7 +399,104 @@ fun AdminDashboardScreen(
                                                     Text("Value: ${"%.1f".format(metrics["priceValue"] ?: 0.0)}", fontSize = 10.sp)
                                                 }
 
-                                                Spacer(modifier = Modifier.height(16.dp))
+                                                Spacer(modifier = Modifier.height(12.dp))
+
+                                                // Real-Time Vendor Status Override (Firestore Sync: Open / Busy / Closed)
+                                                val currentStatus = vendorStatusMap[vendor.id] ?: if (vendor.isOpen) "OPEN" else "CLOSED"
+                                                Column(
+                                                    modifier = Modifier
+                                                        .fillMaxWidth()
+                                                        .clip(RoundedCornerShape(8.dp))
+                                                        .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f))
+                                                        .padding(10.dp)
+                                                ) {
+                                                    Row(
+                                                        modifier = Modifier.fillMaxWidth(),
+                                                        horizontalArrangement = Arrangement.SpaceBetween,
+                                                        verticalAlignment = Alignment.CenterVertically
+                                                    ) {
+                                                        Row(verticalAlignment = Alignment.CenterVertically) {
+                                                            Icon(
+                                                                Icons.Default.CloudSync,
+                                                                contentDescription = "Firestore Real-time Sync",
+                                                                tint = MaterialTheme.colorScheme.primary,
+                                                                modifier = Modifier.size(14.dp)
+                                                            )
+                                                            Spacer(modifier = Modifier.width(4.dp))
+                                                            Text(
+                                                                "Vendor Status (Firestore Sync):",
+                                                                fontSize = 11.sp,
+                                                                fontWeight = FontWeight.Bold
+                                                            )
+                                                        }
+                                                        Text(
+                                                            text = currentStatus,
+                                                            fontSize = 10.sp,
+                                                            fontWeight = FontWeight.ExtraBold,
+                                                            color = when (currentStatus) {
+                                                                "OPEN" -> Color(0xFF2E7D32)
+                                                                "BUSY" -> Color(0xFFE65100)
+                                                                else -> Color(0xFFC62828)
+                                                            }
+                                                        )
+                                                    }
+
+                                                    Spacer(modifier = Modifier.height(6.dp))
+
+                                                    Row(
+                                                        modifier = Modifier.fillMaxWidth(),
+                                                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                                                    ) {
+                                                        // OPEN Button
+                                                        FilterChip(
+                                                            selected = currentStatus == "OPEN",
+                                                            onClick = { viewModel.setVendorStatusByAdmin(vendor.id, "OPEN", vendor.fullName) },
+                                                            label = { Text("OPEN", fontSize = 10.sp, fontWeight = FontWeight.Bold) },
+                                                            leadingIcon = {
+                                                                Icon(
+                                                                    Icons.Default.CheckCircle,
+                                                                    contentDescription = "Open Status",
+                                                                    modifier = Modifier.size(12.dp),
+                                                                    tint = if (currentStatus == "OPEN") Color(0xFF2E7D32) else Color.Gray
+                                                                )
+                                                            },
+                                                            modifier = Modifier.weight(1f).testTag("admin_vendor_status_open_${vendor.id}")
+                                                        )
+
+                                                        // BUSY Button
+                                                        FilterChip(
+                                                            selected = currentStatus == "BUSY",
+                                                            onClick = { viewModel.setVendorStatusByAdmin(vendor.id, "BUSY", vendor.fullName) },
+                                                            label = { Text("BUSY", fontSize = 10.sp, fontWeight = FontWeight.Bold) },
+                                                            leadingIcon = {
+                                                                Icon(
+                                                                    Icons.Default.Schedule,
+                                                                    contentDescription = "Busy Status",
+                                                                    modifier = Modifier.size(12.dp),
+                                                                    tint = if (currentStatus == "BUSY") Color(0xFFE65100) else Color.Gray
+                                                                )
+                                                            },
+                                                            modifier = Modifier.weight(1f).testTag("admin_vendor_status_busy_${vendor.id}")
+                                                        )
+
+                                                        // CLOSED Button
+                                                        FilterChip(
+                                                            selected = currentStatus == "CLOSED",
+                                                            onClick = { viewModel.setVendorStatusByAdmin(vendor.id, "CLOSED", vendor.fullName) },
+                                                            label = { Text("CLOSED", fontSize = 10.sp, fontWeight = FontWeight.Bold) },
+                                                            leadingIcon = {
+                                                                Icon(
+                                                                    Icons.Default.Cancel,
+                                                                    contentDescription = "Closed Status",
+                                                                    modifier = Modifier.size(12.dp),
+                                                                    tint = if (currentStatus == "CLOSED") Color(0xFFC62828) else Color.Gray
+                                                                )
+                                                            },
+                                                            modifier = Modifier.weight(1f).testTag("admin_vendor_status_closed_${vendor.id}")
+                                                        )
+                                                    }
+                                                }
+
                                                 Spacer(modifier = Modifier.height(12.dp))
 
                                                 val totalCompletedOrders = ordersForThisVendor.filter { it.status.uppercase() == "COMPLETED" || it.status.uppercase() == "DELIVERED" }
@@ -651,14 +749,34 @@ fun AdminDashboardScreen(
                     }
                 }
                 1 -> {
-                    // Gemini Analytics page
+                    // Gemini Analytics & Order Trends Visualizer page
                     Column(
                         modifier = Modifier
                             .fillMaxSize()
                             .padding(16.dp)
                             .verticalScroll(adminAiScrollState),
-                        verticalArrangement = Arrangement.spacedBy(12.dp)
+                        verticalArrangement = Arrangement.spacedBy(16.dp)
                     ) {
+                        Text(
+                            "Weekly Vendor Order Trends & Peak Cafeteria Traffic Hours",
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.primary
+                        )
+                        Text(
+                            "Interactive Recharts visualization detailing 7-day weekly order trends, peak traffic hours, and top performance metrics for administrative oversight.",
+                            fontSize = 11.sp,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+
+                        // Embedded Recharts Data Visualization
+                        RechartsDashboardChart(
+                            orders = allOrdersSnapshot,
+                            modifier = Modifier.fillMaxWidth()
+                        )
+
+                        Spacer(modifier = Modifier.height(8.dp))
+
                         Text(
                             "Gemini AI Campus Analytics Advisor",
                             style = MaterialTheme.typography.titleMedium,

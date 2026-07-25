@@ -29,6 +29,16 @@ class MenuAndOrdersSyncWorker(
             // Ensure database is populated with initial menu/user records if needed
             repository.seedDatabaseIfEmpty()
 
+            // Synchronize pending local Room database order changes with remote server
+            try {
+                val syncedCount = repository.syncOfflineOrders()
+                if (syncedCount > 0) {
+                    Log.i(TAG, "Successfully synced $syncedCount pending offline Room order(s) to remote server.")
+                }
+            } catch (e: Exception) {
+                Log.w(TAG, "Offline Room order sync skipped/failed: ${e.message}")
+            }
+
             // Attempt background sync of remote notifications and order status updates
             try {
                 repository.fetchLaravelNotifications()

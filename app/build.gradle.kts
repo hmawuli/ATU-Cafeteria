@@ -72,6 +72,7 @@ dependencies {
   implementation(platform(libs.androidx.compose.bom))
   implementation(platform(libs.firebase.bom))
   implementation(libs.firebase.messaging)
+  implementation(libs.firebase.firestore)
   implementation(libs.firebase.analytics)
   implementation(libs.play.app.update)
   implementation(libs.play.app.update.ktx)
