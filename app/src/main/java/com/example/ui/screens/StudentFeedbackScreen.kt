@@ -151,7 +151,7 @@ fun StudentFeedbackScreen(
                     ) {
                         Icon(
                             Icons.Default.RateReview,
-                            contentDescription = null,
+                            contentDescription = "Review Icon",
                             tint = MaterialTheme.colorScheme.primary,
                             modifier = Modifier.size(32.dp)
                         )
@@ -332,7 +332,7 @@ fun StudentFeedbackScreen(
                         .height(50.dp)
                         .testTag("submit_student_feedback_button")
                 ) {
-                    Icon(Icons.Default.Star, contentDescription = null, modifier = Modifier.size(18.dp))
+                    Icon(Icons.Default.Star, contentDescription = "Rating Star Icon", modifier = Modifier.size(18.dp))
                     Spacer(modifier = Modifier.width(8.dp))
                     Text("Submit Review & Earn Loyalty Points", fontWeight = FontWeight.Bold, fontSize = 14.sp)
                 }

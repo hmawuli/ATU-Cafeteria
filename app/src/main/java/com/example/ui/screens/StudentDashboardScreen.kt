@@ -10370,52 +10370,93 @@ fun StudentDashboardScreen(
                                     verticalArrangement = Arrangement.spacedBy(8.dp)
                                 ) {
                                     cartItems.forEach { item ->
-                                        Row(
-                                            modifier = Modifier
-                                                .fillMaxWidth()
-                                                .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f), RoundedCornerShape(8.dp))
-                                                .padding(8.dp),
-                                            verticalAlignment = Alignment.CenterVertically,
-                                            horizontalArrangement = Arrangement.SpaceBetween
-                                        ) {
-                                            Column(modifier = Modifier.weight(1f)) {
-                                                Text(item.foodItem.name, fontWeight = FontWeight.Bold, fontSize = 12.sp)
-                                                Text("GH₵ ${"%.2f".format(item.foodItem.price)} each", fontSize = 10.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                                                Text("Subtotal: GH₵ ${"%.2f".format(item.foodItem.price * item.quantity)}", fontSize = 11.sp, fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.secondary)
-                                            }
-                                            Row(
-                                                verticalAlignment = Alignment.CenterVertically,
-                                                horizontalArrangement = Arrangement.spacedBy(4.dp)
-                                            ) {
-                                                IconButton(
-                                                    onClick = {
-                                                        if (item.quantity > 1) {
-                                                            viewModel.updateCartQuantity(item.foodItem, item.quantity - 1)
-                                                        } else {
-                                                            viewModel.removeFromCart(item.foodItem)
-                                                        }
-                                                    }
-                                                ) {
-                                                    Text("-", fontSize = 18.sp, fontWeight = FontWeight.Bold)
-                                                }
-                                                Text("${item.quantity}", fontWeight = FontWeight.Bold, fontSize = 12.sp)
-                                                IconButton(
-                                                    onClick = {
-                                                        if (item.quantity < 5) {
-                                                            viewModel.updateCartQuantity(item.foodItem, item.quantity + 1)
-                                                        }
-                                                    }
-                                                ) {
-                                                    Text("+", fontSize = 14.sp, fontWeight = FontWeight.Bold)
-                                                }
-                                                IconButton(
-                                                    onClick = { viewModel.removeFromCart(item.foodItem) },
-                                                    modifier = Modifier.testTag("remove_item_btn_${item.foodItem.id}")
-                                                ) {
-                                                    Icon(Icons.Default.Delete, contentDescription = "Remove", tint = MaterialTheme.colorScheme.error, modifier = Modifier.size(16.dp))
+                                        @OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
+                                        val dismissState = androidx.compose.material3.rememberSwipeToDismissBoxState(
+                                            confirmValueChange = { dismissValue ->
+                                                if (dismissValue == androidx.compose.material3.SwipeToDismissBoxValue.EndToStart ||
+                                                    dismissValue == androidx.compose.material3.SwipeToDismissBoxValue.StartToEnd) {
+                                                    viewModel.removeFromCart(item.foodItem)
+                                                    com.example.ui.util.HapticUtil.performOrderButtonHaptic(context)
+                                                    true
+                                                } else {
+                                                    false
                                                 }
                                             }
-                                        }
+                                        )
+
+                                        @OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
+                                        androidx.compose.material3.SwipeToDismissBox(
+                                            state = dismissState,
+                                            backgroundContent = {
+                                                val color = when (dismissState.dismissDirection) {
+                                                    androidx.compose.material3.SwipeToDismissBoxValue.EndToStart,
+                                                    androidx.compose.material3.SwipeToDismissBoxValue.StartToEnd -> MaterialTheme.colorScheme.errorContainer
+                                                    else -> androidx.compose.ui.graphics.Color.Transparent
+                                                }
+                                                Box(
+                                                    modifier = Modifier
+                                                        .fillMaxSize()
+                                                        .clip(RoundedCornerShape(8.dp))
+                                                        .background(color)
+                                                        .padding(horizontal = 16.dp),
+                                                    contentAlignment = Alignment.CenterEnd
+                                                ) {
+                                                    Icon(
+                                                        Icons.Default.Delete,
+                                                        contentDescription = "Swipe to remove item",
+                                                        tint = MaterialTheme.colorScheme.onErrorContainer
+                                                    )
+                                                }
+                                            },
+                                            content = {
+                                                Row(
+                                                    modifier = Modifier
+                                                        .fillMaxWidth()
+                                                        .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f), RoundedCornerShape(8.dp))
+                                                        .padding(8.dp),
+                                                    verticalAlignment = Alignment.CenterVertically,
+                                                    horizontalArrangement = Arrangement.SpaceBetween
+                                                ) {
+                                                    Column(modifier = Modifier.weight(1f)) {
+                                                        Text(item.foodItem.name, fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                                                        Text("GH₵ ${"%.2f".format(item.foodItem.price)} each", fontSize = 10.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                                        Text("Subtotal: GH₵ ${"%.2f".format(item.foodItem.price * item.quantity)}", fontSize = 11.sp, fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.secondary)
+                                                    }
+                                                    Row(
+                                                        verticalAlignment = Alignment.CenterVertically,
+                                                        horizontalArrangement = Arrangement.spacedBy(4.dp)
+                                                    ) {
+                                                        IconButton(
+                                                            onClick = {
+                                                                if (item.quantity > 1) {
+                                                                    viewModel.updateCartQuantity(item.foodItem, item.quantity - 1)
+                                                                } else {
+                                                                    viewModel.removeFromCart(item.foodItem)
+                                                                }
+                                                            }
+                                                        ) {
+                                                            Text("-", fontSize = 18.sp, fontWeight = FontWeight.Bold)
+                                                        }
+                                                        Text("${item.quantity}", fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                                                        IconButton(
+                                                            onClick = {
+                                                                if (item.quantity < 5) {
+                                                                    viewModel.updateCartQuantity(item.foodItem, item.quantity + 1)
+                                                                }
+                                                            }
+                                                        ) {
+                                                            Text("+", fontSize = 14.sp, fontWeight = FontWeight.Bold)
+                                                        }
+                                                        IconButton(
+                                                            onClick = { viewModel.removeFromCart(item.foodItem) },
+                                                            modifier = Modifier.testTag("remove_item_btn_${item.foodItem.id}")
+                                                        ) {
+                                                            Icon(Icons.Default.Delete, contentDescription = "Remove", tint = MaterialTheme.colorScheme.error, modifier = Modifier.size(16.dp))
+                                                        }
+                                                    }
+                                                }
+                                            }
+                                        )
                                     }
 
                                     Spacer(modifier = Modifier.height(12.dp))

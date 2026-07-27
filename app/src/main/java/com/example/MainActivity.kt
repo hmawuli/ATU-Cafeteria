@@ -64,6 +64,7 @@ class MainActivity : FragmentActivity() {
         com.example.ui.util.NotificationHelper.createNotificationChannels(this)
         com.example.worker.MenuAndOrdersSyncWorker.schedulePeriodicSync(this)
         com.example.worker.OrderArchiverWorker.schedulePeriodicArchive(this)
+        com.example.worker.ChargingWifiDataSyncWorker.schedulePeriodicSync(this)
         com.example.ui.util.InAppUpdateHelper.checkForUpdates(this, this) { _, _ -> }
         enableEdgeToEdge()
         com.example.ui.util.PerformanceMonitoringHelper.stopTrace("app_launch_startup")
@@ -80,6 +81,13 @@ class MainActivity : FragmentActivity() {
                     val isOnline by viewModel.isOnline.collectAsState()
                     val currentBackStackEntry by navController.currentBackStackEntryAsState()
                     val currentRoute = currentBackStackEntry?.destination?.route
+
+                    val snackbarHostState = androidx.compose.runtime.remember { androidx.compose.material3.SnackbarHostState() }
+                    LaunchedEffect(Unit) {
+                        com.example.ui.util.SnackbarManager.messages.collect { message ->
+                            snackbarHostState.showSnackbar(message)
+                        }
+                    }
 
                     LaunchedEffect(currentUser, currentRoute) {
                         val user = currentUser
@@ -263,6 +271,22 @@ class MainActivity : FragmentActivity() {
                                     imageVector = icon,
                                     contentDescription = "Toggle Screen Orientation: ${rotationMode.label}",
                                     modifier = Modifier.size(24.dp)
+                                )
+                            }
+
+                            // Global Snackbar Feedback Component
+                            androidx.compose.material3.SnackbarHost(
+                                hostState = snackbarHostState,
+                                modifier = Modifier
+                                    .align(androidx.compose.ui.Alignment.BottomCenter)
+                                    .padding(bottom = 24.dp)
+                                    .testTag("global_snackbar_host")
+                            ) { data ->
+                                androidx.compose.material3.Snackbar(
+                                    snackbarData = data,
+                                    containerColor = MaterialTheme.colorScheme.inverseSurface,
+                                    contentColor = MaterialTheme.colorScheme.inverseOnSurface,
+                                    shape = androidx.compose.foundation.shape.RoundedCornerShape(12.dp)
                                 )
                             }
                         }

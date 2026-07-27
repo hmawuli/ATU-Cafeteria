@@ -97,4 +97,44 @@ object HapticUtil {
             Log.e(TAG, "Error performing error state haptic", e)
         }
     }
+
+    /**
+     * Trigger tactile haptic feedback for order button clicks and cart actions.
+     */
+    fun performOrderButtonHaptic(context: Context, view: View? = null) {
+        view?.performHapticFeedback(HapticFeedbackConstants.VIRTUAL_KEY)
+        val vibrator = getVibrator(context) ?: return
+        if (!vibrator.hasVibrator()) return
+        try {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                vibrator.vibrate(VibrationEffect.createOneShot(45, VibrationEffect.DEFAULT_AMPLITUDE))
+            } else {
+                @Suppress("DEPRECATION")
+                vibrator.vibrate(45)
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "Error performing order button haptic", e)
+        }
+    }
+
+    /**
+     * Trigger tactile haptic feedback for barcode and QR code scanner actions.
+     */
+    fun performScanHaptic(context: Context, view: View? = null) {
+        view?.performHapticFeedback(HapticFeedbackConstants.KEYBOARD_TAP)
+        val vibrator = getVibrator(context) ?: return
+        if (!vibrator.hasVibrator()) return
+        try {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                val timings = longArrayOf(0, 30, 40, 60)
+                val amplitudes = intArrayOf(0, 180, 0, 220)
+                vibrator.vibrate(VibrationEffect.createWaveform(timings, amplitudes, -1))
+            } else {
+                @Suppress("DEPRECATION")
+                vibrator.vibrate(longArrayOf(0, 30, 40, 60), -1)
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "Error performing scan action haptic", e)
+        }
+    }
 }

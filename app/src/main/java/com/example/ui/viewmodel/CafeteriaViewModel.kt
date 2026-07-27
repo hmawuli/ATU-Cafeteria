@@ -278,6 +278,8 @@ class CafeteriaViewModel @Inject constructor(
         }
         _cart.value = currentList
         com.example.ui.util.FirebaseAnalyticsHelper.logAddToCart(foodItem.id, foodItem.name, foodItem.price, qty)
+        com.example.ui.util.HapticUtil.performOrderButtonHaptic(getApplication())
+        com.example.ui.util.SnackbarManager.showMessage("Added ${foodItem.name} (x$qty) to cart.")
     }
 
     fun removeFromCart(foodItem: FoodItem) {
@@ -346,8 +348,10 @@ class CafeteriaViewModel @Inject constructor(
                         paymentMethod = if (useWallet) "WALLET" else "POD"
                     )
                     clearCart()
+                    com.example.ui.util.SnackbarManager.showMessage("Order placed successfully!")
                     onComplete(true)
                 } else {
+                    com.example.ui.util.SnackbarManager.showMessage("Insufficient wallet balance for cart checkout.")
                     onComplete(false)
                 }
             } else {
@@ -356,6 +360,7 @@ class CafeteriaViewModel @Inject constructor(
                 }
                 repository.insertAuditLog(user.id, "POD_ORDER", "Cart orders generated under Pay-on-Delivery protocol.")
                 clearCart()
+                com.example.ui.util.SnackbarManager.showMessage("Order placed successfully (Pay on Delivery)!")
                 onComplete(true)
             }
         }
@@ -1537,6 +1542,11 @@ class CafeteriaViewModel @Inject constructor(
                 _currentUser.value = refreshed
             }
             _isLoading.value = false
+            if (success) {
+                com.example.ui.util.SnackbarManager.showMessage("Profile updated successfully!")
+            } else {
+                com.example.ui.util.SnackbarManager.showMessage("Failed to update profile.")
+            }
             onResult(success)
         }
     }
@@ -1573,6 +1583,9 @@ class CafeteriaViewModel @Inject constructor(
                 val refreshed = repository.userDao.getUserSync(user.id)
                 if (refreshed != null) {
                     _currentUser.value = refreshed
+                }
+                if (amount >= 0) {
+                    com.example.ui.util.SnackbarManager.showMessage("Wallet loaded with GH₵ ${"%.2f".format(amount)} successfully!")
                 }
             }
         }
@@ -1635,8 +1648,12 @@ class CafeteriaViewModel @Inject constructor(
                         _currentUser.value = refreshed
                     }
                     fetchLoyaltySummary()
+                    com.example.ui.util.HapticUtil.performPaymentSuccess(getApplication())
+                    com.example.ui.util.SnackbarManager.showMessage("Order placed successfully!")
                     onComplete(true)
                 } else {
+                    com.example.ui.util.HapticUtil.performErrorState(getApplication())
+                    com.example.ui.util.SnackbarManager.showMessage("Insufficient wallet balance.")
                     onComplete(false)
                 }
             } else {
@@ -1644,6 +1661,8 @@ class CafeteriaViewModel @Inject constructor(
                 repository.insertAuditLog(user.id, "POD_ORDER", "Order generated under Pay-on-Delivery protocol." + (if (pointsToRedeem > 0) " Loyalty points applied offline." else ""))
                 loadOfflineOrders()
                 fetchLoyaltySummary()
+                com.example.ui.util.HapticUtil.performOrderButtonHaptic(getApplication())
+                com.example.ui.util.SnackbarManager.showMessage("Order placed successfully (Pay on Delivery)!")
                 onComplete(true)
             }
         }
@@ -1764,6 +1783,7 @@ class CafeteriaViewModel @Inject constructor(
             )
             // Transition status manually in simulation to ensure feedback loop completes
             repository.insertAuditLog(user.id, "FEEDBACK_POSTED", "Verified review recorded for order #${orderId}.")
+            com.example.ui.util.SnackbarManager.showMessage("Feedback submitted successfully!")
             onComplete()
         }
     }
@@ -2008,17 +2028,21 @@ class CafeteriaViewModel @Inject constructor(
 
     fun studentVerifyPickupViaQr(orderId: Int, counterQrCode: String, onResult: (Boolean) -> Unit) {
         viewModelScope.launch {
+            com.example.ui.util.HapticUtil.performScanHaptic(getApplication())
             val order = repository.orderDao.getOrderById(orderId)
             if (order != null && order.status.uppercase() == "READY" && counterQrCode.startsWith("ATU-COUNTER-")) {
                 val vendorIdFromQr = counterQrCode.removePrefix("ATU-COUNTER-").toIntOrNull()
                 if (vendorIdFromQr == order.vendorId) {
                     repository.updateOrderStatus(order.vendorId, orderId, "DELIVERED", null)
                     repository.insertAuditLog(order.customerId, "PICKUP_VALIDATED_QR", "Student verified order #${orderId} secure counter QR scan and marked Delivered.")
+                    com.example.ui.util.HapticUtil.performOrderCompletion(getApplication())
                     onResult(true)
                 } else {
+                    com.example.ui.util.HapticUtil.performErrorState(getApplication())
                     onResult(false)
                 }
             } else {
+                com.example.ui.util.HapticUtil.performErrorState(getApplication())
                 onResult(false)
             }
         }
@@ -2026,6 +2050,7 @@ class CafeteriaViewModel @Inject constructor(
 
     fun studentCounterCheckIn(counterQrCode: String, onResult: (Boolean, String) -> Unit) {
         viewModelScope.launch {
+            com.example.ui.util.HapticUtil.performScanHaptic(getApplication())
             val user = _currentUser.value
             if (user == null) {
                 onResult(false, "User session not active.")
