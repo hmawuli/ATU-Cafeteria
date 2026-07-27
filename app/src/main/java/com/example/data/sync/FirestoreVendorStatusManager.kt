@@ -1,6 +1,7 @@
 package com.example.data.sync
 
 import android.util.Log
+import com.google.firebase.FirebaseApp
 import com.google.firebase.firestore.FirebaseFirestore
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -37,6 +38,10 @@ object FirestoreVendorStatusManager {
         _vendorStatusMap.value = currentMap
 
         try {
+            try { FirebaseApp.getInstance() } catch (e: Exception) {
+                Log.w(TAG, "FirebaseApp is not initialized. Skipping Firestore vendor status update.")
+                return
+            }
             val firestore = FirebaseFirestore.getInstance()
             val docRef = firestore.collection(COLLECTION_NAME).document("vendor_$vendorId")
 
@@ -66,6 +71,10 @@ object FirestoreVendorStatusManager {
         if (isListening) return
 
         try {
+            try { FirebaseApp.getInstance() } catch (e: Exception) {
+                Log.w(TAG, "FirebaseApp is not initialized. Skipping Firestore vendor status listener.")
+                return
+            }
             val firestore = FirebaseFirestore.getInstance()
             firestore.collection(COLLECTION_NAME)
                 .addSnapshotListener { snapshot, error ->
