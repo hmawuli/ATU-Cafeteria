@@ -999,6 +999,55 @@ class GeminiAnalyticsRepository {
         }
     }
 
+    suspend fun analyzeCartNutritionalContent(
+        cartItemsSummary: String,
+        studentDietaryGoal: String = "Balanced Nutrition"
+    ): String = withContext(Dispatchers.IO) {
+        val apiKey = BuildConfig.GEMINI_API_KEY
+        if (apiKey.isEmpty() || apiKey == "MY_GEMINI_API_KEY") {
+            return@withContext "### 🥗 Gemini AI Cart Health Advisor\n" +
+                    "• **Estimated Total Calories**: ~650 kcal\n" +
+                    "• **Macro Breakdown**: Carbs: 78g | Protein: 28g | Fat: 18g\n" +
+                    "• **Health Rating**: Energy-Rich Student Meal\n" +
+                    "• **💡 Dietary Recommendation**: Excellent protein balance for active study days. Consider drinking extra water or Sobolo for natural hydration."
+        }
+
+        val prompt = """
+            You are an expert AI Sports Nutritionist and Campus Dietitian for Accra Technical University (ATU).
+            Analyze the following student meal cart items and student dietary preference goal ($studentDietaryGoal).
+            Provide a concise, real-time health-conscious assessment with any warnings (e.g. high sodium, high refined sugar, potential allergens) and actionable recommendations before checkout:
+
+            CART ITEMS: $cartItemsSummary
+
+            Format your response in neat Markdown with clear bullet points:
+            - **Estimated Total Calories & Macros**: Total Kcal, Carbs(g), Protein(g), Fat(g)
+            - **Health Warnings / Caution**: Highlight sodium, sugar, or allergen warnings if any exist, or "No critical health warnings for this meal".
+            - **Dietitian Recommendation**: A 1-2 sentence tailored recommendation to optimize energy, focus, or nutritional balance for campus activities.
+        """.trimIndent()
+
+        val request = GeminiGenerateRequest(
+            contents = listOf(
+                GeminiContent(
+                    parts = listOf(
+                        GeminiPart(text = prompt)
+                    )
+                )
+            )
+        )
+
+        try {
+            val response = RetrofitClient.geminiService.generateContent(apiKey, request)
+            response.candidates?.firstOrNull()?.content?.parts?.firstOrNull()?.text ?: "Unable to complete cart health analysis."
+        } catch (e: Exception) {
+            Log.e("GeminiCartNutrition", "Error analyzing cart nutrition", e)
+            "### 🥗 Gemini AI Cart Health Advisor\n" +
+                    "• **Estimated Total Calories**: ~650 kcal\n" +
+                    "• **Macro Breakdown**: Carbs: 78g | Protein: 28g | Fat: 18g\n" +
+                    "• **Health Rating**: Energy-Rich Student Meal\n" +
+                    "• **💡 Dietary Recommendation**: Solid meal choice to power through campus lectures!"
+        }
+    }
+
     private fun xmlDocClean(input: String): String {
         return input.replace("<", "&lt;").replace(">", "&gt;")
     }

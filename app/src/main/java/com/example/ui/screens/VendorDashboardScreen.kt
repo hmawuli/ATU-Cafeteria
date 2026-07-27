@@ -56,8 +56,10 @@ import com.example.ui.components.DailyRevenueBarChart
 import com.example.ui.components.RadarFeedbackChart
 import com.example.ui.components.StudentTrendsLineChart
 import com.example.ui.components.VendorPerformanceTrendChart
+import com.example.ui.components.VendorStallPerformanceMap
 import com.example.ui.components.WeeklyRevenueTrendLineChart
 import com.example.ui.components.LaravelDailyRevenueTrendChart
+import com.example.ui.util.BiometricHelper
 import com.example.ui.viewmodel.CafeteriaViewModel
 
 // ==========================================
@@ -2626,7 +2628,6 @@ fun VendorDashboardScreen(
                                             Spacer(modifier = Modifier.height(4.dp))
                                             Text(food.description, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                                             Spacer(modifier = Modifier.height(12.dp))
-
                                             Row(
                                                 modifier = Modifier.fillMaxWidth(),
                                                 verticalAlignment = Alignment.CenterVertically,
@@ -2639,8 +2640,123 @@ fun VendorDashboardScreen(
                                                 )
                                             }
 
+                                            Spacer(modifier = Modifier.height(6.dp))
+
+                                            // Time-Based Menu Visibility Scheduling Block
+                                            var showTimeSchedulePicker by remember { mutableStateOf(false) }
+                                            var scheduleStart by remember { mutableStateOf(food.availableStartTime) }
+                                            var scheduleEnd by remember { mutableStateOf(food.availableEndTime) }
+
+                                            val isCurrentlyScheduledVisible = viewModel.isFoodItemCurrentlyVisibleBySchedule(food)
+
+                                            Card(
+                                                modifier = Modifier.fillMaxWidth(),
+                                                colors = CardDefaults.cardColors(
+                                                    containerColor = if (food.isTimeScheduled) MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.2f) else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f)
+                                                ),
+                                                shape = RoundedCornerShape(8.dp)
+                                            ) {
+                                                Column(modifier = Modifier.padding(10.dp)) {
+                                                    Row(
+                                                        modifier = Modifier.fillMaxWidth(),
+                                                        verticalAlignment = Alignment.CenterVertically,
+                                                        horizontalArrangement = Arrangement.SpaceBetween
+                                                    ) {
+                                                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                                                            Icon(Icons.Default.Schedule, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(16.dp))
+                                                            Column {
+                                                                Text("Schedule Visibility by Time", fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                                                                Text(
+                                                                    if (food.isTimeScheduled) "Auto-hides outside ${food.availableStartTime} - ${food.availableEndTime}" else "Item visible all day",
+                                                                    fontSize = 9.sp,
+                                                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                                                )
+                                                            }
+                                                        }
+                                                        Switch(
+                                                            checked = food.isTimeScheduled,
+                                                            onCheckedChange = { isChecked ->
+                                                                viewModel.updateFoodItemTimeSchedule(
+                                                                    foodItem = food,
+                                                                    isScheduled = isChecked,
+                                                                    startTime = scheduleStart,
+                                                                    endTime = scheduleEnd
+                                                                )
+                                                            },
+                                                            modifier = Modifier.testTag("time_schedule_switch_${food.id}")
+                                                        )
+                                                    }
+
+                                                    if (food.isTimeScheduled) {
+                                                        Spacer(modifier = Modifier.height(6.dp))
+                                                        Row(
+                                                            modifier = Modifier.fillMaxWidth(),
+                                                            verticalAlignment = Alignment.CenterVertically,
+                                                            horizontalArrangement = Arrangement.SpaceBetween
+                                                        ) {
+                                                            Text(
+                                                                text = if (isCurrentlyScheduledVisible) "🟢 Currently VISIBLE on Menu" else "🔴 Currently HIDDEN (Outside Schedule)",
+                                                                fontSize = 10.sp,
+                                                                fontWeight = FontWeight.Bold,
+                                                                color = if (isCurrentlyScheduledVisible) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.error
+                                                            )
+                                                            TextButton(
+                                                                onClick = { showTimeSchedulePicker = !showTimeSchedulePicker },
+                                                                modifier = Modifier.testTag("configure_schedule_btn_${food.id}")
+                                                            ) {
+                                                                Text(if (showTimeSchedulePicker) "Close" else "Edit Schedule", fontSize = 10.sp, fontWeight = FontWeight.Bold)
+                                                            }
+                                                        }
+
+                                                        if (showTimeSchedulePicker) {
+                                                            Spacer(modifier = Modifier.height(6.dp))
+                                                            Text("Quick Meal Presets:", fontSize = 10.sp, fontWeight = FontWeight.Bold)
+                                                            Spacer(modifier = Modifier.height(4.dp))
+                                                            LazyRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                                                                val presets = listOf(
+                                                                    "Breakfast" to ("06:00" to "11:00"),
+                                                                    "Lunch Rush" to ("11:00" to "16:00"),
+                                                                    "Evening Meals" to ("16:00" to "22:00"),
+                                                                    "All Day" to ("00:00" to "23:59")
+                                                                )
+                                                                items(presets) { (label, times) ->
+                                                                    val isSel = scheduleStart == times.first && scheduleEnd == times.second
+                                                                    Box(
+                                                                        modifier = Modifier
+                                                                            .background(
+                                                                                if (isSel) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceVariant,
+                                                                                RoundedCornerShape(6.dp)
+                                                                            )
+                                                                            .clickable {
+                                                                                scheduleStart = times.first
+                                                                                scheduleEnd = times.second
+                                                                                viewModel.updateFoodItemTimeSchedule(
+                                                                                    foodItem = food,
+                                                                                    isScheduled = true,
+                                                                                    startTime = times.first,
+                                                                                    endTime = times.second
+                                                                                )
+                                                                            }
+                                                                            .padding(horizontal = 8.dp, vertical = 4.dp),
+                                                                        contentAlignment = Alignment.Center
+                                                                    ) {
+                                                                        Text(
+                                                                            "$label (${times.first}-${times.second})",
+                                                                            fontSize = 9.sp,
+                                                                            fontWeight = FontWeight.Bold,
+                                                                            color = if (isSel) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant
+                                                                        )
+                                                                    }
+                                                                }
+                                                            }
+                                                        }
+                                                    }
+                                                }
+                                            }
+
                                             Spacer(modifier = Modifier.height(8.dp))
                                             androidx.compose.material3.HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
+                                            Spacer(modifier = Modifier.height(8.dp))
                                             Spacer(modifier = Modifier.height(8.dp))
 
                                             var isEditingStockSettings by remember { mutableStateOf(false) }
@@ -3889,6 +4005,11 @@ fun VendorDashboardScreen(
                                 }
                             }
                         }
+
+                        // Interactive Visual Map of Cafeteria Stalls color-coded by performance metrics
+                        VendorStallPerformanceMap(orders = incomingOrders, modifier = Modifier.fillMaxWidth())
+
+                        Spacer(modifier = Modifier.height(10.dp))
 
                         // 1c. d3.js Interactive Dashboard Chart View
                         D3DashboardChart(orders = filteredIncomingOrders, feedbacks = filteredFeedbackList, auditLogs = auditLogs, modifier = Modifier.fillMaxWidth())
@@ -6448,6 +6569,8 @@ fun VendorDashboardScreen(
 
                                         Spacer(modifier = Modifier.height(16.dp))
 
+                                        val androidContext = androidx.compose.ui.platform.LocalContext.current
+
                                         Button(
                                             onClick = {
                                                 val amt = payoutAmountState.toDoubleOrNull()
@@ -6464,17 +6587,35 @@ fun VendorDashboardScreen(
                                                     return@Button
                                                 }
                                                 payoutErrorMessage = null
-                                                viewModel.requestVendorPayout(amt, payoutDetailsState) { success ->
-                                                    if (success) {
-                                                        hasRequestedPayout = "GH₵ ${"%.2f".format(amt)} payout logged successfully! Will hit your phone wallet shortly."
-                                                    } else {
-                                                        payoutErrorMessage = "Payout failed. Verify system connection."
+
+                                                val activity = BiometricHelper.findActivity(androidContext)
+                                                val executePayout = {
+                                                    viewModel.requestVendorPayout(amt, payoutDetailsState) { success ->
+                                                        if (success) {
+                                                            hasRequestedPayout = "GH₵ ${"%.2f".format(amt)} payout logged successfully! Will hit your phone wallet shortly."
+                                                        } else {
+                                                            payoutErrorMessage = "Payout failed. Verify system connection."
+                                                        }
                                                     }
                                                 }
+
+                                                if (activity != null && BiometricHelper.isBiometricAvailable(androidContext)) {
+                                                    BiometricHelper.showBiometricPrompt(
+                                                        activity = activity,
+                                                        title = "Authorize Financial Payout",
+                                                        subtitle = "Verify identity to disburse GH₵ ${"%.2f".format(amt)} to $payoutDetailsState",
+                                                        onSuccess = { executePayout() },
+                                                        onError = { err -> payoutErrorMessage = "Biometric Verification Failed: $err" }
+                                                    )
+                                                } else {
+                                                    executePayout()
+                                                }
                                             },
-                                            modifier = Modifier.fillMaxWidth()
+                                            modifier = Modifier.fillMaxWidth().testTag("settle_payout_btn")
                                         ) {
-                                            Text("Settle Funds Now")
+                                            Icon(Icons.Default.Fingerprint, contentDescription = null, modifier = Modifier.size(16.dp))
+                                            Spacer(modifier = Modifier.width(6.dp))
+                                            Text("Settle Funds Now (Biometric Protection)")
                                         }
                                     }
                                 }

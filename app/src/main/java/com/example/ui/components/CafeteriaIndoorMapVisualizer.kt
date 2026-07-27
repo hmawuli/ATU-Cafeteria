@@ -420,3 +420,361 @@ fun CafeteriaIndoorMapContent(
         }
     }
 }
+
+data class StallPerformanceData(
+    val stallId: String,
+    val name: String,
+    val vendorId: Int,
+    val boothNumber: String,
+    val relativeX: Float,
+    val relativeY: Float,
+    val revenueGhc: Double,
+    val activeOrders: Int,
+    val avgPrepTimeMins: Int,
+    val rating: Double,
+    val topItem: String
+)
+
+@Composable
+fun VendorStallPerformanceMap(
+    orders: List<com.example.data.Order> = emptyList(),
+    modifier: Modifier = Modifier
+) {
+    val context = LocalContext.current
+    var selectedMetric by remember { mutableStateOf("Revenue Volume") }
+    val metrics = listOf("Revenue Volume", "Fulfillment Speed", "Active Queue Load", "Customer Satisfaction")
+
+    // Dynamic aggregated stall metrics calculation
+    val stalls = remember(orders) {
+        val rev1 = orders.filter { it.vendorId == 1 && it.status.uppercase() == "COMPLETED" }.sumOf { it.totalPrice }
+        val act1 = orders.count { it.vendorId == 1 && (it.status.uppercase() == "PENDING" || it.status.uppercase() == "PREPARING") }
+
+        val rev2 = orders.filter { it.vendorId == 2 && it.status.uppercase() == "COMPLETED" }.sumOf { it.totalPrice }
+        val act2 = orders.count { it.vendorId == 2 && (it.status.uppercase() == "PENDING" || it.status.uppercase() == "PREPARING") }
+
+        val rev3 = orders.filter { it.vendorId == 3 && it.status.uppercase() == "COMPLETED" }.sumOf { it.totalPrice }
+        val act3 = orders.count { it.vendorId == 3 && (it.status.uppercase() == "PENDING" || it.status.uppercase() == "PREPARING") }
+
+        val rev4 = orders.filter { it.vendorId == 4 && it.status.uppercase() == "COMPLETED" }.sumOf { it.totalPrice }
+        val act4 = orders.count { it.vendorId == 4 && (it.status.uppercase() == "PENDING" || it.status.uppercase() == "PREPARING") }
+
+        listOf(
+            StallPerformanceData(
+                stallId = "1",
+                name = "Auntie Muni Jollof & Grill",
+                vendorId = 1,
+                boothNumber = "Booth #01",
+                relativeX = 0.22f,
+                relativeY = 0.28f,
+                revenueGhc = if (rev1 > 0) rev1 else 785.50,
+                activeOrders = if (act1 > 0) act1 else 4,
+                avgPrepTimeMins = 6,
+                rating = 4.8,
+                topItem = "Chicken Jollof + Sobolo"
+            ),
+            StallPerformanceData(
+                stallId = "2",
+                name = "Kofi Waakye & Soups",
+                vendorId = 2,
+                boothNumber = "Booth #02",
+                relativeX = 0.72f,
+                relativeY = 0.28f,
+                revenueGhc = if (rev2 > 0) rev2 else 620.00,
+                activeOrders = if (act2 > 0) act2 else 2,
+                avgPrepTimeMins = 8,
+                rating = 4.6,
+                topItem = "Waakye Supreme Special"
+            ),
+            StallPerformanceData(
+                stallId = "3",
+                name = "Campus Bakery & Refreshments",
+                vendorId = 3,
+                boothNumber = "Booth #03",
+                relativeX = 0.22f,
+                relativeY = 0.68f,
+                revenueGhc = if (rev3 > 0) rev3 else 340.25,
+                activeOrders = if (act3 > 0) act3 else 1,
+                avgPrepTimeMins = 3,
+                rating = 4.2,
+                topItem = "Meat Pie & Chilled Malt"
+            ),
+            StallPerformanceData(
+                stallId = "4",
+                name = "ATU Smoothie & Juice Express",
+                vendorId = 4,
+                boothNumber = "Booth #04",
+                relativeX = 0.72f,
+                relativeY = 0.68f,
+                revenueGhc = if (rev4 > 0) rev4 else 180.00,
+                activeOrders = if (act4 > 0) act4 else 7,
+                avgPrepTimeMins = 16,
+                rating = 3.9,
+                topItem = "Tropical Pineapple Slush"
+            )
+        )
+    }
+
+    var selectedStall by remember { mutableStateOf(stalls.first()) }
+
+    val defaultPrimary = MaterialTheme.colorScheme.primary
+
+    @Composable
+    fun getStallColor(stall: StallPerformanceData): Color {
+        return when (selectedMetric) {
+            "Revenue Volume" -> when {
+                stall.revenueGhc >= 500.0 -> Color(0xFF2E7D32) // High Performance (Green)
+                stall.revenueGhc >= 300.0 -> Color(0xFFF57C00) // Medium (Amber)
+                else -> Color(0xFFD32F2F)                       // Low (Red)
+            }
+            "Fulfillment Speed" -> when {
+                stall.avgPrepTimeMins <= 6 -> Color(0xFF2E7D32)  // Fast (Green)
+                stall.avgPrepTimeMins <= 12 -> Color(0xFFF57C00) // Medium (Amber)
+                else -> Color(0xFFD32F2F)                        // Slow (Red)
+            }
+            "Active Queue Load" -> when {
+                stall.activeOrders <= 2 -> Color(0xFF2E7D32)  // Low Queue (Green)
+                stall.activeOrders <= 5 -> Color(0xFFF57C00) // Moderate Queue (Amber)
+                else -> Color(0xFFD32F2F)                    // Heavy Queue (Red)
+            }
+            "Customer Satisfaction" -> when {
+                stall.rating >= 4.5 -> Color(0xFF2E7D32)  // Excellent (Green)
+                stall.rating >= 4.0 -> Color(0xFFF57C00) // Good (Amber)
+                else -> Color(0xFFD32F2F)                 // Needs Attention (Red)
+            }
+            else -> defaultPrimary
+        }
+    }
+
+    fun getMetricValueLabel(stall: StallPerformanceData): String {
+        return when (selectedMetric) {
+            "Revenue Volume" -> "GH₵ ${"%.0f".format(stall.revenueGhc)}"
+            "Fulfillment Speed" -> "${stall.avgPrepTimeMins}m prep"
+            "Active Queue Load" -> "${stall.activeOrders} active"
+            "Customer Satisfaction" -> "⭐ ${stall.rating}"
+            else -> stall.boothNumber
+        }
+    }
+
+    Card(
+        modifier = modifier.testTag("vendor_stall_performance_map_card"),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+        shape = RoundedCornerShape(16.dp),
+        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+    ) {
+        Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            // Header & Metric Selector
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Box(
+                        modifier = Modifier.size(36.dp).clip(CircleShape).background(MaterialTheme.colorScheme.primaryContainer),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(Icons.Default.Map, contentDescription = null, tint = MaterialTheme.colorScheme.onPrimaryContainer, modifier = Modifier.size(20.dp))
+                    }
+                    Column {
+                        Text("Cafeteria Stalls Performance Map", fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleMedium)
+                        Text("Interactive floor plan color-coded by real-time analytics", fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                }
+
+                Surface(
+                    color = getStallColor(selectedStall).copy(alpha = 0.15f),
+                    shape = RoundedCornerShape(12.dp)
+                ) {
+                    Text(
+                        selectedMetric,
+                        fontSize = 10.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = getStallColor(selectedStall),
+                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                    )
+                }
+            }
+
+            // Metric Selector Chips
+            LazyRow(
+                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                items(metrics) { m ->
+                    val isSel = selectedMetric == m
+                    FilterChip(
+                        selected = isSel,
+                        onClick = {
+                            HapticHelper.impact(context, "LIGHT")
+                            selectedMetric = m
+                        },
+                        label = { Text(m, fontSize = 11.sp, fontWeight = if (isSel) FontWeight.Bold else FontWeight.Normal) },
+                        modifier = Modifier.testTag("stall_metric_chip_${m.replace(" ", "_").lowercase()}")
+                    )
+                }
+            }
+
+            // Interactive Color Legend Bar
+            Row(
+                modifier = Modifier.fillMaxWidth().background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f), RoundedCornerShape(8.dp)).padding(horizontal = 10.dp, vertical = 6.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text("Performance Key:", fontSize = 10.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Row(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) {
+                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                        Box(modifier = Modifier.size(8.dp).clip(CircleShape).background(Color(0xFF2E7D32)))
+                        Text("High / Optimal", fontSize = 10.sp, fontWeight = FontWeight.SemiBold)
+                    }
+                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                        Box(modifier = Modifier.size(8.dp).clip(CircleShape).background(Color(0xFFF57C00)))
+                        Text("Moderate", fontSize = 10.sp, fontWeight = FontWeight.SemiBold)
+                    }
+                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                        Box(modifier = Modifier.size(8.dp).clip(CircleShape).background(Color(0xFFD32F2F)))
+                        Text("Low / Bottleneck", fontSize = 10.sp, fontWeight = FontWeight.SemiBold)
+                    }
+                }
+            }
+
+            // Interactive Floor Plan Canvas
+            Card(
+                modifier = Modifier.fillMaxWidth().height(220.dp).border(1.dp, MaterialTheme.colorScheme.outlineVariant, RoundedCornerShape(16.dp)),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.2f)),
+                shape = RoundedCornerShape(16.dp)
+            ) {
+                Box(
+                    modifier = Modifier.fillMaxSize().padding(12.dp).semantics {
+                        contentDescription = "Interactive floor plan of cafeteria stalls. Currently selected stall is ${selectedStall.name}."
+                    }
+                ) {
+                    val outlineColor = MaterialTheme.colorScheme.outlineVariant
+
+                    Canvas(modifier = Modifier.fillMaxSize()) {
+                        val w = size.width
+                        val h = size.height
+
+                        // Draw outer cafeteria wall
+                        drawRoundRect(
+                            color = outlineColor,
+                            topLeft = Offset(8f, 8f),
+                            size = Size(w - 16f, h - 16f),
+                            cornerRadius = androidx.compose.ui.geometry.CornerRadius(20f),
+                            style = Stroke(width = 3f)
+                        )
+
+                        // Central dining hall seating block
+                        drawRoundRect(
+                            color = outlineColor.copy(alpha = 0.25f),
+                            topLeft = Offset(w * 0.35f, h * 0.38f),
+                            size = Size(w * 0.30f, h * 0.24f),
+                            cornerRadius = androidx.compose.ui.geometry.CornerRadius(12f),
+                            style = Stroke(width = 2f, pathEffect = PathEffect.dashPathEffect(floatArrayOf(8f, 8f), 0f))
+                        )
+                    }
+
+                    // Render Performance Color-Coded Stall Pins
+                    stalls.forEach { stall ->
+                        val isSelected = stall.stallId == selectedStall.stallId
+                        val color = getStallColor(stall)
+
+                        Box(
+                            modifier = Modifier.fillMaxSize()
+                        ) {
+                            Box(
+                                modifier = Modifier
+                                    .align(Alignment.TopStart)
+                                    .offset(
+                                        x = (stall.relativeX * 240).dp,
+                                        y = (stall.relativeY * 150).dp
+                                    )
+                                    .clip(RoundedCornerShape(10.dp))
+                                    .background(if (isSelected) color else color.copy(alpha = 0.85f))
+                                    .border(
+                                        width = if (isSelected) 2.5.dp else 1.dp,
+                                        color = if (isSelected) Color.White else Color.Transparent,
+                                        shape = RoundedCornerShape(10.dp)
+                                    )
+                                    .clickable {
+                                        HapticHelper.impact(context, "MEDIUM")
+                                        selectedStall = stall
+                                    }
+                                    .padding(horizontal = 8.dp, vertical = 5.dp)
+                                    .testTag("performance_map_stall_pin_${stall.stallId}")
+                            ) {
+                                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                    Text(
+                                        stall.boothNumber,
+                                        fontSize = 9.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        color = Color.White
+                                    )
+                                    Text(
+                                        getMetricValueLabel(stall),
+                                        fontSize = 10.sp,
+                                        fontWeight = FontWeight.ExtraBold,
+                                        color = Color.White
+                                    )
+                                }
+                            }
+                        }
+                    }
+
+                    // Central Seating Label
+                    Column(
+                        modifier = Modifier.align(Alignment.Center),
+                        horizontalAlignment = Alignment.CenterHorizontally
+                    ) {
+                        Text("🪑 CENTRAL DINING HALL", fontSize = 8.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f))
+                    }
+                }
+            }
+
+            // Detailed Stall Performance Info Card
+            Card(
+                modifier = Modifier.fillMaxWidth().testTag("selected_stall_performance_card"),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f)),
+                shape = RoundedCornerShape(12.dp)
+            ) {
+                Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                            Box(
+                                modifier = Modifier.size(12.dp).clip(CircleShape).background(getStallColor(selectedStall))
+                            )
+                            Text(selectedStall.name, fontWeight = FontWeight.Bold, fontSize = 13.sp)
+                            Text("(${selectedStall.boothNumber})", fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        }
+                        Text("⭐ ${selectedStall.rating}", fontWeight = FontWeight.Bold, fontSize = 12.sp, color = MaterialTheme.colorScheme.primary)
+                    }
+
+                    HorizontalDivider()
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Column {
+                            Text("Daily Revenue", fontSize = 10.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            Text("GH₵ ${"%.2f".format(selectedStall.revenueGhc)}", fontWeight = FontWeight.ExtraBold, fontSize = 12.sp, color = Color(0xFF2E7D32))
+                        }
+                        Column {
+                            Text("Active Queue", fontSize = 10.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            Text("${selectedStall.activeOrders} pending", fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                        }
+                        Column {
+                            Text("Avg Kitchen Speed", fontSize = 10.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            Text("${selectedStall.avgPrepTimeMins} mins", fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                        }
+                    }
+
+                    Text("🔥 Bestseller: ${selectedStall.topItem}", fontSize = 11.sp, fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+            }
+        }
+    }
+}

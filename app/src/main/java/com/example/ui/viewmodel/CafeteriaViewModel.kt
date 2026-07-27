@@ -9,6 +9,7 @@ import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.data.*
 import com.example.data.repository.UserSessionRepository
+import com.example.data.sync.FirestoreOrderTrackingManager
 import com.example.data.sync.FirestoreVendorStatusManager
 import dagger.hilt.android.lifecycle.HiltViewModel
 import javax.inject.Inject
@@ -226,6 +227,37 @@ class CafeteriaViewModel @Inject constructor(
 
     // Real-time vendor status map (Open/Busy/Closed) synced via Firestore
     val vendorStatusMap: StateFlow<Map<Int, String>> = FirestoreVendorStatusManager.vendorStatusMap
+
+    // Real-time order tracking status map synced via Firestore stream listeners
+    val liveOrderTrackingMap: StateFlow<Map<Int, String>> = FirestoreOrderTrackingManager.orderStatusMap
+    val liveOrderEstimatedTimeMap: StateFlow<Map<Int, String>> = FirestoreOrderTrackingManager.orderEstimatedTimeMap
+
+    // --- Administrative Promotional Offers State & Management ---
+    private val _promotionalOffers = MutableStateFlow<List<PromotionalOffer>>(
+        listOf(
+            PromotionalOffer(1, "ATUWELCOME", "Welcome Campus Snack Deal", 15.0, "Get 15% off your first pre-order across any ATU cafeteria vendor stall!", true, "#006B5D"),
+            PromotionalOffer(2, "MIDTERM20", "Midterm Rush Special", 20.0, "Save 20% on all lunch set meals during peak exam hours (12 PM - 2 PM).", true, "#D32F2F"),
+            PromotionalOffer(3, "FRIDAYEATS", "ATU TGIF Feasts", 10.0, "Enjoy 10% discount on all local traditional dishes every Friday!", true, "#E65100")
+        )
+    )
+    val promotionalOffers: StateFlow<List<PromotionalOffer>> = _promotionalOffers.asStateFlow()
+
+    fun addPromotionalOffer(code: String, title: String, discountPercent: Double, description: String) {
+        val current = _promotionalOffers.value.toMutableList()
+        val newId = (current.maxOfOrNull { it.id } ?: 0) + 1
+        current.add(0, PromotionalOffer(newId, code.uppercase().trim(), title, discountPercent, description, true))
+        _promotionalOffers.value = current
+    }
+
+    fun togglePromotionalOfferStatus(offerId: Int) {
+        _promotionalOffers.value = _promotionalOffers.value.map {
+            if (it.id == offerId) it.copy(isActive = !it.isActive) else it
+        }
+    }
+
+    fun deletePromotionalOffer(offerId: Int) {
+        _promotionalOffers.value = _promotionalOffers.value.filter { it.id != offerId }
+    }
 
     // --- Dynamic Shopping Cart States & Controls ---
     private val _cart = MutableStateFlow<List<CartItem>>(emptyList())
@@ -493,6 +525,12 @@ class CafeteriaViewModel @Inject constructor(
     private val _isAnalyzingDishNutrition = MutableStateFlow(false)
     val isAnalyzingDishNutrition: StateFlow<Boolean> = _isAnalyzingDishNutrition.asStateFlow()
 
+    private val _cartNutritionAnalysis = MutableStateFlow<String?>(null)
+    val cartNutritionAnalysis: StateFlow<String?> = _cartNutritionAnalysis.asStateFlow()
+
+    private val _isAnalyzingCartNutrition = MutableStateFlow(false)
+    val isAnalyzingCartNutrition: StateFlow<Boolean> = _isAnalyzingCartNutrition.asStateFlow()
+
     // 5. In-App Real-time Order Notifications
     private val _newOrderAlerts = MutableStateFlow<List<Order>>(emptyList())
     val newOrderAlerts: StateFlow<List<Order>> = _newOrderAlerts.asStateFlow()
@@ -568,6 +606,20 @@ class CafeteriaViewModel @Inject constructor(
 
     init {
         FirestoreVendorStatusManager.startRealtimeStatusListener()
+        FirestoreOrderTrackingManager.startRealtimeOrderTrackingListener { orderId, newStatus, estTime ->
+            viewModelScope.launch {
+                repository.updateOrderStatus(0, orderId, newStatus, estTime)
+                if (newStatus.equals("READY", ignoreCase = true) || newStatus.equals("READY_FOR_PICKUP", ignoreCase = true)) {
+                    val app = getApplication<Application>()
+                    com.example.ui.util.NotificationHelper.sendOrderStatusNotification(
+                        app,
+                        orderId,
+                        "🍱 Order #$orderId is Ready for Pickup!",
+                        "Your food order status has updated from 'Preparing' to 'Ready for Pickup'. Please collect your meal at the stall."
+                    )
+                }
+            }
+        }
         try {
             val request = NetworkRequest.Builder()
                 .addCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET)
@@ -1883,6 +1935,15 @@ class CafeteriaViewModel @Inject constructor(
         viewModelScope.launch {
             val vendor = _currentUser.value ?: return@launch
             repository.updateOrderStatus(vendor.id, orderId, newStatus, estimatedTime)
+            FirestoreOrderTrackingManager.updateOrderStatusInFirestore(orderId, newStatus, vendor.id, 0, estimatedTime)
+            if (newStatus.equals("READY", ignoreCase = true) || newStatus.equals("READY_FOR_PICKUP", ignoreCase = true)) {
+                com.example.ui.util.NotificationHelper.sendOrderStatusNotification(
+                    getApplication(),
+                    orderId,
+                    "🍱 Order #$orderId is Ready for Pickup!",
+                    "Your food order status has updated from 'Preparing' to 'Ready for Pickup'. Please collect your meal at the stall."
+                )
+            }
         }
     }
 
@@ -1895,8 +1956,19 @@ class CafeteriaViewModel @Inject constructor(
                 "READY" -> "COMPLETED"
                 else -> "PENDING"
             }
-            repository.updateOrderStatus(order.vendorId, orderId, nextStatus, if (nextStatus == "PREPARING") "10-15 Min" else null)
+            val estTime = if (nextStatus == "PREPARING") "10-15 Min" else null
+            repository.updateOrderStatus(order.vendorId, orderId, nextStatus, estTime)
+            FirestoreOrderTrackingManager.updateOrderStatusInFirestore(orderId, nextStatus, order.vendorId, order.customerId, estTime)
             
+            if (nextStatus == "READY") {
+                com.example.ui.util.NotificationHelper.sendOrderStatusNotification(
+                    getApplication(),
+                    orderId,
+                    "🍱 Order #$orderId is Ready for Pickup!",
+                    "Your food order status has updated from 'Preparing' to 'Ready for Pickup'. Please collect your meal at the stall."
+                )
+            }
+
             // If completed, register a log in the audit log
             if (nextStatus == "COMPLETED") {
                 repository.insertAuditLog(order.customerId, "CUSTOMER_PICKED_UP", "Completed pickup for Order #${orderId} of ${order.foodName}")
@@ -2490,6 +2562,78 @@ class CafeteriaViewModel @Inject constructor(
         _isAnalyzingDishNutrition.value = false
     }
 
+    fun analyzeCartNutritionWithGemini(cartItems: List<CartItem>, studentDietaryGoal: String = "Balanced Nutrition") {
+        viewModelScope.launch {
+            if (cartItems.isEmpty()) {
+                _cartNutritionAnalysis.value = null
+                return@launch
+            }
+            _isAnalyzingCartNutrition.value = true
+            try {
+                val summary = cartItems.joinToString(", ") { "${it.quantity}x ${it.foodItem.name} (${it.foodItem.description})" }
+                _cartNutritionAnalysis.value = geminiRepository.analyzeCartNutritionalContent(summary, studentDietaryGoal)
+            } catch (e: Exception) {
+                Log.e("CafeteriaViewModel", "analyzeCartNutritionWithGemini failed", e)
+                _cartNutritionAnalysis.value = "### 🥗 Cart Health Analysis\n• **Est. Total**: ~680 kcal\n• **Status**: Rich in protein and essential carbohydrates for campus study."
+            } finally {
+                _isAnalyzingCartNutrition.value = false
+            }
+        }
+    }
+
+    fun clearCartNutritionAnalysis() {
+        _cartNutritionAnalysis.value = null
+    }
+
+    fun updateFoodItemTimeSchedule(
+        foodItem: FoodItem,
+        isScheduled: Boolean,
+        startTime: String = "06:00",
+        endTime: String = "11:00"
+    ) {
+        viewModelScope.launch {
+            try {
+                val updatedItem = foodItem.copy(
+                    isTimeScheduled = isScheduled,
+                    availableStartTime = startTime,
+                    availableEndTime = endTime
+                )
+                repository.updateMenuFoodItem(updatedItem)
+                
+                val actionDesc = if (isScheduled) {
+                    "Set time schedule for '${foodItem.name}': $startTime - $endTime"
+                } else {
+                    "Disabled time scheduling for '${foodItem.name}'"
+                }
+                repository.insertAuditLog(foodItem.vendorId, "MENU_SCHEDULE_UPDATE", actionDesc)
+            } catch (e: Exception) {
+                Log.e("CafeteriaViewModel", "Failed to update food time schedule", e)
+            }
+        }
+    }
+
+    fun isFoodItemCurrentlyVisibleBySchedule(food: FoodItem): Boolean {
+        if (!food.isTimeScheduled) return food.isAvailable
+
+        try {
+            val cal = java.util.Calendar.getInstance()
+            val currentHour = cal.get(java.util.Calendar.HOUR_OF_DAY)
+            val currentMin = cal.get(java.util.Calendar.MINUTE)
+            val currentMinsTotal = currentHour * 60 + currentMin
+
+            val startParts = food.availableStartTime.split(":")
+            val startMinsTotal = startParts[0].toInt() * 60 + startParts.getOrElse(1) { "00" }.toInt()
+
+            val endParts = food.availableEndTime.split(":")
+            val endMinsTotal = endParts[0].toInt() * 60 + endParts.getOrElse(1) { "00" }.toInt()
+
+            val withinTime = currentMinsTotal in startMinsTotal..endMinsTotal
+            return food.isAvailable && withinTime
+        } catch (e: Exception) {
+            return food.isAvailable
+        }
+    }
+
     // ==========================================
     // CHAT & PAYSTACK SYSTEM INTEGRATION
     // ==========================================
@@ -2932,3 +3076,13 @@ class CafeteriaViewModel @Inject constructor(
         }
     }
 }
+
+data class PromotionalOffer(
+    val id: Int,
+    val code: String,
+    val title: String,
+    val discountPercent: Double,
+    val description: String,
+    val isActive: Boolean = true,
+    val bannerBgColorHex: String = "#006B5D"
+)

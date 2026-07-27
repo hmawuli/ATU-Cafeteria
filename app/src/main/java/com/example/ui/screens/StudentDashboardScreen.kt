@@ -328,7 +328,18 @@ fun StudentDashboardScreen(
 
     var searchQuery by remember { mutableStateOf("") }
 
-    // Voice-controlled search Speech Recognition Launcher
+    // Dynamic Record Audio Permission Launcher
+    val audioPermissionLauncher = androidx.activity.compose.rememberLauncherForActivityResult(
+        contract = androidx.activity.result.contract.ActivityResultContracts.RequestPermission()
+    ) { isGranted ->
+        if (isGranted) {
+            android.widget.Toast.makeText(context, "Microphone permission granted! Tap Mic again to speak.", android.widget.Toast.LENGTH_SHORT).show()
+        } else {
+            android.widget.Toast.makeText(context, "Microphone permission required for voice ordering.", android.widget.Toast.LENGTH_SHORT).show()
+        }
+    }
+
+    // Voice-controlled search & Voice Ordering Speech Recognition Launcher
     val speechRecognizerLauncher = androidx.activity.compose.rememberLauncherForActivityResult(
         contract = androidx.activity.result.contract.ActivityResultContracts.StartActivityForResult()
     ) { result ->
@@ -336,14 +347,34 @@ fun StudentDashboardScreen(
             val data = result.data
             val results = data?.getStringArrayListExtra(android.speech.RecognizerIntent.EXTRA_RESULTS)
             if (!results.isNullOrEmpty()) {
-                searchQuery = results[0]
-                android.widget.Toast.makeText(context, "Voice Search: ${results[0]}", android.widget.Toast.LENGTH_SHORT).show()
+                val spokenText = results[0]
+                val lowerSpoken = spokenText.lowercase()
+
+                // Smart voice matching against menu items
+                val matchedItem = allFoodItems.find { food ->
+                    val foodLower = food.name.lowercase()
+                    lowerSpoken.contains(foodLower) || foodLower.contains(lowerSpoken.replace("add", "").replace("cart", "").replace("order", "").replace("i want", "").trim())
+                }
+
+                if (matchedItem != null && (lowerSpoken.contains("add") || lowerSpoken.contains("cart") || lowerSpoken.contains("order") || lowerSpoken.contains("want") || lowerSpoken.contains("buy"))) {
+                    viewModel.addToCart(matchedItem, 1)
+                    searchQuery = matchedItem.name
+                    android.widget.Toast.makeText(context, "🎤 Voice Command Recognized: Added '${matchedItem.name}' to cart!", android.widget.Toast.LENGTH_LONG).show()
+                    tts?.speak("Added ${matchedItem.name} to your shopping cart", android.speech.tts.TextToSpeech.QUEUE_FLUSH, null, null)
+                } else if (matchedItem != null) {
+                    searchQuery = matchedItem.name
+                    android.widget.Toast.makeText(context, "🎤 Voice Search: Found '${matchedItem.name}'", android.widget.Toast.LENGTH_SHORT).show()
+                    tts?.speak("Found ${matchedItem.name} on the menu", android.speech.tts.TextToSpeech.QUEUE_FLUSH, null, null)
+                } else {
+                    searchQuery = spokenText
+                    android.widget.Toast.makeText(context, "🎤 Voice Search: '$spokenText'", android.widget.Toast.LENGTH_SHORT).show()
+                }
             }
         }
     }
 
     var selectedCategory by remember { mutableStateOf("All") }
-    val categories = listOf("All", "Breakfast", "Local Dish", "Fast Food", "Drinks", "Snacks")
+    val categories = listOf("All", "Breakfast", "Lunch", "Vegan", "Local Dish", "Fast Food", "Drinks", "Snacks")
     var selectedDietaryFilter by remember { mutableStateOf("All") }
     var showCartCheckoutDialog by remember { mutableStateOf(false) }
 
@@ -1756,15 +1787,24 @@ fun StudentDashboardScreen(
                                         IconButton(
                                             onClick = {
                                                 HapticHelper.impact(context, "LIGHT")
-                                                val intent = android.content.Intent(android.speech.RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
-                                                    putExtra(android.speech.RecognizerIntent.EXTRA_LANGUAGE_MODEL, android.speech.RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
-                                                    putExtra(android.speech.RecognizerIntent.EXTRA_LANGUAGE, java.util.Locale.getDefault())
-                                                    putExtra(android.speech.RecognizerIntent.EXTRA_PROMPT, "Speak now to search menus hands-free...")
-                                                }
-                                                try {
-                                                    speechRecognizerLauncher.launch(intent)
-                                                } catch (e: Exception) {
-                                                    android.widget.Toast.makeText(context, "Voice Search not supported.", android.widget.Toast.LENGTH_SHORT).show()
+                                                val hasMicPerm = androidx.core.content.ContextCompat.checkSelfPermission(
+                                                    context,
+                                                    android.Manifest.permission.RECORD_AUDIO
+                                                ) == android.content.pm.PackageManager.PERMISSION_GRANTED
+
+                                                if (!hasMicPerm) {
+                                                    audioPermissionLauncher.launch(android.Manifest.permission.RECORD_AUDIO)
+                                                } else {
+                                                    val intent = android.content.Intent(android.speech.RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
+                                                        putExtra(android.speech.RecognizerIntent.EXTRA_LANGUAGE_MODEL, android.speech.RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
+                                                        putExtra(android.speech.RecognizerIntent.EXTRA_LANGUAGE, java.util.Locale.getDefault())
+                                                        putExtra(android.speech.RecognizerIntent.EXTRA_PROMPT, "Speak to search or add items to cart (e.g. 'Add Jollof Rice')...")
+                                                    }
+                                                    try {
+                                                        speechRecognizerLauncher.launch(intent)
+                                                    } catch (e: Exception) {
+                                                        android.widget.Toast.makeText(context, "Voice Speech Recognition not supported on this device.", android.widget.Toast.LENGTH_SHORT).show()
+                                                    }
                                                 }
                                             },
                                             modifier = Modifier.testTag("voice_search_button")
@@ -2466,7 +2506,9 @@ fun StudentDashboardScreen(
                                 "Gluten-Free" -> food.description.contains("Gluten-Free", ignoreCase = true) || food.name.contains("Gluten-Free", ignoreCase = true) || food.allergens.contains("Gluten-Free", ignoreCase = true) || !food.allergens.contains("Wheat", ignoreCase = true)
                                 else -> true
                             }
+                            val isScheduledVisible = viewModel.isFoodItemCurrentlyVisibleBySchedule(food)
                             vendorIsOpen &&
+                            isScheduledVisible &&
                             matchesDietary &&
                             (selectedVendorIdFilter == null || food.vendorId == selectedVendorIdFilter) &&
                             (selectedCategory == "All" || food.category.equals(selectedCategory, ignoreCase = true)) &&
@@ -8683,60 +8725,51 @@ fun StudentDashboardScreen(
 
                             Box(
                                 modifier = Modifier
-                                    .size(180.dp)
+                                    .size(190.dp)
                                     .clip(RoundedCornerShape(12.dp))
                                     .background(Color.White)
-                                    .padding(12.dp),
+                                    .padding(8.dp),
                                 contentAlignment = Alignment.Center
                             ) {
-                                androidx.compose.foundation.Canvas(modifier = Modifier.fillMaxSize()) {
-                                    val sizePx = size.width
-                                    val finderSize = sizePx * 7f / 21f
+                                val qrBitmap = remember(order.id, order.pickupPin, order.totalPrice) {
+                                    com.example.ui.util.QrCodeGeneratorUtil.generateQrImageBitmap(
+                                        content = "ATU-ORDER-${order.id}-${order.pickupPin}-${order.totalPrice}",
+                                        sizePx = 512
+                                    )
+                                }
+                                if (qrBitmap != null) {
+                                    androidx.compose.foundation.Image(
+                                        bitmap = qrBitmap,
+                                        contentDescription = "Transaction QR Code for Order #${order.id}",
+                                        modifier = Modifier.fillMaxSize().testTag("student_transaction_qr_image_${order.id}")
+                                    )
+                                } else {
+                                    androidx.compose.foundation.Canvas(modifier = Modifier.fillMaxSize()) {
+                                        val sizePx = size.width
+                                        val finderSize = sizePx * 7f / 21f
 
-                                    fun drawFinder(x: Float, y: Float, fSize: Float) {
-                                        val strokeW = fSize / 7f
-                                        drawRect(
-                                            color = Color.Black,
-                                            topLeft = androidx.compose.ui.geometry.Offset(x, y),
-                                            size = androidx.compose.ui.geometry.Size(fSize, fSize)
-                                        )
-                                        drawRect(
-                                            color = Color.White,
-                                            topLeft = androidx.compose.ui.geometry.Offset(x + strokeW, y + strokeW),
-                                            size = androidx.compose.ui.geometry.Size(fSize - strokeW * 2f, fSize - strokeW * 2f)
-                                        )
-                                        drawRect(
-                                            color = Color.Black,
-                                            topLeft = androidx.compose.ui.geometry.Offset(x + strokeW * 2f, y + strokeW * 2f),
-                                            size = androidx.compose.ui.geometry.Size(fSize - strokeW * 4f, fSize - strokeW * 4f)
-                                        )
-                                    }
-
-                                    drawFinder(0f, 0f, finderSize)
-                                    drawFinder(sizePx - finderSize, 0f, finderSize)
-                                    drawFinder(0f, sizePx - finderSize, finderSize)
-
-                                    val gridCount = 21
-                                    val cellSize = sizePx / gridCount
-                                    val seed = (order.id.toString() + order.pickupPin).hashCode()
-                                    val random = java.util.Random(seed.toLong())
-
-                                    for (row in 0 until gridCount) {
-                                        for (col in 0 until gridCount) {
-                                            val inTopLeft = row < 8 && col < 8
-                                            val inTopRight = row < 8 && col >= gridCount - 8
-                                            val inBottomLeft = row >= gridCount - 8 && col < 8
-
-                                            if (!inTopLeft && !inTopRight && !inBottomLeft) {
-                                                if (random.nextBoolean()) {
-                                                    drawRect(
-                                                        color = Color.Black,
-                                                        topLeft = androidx.compose.ui.geometry.Offset(col * cellSize, row * cellSize),
-                                                        size = androidx.compose.ui.geometry.Size(cellSize, cellSize)
-                                                    )
-                                                }
-                                            }
+                                        fun drawFinder(x: Float, y: Float, fSize: Float) {
+                                            val strokeW = fSize / 7f
+                                            drawRect(
+                                                color = Color.Black,
+                                                topLeft = androidx.compose.ui.geometry.Offset(x, y),
+                                                size = androidx.compose.ui.geometry.Size(fSize, fSize)
+                                            )
+                                            drawRect(
+                                                color = Color.White,
+                                                topLeft = androidx.compose.ui.geometry.Offset(x + strokeW, y + strokeW),
+                                                size = androidx.compose.ui.geometry.Size(fSize - strokeW * 2f, fSize - strokeW * 2f)
+                                            )
+                                            drawRect(
+                                                color = Color.Black,
+                                                topLeft = androidx.compose.ui.geometry.Offset(x + strokeW * 2f, y + strokeW * 2f),
+                                                size = androidx.compose.ui.geometry.Size(fSize - strokeW * 4f, fSize - strokeW * 4f)
+                                            )
                                         }
+
+                                        drawFinder(0f, 0f, finderSize)
+                                        drawFinder(sizePx - finderSize, 0f, finderSize)
+                                        drawFinder(0f, sizePx - finderSize, finderSize)
                                     }
                                 }
                             }
@@ -10459,6 +10492,133 @@ fun StudentDashboardScreen(
                                             }
                                         }
                                     }
+
+                                    // ⏱️ Real-Time Wait-Time Estimation Card (Historical & Live Volume Data)
+                                    val allOrdersList by viewModel.allOrdersSnapshot.collectAsStateWithLifecycle()
+                                    val customerOrdersList by viewModel.customerOrders.collectAsStateWithLifecycle()
+                                    val totalCartQty = cartItems.sumOf { it.quantity }
+                                    val cartVendorId = cartItems.firstOrNull()?.foodItem?.vendorId ?: 0
+
+                                    val waitTimeEstimate = remember(cartItems, allOrdersList, customerOrdersList) {
+                                        com.example.ui.util.WaitTimeService.calculateDetailedWaitTime(
+                                            activeOrders = allOrdersList,
+                                            historicalOrders = customerOrdersList,
+                                            vendorId = cartVendorId,
+                                            newItemQuantity = totalCartQty
+                                        )
+                                    }
+
+                                    Card(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        colors = CardDefaults.cardColors(
+                                            containerColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.25f)
+                                        ),
+                                        shape = RoundedCornerShape(10.dp)
+                                    ) {
+                                        Row(
+                                            modifier = Modifier.padding(10.dp),
+                                            verticalAlignment = Alignment.CenterVertically,
+                                            horizontalArrangement = Arrangement.spacedBy(10.dp)
+                                        ) {
+                                            Icon(
+                                                imageVector = Icons.Default.Timer,
+                                                contentDescription = "Wait Time",
+                                                tint = MaterialTheme.colorScheme.primary,
+                                                modifier = Modifier.size(24.dp)
+                                            )
+                                            Column {
+                                                Text(
+                                                    "⏱️ Est. Kitchen Preparation Wait Time",
+                                                    fontSize = 11.sp,
+                                                    fontWeight = FontWeight.Bold,
+                                                    color = MaterialTheme.colorScheme.primary
+                                                )
+                                                Text(
+                                                    waitTimeEstimate.summaryText,
+                                                    fontSize = 12.sp,
+                                                    fontWeight = FontWeight.ExtraBold,
+                                                    color = MaterialTheme.colorScheme.onSurface
+                                                )
+                                                Text(
+                                                    "Calculated from ${waitTimeEstimate.queueSize} queue orders & historical average prep speed",
+                                                    fontSize = 9.sp,
+                                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                                )
+                                            }
+                                        }
+                                    }
+
+                                    Spacer(modifier = Modifier.height(10.dp))
+
+                                    // 🥗 Gemini Real-time Cart Nutritional Analysis & Health Warning/Recommendation Card
+                                    val cartNutritionAnalysisText by viewModel.cartNutritionAnalysis.collectAsStateWithLifecycle()
+                                    val isAnalyzingCartNutrition by viewModel.isAnalyzingCartNutrition.collectAsStateWithLifecycle()
+
+                                    LaunchedEffect(cartItems) {
+                                        if (cartItems.isNotEmpty()) {
+                                            viewModel.analyzeCartNutritionWithGemini(cartItems)
+                                        }
+                                    }
+
+                                    Card(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        colors = CardDefaults.cardColors(
+                                            containerColor = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.25f)
+                                        ),
+                                        shape = RoundedCornerShape(10.dp)
+                                    ) {
+                                        Column(modifier = Modifier.padding(10.dp)) {
+                                            Row(
+                                                modifier = Modifier.fillMaxWidth(),
+                                                verticalAlignment = Alignment.CenterVertically,
+                                                horizontalArrangement = Arrangement.SpaceBetween
+                                            ) {
+                                                Row(
+                                                    verticalAlignment = Alignment.CenterVertically,
+                                                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                                                ) {
+                                                    Icon(
+                                                        imageVector = Icons.Default.AutoAwesome,
+                                                        contentDescription = "Gemini AI",
+                                                        tint = MaterialTheme.colorScheme.secondary,
+                                                        modifier = Modifier.size(18.dp)
+                                                    )
+                                                    Text(
+                                                        "Gemini Real-time Cart Health & Nutrition Advisor",
+                                                        fontSize = 11.sp,
+                                                        fontWeight = FontWeight.Bold,
+                                                        color = MaterialTheme.colorScheme.secondary
+                                                    )
+                                                }
+                                                if (isAnalyzingCartNutrition) {
+                                                    CircularProgressIndicator(
+                                                        modifier = Modifier.size(14.dp),
+                                                        strokeWidth = 2.dp,
+                                                        color = MaterialTheme.colorScheme.secondary
+                                                    )
+                                                }
+                                            }
+
+                                            Spacer(modifier = Modifier.height(6.dp))
+
+                                            if (cartNutritionAnalysisText != null) {
+                                                Text(
+                                                    text = cartNutritionAnalysisText ?: "",
+                                                    fontSize = 10.sp,
+                                                    color = MaterialTheme.colorScheme.onSurface,
+                                                    lineHeight = 14.sp
+                                                )
+                                            } else {
+                                                Text(
+                                                    "Analyzing meal calories, macronutrients, and health recommendations...",
+                                                    fontSize = 10.sp,
+                                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                                )
+                                            }
+                                        }
+                                    }
+
+                                    Spacer(modifier = Modifier.height(10.dp))
 
                                     val cartTotalSum = viewModel.getCartTotal()
                                     val finalCartPickupTimeText = if (cartScheduleForLaterEnabled) {

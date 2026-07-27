@@ -56,7 +56,10 @@ data class FoodItem(
     val currentStock: Int = 100,
     val lowStockThreshold: Int = 15,
     val calories: Int = 180,
-    val allergens: String = "None"
+    val allergens: String = "None",
+    val availableStartTime: String = "06:00",
+    val availableEndTime: String = "23:59",
+    val isTimeScheduled: Boolean = false
 )
 
 @Entity(

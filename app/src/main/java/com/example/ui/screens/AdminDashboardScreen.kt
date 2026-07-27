@@ -77,6 +77,7 @@ fun AdminDashboardScreen(
     val auditHistoryLogs by viewModel.auditLogs.collectAsStateWithLifecycle()
     val allUsers by viewModel.allUsers.collectAsStateWithLifecycle()
     val adminInventoryAlerts by viewModel.adminInventoryAlerts.collectAsStateWithLifecycle()
+    val promotionalOffers by viewModel.promotionalOffers.collectAsStateWithLifecycle()
 
     var activeSubTab by remember { mutableIntStateOf(0) } // 0: Compliance Board, 1: AI Advisor, 2: Cyber Logs
 
@@ -1085,6 +1086,177 @@ fun AdminDashboardScreen(
                                         modifier = Modifier.fillMaxWidth(),
                                         singleLine = true
                                     )
+                                }
+                            }
+                        }
+
+                        // Promotional Offers & Loyalty Program Manager card
+                        item {
+                            var promoCodeInput by remember { mutableStateOf("") }
+                            var promoTitleInput by remember { mutableStateOf("") }
+                            var promoDiscountInput by remember { mutableStateOf("") }
+                            var promoDescInput by remember { mutableStateOf("") }
+                            var promoErrorMsg by remember { mutableStateOf<String?>(null) }
+                            var promoSuccessMsg by remember { mutableStateOf<String?>(null) }
+
+                            Card(
+                                modifier = Modifier.fillMaxWidth().testTag("admin_promotional_offers_card"),
+                                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                                shape = RoundedCornerShape(16.dp)
+                            ) {
+                                Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                                    Row(
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.SpaceBetween,
+                                        modifier = Modifier.fillMaxWidth()
+                                    ) {
+                                        Row(verticalAlignment = Alignment.CenterVertically) {
+                                            Icon(
+                                                imageVector = Icons.Default.Discount,
+                                                contentDescription = null,
+                                                tint = MaterialTheme.colorScheme.primary,
+                                                modifier = Modifier.size(20.dp)
+                                            )
+                                            Spacer(modifier = Modifier.width(8.dp))
+                                            Text("Promotional Offers & Campus Deals", fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleSmall)
+                                        }
+                                        Surface(
+                                            color = MaterialTheme.colorScheme.primaryContainer,
+                                            shape = RoundedCornerShape(12.dp)
+                                        ) {
+                                            Text(
+                                                "${promotionalOffers.count { it.isActive }} Active",
+                                                fontSize = 10.sp,
+                                                fontWeight = FontWeight.Bold,
+                                                color = MaterialTheme.colorScheme.onPrimaryContainer,
+                                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                                            )
+                                        }
+                                    }
+
+                                    Text(
+                                        "Create and manage campus-wide promotional discount codes displayed to students in the ATU Cafeteria app.",
+                                        fontSize = 11.sp,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+
+                                    // Input Fields for New Offer
+                                    OutlinedTextField(
+                                        value = promoCodeInput,
+                                        onValueChange = { promoCodeInput = it.uppercase() },
+                                        label = { Text("Promo Code (e.g. EXAM20)") },
+                                        modifier = Modifier.fillMaxWidth(),
+                                        singleLine = true
+                                    )
+
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                    ) {
+                                        OutlinedTextField(
+                                            value = promoTitleInput,
+                                            onValueChange = { promoTitleInput = it },
+                                            label = { Text("Campaign Title") },
+                                            modifier = Modifier.weight(1.5f),
+                                            singleLine = true
+                                        )
+                                        OutlinedTextField(
+                                            value = promoDiscountInput,
+                                            onValueChange = { promoDiscountInput = it },
+                                            label = { Text("Discount %") },
+                                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                                            modifier = Modifier.weight(1f),
+                                            singleLine = true
+                                        )
+                                    }
+
+                                    OutlinedTextField(
+                                        value = promoDescInput,
+                                        onValueChange = { promoDescInput = it },
+                                        label = { Text("Offer Description / Conditions") },
+                                        modifier = Modifier.fillMaxWidth(),
+                                        singleLine = true
+                                    )
+
+                                    promoErrorMsg?.let { err ->
+                                        Text(err, color = MaterialTheme.colorScheme.error, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                                    }
+                                    promoSuccessMsg?.let { msg ->
+                                        Text(msg, color = Color(0xFF2E7D32), fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                                    }
+
+                                    Button(
+                                        onClick = {
+                                            val pct = promoDiscountInput.toDoubleOrNull()
+                                            if (promoCodeInput.isBlank() || promoTitleInput.isBlank() || pct == null || pct <= 0.0) {
+                                                promoErrorMsg = "Please fill in valid code, title, and discount percentage."
+                                                promoSuccessMsg = null
+                                                return@Button
+                                            }
+                                            viewModel.addPromotionalOffer(promoCodeInput, promoTitleInput, pct, promoDescInput.ifBlank { "Special ATU Campus discount offer!" })
+                                            promoErrorMsg = null
+                                            promoSuccessMsg = "Promotional offer '${promoCodeInput}' created successfully!"
+                                            promoCodeInput = ""
+                                            promoTitleInput = ""
+                                            promoDiscountInput = ""
+                                            promoDescInput = ""
+                                        },
+                                        modifier = Modifier.fillMaxWidth().testTag("add_promo_offer_btn"),
+                                        shape = RoundedCornerShape(8.dp)
+                                    ) {
+                                        Icon(Icons.Default.AddCircle, contentDescription = null, modifier = Modifier.size(16.dp))
+                                        Spacer(modifier = Modifier.width(6.dp))
+                                        Text("Publish Promotional Offer")
+                                    }
+
+                                    Spacer(modifier = Modifier.height(8.dp))
+                                    HorizontalDivider()
+
+                                    Text("Active & Managed Promotional Offers", fontWeight = FontWeight.Bold, fontSize = 12.sp)
+
+                                    promotionalOffers.forEach { offer ->
+                                        Card(
+                                            colors = CardDefaults.cardColors(
+                                                containerColor = if (offer.isActive) MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f) else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.2f)
+                                            ),
+                                            shape = RoundedCornerShape(8.dp),
+                                            modifier = Modifier.fillMaxWidth().padding(vertical = 2.dp)
+                                        ) {
+                                            Row(
+                                                modifier = Modifier.fillMaxWidth().padding(12.dp),
+                                                horizontalArrangement = Arrangement.SpaceBetween,
+                                                verticalAlignment = Alignment.CenterVertically
+                                            ) {
+                                                Column(modifier = Modifier.weight(1f)) {
+                                                    Row(verticalAlignment = Alignment.CenterVertically) {
+                                                        Text(offer.code, fontWeight = FontWeight.ExtraBold, fontSize = 13.sp, color = MaterialTheme.colorScheme.primary)
+                                                        Spacer(modifier = Modifier.width(8.dp))
+                                                        Surface(
+                                                            color = MaterialTheme.colorScheme.tertiaryContainer,
+                                                            shape = RoundedCornerShape(4.dp)
+                                                        ) {
+                                                            Text("${offer.discountPercent.toInt()}% OFF", fontSize = 9.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(horizontal = 4.dp, vertical = 2.dp))
+                                                        }
+                                                    }
+                                                    Text(offer.title, fontSize = 11.sp, fontWeight = FontWeight.SemiBold)
+                                                    Text(offer.description, fontSize = 10.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                                }
+
+                                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                                    IconButton(onClick = { viewModel.togglePromotionalOfferStatus(offer.id) }) {
+                                                        Icon(
+                                                            imageVector = if (offer.isActive) Icons.Default.Visibility else Icons.Default.VisibilityOff,
+                                                            contentDescription = "Toggle status",
+                                                            tint = if (offer.isActive) MaterialTheme.colorScheme.primary else Color.Gray
+                                                        )
+                                                    }
+                                                    IconButton(onClick = { viewModel.deletePromotionalOffer(offer.id) }) {
+                                                        Icon(Icons.Default.Delete, contentDescription = "Delete offer", tint = MaterialTheme.colorScheme.error)
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    }
                                 }
                             }
                         }
