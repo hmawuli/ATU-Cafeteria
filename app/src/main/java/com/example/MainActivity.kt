@@ -99,7 +99,16 @@ class MainActivity : FragmentActivity() {
                             }
                         } else {
                             val role = user.role.uppercase()
-                            if (role == "STUDENT" && (currentRoute == "vendor_home" || currentRoute == "admin_home")) {
+                            if (currentRoute == "login") {
+                                val target = when (role) {
+                                    "VENDOR" -> "vendor_home"
+                                    "ADMIN" -> "admin_home"
+                                    else -> "student_home"
+                                }
+                                navController.navigate(target) {
+                                    popUpTo(0) { inclusive = true }
+                                }
+                            } else if (role == "STUDENT" && (currentRoute == "vendor_home" || currentRoute == "admin_home")) {
                                 navController.navigate("student_home") {
                                     popUpTo(0) { inclusive = true }
                                 }

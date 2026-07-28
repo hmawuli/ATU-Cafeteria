@@ -181,10 +181,16 @@ fun StudentDashboardScreen(
     val context = androidx.compose.ui.platform.LocalContext.current
     val tts = remember {
         var textToSpeech: android.speech.tts.TextToSpeech? = null
-        textToSpeech = android.speech.tts.TextToSpeech(context) { status ->
-            if (status == android.speech.tts.TextToSpeech.SUCCESS) {
-                textToSpeech?.setLanguage(java.util.Locale.US)
+        try {
+            textToSpeech = android.speech.tts.TextToSpeech(context) { status ->
+                if (status == android.speech.tts.TextToSpeech.SUCCESS) {
+                    try {
+                        textToSpeech?.setLanguage(java.util.Locale.US)
+                    } catch (_: Exception) {}
+                }
             }
+        } catch (e: Exception) {
+            android.util.Log.e("StudentDashboardScreen", "TextToSpeech engine initialization failed", e)
         }
         textToSpeech
     }
@@ -192,7 +198,7 @@ fun StudentDashboardScreen(
     DisposableEffect(Unit) {
         onDispose {
             try {
-                tts.shutdown()
+                tts?.shutdown()
             } catch (e: Exception) {
                 e.printStackTrace()
             }
@@ -215,6 +221,26 @@ fun StudentDashboardScreen(
                 null
             )
         }
+    }
+
+    val snackbarHostState = remember { SnackbarHostState() }
+    var previousOnlineState by remember { mutableStateOf<Boolean?>(null) }
+
+    LaunchedEffect(isOnline) {
+        if (previousOnlineState != null && previousOnlineState != isOnline) {
+            if (!isOnline) {
+                snackbarHostState.showSnackbar(
+                    message = "⚠️ Connectivity lost: You are browsing the menu in offline mode with cached items.",
+                    duration = SnackbarDuration.Short
+                )
+            } else {
+                snackbarHostState.showSnackbar(
+                    message = "⚡ Internet reconnected! Live menu refreshed.",
+                    duration = SnackbarDuration.Short
+                )
+            }
+        }
+        previousOnlineState = isOnline
     }
 
     var activeTab by remember { mutableIntStateOf(0) } // 0: Browse Food, 1: Orders Hub, 2: Nutrition, 3: Prep Reserves, 4: Smart Wallet & ID
@@ -610,6 +636,7 @@ fun StudentDashboardScreen(
                 )
             )
         },
+        snackbarHost = { SnackbarHost(snackbarHostState) },
         bottomBar = {
             NavigationBar {
                 NavigationBarItem(

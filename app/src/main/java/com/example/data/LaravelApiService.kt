@@ -489,6 +489,9 @@ data class LaravelGeminiInsightResponse(
 // ==========================================
 
 interface LaravelApiService {
+    @GET("api/ping")
+    suspend fun pingHealth(): LaravelGeneralResponse
+
     @POST("api/register")
     suspend fun register(@Body request: LaravelRegisterRequest): User
 
@@ -775,6 +778,19 @@ object LaravelClientManager {
 
         cachedService = service
         return service
+    }
+
+    suspend fun pingBackendHealth(): Boolean {
+        if (!isLaravelEnabled) return true
+        return try {
+            com.example.ui.util.CrashlyticsHelper.log("Network Operation: Pinging backend health endpoint at $baseUrl")
+            val service = getService()
+            val response = service.pingHealth()
+            response.success
+        } catch (e: Exception) {
+            com.example.ui.util.CrashlyticsHelper.recordException(e, "Backend health ping failed for $baseUrl")
+            false
+        }
     }
 
     // Mapper helper utilities

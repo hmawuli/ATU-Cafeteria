@@ -609,7 +609,21 @@ class CafeteriaViewModel @Inject constructor(
     private val completedOrderIds = java.util.Collections.synchronizedSet(mutableSetOf<Int>())
     private var vendorMetricsPollingJob: kotlinx.coroutines.Job? = null
 
+    private val authStateListener = object : com.example.data.repository.AuthStateListener {
+        override fun onSessionExpired(reason: String) {
+            _loginError.value = "Session expired: $reason. Please log in again."
+            logOut()
+        }
+        override fun onNetworkInterrupted(message: String) {
+            _loginError.value = "Network interruption: $message. Falling back to local offline mode."
+        }
+        override fun onAuthenticated(user: User) {
+            _currentUser.value = user
+        }
+    }
+
     init {
+        userSessionRepo.addAuthStateListener(authStateListener)
         FirestoreVendorStatusManager.startRealtimeStatusListener()
         FirestoreOrderTrackingManager.startRealtimeOrderTrackingListener { orderId, newStatus, estTime ->
             viewModelScope.launch {
@@ -1365,16 +1379,74 @@ class CafeteriaViewModel @Inject constructor(
         viewModelScope.launch {
             _isLoading.value = true
             _loginError.value = null
-            val authenticated = repository.authenticateUser(username, pinCode)
-            if (authenticated != null) {
-                _currentUser.value = authenticated
-                if (LaravelClientManager.isLaravelEnabled) {
-                    repository.syncAllFromLaravel()
+
+            val formattedEmail = if (username.contains("@")) username.trim() else "${username.trim()}@atu.edu.gh"
+            val pinHash = repository.sha256(pinCode)
+            val fbUser = try { com.google.firebase.auth.FirebaseAuth.getInstance().currentUser } catch (_: Exception) { null }
+
+            // CONSOLE LOGGING MECHANISM FOR PAYLOAD INSPECTION
+            Log.i("AUTH_PAYLOAD_INSPECTOR", "========== LOGIN SUBMIT PAYLOAD INSPECTION ==========")
+            Log.i("AUTH_PAYLOAD_INSPECTOR", "Raw Input Username : '$username'")
+            Log.i("AUTH_PAYLOAD_INSPECTOR", "Calculated Email   : '$formattedEmail'")
+            Log.i("AUTH_PAYLOAD_INSPECTOR", "PIN String Length  : ${pinCode.length}")
+            Log.i("AUTH_PAYLOAD_INSPECTOR", "Is PIN Truncated   : ${pinCode.length != pinCode.trim().length}")
+            Log.i("AUTH_PAYLOAD_INSPECTOR", "PIN SHA-256 Hash   : '$pinHash'")
+            Log.i("AUTH_PAYLOAD_INSPECTOR", "Firebase Auth User : ${fbUser?.uid ?: "Unauthenticated"}")
+            Log.i("AUTH_PAYLOAD_INSPECTOR", "=====================================================")
+
+            com.example.ui.util.CrashlyticsHelper.log("Authentication state: Login attempt initiated for user '$username' (Email payload: '$formattedEmail', PIN len: ${pinCode.length})")
+            
+            // Server Health Service Layer Ping Check before authentication
+            if (LaravelClientManager.isLaravelEnabled) {
+                com.example.ui.util.CrashlyticsHelper.log("Network operation: Pinging server health before login...")
+                val isHealthy = LaravelClientManager.pingBackendHealth()
+                if (!isHealthy) {
+                    val infoMsg = "Backend server unreachable. Authenticating using local database mode."
+                    com.example.ui.util.CrashlyticsHelper.log("Authentication state: Backend ping failed for '$username' — proceeding with local DB fallback")
+                    com.example.ui.util.FirebaseAnalyticsHelper.logLoginFailure("CREDENTIALS", "SERVER_UNREACHABLE_FALLBACK", infoMsg)
+                    userSessionRepo.notifyNetworkInterruption(infoMsg)
                 }
-                _isLoading.value = false
-                onComplete(true)
-            } else {
-                _loginError.value = "Invalid Username or Pass-PIN."
+            }
+
+            try {
+                com.example.ui.util.CrashlyticsHelper.log("Network operation: Authenticating user '$username'")
+                val authenticated = repository.authenticateUser(username, pinCode)
+                if (authenticated != null) {
+                    _currentUser.value = authenticated
+                    userSessionRepo.saveSession(
+                        token = "TOKEN_${System.currentTimeMillis()}_${authenticated.id}",
+                        userId = authenticated.id,
+                        userName = authenticated.username,
+                        role = authenticated.role
+                    )
+                    com.example.ui.util.CrashlyticsHelper.log("Authentication state: User '${authenticated.username}' (ID: ${authenticated.id}, Role: ${authenticated.role}) successfully authenticated")
+                    com.example.ui.util.FirebaseAnalyticsHelper.logLoginSuccess("CREDENTIALS", authenticated.id, authenticated.role)
+                    userSessionRepo.notifyAuthenticated(authenticated)
+
+                    if (LaravelClientManager.isLaravelEnabled) {
+                        try {
+                            repository.syncAllFromLaravel()
+                        } catch (se: Exception) {
+                            Log.e("CafeteriaViewModel", "Sync after login warning", se)
+                            com.example.ui.util.CrashlyticsHelper.recordException(se, "Menu sync failed after login")
+                            userSessionRepo.notifyNetworkInterruption("Laravel menu sync warning: ${se.localizedMessage}")
+                        }
+                    }
+                    _isLoading.value = false
+                    onComplete(true)
+                } else {
+                    val errMsg = "Invalid Username or Pass-PIN."
+                    com.example.ui.util.CrashlyticsHelper.log("Authentication state: Invalid credentials provided for '$username'")
+                    com.example.ui.util.FirebaseAnalyticsHelper.logLoginFailure("CREDENTIALS", "INVALID_CREDENTIALS", errMsg)
+                    _loginError.value = errMsg
+                    _isLoading.value = false
+                    onComplete(false)
+                }
+            } catch (e: Exception) {
+                com.example.ui.util.CrashlyticsHelper.recordException(e, "Login exception for user '$username'")
+                com.example.ui.util.FirebaseAnalyticsHelper.logLoginFailure("CREDENTIALS", "NETWORK_OR_RUNTIME_EXCEPTION", e.localizedMessage ?: "Login error")
+                Log.e("CafeteriaViewModel", "Login error", e)
+                _loginError.value = "Login connection issue: ${e.localizedMessage ?: "Failed to authenticate"}. Check connection or try again."
                 _isLoading.value = false
                 onComplete(false)
             }
@@ -1385,16 +1457,49 @@ class CafeteriaViewModel @Inject constructor(
         viewModelScope.launch {
             _isLoading.value = true
             _loginError.value = null
+            com.example.ui.util.CrashlyticsHelper.log("Authentication state: SSO Login attempt via $provider for user '$username'")
+
+            if (LaravelClientManager.isLaravelEnabled) {
+                val isHealthy = LaravelClientManager.pingBackendHealth()
+                if (!isHealthy) {
+                    val errMsg = "$provider authentication unreachable: Server health check failed."
+                    com.example.ui.util.FirebaseAnalyticsHelper.logLoginFailure("SSO_$provider", "SERVER_UNREACHABLE", errMsg)
+                    _loginError.value = errMsg
+                    _isLoading.value = false
+                    onComplete(false)
+                    return@launch
+                }
+            }
+
             try {
                 val authenticated = repository.authenticateOrRegisterSocialUser(username, fullName, provider, logoUrl)
                 _currentUser.value = authenticated
+                userSessionRepo.saveSession(
+                    token = "SSO_TOKEN_${System.currentTimeMillis()}_${authenticated.id}",
+                    userId = authenticated.id,
+                    userName = authenticated.username,
+                    role = authenticated.role
+                )
+                com.example.ui.util.CrashlyticsHelper.log("Authentication state: SSO user '${authenticated.username}' successfully authenticated via $provider")
+                com.example.ui.util.FirebaseAnalyticsHelper.logLoginSuccess("SSO_$provider", authenticated.id, authenticated.role)
+                userSessionRepo.notifyAuthenticated(authenticated)
+
                 if (LaravelClientManager.isLaravelEnabled) {
-                    repository.syncAllFromLaravel()
+                    try {
+                        repository.syncAllFromLaravel()
+                    } catch (se: Exception) {
+                        Log.e("CafeteriaViewModel", "Sync after social login warning", se)
+                        com.example.ui.util.CrashlyticsHelper.recordException(se, "Sync after social login failed")
+                        userSessionRepo.notifyNetworkInterruption("Social sync warning: ${se.localizedMessage}")
+                    }
                 }
                 _isLoading.value = false
                 onComplete(true)
             } catch (e: Exception) {
-                _loginError.value = "Failed to authenticate with $provider: ${e.localizedMessage}"
+                com.example.ui.util.CrashlyticsHelper.recordException(e, "SSO login exception for $provider")
+                val errMsg = "Failed to authenticate with $provider: ${e.localizedMessage}"
+                com.example.ui.util.FirebaseAnalyticsHelper.logLoginFailure("SSO_$provider", "AUTHENTICATION_EXCEPTION", errMsg)
+                _loginError.value = errMsg
                 _isLoading.value = false
                 onComplete(false)
             }
@@ -3092,6 +3197,7 @@ class CafeteriaViewModel @Inject constructor(
 
     override fun onCleared() {
         super.onCleared()
+        userSessionRepo.removeAuthStateListener(authStateListener)
         stopVendorMetricsPolling()
         LaravelEchoWebSocketManager.stopListening()
         try {

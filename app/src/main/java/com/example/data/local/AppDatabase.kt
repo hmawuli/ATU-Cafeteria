@@ -1,6 +1,7 @@
 package com.example.data
 
 import android.content.Context
+import android.util.Log
 import androidx.room.*
 
 // ==========================================
@@ -21,7 +22,7 @@ import androidx.room.*
         OfflineOrder::class,
         ChatMessage::class
     ],
-    version = 14,
+    version = 15,
     exportSchema = false
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -43,16 +44,33 @@ abstract class AppDatabase : RoomDatabase() {
 
         fun getDatabase(context: Context): AppDatabase {
             return INSTANCE ?: synchronized(this) {
-                val instance = Room.databaseBuilder(
-                    context.applicationContext,
+                val instance = buildDatabase(context.applicationContext)
+                INSTANCE = instance
+                instance
+            }
+        }
+
+        private fun buildDatabase(appContext: Context): AppDatabase {
+            return try {
+                Room.databaseBuilder(
+                    appContext,
                     AppDatabase::class.java,
                     "atu_cafeteria_db"
                 )
-                .fallbackToDestructiveMigration(true)
-                .fallbackToDestructiveMigrationOnDowngrade(true)
+                .fallbackToDestructiveMigration(dropAllTables = true)
+                .fallbackToDestructiveMigrationOnDowngrade(dropAllTables = true)
                 .build()
-                INSTANCE = instance
-                instance
+            } catch (e: Exception) {
+                Log.e("AppDatabase", "Failed to initialize AppDatabase, purging stale DB file and recreating...", e)
+                try { appContext.deleteDatabase("atu_cafeteria_db") } catch (_: Exception) {}
+                Room.databaseBuilder(
+                    appContext,
+                    AppDatabase::class.java,
+                    "atu_cafeteria_db"
+                )
+                .fallbackToDestructiveMigration(dropAllTables = true)
+                .fallbackToDestructiveMigrationOnDowngrade(dropAllTables = true)
+                .build()
             }
         }
     }

@@ -71,6 +71,7 @@ secrets {
 dependencies {
   implementation(platform(libs.androidx.compose.bom))
   implementation(platform(libs.firebase.bom))
+  implementation("com.google.firebase:firebase-auth")
   implementation(libs.firebase.messaging)
   implementation(libs.firebase.firestore)
   implementation(libs.firebase.analytics)

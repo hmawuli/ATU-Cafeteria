@@ -74,6 +74,32 @@ object FirebaseAnalyticsHelper {
         logEvent("change_language", bundle)
     }
 
+    /**
+     * Log login success event for telemetry.
+     */
+    fun logLoginSuccess(method: String, userId: Int, role: String) {
+        val bundle = Bundle().apply {
+            putString("method", method)
+            putString("user_id", userId.toString())
+            putString("role", role)
+        }
+        logEvent(FirebaseAnalytics.Event.LOGIN, bundle)
+        Timber.i("Analytics Event: LOGIN SUCCESS ($method) -> User #$userId [$role]")
+    }
+
+    /**
+     * Log login failure event segmented by error type for crash & error diagnosis.
+     */
+    fun logLoginFailure(method: String, errorType: String, errorMessage: String) {
+        val bundle = Bundle().apply {
+            putString("method", method)
+            putString("error_type", errorType)
+            putString("error_message", errorMessage.take(100))
+        }
+        logEvent("login_failure", bundle)
+        Timber.w("Analytics Event: LOGIN FAILURE ($method) -> $errorType: $errorMessage")
+    }
+
     private fun logEvent(eventName: String, params: Bundle) {
         try {
             firebaseAnalytics?.logEvent(eventName, params)
