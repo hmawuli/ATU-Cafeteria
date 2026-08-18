@@ -3,21 +3,24 @@ package com.example.data
 import android.content.Context
 import androidx.room.Room
 import androidx.test.core.app.ApplicationProvider
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
 import org.junit.After
+import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNotNull
+import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
-import org.junit.jupiter.api.Assertions.*
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 
 /**
- * Comprehensive JUnit 5 DAO Test Suite for Room Database.
+ * Comprehensive JUnit DAO Test Suite for Room Database.
  * Verifies data integrity for menu items, order history, and offline queue caching layer.
  */
 @RunWith(RobolectricTestRunner::class)
-@Config(sdk = [36])
+@Config(sdk = [34])
 class RoomDaoIntegrityTest {
 
     private lateinit var db: AppDatabase
@@ -44,21 +47,32 @@ class RoomDaoIntegrityTest {
     }
 
     @Test
-    fun `test FoodItem insertion and retrieval maintains data integrity`() = runBlocking {
+    fun testFoodItemInsertionAndRetrieval() = runBlocking {
+        val vendor = User(
+            id = 1,
+            username = "vendor_test",
+            passwordHash = "hash123",
+            role = "VENDOR",
+            fullName = "Vendor One",
+            info = "Stall 1"
+        )
+        userDao.insertUser(vendor)
+
         val item = FoodItem(
             id = 101,
+            vendorId = 1,
             name = "Waakye Special with Fish & Egg",
             price = 35.00,
             category = "Main Meal",
             imageUrl = "https://example.com/waakye.jpg",
             description = "Authentic Ghanaian waakye served with shito, boiled egg, and fried fish",
-            prepTimeMinutes = 15,
             isAvailable = true,
-            stockQuantity = 50
+            initialStock = 50,
+            currentStock = 50
         )
 
         foodItemDao.insertFoodItem(item)
-        val items = foodItemDao.getAllFoodItems()
+        val items = foodItemDao.getAllFoodItems().first()
 
         assertNotNull(items)
         assertEquals(1, items.size)
@@ -67,54 +81,76 @@ class RoomDaoIntegrityTest {
         assertEquals(35.00, retrieved.price, 0.001)
         assertEquals("Main Meal", retrieved.category)
         assertTrue(retrieved.isAvailable)
-        assertEquals(50, retrieved.stockQuantity)
+        assertEquals(50, retrieved.currentStock)
     }
 
     @Test
-    fun `test Order creation and order history query`() = runBlocking {
+    fun testOrderCreationAndOrderHistoryQuery() = runBlocking {
+        val student = User(
+            id = 99,
+            username = "student_99",
+            passwordHash = "hash123",
+            role = "STUDENT",
+            fullName = "Student 99",
+            info = "STU-2026-99"
+        )
+        val vendor = User(
+            id = 5,
+            username = "vendor_5",
+            passwordHash = "hash123",
+            role = "VENDOR",
+            fullName = "Vendor Five",
+            info = "Stall 5"
+        )
+        userDao.insertUser(student)
+        userDao.insertUser(vendor)
+
         val order1 = Order(
             id = 1001,
+            customerId = 99,
+            vendorId = 5,
+            foodItemId = 101,
             foodName = "Jollof Rice with Chicken",
             quantity = 2,
+            unitPrice = 25.00,
             totalPrice = 50.00,
-            vendorName = "Auntie Mary Jollof Spot",
-            vendorId = 5,
             status = "PLACED",
-            customerId = "STU-2026-99"
+            pickupPin = "1234"
         )
         val order2 = Order(
             id = 1002,
+            customerId = 99,
+            vendorId = 5,
+            foodItemId = 102,
             foodName = "Fried Plantain & Beans (Gob3)",
             quantity = 1,
+            unitPrice = 20.00,
             totalPrice = 20.00,
-            vendorName = "Kojo Fast Foods",
-            vendorId = 8,
             status = "COMPLETED",
-            customerId = "STU-2026-99"
+            pickupPin = "5678"
         )
 
         orderDao.insertOrder(order1)
         orderDao.insertOrder(order2)
 
-        val allOrders = orderDao.getAllOrders()
+        val allOrders = orderDao.getAllOrders().first()
         assertEquals(2, allOrders.size)
 
-        // Verify ordering or content
-        val studentOrders = orderDao.getOrdersByCustomerId("STU-2026-99")
+        val studentOrders = orderDao.getOrdersForCustomer(99).first()
         assertEquals(2, studentOrders.size)
     }
 
     @Test
-    fun `test OfflineOrder queue persistence and clearance for offline caching layer`() = runBlocking {
+    fun testOfflineOrderQueuePersistence() = runBlocking {
         val offlineOrder = OfflineOrder(
             id = 501,
-            foodId = 101,
+            customerId = 99,
+            vendorId = 5,
+            foodItemId = 101,
             foodName = "Koko & Koose",
-            price = 12.50,
             quantity = 2,
-            vendorId = 2,
-            customerId = "STU-OFFLINE-01",
-            createdAt = System.currentTimeMillis()
+            unitPrice = 6.25,
+            totalPrice = 12.50
         )
 
         offlineOrderDao.insertOfflineOrder(offlineOrder)
@@ -122,7 +158,7 @@ class RoomDaoIntegrityTest {
         val pendingQueue = offlineOrderDao.getAllOfflineOrders()
         assertEquals(1, pendingQueue.size)
         assertEquals("Koko & Koose", pendingQueue[0].foodName)
-        assertEquals(12.50, pendingQueue[0].price, 0.001)
+        assertEquals(12.50, pendingQueue[0].totalPrice, 0.001)
 
         // Simulate syncing and clearing queue
         offlineOrderDao.deleteOfflineOrder(pendingQueue[0])
@@ -131,14 +167,15 @@ class RoomDaoIntegrityTest {
     }
 
     @Test
-    fun `test User profile caching and retrieval`() = runBlocking {
+    fun testUserProfileCachingAndRetrieval() = runBlocking {
         val user = User(
             id = 1,
             username = "kwame_atu",
+            passwordHash = "secure_hash",
             fullName = "Kwame Mensah",
             role = "STUDENT",
             email = "kwame.mensah@atu.edu.gh",
-            phoneNumber = "+233241234567",
+            telephone = "+233241234567",
             info = "INDEX: 012345678"
         )
 

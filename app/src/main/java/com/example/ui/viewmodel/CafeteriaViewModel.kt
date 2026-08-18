@@ -747,33 +747,22 @@ class CafeteriaViewModel @Inject constructor(
         viewModelScope.launch {
             LaravelEchoWebSocketManager.realTimeStudentNotificationFlow.collect { event ->
                 val activeUser = _currentUser.value
-                if (activeUser != null && activeUser.role == "STUDENT" && activeUser.id == event.vendorId) { // vendorId contains target student ID in some systems or is student ID
-                    // Display floating alert immediately & play audio cue!
-                    val fabricatedNotif = com.example.data.LaravelDatabaseNotification(
-                        id = event.notificationId,
-                        type = "App\\Notifications\\OrderStatusChangedNotification",
-                        notifiable_type = "App\\Models\\User",
-                        notifiable_id = activeUser.id,
-                        data = com.example.data.LaravelNotificationData(
-                            order_id = event.orderId,
-                            vendor_id = event.vendorId,
-                            total_price = 0.0,
-                            old_status = event.oldStatus,
-                            new_status = event.newStatus,
-                            message = event.message,
-                            time = java.text.SimpleDateFormat("yyyy-MM-dd HH:mm:ss", java.util.Locale.getDefault()).format(java.util.Date(event.timestamp))
-                        ),
-                        read_at = null,
-                        created_at = null,
-                        updated_at = null
-                    )
-                    _activeStudentAlerts.value = _activeStudentAlerts.value + fabricatedNotif
-                    _studentNotifications.value = listOf(fabricatedNotif) + _studentNotifications.value
-                    playSoundNotification()
-                } else if (activeUser != null && activeUser.role == "STUDENT") {
-                    // Check if notification belongs to this student
+                // Real-time synchronization: Update live tracking manager and Room DB
+                FirestoreOrderTrackingManager.updateOrderStatusInFirestore(
+                    orderId = event.orderId,
+                    newStatus = event.newStatus,
+                    vendorId = event.vendorId
+                )
+                try {
+                    repository.updateOrderStatus(event.vendorId, event.orderId, event.newStatus)
+                } catch (e: Exception) {
+                    Log.w("CafeteriaViewModel", "Could not update Room order status for #${event.orderId}: ${e.message}")
+                }
+
+                if (activeUser != null && activeUser.role == "STUDENT" && (activeUser.id == event.vendorId || activeUser.id != 0)) {
                     val order = repository.orderDao.getOrderById(event.orderId)
-                    if (order != null && order.customerId == activeUser.id) {
+                    if (order == null || order.customerId == activeUser.id) {
+                        // Display floating alert immediately & play audio cue!
                         val fabricatedNotif = com.example.data.LaravelDatabaseNotification(
                             id = event.notificationId,
                             type = "App\\Notifications\\OrderStatusChangedNotification",
@@ -781,8 +770,8 @@ class CafeteriaViewModel @Inject constructor(
                             notifiable_id = activeUser.id,
                             data = com.example.data.LaravelNotificationData(
                                 order_id = event.orderId,
-                                vendor_id = order.vendorId,
-                                total_price = order.totalPrice,
+                                vendor_id = event.vendorId,
+                                total_price = order?.totalPrice ?: 0.0,
                                 old_status = event.oldStatus,
                                 new_status = event.newStatus,
                                 message = event.message,
@@ -1141,10 +1130,10 @@ class CafeteriaViewModel @Inject constructor(
             }
         }
 
-        // 2. Continuous Polling Job: every 8s syncs if user is VENDOR/STUDENT & Laravel is enabled
+        // 2. Continuous Polling Job: periodically syncs when user is active & Laravel is enabled
         viewModelScope.launch {
             while (true) {
-                delay(8000)
+                delay(15000)
                 val user = _currentUser.value
                 if (user != null && LaravelClientManager.isLaravelEnabled) {
                     try {
@@ -1155,7 +1144,7 @@ class CafeteriaViewModel @Inject constructor(
                             pollStudentNotifications()
                         }
                     } catch (e: Exception) {
-                        Log.e("CafeteriaViewModel", "Periodic background sync failed", e)
+                        Log.w("CafeteriaViewModel", "Periodic background sync non-fatal warning: ${e.message}")
                     }
                 }
             }
@@ -1382,8 +1371,6 @@ class CafeteriaViewModel @Inject constructor(
 
             val formattedEmail = if (username.contains("@")) username.trim() else "${username.trim()}@atu.edu.gh"
             val pinHash = repository.sha256(pinCode)
-            val fbUser = try { com.google.firebase.auth.FirebaseAuth.getInstance().currentUser } catch (_: Exception) { null }
-
             // CONSOLE LOGGING MECHANISM FOR PAYLOAD INSPECTION
             Log.i("AUTH_PAYLOAD_INSPECTOR", "========== LOGIN SUBMIT PAYLOAD INSPECTION ==========")
             Log.i("AUTH_PAYLOAD_INSPECTOR", "Raw Input Username : '$username'")
@@ -1391,7 +1378,6 @@ class CafeteriaViewModel @Inject constructor(
             Log.i("AUTH_PAYLOAD_INSPECTOR", "PIN String Length  : ${pinCode.length}")
             Log.i("AUTH_PAYLOAD_INSPECTOR", "Is PIN Truncated   : ${pinCode.length != pinCode.trim().length}")
             Log.i("AUTH_PAYLOAD_INSPECTOR", "PIN SHA-256 Hash   : '$pinHash'")
-            Log.i("AUTH_PAYLOAD_INSPECTOR", "Firebase Auth User : ${fbUser?.uid ?: "Unauthenticated"}")
             Log.i("AUTH_PAYLOAD_INSPECTOR", "=====================================================")
 
             com.example.ui.util.CrashlyticsHelper.log("Authentication state: Login attempt initiated for user '$username' (Email payload: '$formattedEmail', PIN len: ${pinCode.length})")

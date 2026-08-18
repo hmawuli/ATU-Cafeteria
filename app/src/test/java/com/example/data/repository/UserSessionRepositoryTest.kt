@@ -1,81 +1,61 @@
 package com.example.data.repository
 
 import android.content.Context
-import android.content.SharedPreferences
+import androidx.test.core.app.ApplicationProvider
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
-import org.mockito.Mockito.*
+import org.junit.runner.RunWith
+import org.robolectric.RobolectricTestRunner
+import org.robolectric.annotation.Config
 
 /**
  * Unit Test Suite for UserSessionRepository.
  * Verifies session persistence, authentication state checks, and biometric credentials storage.
  */
+@RunWith(RobolectricTestRunner::class)
+@Config(sdk = [34])
 class UserSessionRepositoryTest {
 
-    private lateinit var mockContext: Context
-    private lateinit var mockPrefs: SharedPreferences
-    private lateinit var mockEditor: SharedPreferences.Editor
+    private lateinit var context: Context
+    private lateinit var repository: UserSessionRepository
 
     @Before
     fun setUp() {
-        mockContext = mock(Context::class.java)
-        mockPrefs = mock(SharedPreferences::class.java)
-        mockEditor = mock(SharedPreferences.Editor::class.java)
-
-        `when`(mockContext.getSharedPreferences(anyString(), anyInt())).thenReturn(mockPrefs)
-        `when`(mockPrefs.edit()).thenReturn(mockEditor)
-        `when`(mockEditor.putString(anyString(), anyString())).thenReturn(mockEditor)
-        `when`(mockEditor.putInt(anyString(), anyInt())).thenReturn(mockEditor)
-        `when`(mockEditor.putBoolean(anyString(), anyBoolean())).thenReturn(mockEditor)
-        `when`(mockEditor.putLong(anyString(), anyLong())).thenReturn(mockEditor)
-        `when`(mockEditor.remove(anyString())).thenReturn(mockEditor)
+        context = ApplicationProvider.getApplicationContext()
+        repository = UserSessionRepository(context)
+        repository.clearSession()
     }
 
     @Test
     fun testIsLoggedIn_ReturnsTrueWhenTokenExists() {
-        `when`(mockPrefs.getBoolean("key_is_logged_in", false)).thenReturn(true)
-        `when`(mockPrefs.getString("key_auth_token", null)).thenReturn("mock_jwt_bearer_token_12345")
-
-        val repository = UserSessionRepository(mockContext)
+        repository.saveSession("mock_jwt_bearer_token_12345", 42, "Kofi Mensah", "STUDENT")
         val result = repository.isLoggedIn()
-
         assertTrue(result)
+        assertEquals(42, repository.getUserId())
+        assertEquals("Kofi Mensah", repository.getUserName())
+        assertEquals("STUDENT", repository.getUserRole())
     }
 
     @Test
-    fun testIsLoggedIn_ReturnsFalseWhenTokenNull() {
-        `when`(mockPrefs.getBoolean("key_is_logged_in", false)).thenReturn(true)
-        `when`(mockPrefs.getString("key_auth_token", null)).thenReturn(null)
+    fun testIsLoggedIn_ReturnsFalseWhenCleared() {
+        repository.saveSession("mock_jwt_bearer_token_12345", 42, "Kofi Mensah", "STUDENT")
+        assertTrue(repository.isLoggedIn())
 
-        val repository = UserSessionRepository(mockContext)
-        val result = repository.isLoggedIn()
-
-        assertFalse(result)
-    }
-
-    @Test
-    fun testSaveSession_ExecutesSharedPreferencesEdits() {
-        val repository = UserSessionRepository(mockContext)
-        repository.saveSession("token_abc", 42, "Kofi Mensah", "STUDENT")
-
-        verify(mockEditor).putString("key_auth_token", "token_abc")
-        verify(mockEditor).putInt("key_user_id", 42)
-        verify(mockEditor).putString("key_user_name", "Kofi Mensah")
-        verify(mockEditor).putString("key_user_role", "STUDENT")
-        verify(mockEditor).apply()
-    }
-
-    @Test
-    fun testClearSession_ResetsLoggedInState() {
-        val repository = UserSessionRepository(mockContext)
         repository.clearSession()
+        assertFalse(repository.isLoggedIn())
+    }
 
-        verify(mockEditor).remove("key_auth_token")
-        verify(mockEditor).remove("key_user_id")
-        verify(mockEditor).putBoolean("key_is_logged_in", false)
-        verify(mockEditor).apply()
+    @Test
+    fun testBiometricPreferences() {
+        repository.setBiometricLoginEnabled(true, "kofi_student", "1234")
+        assertTrue(repository.isBiometricLoginEnabled())
+        assertEquals("kofi_student", repository.getSavedBiometricUsername())
+        assertEquals("1234", repository.getSavedBiometricPin())
+
+        repository.setBiometricLoginEnabled(false)
+        assertFalse(repository.isBiometricLoginEnabled())
     }
 }

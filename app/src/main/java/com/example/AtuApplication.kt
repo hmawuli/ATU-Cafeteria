@@ -6,8 +6,6 @@ import coil.ImageLoaderFactory
 import coil.disk.DiskCache
 import coil.memory.MemoryCache
 import coil.util.DebugLogger
-import com.google.firebase.FirebaseApp
-import com.google.firebase.FirebaseOptions
 import com.example.di.ServiceLocator
 import com.example.ui.util.CrashlyticsHelper
 import timber.log.Timber
@@ -15,15 +13,12 @@ import timber.log.Timber
 /**
  * Custom Application class for ATU Cafeteria Mobile App.
  * Initializes Coil disk caching, Timber debug/production tree logging,
- * Firebase Crashlytics monitoring, and Hilt dependency injection framework.
+ * telemetry monitoring, and Hilt dependency injection framework.
  */
 class AtuApplication : Application(), ImageLoaderFactory {
 
     override fun onCreate() {
         super.onCreate()
-
-        // 0. Initialize FirebaseApp if not already initialized
-        setupFirebaseApp()
 
         // 1. Initialize Timber Logging Tree
         if (BuildConfig.DEBUG) {
@@ -46,7 +41,7 @@ class AtuApplication : Application(), ImageLoaderFactory {
             })
         }
 
-        // 2. Initialize Firebase Crashlytics & Analytics & Custom Exception Handler
+        // 2. Initialize Telemetry & Custom Exception Handler
         CrashlyticsHelper.init(this)
         com.example.ui.util.FirebaseAnalyticsHelper.init(this)
         setupCustomExceptionHandler()
@@ -83,7 +78,7 @@ class AtuApplication : Application(), ImageLoaderFactory {
 
     /**
      * Custom Exception Handler to capture and report non-fatal and uncaught
-     * UI thread exceptions to Firebase Crashlytics console.
+     * UI thread exceptions to console.
      */
     private fun setupCustomExceptionHandler() {
         val originalHandler = Thread.getDefaultUncaughtExceptionHandler()
@@ -94,23 +89,6 @@ class AtuApplication : Application(), ImageLoaderFactory {
                 "Uncaught Exception on thread '${thread.name}': ${throwable.localizedMessage}"
             )
             originalHandler?.uncaughtException(thread, throwable)
-        }
-    }
-
-    private fun setupFirebaseApp() {
-        try {
-            if (FirebaseApp.getApps(this).isEmpty()) {
-                val options = FirebaseOptions.Builder()
-                    .setApplicationId("1:108930000000:android:com.aistudio.atucafeteria")
-                    .setProjectId("atu-cafeteria")
-                    .setApiKey("AIzaSyATUCafeteriaDefaultKeyForBuild")
-                    .setGcmSenderId("108930000000")
-                    .build()
-                FirebaseApp.initializeApp(this, options)
-                Timber.i("FirebaseApp initialized with default fallback options.")
-            }
-        } catch (e: Exception) {
-            Timber.e(e, "Could not initialize default FirebaseApp.")
         }
     }
 }

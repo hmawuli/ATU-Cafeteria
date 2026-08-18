@@ -393,7 +393,7 @@ fun CentralizedSettingsScreen(
             PreferenceCard {
                 Column {
                     PreferenceActionTile(
-                        title = "Check for Google Play In-App Updates",
+                        title = "Check for Software Updates",
                         subtitle = updateStatusMessage ?: "Verify app is running the latest security patch and features",
                         icon = Icons.Default.SystemUpdate,
                         onClick = {

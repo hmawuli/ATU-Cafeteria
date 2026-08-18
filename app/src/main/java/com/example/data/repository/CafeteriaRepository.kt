@@ -1017,37 +1017,53 @@ class CafeteriaRepository(private val db: AppDatabase) {
             val service = LaravelClientManager.getService()
 
             // 1. Sync Users
-            val remoteUsers = service.getAllUsers()
-            for (u in remoteUsers) {
-                val localUser = userDao.getUserSync(u.id)
-                val userToSave = if (localUser != null) {
-                    u.copy(balance = localUser.balance)
-                } else {
-                    u
+            try {
+                val remoteUsers = service.getAllUsers()
+                for (u in remoteUsers) {
+                    val localUser = userDao.getUserSync(u.id)
+                    val userToSave = if (localUser != null) {
+                        u.copy(balance = localUser.balance)
+                    } else {
+                        u
+                    }
+                    try {
+                        userDao.insertUser(userToSave)
+                    } catch (pe: Exception) {
+                        userDao.updateUser(userToSave)
+                    }
                 }
-                try {
-                    userDao.insertUser(userToSave)
-                } catch (pe: Exception) {
-                    userDao.updateUser(userToSave)
-                }
+            } catch (ue: Exception) {
+                Log.w("CafeteriaRepository", "Syncing users partial warning: ${ue.message}")
             }
 
             // 2. Sync Foods
-            val remoteFoods = service.getFoodItems()
-            for (f in remoteFoods) {
-                foodItemDao.insertFoodItem(LaravelClientManager.toRoomFoodItem(f))
+            try {
+                val remoteFoods = service.getFoodItems()
+                for (f in remoteFoods) {
+                    foodItemDao.insertFoodItem(LaravelClientManager.toRoomFoodItem(f))
+                }
+            } catch (fe: Exception) {
+                Log.w("CafeteriaRepository", "Syncing foods partial warning: ${fe.message}")
             }
 
             // 3. Sync Orders
-            val remoteOrders = service.getAllOrders()
-            for (o in remoteOrders) {
-                orderDao.insertOrder(LaravelClientManager.toRoomOrder(o))
+            try {
+                val remoteOrders = service.getAllOrders()
+                for (o in remoteOrders) {
+                    orderDao.insertOrder(LaravelClientManager.toRoomOrder(o))
+                }
+            } catch (oe: Exception) {
+                Log.w("CafeteriaRepository", "Syncing orders partial warning: ${oe.message}")
             }
 
             // 4. Sync Feedbacks
-            val remoteFeedback = service.getAllFeedback()
-            for (f in remoteFeedback) {
-                feedbackDao.insertFeedback(LaravelClientManager.toRoomFeedback(f))
+            try {
+                val remoteFeedback = service.getAllFeedback()
+                for (f in remoteFeedback) {
+                    feedbackDao.insertFeedback(LaravelClientManager.toRoomFeedback(f))
+                }
+            } catch (fbe: Exception) {
+                Log.w("CafeteriaRepository", "Syncing feedbacks partial warning: ${fbe.message}")
             }
 
             // 4a. Sync Food Feedbacks
@@ -1057,13 +1073,17 @@ class CafeteriaRepository(private val db: AppDatabase) {
                     foodItemFeedbackDao.insertFoodFeedback(LaravelClientManager.toRoomFoodItemFeedback(ff))
                 }
             } catch (ffe: Exception) {
-                Log.e("CafeteriaRepository", "Syncing food feedbacks failed", ffe)
+                Log.w("CafeteriaRepository", "Syncing food feedbacks partial warning: ${ffe.message}")
             }
 
             // 5. Sync Audit Logs
-            val remoteLogs = service.getAllAuditLogs()
-            for (l in remoteLogs) {
-                auditLogDao.insertLog(LaravelClientManager.toRoomAuditLog(l))
+            try {
+                val remoteLogs = service.getAllAuditLogs()
+                for (l in remoteLogs) {
+                    auditLogDao.insertLog(LaravelClientManager.toRoomAuditLog(l))
+                }
+            } catch (ale: Exception) {
+                Log.w("CafeteriaRepository", "Syncing audit logs partial warning: ${ale.message}")
             }
 
             Log.d("CafeteriaRepository", "Sync completed successfully!")

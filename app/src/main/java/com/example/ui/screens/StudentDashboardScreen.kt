@@ -403,18 +403,13 @@ fun StudentDashboardScreen(
     val categories = listOf("All", "Breakfast", "Lunch", "Vegan", "Local Dish", "Fast Food", "Drinks", "Snacks")
     var selectedDietaryFilter by remember { mutableStateOf("All") }
     var showCartCheckoutDialog by remember { mutableStateOf(false) }
+    var showCartOrderConfirmationDialog by remember { mutableStateOf(false) }
 
-    // Real-time order status tracking via polling
+    // Real-time synchronization initialization
     LaunchedEffect(currentUser) {
         if (currentUser != null) {
             viewModel.loadPopularTodaySuggestions()
             viewModel.fetchLoyaltySummary()
-            while (true) {
-                delay(8000) // Poll every 8 seconds
-                if (isOnline) {
-                    viewModel.syncAllFromLaravel { }
-                }
-            }
         }
     }
 
@@ -3009,6 +3004,8 @@ fun StudentDashboardScreen(
                         }
                         
                         if (ordersSubTab == 0) {
+                            val liveTrackingMap by viewModel.liveOrderTrackingMap.collectAsStateWithLifecycle()
+                            val liveEstTimeMap by viewModel.liveOrderEstimatedTimeMap.collectAsStateWithLifecycle()
                             val activeOrders = studentOrders.filter { it.status == "PENDING" || it.status == "PREPARING" || it.status == "READY" || it.status == "COMPLETED" || it.status == "DELIVERED" }.sortedByDescending { it.id }
                             
                             LazyColumn(
@@ -3077,10 +3074,12 @@ fun StudentDashboardScreen(
                             }
                         } else {
                             items(activeOrders) { order ->
+                                val effectiveStatus = liveTrackingMap[order.id] ?: order.status
+                                val effectiveEstTime = liveEstTimeMap[order.id] ?: order.estimatedPickupTime
                                 val vendor = allVendors.find { it.id == order.vendorId }
                                 val orderFeedback = allFeedback.find { it.orderId == order.id }
                                 Card(
-                                    modifier = Modifier.fillMaxWidth(),
+                                    modifier = Modifier.fillMaxWidth().testTag("order_tracker_card_${order.id}"),
                                     colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
                                     shape = RoundedCornerShape(16.dp)
                                 ) {
@@ -3112,11 +3111,11 @@ fun StudentDashboardScreen(
 
                                             // Status tag with smooth animated color transition
                                             val animatedBadgeColor by animateColorAsState(
-                                                targetValue = when (order.status.uppercase()) {
-                                                    "PENDING", "ORDER_PLACED" -> Color(0xFFF9A825) // Amber
-                                                    "PREPARING" -> Color(0xFF1976D2) // Blue
-                                                    "READY", "OUT_FOR_DELIVERY" -> Color(0xFF2E7D32) // Green
-                                                    "COMPLETED", "DELIVERED" -> Color(0xFF4CAF50) // Emerald Green
+                                                targetValue = when (effectiveStatus.uppercase()) {
+                                                    "PENDING", "ORDER_PLACED", "RECEIVED" -> Color(0xFFF9A825) // Amber / Received
+                                                    "PREPARING" -> Color(0xFF1976D2) // Blue / Preparing
+                                                    "READY", "READY_FOR_PICKUP", "OUT_FOR_DELIVERY" -> Color(0xFF2E7D32) // Green / Out for Delivery
+                                                    "COMPLETED", "DELIVERED" -> Color(0xFF388E3C) // Emerald Green / Delivered
                                                     else -> MaterialTheme.colorScheme.primary
                                                 },
                                                 animationSpec = tween(durationMillis = 400),
@@ -3129,7 +3128,7 @@ fun StudentDashboardScreen(
                                                     .padding(horizontal = 10.dp, vertical = 5.dp)
                                             ) {
                                                 AnimatedContent(
-                                                    targetState = order.status.uppercase(),
+                                                    targetState = effectiveStatus.uppercase(),
                                                     transitionSpec = {
                                                         fadeIn(animationSpec = tween(300)) togetherWith fadeOut(animationSpec = tween(300))
                                                     },
@@ -3137,9 +3136,9 @@ fun StudentDashboardScreen(
                                                 ) { targetStatus ->
                                                     Text(
                                                         text = when (targetStatus) {
-                                                            "PENDING", "ORDER_PLACED" -> "Order Received"
+                                                            "PENDING", "ORDER_PLACED", "RECEIVED" -> "Received"
                                                             "PREPARING" -> "Preparing"
-                                                            "READY", "OUT_FOR_DELIVERY" -> "Out for Delivery"
+                                                            "READY", "READY_FOR_PICKUP", "OUT_FOR_DELIVERY" -> "Out for Delivery"
                                                             "COMPLETED", "DELIVERED" -> "Delivered"
                                                             else -> targetStatus
                                                         },
@@ -3156,11 +3155,11 @@ fun StudentDashboardScreen(
                                         Spacer(modifier = Modifier.height(12.dp))
 
                                         // Stepper progress timeline helper
-                                        val steps = listOf("Order Received", "Preparing", "Out for Delivery", "Delivered")
-                                        val activeStep = when (order.status.uppercase()) {
-                                            "PENDING", "ORDER_PLACED" -> 0
+                                        val steps = listOf("Received", "Preparing", "Out for Delivery", "Delivered")
+                                        val activeStep = when (effectiveStatus.uppercase()) {
+                                            "PENDING", "ORDER_PLACED", "RECEIVED" -> 0
                                             "PREPARING" -> 1
-                                            "READY", "OUT_FOR_DELIVERY" -> 2
+                                            "READY", "READY_FOR_PICKUP", "OUT_FOR_DELIVERY" -> 2
                                             "COMPLETED", "DELIVERED" -> 3
                                             else -> 0
                                         }
@@ -10802,7 +10801,7 @@ fun StudentDashboardScreen(
                                                         fontSize = 11.sp,
                                                         color = MaterialTheme.colorScheme.onErrorContainer
                                                     )
-                                                    conflicts.forEach { conflict ->
+                                                    for (conflict in conflicts) {
                                                         Text(
                                                             text = "• $conflict",
                                                             fontSize = 9.5.sp,
@@ -10837,22 +10836,8 @@ fun StudentDashboardScreen(
                                                             android.widget.Toast.LENGTH_LONG
                                                         ).show()
                                                     }
-                                                    cartCheckoutProcessing = true
                                                     cartCheckoutError = null
-                                                    viewModel.checkoutCart(
-                                                        useWallet = (cartPaymentMode == "WALLET"),
-                                                        estimatedPickupTime = finalCartPickupTimeText
-                                                    ) { success ->
-                                                        cartCheckoutProcessing = false
-                                                        if (success) {
-                                                             HapticHelper.notification(context, "SUCCESS")
-                                                             showOrderPlacedConfetti = true
-                                                             animateCartTrigger = false
-                                                        } else {
-                                                             HapticHelper.notification(context, "ERROR")
-                                                             cartCheckoutError = "Checkout transaction failed. Try again."
-                                                        }
-                                                    }
+                                                    showCartOrderConfirmationDialog = true
                                                 }
                                             },
                                             modifier = Modifier.fillMaxWidth().testTag("cart_checkout_submit_btn"),
@@ -10860,14 +10845,195 @@ fun StudentDashboardScreen(
                                         ) {
                                             Text("Place Multi-Order (${cartItems.size} items)")
                                         }
+
+                                        // MULTI-ITEM CART ORDER CONFIRMATION DIALOG (PREVENTS ACCIDENTAL PURCHASES)
+                                        if (showCartOrderConfirmationDialog) {
+                                            val confirmTotalSum = cartItems.sumOf { it.foodItem.price * it.quantity }
+
+                                            Dialog(onDismissRequest = { if (!cartCheckoutProcessing) showCartOrderConfirmationDialog = false }) {
+                                                Card(
+                                                    modifier = Modifier
+                                                        .fillMaxWidth()
+                                                        .padding(16.dp)
+                                                        .testTag("multi_cart_confirmation_dialog"),
+                                                    shape = RoundedCornerShape(24.dp),
+                                                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                                                    elevation = CardDefaults.cardElevation(defaultElevation = 8.dp)
+                                                ) {
+                                                    Column(
+                                                        modifier = Modifier
+                                                            .padding(24.dp)
+                                                            .fillMaxWidth(),
+                                                        horizontalAlignment = Alignment.CenterHorizontally,
+                                                        verticalArrangement = Arrangement.spacedBy(16.dp)
+                                                    ) {
+                                                        Box(
+                                                            modifier = Modifier
+                                                                .size(56.dp)
+                                                                .background(MaterialTheme.colorScheme.primaryContainer, shape = CircleShape),
+                                                            contentAlignment = Alignment.Center
+                                                        ) {
+                                                            Icon(
+                                                                imageVector = Icons.Default.ShoppingCart,
+                                                                contentDescription = null,
+                                                                tint = MaterialTheme.colorScheme.onPrimaryContainer,
+                                                                modifier = Modifier.size(28.dp)
+                                                            )
+                                                        }
+
+                                                        Text(
+                                                            "Confirm Multi-Item Order",
+                                                            style = MaterialTheme.typography.titleLarge,
+                                                            fontWeight = FontWeight.Bold,
+                                                            color = MaterialTheme.colorScheme.onSurface
+                                                        )
+
+                                                        Surface(
+                                                            color = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.5f),
+                                                            shape = RoundedCornerShape(8.dp)
+                                                        ) {
+                                                            Row(
+                                                                modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
+                                                                verticalAlignment = Alignment.CenterVertically
+                                                            ) {
+                                                                Icon(
+                                                                    Icons.Default.VerifiedUser,
+                                                                    contentDescription = null,
+                                                                    tint = MaterialTheme.colorScheme.onSecondaryContainer,
+                                                                    modifier = Modifier.size(16.dp)
+                                                                )
+                                                                Spacer(modifier = Modifier.width(6.dp))
+                                                                Text(
+                                                                    "Accidental Purchase Protection Active",
+                                                                    fontSize = 11.sp,
+                                                                    fontWeight = FontWeight.SemiBold,
+                                                                    color = MaterialTheme.colorScheme.onSecondaryContainer
+                                                                )
+                                                            }
+                                                        }
+
+                                                        Text(
+                                                            "Review your order summary and final payable total before sending order directly to cafeteria kitchen staff.",
+                                                            style = MaterialTheme.typography.bodySmall,
+                                                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                                            textAlign = androidx.compose.ui.text.style.TextAlign.Center
+                                                        )
+
+                                                        HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+
+                                                        // Items breakdown list
+                                                        Column(
+                                                            modifier = Modifier
+                                                                .fillMaxWidth()
+                                                                .heightIn(max = 180.dp)
+                                                                .verticalScroll(rememberScrollState()),
+                                                            verticalArrangement = Arrangement.spacedBy(8.dp)
+                                                        ) {
+                                                            cartItems.forEach { cartItem ->
+                                                                Row(
+                                                                    modifier = Modifier.fillMaxWidth(),
+                                                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                                                    verticalAlignment = Alignment.CenterVertically
+                                                                ) {
+                                                                    Column(modifier = Modifier.weight(1f)) {
+                                                                        Text(
+                                                                            cartItem.foodItem.name,
+                                                                            fontWeight = FontWeight.Bold,
+                                                                            style = MaterialTheme.typography.bodyMedium
+                                                                        )
+                                                                        Text(
+                                                                            "Qty: ${cartItem.quantity} x GH₵ ${"%.2f".format(cartItem.foodItem.price)}",
+                                                                            fontSize = 11.sp,
+                                                                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                                                                        )
+                                                                    }
+                                                                    Text(
+                                                                        "GH₵ ${"%.2f".format(cartItem.foodItem.price * cartItem.quantity)}",
+                                                                        fontWeight = FontWeight.Bold,
+                                                                        style = MaterialTheme.typography.bodyMedium,
+                                                                        color = MaterialTheme.colorScheme.primary
+                                                                    )
+                                                                }
+                                                            }
+                                                        }
+
+                                                        HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+
+                                                        // Payment mode & Pickup summary
+                                                        Row(
+                                                            modifier = Modifier.fillMaxWidth(),
+                                                            horizontalArrangement = Arrangement.SpaceBetween
+                                                        ) {
+                                                            Text("Payment Method:", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                                            Text(
+                                                                if (cartPaymentMode == "WALLET") "Virtual ID Wallet" else cartPaymentMode,
+                                                                fontSize = 12.sp,
+                                                                fontWeight = FontWeight.Bold,
+                                                                color = MaterialTheme.colorScheme.onSurface
+                                                            )
+                                                        }
+
+                                                        Row(
+                                                            modifier = Modifier.fillMaxWidth(),
+                                                            horizontalArrangement = Arrangement.SpaceBetween
+                                                        ) {
+                                                            Text("Total Payable:", fontSize = 14.sp, fontWeight = FontWeight.Bold)
+                                                            Text(
+                                                                "GH₵ ${"%.2f".format(confirmTotalSum)}",
+                                                                fontSize = 18.sp,
+                                                                fontWeight = FontWeight.ExtraBold,
+                                                                color = MaterialTheme.colorScheme.primary
+                                                            )
+                                                        }
+
+                                                        if (cartCheckoutProcessing) {
+                                                            CircularProgressIndicator(modifier = Modifier.size(28.dp).align(Alignment.CenterHorizontally))
+                                                        } else {
+                                                            Row(
+                                                                modifier = Modifier.fillMaxWidth(),
+                                                                horizontalArrangement = Arrangement.spacedBy(12.dp)
+                                                            ) {
+                                                                OutlinedButton(
+                                                                    onClick = { showCartOrderConfirmationDialog = false },
+                                                                    modifier = Modifier.weight(1f).testTag("cancel_multi_cart_confirm_btn")
+                                                                ) {
+                                                                    Text("Modify Cart")
+                                                                }
+                                                                Button(
+                                                                    onClick = {
+                                                                        cartCheckoutProcessing = true
+                                                                        viewModel.checkoutCart(
+                                                                            useWallet = (cartPaymentMode == "WALLET"),
+                                                                            estimatedPickupTime = finalCartPickupTimeText
+                                                                        ) { success ->
+                                                                            cartCheckoutProcessing = false
+                                                                            showCartOrderConfirmationDialog = false
+                                                                            if (success) {
+                                                                                HapticHelper.notification(context, "SUCCESS")
+                                                                                showOrderPlacedConfetti = true
+                                                                                showCartCheckoutDialog = false
+                                                                            } else {
+                                                                                HapticHelper.notification(context, "ERROR")
+                                                                                cartCheckoutError = "Checkout transaction failed. Try again."
+                                                                            }
+                                                                        }
+                                                                    },
+                                                                    modifier = Modifier.weight(1.4f).testTag("confirm_multi_cart_submit_btn")
+                                                                ) {
+                                                                    Text("Confirm & Pay GH₵ ${"%.2f".format(confirmTotalSum)}", fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                                                                }
+                                                            }
+                                                        }
+                                                    }
+                                                }
+                                            }
+                                        }
                                     }
                                 }
                             }
                         }
                     }
-                    }
                 }
-            }
 
             // ORDER SUBMISSION CONFIRMATION DIALOG (PREVENTS ACCIDENTAL DUPLICATIONS)
             if (showSubmissionConfirmation) {
@@ -10989,26 +11155,27 @@ fun StudentDashboardScreen(
                                     }
                                 }
 
-                                // Prevent Duplication Warning Banner
+                                // Biometric Security & Prevent Duplication Warning Banner
                                 Row(
                                     modifier = Modifier
                                         .fillMaxWidth()
-                                        .background(MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.25f), shape = RoundedCornerShape(12.dp))
-                                        .padding(12.dp),
+                                        .background(MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.4f), shape = RoundedCornerShape(12.dp))
+                                        .border(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.2f), shape = RoundedCornerShape(12.dp))
+                                        .padding(10.dp),
                                     verticalAlignment = Alignment.CenterVertically
                                 ) {
                                     Icon(
-                                        imageVector = Icons.Default.Lock,
-                                        contentDescription = null,
-                                        tint = MaterialTheme.colorScheme.error,
-                                        modifier = Modifier.size(18.dp)
+                                        imageVector = Icons.Default.Fingerprint,
+                                        contentDescription = "Biometric Security",
+                                        tint = MaterialTheme.colorScheme.primary,
+                                        modifier = Modifier.size(20.dp)
                                     )
                                     Spacer(modifier = Modifier.width(8.dp))
                                     Text(
-                                        "Double placement defense active: Confirming will process payment and alert the vendor. Please click only once.",
+                                        "Biometric Check: Fingerprint verification authorizes order payment and initiates immediate preparation.",
                                         style = MaterialTheme.typography.bodySmall,
                                         fontWeight = FontWeight.SemiBold,
-                                        color = MaterialTheme.colorScheme.onErrorContainer
+                                        color = MaterialTheme.colorScheme.onPrimaryContainer
                                     )
                                 }
 
@@ -11033,13 +11200,14 @@ fun StudentDashboardScreen(
                                             if (activity != null && com.example.ui.util.BiometricHelper.isBiometricAvailable(context)) {
                                                 com.example.ui.util.BiometricHelper.showBiometricPrompt(
                                                     activity = activity,
-                                                    title = "Confirm Order with Biometrics",
-                                                    subtitle = "Scan fingerprint or face ID to authorize GH₵ ${"%.2f".format(totalSum)}",
+                                                    title = "Authenticate with Fingerprint",
+                                                    subtitle = "Verify biometric identity to confirm GH₵ ${"%.2f".format(totalSum)} checkout",
                                                     onSuccess = {
                                                         submissionIsProcessing = true
                                                         submissionConfirmCallback?.invoke()
                                                     },
-                                                    onError = {
+                                                    onError = { err ->
+                                                        // Fall back cleanly to standard authorized placement
                                                         submissionIsProcessing = true
                                                         submissionConfirmCallback?.invoke()
                                                     }
@@ -11060,9 +11228,9 @@ fun StudentDashboardScreen(
                                                 color = MaterialTheme.colorScheme.onPrimary
                                             )
                                         } else {
-                                            Icon(imageVector = Icons.Default.Check, contentDescription = null, modifier = Modifier.size(16.dp))
+                                            Icon(imageVector = Icons.Default.Fingerprint, contentDescription = null, modifier = Modifier.size(18.dp))
                                             Spacer(modifier = Modifier.width(6.dp))
-                                            Text("Confirm Order")
+                                            Text("Authorize & Pay")
                                         }
                                     }
                                 }
@@ -11787,6 +11955,8 @@ fun StudentDashboardScreen(
     }
 }
 }
+}
+}
 
 @Composable
 fun EditBudgetDialog(
@@ -12343,6 +12513,17 @@ fun LottieOrderStatusUpdateView(
 /**
  * Dedicated Rewards Catalog dialog for students to redeem earned loyalty points for discounts and perks.
  */
+private data class RewardCatalogItem(
+    val id: String,
+    val title: String,
+    val description: String,
+    val pointsCost: Int,
+    val discountAmount: Double,
+    val category: String,
+    val icon: androidx.compose.ui.graphics.vector.ImageVector,
+    val accentColor: Color
+)
+
 @Composable
 fun RewardsCatalogDialog(
     availablePoints: Int,
@@ -12545,15 +12726,4 @@ fun RewardsCatalogDialog(
         }
     }
 }
-
-private data class RewardCatalogItem(
-    val id: String,
-    val title: String,
-    val description: String,
-    val pointsCost: Int,
-    val discountAmount: Double,
-    val category: String,
-    val icon: androidx.compose.ui.graphics.vector.ImageVector,
-    val accentColor: Color
-)
 

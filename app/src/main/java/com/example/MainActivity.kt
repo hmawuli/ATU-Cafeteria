@@ -25,6 +25,7 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.compose.currentBackStackEntryAsState
+import com.example.ui.screens.DailyMenuScreen
 import com.example.ui.screens.LoginScreen
 import com.example.ui.screens.RegisterScreen
 import com.example.ui.screens.StudentDashboardScreen
@@ -65,7 +66,6 @@ class MainActivity : FragmentActivity() {
         com.example.worker.MenuAndOrdersSyncWorker.schedulePeriodicSync(this)
         com.example.worker.OrderArchiverWorker.schedulePeriodicArchive(this)
         com.example.worker.ChargingWifiDataSyncWorker.schedulePeriodicSync(this)
-        com.example.ui.util.InAppUpdateHelper.checkForUpdates(this, this) { _, _ -> }
         enableEdgeToEdge()
         com.example.ui.util.PerformanceMonitoringHelper.stopTrace("app_launch_startup")
         setContent {
@@ -189,6 +189,12 @@ class MainActivity : FragmentActivity() {
                                                 101, 1, foodQuality, cleanliness, speed, priceValue, comment
                                             ) { navController.popBackStack() }
                                         }
+                                    )
+                                }
+                                composable("daily_menu") {
+                                    DailyMenuScreen(
+                                        viewModel = viewModel,
+                                        navController = navController
                                     )
                                 }
                             }

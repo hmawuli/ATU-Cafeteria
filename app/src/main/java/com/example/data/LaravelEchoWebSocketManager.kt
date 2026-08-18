@@ -30,6 +30,8 @@ object LaravelEchoWebSocketManager {
     private val scope = CoroutineScope(Dispatchers.Default + SupervisorJob())
     private var isConnecting = false
     private var reconnectJob: Job? = null
+    private var reconnectAttempts = 0
+    private const val MAX_RECONNECT_ATTEMPTS = 3
     
     // Store current registration metrics for secure reconnections
     private var activeUserId: Int? = null
@@ -113,6 +115,7 @@ object LaravelEchoWebSocketManager {
         webSocket = client.newWebSocket(request, object : WebSocketListener() {
             override fun onOpen(webSocket: WebSocket, response: Response) {
                 isConnecting = false
+                reconnectAttempts = 0
                 Log.i(TAG, "Laravel Echo WebSocket subscription pipe connected successfully.")
                 // Send standard Pusher/Echo subscribe message
                 subscribeToRoleChannel(webSocket, userId, normalizedRole)
@@ -133,7 +136,10 @@ object LaravelEchoWebSocketManager {
             }
 
             override fun onFailure(webSocket: WebSocket, t: Throwable, response: Response?) {
-                Log.e(TAG, "WebSocket failure, proceeding with auto-reconnection fallback: ${t.message}")
+                Log.w(TAG, "WebSocket connection failed (${t.message}), managing fallback...")
+                try {
+                    webSocket.cancel()
+                } catch (_: Exception) {}
                 scheduleReconnect(userId, normalizedRole)
             }
         })
@@ -260,9 +266,15 @@ object LaravelEchoWebSocketManager {
         webSocket = null
         isConnecting = false
         reconnectJob?.cancel()
+        if (reconnectAttempts >= MAX_RECONNECT_ATTEMPTS) {
+            Log.i(TAG, "Max WebSocket reconnect attempts ($MAX_RECONNECT_ATTEMPTS) reached. Operating smoothly in local loopback mode.")
+            return
+        }
+        reconnectAttempts++
+        val backoffDelayMs = (1500L * (1 shl (reconnectAttempts - 1))).coerceAtMost(10000L)
         reconnectJob = scope.launch {
-            delay(5000)
-            Log.i(TAG, "Initiating socket reconnection attempt...")
+            delay(backoffDelayMs)
+            Log.i(TAG, "Initiating socket reconnection attempt $reconnectAttempts of $MAX_RECONNECT_ATTEMPTS...")
             startListening(userId, role)
         }
     }
@@ -357,7 +369,10 @@ object LaravelEchoWebSocketManager {
     fun stopListening() {
         simulationJob?.cancel()
         reconnectJob?.cancel()
-        webSocket?.close(1000, "Dashboard exit complete")
+        reconnectAttempts = 0
+        try {
+            webSocket?.close(1000, "Dashboard exit complete")
+        } catch (_: Exception) {}
         webSocket = null
         isConnecting = false
         Log.i(TAG, "WebSocket listeners cleanly deallocated.")

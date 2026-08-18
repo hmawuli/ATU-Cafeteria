@@ -143,6 +143,7 @@ fun VendorDashboardScreen(
     var showVendorNotificationsDialog by remember { mutableStateOf(false) }
     var orderTimeFilter by remember { mutableStateOf("All Time") }
     var orderStatusFilter by remember { mutableStateOf("Active Orders") }
+    var isKitchenTerminalMode by remember { mutableStateOf(false) }
     var bulkSelectedOrderIds by remember { mutableStateOf(setOf<Int>()) }
     var isAddingFood by remember { mutableStateOf(false) }
     var previewTargetReceipt by remember { mutableStateOf<Order?>(null) }
@@ -207,6 +208,26 @@ fun VendorDashboardScreen(
                 actions = {
                     val inventoryNotifs by viewModel.vendorInventoryNotifications.collectAsStateWithLifecycle()
                     val unreadCount = remember(inventoryNotifs) { inventoryNotifs.count { !it.isRead } }
+
+                    FilterChip(
+                        selected = isKitchenTerminalMode,
+                        onClick = { isKitchenTerminalMode = !isKitchenTerminalMode },
+                        label = {
+                            Text(
+                                if (isKitchenTerminalMode) "🍳 Express ON" else "🍳 Kitchen Express",
+                                fontSize = 10.sp,
+                                fontWeight = FontWeight.Bold
+                            )
+                        },
+                        colors = FilterChipDefaults.filterChipColors(
+                            selectedContainerColor = MaterialTheme.colorScheme.tertiaryContainer,
+                            selectedLabelColor = MaterialTheme.colorScheme.onTertiaryContainer,
+                            containerColor = Color.White.copy(alpha = 0.2f),
+                            labelColor = Color.White
+                        ),
+                        modifier = Modifier.testTag("toggle_kitchen_express_btn")
+                    )
+                    Spacer(modifier = Modifier.width(4.dp))
 
                     IconButton(
                         onClick = { showVendorNotificationsDialog = true },
@@ -1074,7 +1095,15 @@ fun VendorDashboardScreen(
             ) { targetTab ->
                 when (targetTab) {
                 0 -> {
-                    val timeFrames = listOf("All Time", "Last 2 hours", "Today")
+                    if (isKitchenTerminalMode) {
+                        SimplifiedKitchenTerminalView(
+                            incomingOrders = incomingOrders,
+                            allUsers = allUsers,
+                            viewModel = viewModel,
+                            onExitTerminal = { isKitchenTerminalMode = false }
+                        )
+                    } else {
+                        val timeFrames = listOf("All Time", "Last 2 hours", "Today")
                     val statusOptions = listOf("Active Orders", "Completed", "All Statuses")
 
                     val filteredOrders = remember(incomingOrders, orderTimeFilter, orderStatusFilter) {
@@ -2271,6 +2300,7 @@ fun VendorDashboardScreen(
                             }
                         }
                     }
+                }
                 }
                 1 -> {
                     // Menu Management
@@ -7830,6 +7860,270 @@ fun VendorDashboardScreen(
         }
     }
 }
+}
+
+// ==========================================
+// SIMPLIFIED VENDOR KITCHEN TERMINAL VIEW
+// ==========================================
+
+@Composable
+fun SimplifiedKitchenTerminalView(
+    incomingOrders: List<Order>,
+    allUsers: List<User>,
+    viewModel: CafeteriaViewModel,
+    onExitTerminal: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    var selectedFilter by remember { mutableStateOf("ALL") }
+    val filteredOrders = remember(incomingOrders, selectedFilter) {
+        incomingOrders.filter { order ->
+            when (selectedFilter) {
+                "PENDING" -> order.status == "PENDING" || order.status == "ORDER_PLACED"
+                "PREPARING" -> order.status == "PREPARING"
+                "READY" -> order.status == "READY" || order.status == "OUT_FOR_DELIVERY"
+                else -> order.status != "COMPLETED" && order.status != "DELIVERED" && order.status != "CANCELLED"
+            }
+        }.sortedBy { it.id }
+    }
+
+    Column(
+        modifier = modifier
+            .fillMaxSize()
+            .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.2f))
+            .padding(16.dp)
+    ) {
+        // Kitchen Terminal Banner
+        Card(
+            modifier = Modifier.fillMaxWidth(),
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer),
+            shape = RoundedCornerShape(16.dp)
+        ) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(16.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Column {
+                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Text("🍳", fontSize = 24.sp)
+                        Text(
+                            "Kitchen Terminal Express",
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.onPrimaryContainer
+                        )
+                    }
+                    Text(
+                        "Tap status button to toggle order readiness in real-time",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.8f)
+                    )
+                }
+
+                OutlinedButton(
+                    onClick = onExitTerminal,
+                    colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.onPrimaryContainer),
+                    modifier = Modifier.testTag("exit_kitchen_terminal_btn")
+                ) {
+                    Text("Exit Express", fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                }
+            }
+        }
+
+        Spacer(modifier = Modifier.height(12.dp))
+
+        // Large Status Filter Chips
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .horizontalScroll(rememberScrollState()),
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            val filterOptions = listOf("ALL" to "All Active", "PENDING" to "Pending", "PREPARING" to "Preparing", "READY" to "Ready for Pickup")
+            filterOptions.forEach { (code, label) ->
+                val count = incomingOrders.count {
+                    when (code) {
+                        "PENDING" -> it.status == "PENDING" || it.status == "ORDER_PLACED"
+                        "PREPARING" -> it.status == "PREPARING"
+                        "READY" -> it.status == "READY" || it.status == "OUT_FOR_DELIVERY"
+                        else -> it.status != "COMPLETED" && it.status != "DELIVERED" && it.status != "CANCELLED"
+                    }
+                }
+                FilterChip(
+                    selected = selectedFilter == code,
+                    onClick = { selectedFilter = code },
+                    label = { Text("$label ($count)", fontSize = 12.sp, fontWeight = FontWeight.Bold) },
+                    shape = RoundedCornerShape(20.dp),
+                    modifier = Modifier.testTag("kitchen_filter_$code")
+                )
+            }
+        }
+
+        Spacer(modifier = Modifier.height(12.dp))
+
+        if (filteredOrders.isEmpty()) {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .weight(1f),
+                contentAlignment = Alignment.Center
+            ) {
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    Text("🎉", fontSize = 48.sp)
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Text("All quiet in the kitchen!", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
+                    Text("No incoming orders matching filter.", fontSize = 11.sp, color = Color.Gray)
+                }
+            }
+        } else {
+            LazyColumn(
+                modifier = Modifier.weight(1f),
+                verticalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                items(filteredOrders, key = { it.id }) { order ->
+                    val studentUser = allUsers.find { it.id == order.customerId }
+                    Card(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .testTag("kitchen_order_card_${order.id}"),
+                        shape = RoundedCornerShape(16.dp),
+                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                        border = BorderStroke(
+                            2.dp,
+                            when (order.status.uppercase()) {
+                                "PENDING", "ORDER_PLACED" -> Color(0xFFFF9800)
+                                "PREPARING" -> Color(0xFF2196F3)
+                                "READY" -> Color(0xFF4CAF50)
+                                else -> MaterialTheme.colorScheme.outlineVariant
+                            }
+                        ),
+                        elevation = CardDefaults.cardElevation(defaultElevation = 4.dp)
+                    ) {
+                        Column(modifier = Modifier.padding(16.dp)) {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                    Surface(
+                                        color = MaterialTheme.colorScheme.primaryContainer,
+                                        shape = RoundedCornerShape(8.dp)
+                                    ) {
+                                        Text(
+                                            "#${order.id}",
+                                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                                            fontWeight = FontWeight.ExtraBold,
+                                            fontSize = 14.sp,
+                                            color = MaterialTheme.colorScheme.onPrimaryContainer
+                                        )
+                                    }
+                                    Text(
+                                        studentUser?.fullName ?: "Student #${order.customerId}",
+                                        fontWeight = FontWeight.Bold,
+                                        style = MaterialTheme.typography.titleMedium
+                                    )
+                                }
+
+                                Surface(
+                                    color = Color(0xFFE8F5E9),
+                                    shape = RoundedCornerShape(8.dp)
+                                ) {
+                                    Text(
+                                        "PIN: ${order.pickupPin}",
+                                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                                        fontWeight = FontWeight.Bold,
+                                        fontSize = 12.sp,
+                                        color = Color(0xFF2E7D32)
+                                    )
+                                }
+                            }
+
+                            Spacer(modifier = Modifier.height(10.dp))
+
+                            // Big item name & quantity
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Text(
+                                    order.foodName,
+                                    fontSize = 18.sp,
+                                    fontWeight = FontWeight.ExtraBold,
+                                    color = MaterialTheme.colorScheme.onSurface
+                                )
+                                Text(
+                                    "${order.quantity}x",
+                                    fontSize = 22.sp,
+                                    fontWeight = FontWeight.Black,
+                                    color = MaterialTheme.colorScheme.primary
+                                )
+                            }
+
+                            Spacer(modifier = Modifier.height(12.dp))
+                            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
+                            Spacer(modifier = Modifier.height(12.dp))
+
+                            // Prominent readiness status toggle button
+                            when (order.status.uppercase()) {
+                                "PENDING", "ORDER_PLACED" -> {
+                                    Button(
+                                        onClick = { viewModel.updateOrderStatus(order.id, "PREPARING", "15 mins") },
+                                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFFF9800)),
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .height(52.dp)
+                                            .testTag("kitchen_action_start_prep_${order.id}"),
+                                        shape = RoundedCornerShape(12.dp)
+                                    ) {
+                                        Icon(Icons.Default.PlayArrow, contentDescription = null)
+                                        Spacer(modifier = Modifier.width(8.dp))
+                                        Text("▶ ACCEPT & START PREPARING", fontSize = 14.sp, fontWeight = FontWeight.Bold)
+                                    }
+                                }
+                                "PREPARING" -> {
+                                    Button(
+                                        onClick = { viewModel.updateOrderStatus(order.id, "READY") },
+                                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF2196F3)),
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .height(52.dp)
+                                            .testTag("kitchen_action_mark_ready_${order.id}"),
+                                        shape = RoundedCornerShape(12.dp)
+                                    ) {
+                                        Icon(Icons.Default.Check, contentDescription = null)
+                                        Spacer(modifier = Modifier.width(8.dp))
+                                        Text("✔ MARK READY FOR PICKUP", fontSize = 14.sp, fontWeight = FontWeight.Bold)
+                                    }
+                                }
+                                "READY", "OUT_FOR_DELIVERY" -> {
+                                    Button(
+                                        onClick = { viewModel.updateOrderStatus(order.id, "COMPLETED") },
+                                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF4CAF50)),
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .height(52.dp)
+                                            .testTag("kitchen_action_complete_${order.id}"),
+                                        shape = RoundedCornerShape(12.dp)
+                                    ) {
+                                        Icon(Icons.Default.DoneAll, contentDescription = null)
+                                        Spacer(modifier = Modifier.width(8.dp))
+                                        Text("🏁 HANDED TO STUDENT (COMPLETE)", fontSize = 14.sp, fontWeight = FontWeight.Bold)
+                                    }
+                                }
+                                else -> {
+                                    Text("Status: ${order.status}", fontSize = 12.sp, color = Color.Gray)
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
 }
 
 // ==========================================
