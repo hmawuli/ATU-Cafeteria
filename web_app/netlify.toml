@@ -1,0 +1,9 @@
+# Netlify configuration for ATU Cafeteria Web App
+[build]
+  publish = "."
+  command = ""
+
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200

@@ -1582,13 +1582,13 @@ fun VendorDashboardScreen(
                                         Row(verticalAlignment = Alignment.CenterVertically) {
                                             Icon(
                                                 imageVector = Icons.Default.Star,
-                                                contentDescription = "Gemini Spark",
+                                                contentDescription = "ATU Spark",
                                                 tint = MaterialTheme.colorScheme.primary,
                                                 modifier = Modifier.size(20.dp)
                                             )
                                             Spacer(modifier = Modifier.width(8.dp))
                                             Text(
-                                                text = "Gemini Today's Intelligence",
+                                                text = "ATU Today's Intelligence",
                                                 style = MaterialTheme.typography.titleSmall,
                                                 fontWeight = FontWeight.Bold,
                                                 color = MaterialTheme.colorScheme.onPrimaryContainer
@@ -1605,7 +1605,7 @@ fun VendorDashboardScreen(
                                                 .padding(horizontal = 6.dp, vertical = 2.dp)
                                         ) {
                                             Text(
-                                                "LIVE AI",
+                                                "LIVE ATU",
                                                 color = MaterialTheme.colorScheme.onPrimary,
                                                 fontSize = 9.sp,
                                                 fontWeight = FontWeight.Bold
@@ -1647,7 +1647,7 @@ fun VendorDashboardScreen(
                                             )
                                         } ?: run {
                                             Text(
-                                                text = "Need a quick update on today's performance? Tap below to run your Gemini-powered live revenue and busiest hour stats analysis!",
+                                                text = "Need a quick update on today's performance? Tap below to run your ATU live revenue and busiest hour stats analysis!",
                                                 style = MaterialTheme.typography.bodySmall,
                                                 lineHeight = 18.sp,
                                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -4508,11 +4508,11 @@ fun VendorDashboardScreen(
                                 ) {
                                     Icon(
                                         imageVector = Icons.Default.AutoAwesome,
-                                        contentDescription = "Gemini AI",
+                                        contentDescription = "ATU Sentiment",
                                         tint = MaterialTheme.colorScheme.tertiary
                                     )
                                     Text(
-                                        text = "Gemini Student Sentiment Analyst",
+                                        text = "ATU Student Sentiment Analyst",
                                         fontWeight = FontWeight.Bold,
                                         style = MaterialTheme.typography.titleMedium,
                                         color = MaterialTheme.colorScheme.tertiary
@@ -4522,7 +4522,7 @@ fun VendorDashboardScreen(
                                 Spacer(modifier = Modifier.height(4.dp))
                                 
                                 Text(
-                                    text = "Employ Gemini Flash to analyze all student feedback transcripts and order remarks instantly for a complete qualitative report.",
+                                    text = "Employ ATU Analytics to analyze all student feedback transcripts and order remarks instantly for a complete qualitative report.",
                                     fontSize = 11.sp,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant
                                 )
@@ -4642,7 +4642,7 @@ fun VendorDashboardScreen(
                                         tint = MaterialTheme.colorScheme.secondary
                                     )
                                     Text(
-                                        text = "Gemini Quick Response Assistant",
+                                        text = "ATU Quick Response Assistant",
                                         fontWeight = FontWeight.Bold,
                                         style = MaterialTheme.typography.titleMedium,
                                         color = MaterialTheme.colorScheme.secondary
@@ -4772,7 +4772,7 @@ fun VendorDashboardScreen(
                                         tint = MaterialTheme.colorScheme.primary
                                     )
                                     Text(
-                                        text = "Gemini Pricing & Specials Planner",
+                                        text = "ATU Pricing & Specials Planner",
                                         fontWeight = FontWeight.Bold,
                                         style = MaterialTheme.typography.titleMedium,
                                         color = MaterialTheme.colorScheme.primary
@@ -4903,7 +4903,7 @@ fun VendorDashboardScreen(
                                         tint = MaterialTheme.colorScheme.primary
                                     )
                                     Text(
-                                        text = "Gemini Demand & Busiest Hour Advisor",
+                                        text = "ATU Demand & Busiest Hour Advisor",
                                         fontWeight = FontWeight.Bold,
                                         style = MaterialTheme.typography.titleMedium,
                                         color = MaterialTheme.colorScheme.primary
@@ -4913,7 +4913,7 @@ fun VendorDashboardScreen(
                                 Spacer(modifier = Modifier.height(4.dp))
                                 
                                 Text(
-                                    text = "Deploy Google Gemini to crawl your complete historical order database. Generates insights on popular food items, identifies peak crowding slots, and predicts prep schedules.",
+                                    text = "Deploy ATU Analytics to crawl your complete historical order database. Generates insights on popular food items, identifies peak crowding slots, and predicts prep schedules.",
                                     fontSize = 11.sp,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant
                                 )
@@ -4959,7 +4959,7 @@ fun VendorDashboardScreen(
                                                             .padding(horizontal = 6.dp, vertical = 2.dp)
                                                     ) {
                                                         Text(
-                                                            "GEMINI HISTORICAL DEMAND SYNTHESIS",
+                                                            "ATU HISTORICAL DEMAND SYNTHESIS",
                                                             color = MaterialTheme.colorScheme.onPrimaryContainer,
                                                             fontSize = 9.sp,
                                                             fontWeight = FontWeight.Bold
@@ -5035,7 +5035,7 @@ fun VendorDashboardScreen(
                                         tint = MaterialTheme.colorScheme.tertiary
                                     )
                                     Text(
-                                        text = "Gemini AI Item Demand Forecaster",
+                                        text = "ATU Item Demand Forecaster",
                                         fontWeight = FontWeight.Bold,
                                         style = MaterialTheme.typography.titleMedium,
                                         color = MaterialTheme.colorScheme.tertiary
@@ -5091,7 +5091,7 @@ fun VendorDashboardScreen(
                                                             .padding(horizontal = 6.dp, vertical = 2.dp)
                                                     ) {
                                                         Text(
-                                                            "GEMINI PREDICTIVE FORECAST",
+                                                            "ATU PREDICTIVE FORECAST",
                                                             color = MaterialTheme.colorScheme.onTertiaryContainer,
                                                             fontSize = 9.sp,
                                                             fontWeight = FontWeight.Bold
@@ -5168,7 +5168,7 @@ fun VendorDashboardScreen(
                                         tint = MaterialTheme.colorScheme.error
                                     )
                                     Text(
-                                        text = "Gemini AI Low-Stock Predictive Monitor",
+                                        text = "ATU Low-Stock Predictive Monitor",
                                         fontWeight = FontWeight.Bold,
                                         style = MaterialTheme.typography.titleMedium,
                                         color = MaterialTheme.colorScheme.error
@@ -5178,7 +5178,7 @@ fun VendorDashboardScreen(
                                 Spacer(modifier = Modifier.height(4.dp))
                                 
                                 Text(
-                                    text = "Scan sales history using Google Gemini AI to predict items at risk of falling below safe stock limits over the next 24 hours. Generates real-time push alerts to prevent campus stockouts.",
+                                    text = "Scan sales history using ATU Analytics to predict items at risk of falling below safe stock limits over the next 24 hours. Generates real-time push alerts to prevent campus stockouts.",
                                     fontSize = 11.sp,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant
                                 )

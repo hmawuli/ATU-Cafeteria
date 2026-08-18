@@ -75,7 +75,7 @@ fun DailyHealthSummaryDialog(
                         }
                         Column {
                             Text("Daily Health & Nutrition Summary 🍏", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
-                            Text("Aggregated macro data & Gemini AI meal advice", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            Text("Aggregated macro data & ATU Smart meal advice", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                         }
                     }
                     IconButton(onClick = onDismiss, modifier = Modifier.testTag("close_health_summary_btn")) {
@@ -195,7 +195,7 @@ fun DailyHealthSummaryContent(
             }
         }
 
-        // Gemini AI Consultation Action Button
+        // ATU Smart Consultation Action Button
         item {
             Button(
                 onClick = {
@@ -209,27 +209,27 @@ fun DailyHealthSummaryContent(
                         availableFoodItems = availableMenu
                     )
                 },
-                modifier = Modifier.fillMaxWidth().height(48.dp).testTag("ask_gemini_health_advice_btn"),
+                modifier = Modifier.fillMaxWidth().height(48.dp).testTag("ask_atu_health_advice_btn"),
                 colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF2E7D32)),
                 shape = RoundedCornerShape(12.dp)
             ) {
                 if (isAnalyzing) {
                     CircularProgressIndicator(modifier = Modifier.size(20.dp), color = Color.White, strokeWidth = 2.dp)
                     Spacer(modifier = Modifier.width(8.dp))
-                    Text("Consulting Gemini AI Nutritionist...", fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                    Text("Consulting ATU Smart Nutritionist...", fontSize = 12.sp, fontWeight = FontWeight.Bold)
                 } else {
                     Icon(Icons.Default.AutoAwesome, contentDescription = null, modifier = Modifier.size(18.dp))
                     Spacer(modifier = Modifier.width(8.dp))
-                    Text("Generate Gemini Meal Adjustments ✨", fontSize = 13.sp, fontWeight = FontWeight.Bold)
+                    Text("Generate ATU Meal Adjustments ✨", fontSize = 13.sp, fontWeight = FontWeight.Bold)
                 }
             }
         }
 
-        // Gemini AI Response Card
+        // ATU Response Card
         if (nutritionCoachingText != null) {
             item {
                 Card(
-                    modifier = Modifier.fillMaxWidth().testTag("gemini_health_advice_card"),
+                    modifier = Modifier.fillMaxWidth().testTag("atu_health_advice_card"),
                     colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f)),
                     shape = RoundedCornerShape(16.dp),
                     border = BorderStroke(1.dp, Color(0xFF2E7D32).copy(alpha = 0.5f))
@@ -239,8 +239,8 @@ fun DailyHealthSummaryContent(
                             verticalAlignment = Alignment.CenterVertically,
                             horizontalArrangement = Arrangement.spacedBy(8.dp)
                         ) {
-                            Icon(Icons.Default.Psychology, contentDescription = "Gemini", tint = Color(0xFF2E7D32), modifier = Modifier.size(22.dp))
-                            Text("Gemini AI Personalized Health Advice", fontWeight = FontWeight.Bold, fontSize = 13.sp, color = Color(0xFF1B5E20))
+                            Icon(Icons.Default.Psychology, contentDescription = "ATU", tint = Color(0xFF2E7D32), modifier = Modifier.size(22.dp))
+                            Text("ATU Personalized Health Advice", fontWeight = FontWeight.Bold, fontSize = 13.sp, color = Color(0xFF1B5E20))
                         }
                         Spacer(modifier = Modifier.height(10.dp))
                         Text(

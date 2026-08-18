@@ -2378,12 +2378,12 @@ class CafeteriaViewModel @Inject constructor(
                             foodItemId = food.id,
                             foodName = food.name,
                             type = "LOW_STOCK",
-                            message = "Gemini AI Predicts: '${food.name}' has high demand risk. Daily sales trends suggest stock may fall below threshold soon. Suggest restocking 15-20 units.",
+                            message = "ATU Smart Alert: '${food.name}' has high demand risk. Daily sales trends suggest stock may fall below threshold soon. Suggest restocking 15-20 units.",
                             timestamp = currentTime,
                             isRead = false
                         )
                     )
-                    repository.insertAuditLog(vendorId, "GEMINI_STOCK_PREDICTION", "Gemini AI predicted '${food.name}' will fall below low-stock threshold based on sales trends.")
+                    repository.insertAuditLog(vendorId, "ATU_STOCK_PREDICTION", "ATU Intelligence predicted '${food.name}' will fall below low-stock threshold based on sales trends.")
                 }
             }
             
@@ -2651,7 +2651,7 @@ class CafeteriaViewModel @Inject constructor(
                 )
             } catch (e: Exception) {
                 Log.e("CafeteriaViewModel", "runNutritionCoaching failed", e)
-                _nutritionCoachingText.value = "Failed to synchronize lifestyle directives from Gemini. Verify network connection."
+                _nutritionCoachingText.value = "Failed to synchronize lifestyle directives from ATU. Verify network connection."
             } finally {
                 _isAnalyzingNutrition.value = false
             }

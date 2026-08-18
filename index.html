@@ -1,0 +1,841 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>ATU Cafeteria - Smart Food Ordering & Real-Time Tracking</title>
+  
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Lucide Icons -->
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.js"></script>
+  <!-- Google Fonts Inter -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['Plus Jakarta Sans', 'sans-serif'],
+          },
+          colors: {
+            brand: {
+              50: '#fff7ed',
+              100: '#ffedd5',
+              500: '#f97316',
+              600: '#ea580c',
+              700: '#c2410c',
+              800: '#9a3412',
+              900: '#7c2d12',
+            },
+            atu: {
+              blue: '#0F2C59',
+              gold: '#D89216',
+              dark: '#1e293b'
+            }
+          }
+        }
+      }
+    }
+  </script>
+  <style>
+    body {
+      font-family: 'Plus Jakarta Sans', sans-serif;
+      -webkit-tap-highlight-color: transparent;
+    }
+    .badge-pulse {
+      animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+    }
+    @keyframes pulse {
+      0%, 100% { opacity: 1; transform: scale(1); }
+      50% { opacity: .7; transform: scale(1.05); }
+    }
+  </style>
+</head>
+<body class="bg-slate-50 text-slate-900 min-h-screen flex flex-col antialiased selection:bg-brand-500 selection:text-white">
+
+  <!-- Top Navigation Header -->
+  <header class="sticky top-0 z-40 bg-white/90 backdrop-blur-md border-b border-slate-200 shadow-sm">
+    <div class="max-w-6xl mx-auto px-4 py-3 flex items-center justify-between">
+      <div class="flex items-center space-x-3">
+        <div class="w-10 h-10 rounded-xl bg-gradient-to-tr from-brand-600 to-atu-gold flex items-center justify-center text-white shadow-md shadow-brand-500/20">
+          <i data-lucide="utensils" class="w-5 h-5"></i>
+        </div>
+        <div>
+          <h1 class="text-lg font-bold tracking-tight text-slate-900 flex items-center gap-1.5">
+            ATU Cafeteria
+            <span class="text-[10px] uppercase font-extrabold bg-brand-100 text-brand-700 px-2 py-0.5 rounded-full">Web Online</span>
+          </h1>
+          <p class="text-xs text-slate-500 font-medium">Accra Technical University</p>
+        </div>
+      </div>
+
+      <!-- Role Switcher & User Profile Pill -->
+      <div class="flex items-center space-x-3">
+        <div class="hidden sm:flex bg-slate-100 p-1 rounded-xl border border-slate-200 text-xs font-semibold" id="role-selector-desktop">
+          <button onclick="switchRole('STUDENT')" id="btn-role-student" class="px-3 py-1.5 rounded-lg transition-all bg-white text-slate-900 shadow-sm">Student</button>
+          <button onclick="switchRole('VENDOR')" id="btn-role-vendor" class="px-3 py-1.5 rounded-lg transition-all text-slate-600 hover:text-slate-900">Vendor Kitchen</button>
+          <button onclick="switchRole('ADMIN')" id="btn-role-admin" class="px-3 py-1.5 rounded-lg transition-all text-slate-600 hover:text-slate-900">Admin</button>
+        </div>
+
+        <div id="user-wallet-pill" class="flex items-center space-x-2 bg-brand-50 border border-brand-200 px-3 py-1.5 rounded-xl text-xs font-bold text-brand-700">
+          <i data-lucide="wallet" class="w-4 h-4 text-brand-600"></i>
+          <span>GH₵ <span id="student-balance-display">150.00</span></span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Mobile Role Tabs -->
+    <div class="sm:hidden flex border-t border-slate-200 bg-slate-100/70 px-4 py-1.5 justify-around text-xs font-bold">
+      <button onclick="switchRole('STUDENT')" id="m-role-student" class="py-1 px-3 rounded-lg text-brand-600 bg-white shadow-xs">Student Portal</button>
+      <button onclick="switchRole('VENDOR')" id="m-role-vendor" class="py-1 px-3 rounded-lg text-slate-600">Kitchen Orders</button>
+      <button onclick="switchRole('ADMIN')" id="m-role-admin" class="py-1 px-3 rounded-lg text-slate-600">Manager Hub</button>
+    </div>
+  </header>
+
+  <!-- Notification Toast Container -->
+  <div id="toast-container" class="fixed top-20 right-4 z-50 flex flex-col space-y-2 pointer-events-none"></div>
+
+  <!-- MAIN APP CONTAINER -->
+  <main class="flex-1 max-w-6xl w-full mx-auto p-4 md:p-6">
+
+    <!-- 1. STUDENT VIEW -->
+    <section id="student-view" class="space-y-6">
+      <div class="relative overflow-hidden rounded-2xl bg-gradient-to-r from-atu-blue via-slate-900 to-brand-900 text-white p-6 shadow-xl">
+        <div class="relative z-10 max-w-xl">
+          <div class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-white/10 backdrop-blur-md text-amber-300 text-xs font-semibold mb-3">
+            <i data-lucide="sparkles" class="w-3.5 h-3.5"></i>
+            <span>Pre-order & Skip Cafeteria Queues</span>
+          </div>
+          <h2 class="text-2xl md:text-3xl font-extrabold tracking-tight">Enjoy Delicious Hot Campus Meals</h2>
+          <p class="mt-2 text-slate-300 text-sm leading-relaxed">
+            Order fresh meals from Akwaaba Kitchen and track your food status in real-time from the stove to counter pickup.
+          </p>
+        </div>
+        <div class="absolute right-0 -bottom-10 opacity-15 pointer-events-none">
+          <i data-lucide="utensils-crossed" class="w-64 h-64 text-white"></i>
+        </div>
+      </div>
+
+      <!-- Active Orders Live Tracking Section -->
+      <div id="active-orders-section" class="space-y-4">
+        <div class="flex items-center justify-between">
+          <h3 class="text-base font-bold text-slate-900 flex items-center gap-2">
+            <span class="w-2.5 h-2.5 rounded-full bg-emerald-500 badge-pulse"></span>
+            Live Order Tracking
+          </h3>
+          <span id="active-order-count" class="text-xs font-semibold text-slate-500 bg-slate-200 px-2 py-0.5 rounded-full">1 Active</span>
+        </div>
+
+        <div id="active-orders-list" class="grid grid-cols-1 md:grid-cols-2 gap-4"></div>
+      </div>
+
+      <!-- Menu Filter Categories -->
+      <div class="flex items-center space-x-2 overflow-x-auto pb-2 scrollbar-none" id="category-filters">
+        <button onclick="filterCategory('ALL')" class="category-btn active px-4 py-2 rounded-xl text-xs font-bold bg-brand-600 text-white shadow-sm transition-all">All Items</button>
+        <button onclick="filterCategory('Main Dish')" class="category-btn px-4 py-2 rounded-xl text-xs font-bold bg-white text-slate-700 border border-slate-200 hover:bg-slate-50 transition-all">Main Dishes</button>
+        <button onclick="filterCategory('Traditional')" class="category-btn px-4 py-2 rounded-xl text-xs font-bold bg-white text-slate-700 border border-slate-200 hover:bg-slate-50 transition-all">Traditional</button>
+        <button onclick="filterCategory('Drinks')" class="category-btn px-4 py-2 rounded-xl text-xs font-bold bg-white text-slate-700 border border-slate-200 hover:bg-slate-50 transition-all">Chilled Drinks</button>
+        <button onclick="filterCategory('Snacks')" class="category-btn px-4 py-2 rounded-xl text-xs font-bold bg-white text-slate-700 border border-slate-200 hover:bg-slate-50 transition-all">Pastries & Snacks</button>
+      </div>
+
+      <!-- Food Menu Grid -->
+      <div id="food-menu-grid" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5"></div>
+    </section>
+
+    <!-- 2. VENDOR VIEW -->
+    <section id="vendor-view" class="hidden space-y-6">
+      <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white p-5 rounded-2xl border border-slate-200 shadow-sm">
+        <div>
+          <div class="flex items-center gap-2">
+            <span class="w-3 h-3 rounded-full bg-emerald-500"></span>
+            <h2 class="text-xl font-bold text-slate-900">Akwaaba Kitchen Hub</h2>
+            <span class="text-xs font-extrabold bg-emerald-100 text-emerald-800 px-2.5 py-0.5 rounded-full">ONLINE</span>
+          </div>
+          <p class="text-xs text-slate-500 mt-1">Manage kitchen incoming tickets, advance order statuses, and verify student pickup PINs.</p>
+        </div>
+
+        <div class="flex items-center gap-2">
+          <div class="flex items-center bg-slate-100 border border-slate-200 rounded-xl px-3 py-1.5">
+            <i data-lucide="key-round" class="w-4 h-4 text-slate-400 mr-2"></i>
+            <input type="text" id="verify-pin-input" placeholder="Enter Pickup PIN" maxlength="4" class="w-28 bg-transparent text-xs font-bold outline-none text-slate-800" />
+            <button onclick="verifyPickupPin()" class="ml-1 bg-brand-600 hover:bg-brand-700 text-white text-xs font-bold px-3 py-1 rounded-lg">Verify</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="space-y-4">
+        <h3 class="text-base font-bold text-slate-900 flex items-center justify-between">
+          <span>Active Kitchen Queue</span>
+          <button onclick="refreshVendorData()" class="text-xs text-brand-600 font-bold hover:underline flex items-center gap-1">
+            <i data-lucide="refresh-cw" class="w-3.5 h-3.5"></i> Refresh
+          </button>
+        </h3>
+        <div id="vendor-orders-list" class="grid grid-cols-1 md:grid-cols-2 gap-4"></div>
+      </div>
+    </section>
+
+    <!-- 3. ADMIN VIEW -->
+    <section id="admin-view" class="hidden space-y-6">
+      <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm">
+        <h2 class="text-xl font-bold text-slate-900 flex items-center gap-2">
+          <i data-lucide="shield-check" class="w-5 h-5 text-brand-600"></i>
+          ATU Cafeteria Oversight Dashboard
+        </h2>
+        <p class="text-xs text-slate-500 mt-1">Real-time financial summaries, vendor performance indicators, and order telemetry.</p>
+
+        <div class="grid grid-cols-2 sm:grid-cols-4 gap-4 mt-5">
+          <div class="bg-slate-50 p-4 rounded-xl border border-slate-200">
+            <p class="text-xs font-semibold text-slate-500">Total Volume</p>
+            <p class="text-2xl font-extrabold text-slate-900 mt-1" id="kpi-orders-count">24</p>
+            <p class="text-[11px] text-emerald-600 font-semibold mt-1">↑ 100% on campus</p>
+          </div>
+          <div class="bg-slate-50 p-4 rounded-xl border border-slate-200">
+            <p class="text-xs font-semibold text-slate-500">Gross Sales</p>
+            <p class="text-2xl font-extrabold text-brand-600 mt-1">GH₵ <span id="kpi-sales-sum">785.00</span></p>
+            <p class="text-[11px] text-slate-500 mt-1">Settled in GHS</p>
+          </div>
+          <div class="bg-slate-50 p-4 rounded-xl border border-slate-200">
+            <p class="text-xs font-semibold text-slate-500">Active Vendors</p>
+            <p class="text-2xl font-extrabold text-slate-900 mt-1">3</p>
+            <p class="text-[11px] text-slate-500 mt-1">All Kitchens Online</p>
+          </div>
+          <div class="bg-slate-50 p-4 rounded-xl border border-slate-200">
+            <p class="text-xs font-semibold text-slate-500">Avg Fulfillment</p>
+            <p class="text-2xl font-extrabold text-slate-900 mt-1">12 min</p>
+            <p class="text-[11px] text-emerald-600 font-semibold mt-1">Lightning Fast</p>
+          </div>
+        </div>
+      </div>
+
+      <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm space-y-3">
+        <h3 class="text-sm font-bold text-slate-900">System Activity & Audit Telemetry</h3>
+        <div id="audit-logs-list" class="space-y-2 text-xs font-medium text-slate-600 divide-y divide-slate-100"></div>
+      </div>
+    </section>
+  </main>
+
+  <!-- Sticky Bottom Cart Bar -->
+  <div id="sticky-cart-bar" class="sticky bottom-0 z-30 bg-white/95 backdrop-blur-md border-t border-slate-200 p-4 shadow-lg hidden">
+    <div class="max-w-6xl mx-auto flex items-center justify-between">
+      <div class="flex items-center space-x-3">
+        <div class="w-10 h-10 rounded-xl bg-brand-100 text-brand-700 flex items-center justify-center font-bold">
+          <i data-lucide="shopping-bag" class="w-5 h-5"></i>
+        </div>
+        <div>
+          <p class="text-xs text-slate-500 font-semibold"><span id="cart-item-count">0</span> items in tray</p>
+          <p class="text-lg font-extrabold text-brand-600">GH₵ <span id="cart-total-display">0.00</span></p>
+        </div>
+      </div>
+
+      <div class="flex items-center space-x-2">
+        <button onclick="clearCart()" class="px-3 py-2 text-xs font-bold text-slate-600 hover:text-red-600 transition-colors">Clear</button>
+        <button onclick="checkoutCart()" class="px-5 py-2.5 rounded-xl bg-brand-600 hover:bg-brand-700 text-white text-xs font-extrabold shadow-md shadow-brand-500/25 flex items-center gap-1.5 transition-transform active:scale-95">
+          <span>Checkout Pre-order</span>
+          <i data-lucide="arrow-right" class="w-4 h-4"></i>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Order Detail & Live Stepper Modal -->
+  <div id="tracking-modal" class="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm hidden flex items-center justify-center p-4">
+    <div class="bg-white rounded-3xl max-w-md w-full p-6 shadow-2xl space-y-5">
+      <div class="flex items-center justify-between border-b border-slate-100 pb-3">
+        <div>
+          <h3 class="text-lg font-bold text-slate-900" id="modal-order-title">Order #1042</h3>
+          <p class="text-xs text-slate-500 font-medium">Akwaaba Kitchen • Counter Pickup</p>
+        </div>
+        <button onclick="closeTrackingModal()" class="w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center text-slate-500 hover:bg-slate-200">
+          <i data-lucide="x" class="w-4 h-4"></i>
+        </button>
+      </div>
+
+      <div class="bg-brand-50 border border-brand-100 rounded-2xl p-4 flex items-center justify-between">
+        <div>
+          <p class="text-sm font-extrabold text-slate-900" id="modal-food-name">Spiced Jollof Rice</p>
+          <p class="text-xs text-slate-500" id="modal-food-qty">Quantity: 1 • GH₵ 35.00</p>
+        </div>
+        <div class="text-right">
+          <p class="text-[10px] uppercase font-bold text-brand-700">Pickup PIN</p>
+          <p class="text-xl font-black tracking-widest text-brand-600 bg-white px-2.5 py-1 rounded-lg border border-brand-200 shadow-xs" id="modal-pickup-pin">8842</p>
+        </div>
+      </div>
+
+      <div class="space-y-4 pt-2">
+        <h4 class="text-xs font-bold text-slate-700 uppercase tracking-wider">Live Status Progression</h4>
+        <div class="space-y-4">
+          <div class="flex items-start gap-3" id="step-row-0">
+            <div class="flex flex-col items-center">
+              <div class="w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold transition-all step-icon bg-emerald-500 text-white">
+                <i data-lucide="check" class="w-4 h-4"></i>
+              </div>
+              <div class="w-0.5 h-8 bg-slate-200 step-line"></div>
+            </div>
+            <div>
+              <p class="text-xs font-bold text-slate-900">1. Order Received</p>
+              <p class="text-[11px] text-slate-500">Ticket printed at vendor station</p>
+            </div>
+          </div>
+          <div class="flex items-start gap-3" id="step-row-1">
+            <div class="flex flex-col items-center">
+              <div class="w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold transition-all step-icon bg-slate-200 text-slate-600">2</div>
+              <div class="w-0.5 h-8 bg-slate-200 step-line"></div>
+            </div>
+            <div>
+              <p class="text-xs font-bold text-slate-900">2. Kitchen Preparing</p>
+              <p class="text-[11px] text-slate-500">Meal is on the stove / plated</p>
+            </div>
+          </div>
+          <div class="flex items-start gap-3" id="step-row-2">
+            <div class="flex flex-col items-center">
+              <div class="w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold transition-all step-icon bg-slate-200 text-slate-600">3</div>
+              <div class="w-0.5 h-8 bg-slate-200 step-line"></div>
+            </div>
+            <div>
+              <p class="text-xs font-bold text-slate-900">3. Out for Delivery / Counter Ready</p>
+              <p class="text-[11px] text-slate-500">Ready at counter with your PIN</p>
+            </div>
+          </div>
+          <div class="flex items-start gap-3" id="step-row-3">
+            <div class="flex flex-col items-center">
+              <div class="w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold transition-all step-icon bg-slate-200 text-slate-600">4</div>
+            </div>
+            <div>
+              <p class="text-xs font-bold text-slate-900">4. Delivered / Collected</p>
+              <p class="text-[11px] text-slate-500">Transaction completed. Enjoy!</p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <button onclick="closeTrackingModal()" class="w-full py-2.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-800 text-xs font-bold transition-colors">
+        Close Window
+      </button>
+    </div>
+  </div>
+
+  <script>
+    let currentRole = 'STUDENT';
+    let studentBalance = 150.00;
+    let selectedCategory = 'ALL';
+    let cart = {};
+
+    const menuItems = [
+      {
+        id: 1,
+        vendorId: 201,
+        vendorName: 'Akwaaba Kitchen',
+        name: 'Spiced Jollof Rice with Grilled Chicken',
+        price: 35.00,
+        category: 'Main Dish',
+        image: 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=400&q=80',
+        description: 'Fragrant seasoned long-grain rice served with tender quarter grilled chicken, coleslaw, and shito.',
+        calories: 480,
+        badge: 'Popular Today'
+      },
+      {
+        id: 2,
+        vendorId: 201,
+        vendorName: 'Akwaaba Kitchen',
+        name: 'Waakye Deluxe with Egg & Wele',
+        price: 30.00,
+        category: 'Main Dish',
+        image: 'https://images.unsplash.com/photo-1565299624946-b28f40a0ae38?w=400&q=80',
+        description: 'Authentic Ghanaian rice and beans with spaghetti, gari foto, boiled egg, and spicy black shito.',
+        calories: 540,
+        badge: 'Campus Favorite'
+      },
+      {
+        id: 3,
+        vendorId: 201,
+        vendorName: 'Akwaaba Kitchen',
+        name: 'Fried Plantain & Red-Red Beans Stew',
+        price: 25.00,
+        category: 'Traditional',
+        image: 'https://images.unsplash.com/photo-1540420773420-3366772f4999?w=400&q=80',
+        description: 'Sweet golden fried plantains served with rich palm-nut black-eyed bean stew and gari.',
+        calories: 390,
+        badge: 'Vegetarian'
+      },
+      {
+        id: 4,
+        vendorId: 201,
+        vendorName: 'Akwaaba Kitchen',
+        name: 'Chilled Spiced Sobolo Drink (500ml)',
+        price: 10.00,
+        category: 'Drinks',
+        image: 'https://images.unsplash.com/photo-1513558161293-cdaf765ed2fd?w=400&q=80',
+        description: 'Cold brewed hibiscus beverage infused with fresh cloves, ginger, and pineapple juice.',
+        calories: 95,
+        badge: 'Refreshing'
+      },
+      {
+        id: 5,
+        vendorId: 201,
+        vendorName: 'Akwaaba Kitchen',
+        name: 'Crispy Meat Pie & Sausage Roll',
+        price: 15.00,
+        category: 'Snacks',
+        image: 'https://images.unsplash.com/photo-1509440159596-0249088772ff?w=400&q=80',
+        description: 'Flaky baked butter pastry filled with seasoned minced beef and herbs.',
+        calories: 310,
+        badge: 'Quick Bite'
+      }
+    ];
+
+    let orders = [
+      {
+        id: 1024,
+        foodId: 1,
+        foodName: 'Spiced Jollof Rice with Grilled Chicken',
+        quantity: 1,
+        totalPrice: 35.00,
+        status: 'PREPARING',
+        pickupPin: '5821',
+        time: '12:15 PM'
+      }
+    ];
+
+    let auditLogs = [
+      'Order #1024 status updated to PREPARING by Akwaaba Kitchen.',
+      'Daily menu inventory synchronized with ATU campus database.',
+      'Student wallet top-up GH₵ 50.00 completed successfully via Mobile Money.'
+    ];
+
+    document.addEventListener('DOMContentLoaded', () => {
+      lucide.createIcons();
+      renderMenu();
+      renderActiveOrders();
+      renderVendorOrders();
+      renderAdminLogs();
+    });
+
+    function switchRole(role) {
+      currentRole = role;
+      ['student', 'vendor', 'admin'].forEach(r => {
+        const btn = document.getElementById(`btn-role-${r}`);
+        const mBtn = document.getElementById(`m-role-${r}`);
+        const isCurrent = role.toLowerCase() === r;
+
+        if (btn) {
+          btn.className = isCurrent 
+            ? 'px-3 py-1.5 rounded-lg transition-all bg-white text-slate-900 shadow-sm'
+            : 'px-3 py-1.5 rounded-lg transition-all text-slate-600 hover:text-slate-900';
+        }
+        if (mBtn) {
+          mBtn.className = isCurrent
+            ? 'py-1 px-3 rounded-lg text-brand-600 bg-white shadow-xs'
+            : 'py-1 px-3 rounded-lg text-slate-600';
+        }
+      });
+
+      document.getElementById('student-view').classList.toggle('hidden', role !== 'STUDENT');
+      document.getElementById('vendor-view').classList.toggle('hidden', role !== 'VENDOR');
+      document.getElementById('admin-view').classList.toggle('hidden', role !== 'ADMIN');
+      document.getElementById('user-wallet-pill').classList.toggle('hidden', role !== 'STUDENT');
+
+      updateCartBar();
+      lucide.createIcons();
+    }
+
+    function filterCategory(category) {
+      selectedCategory = category;
+      document.querySelectorAll('.category-btn').forEach(btn => {
+        const isActive = (category === 'ALL' && btn.innerText.includes('All')) || btn.innerText.includes(category);
+        btn.className = isActive
+          ? 'category-btn active px-4 py-2 rounded-xl text-xs font-bold bg-brand-600 text-white shadow-sm transition-all'
+          : 'category-btn px-4 py-2 rounded-xl text-xs font-bold bg-white text-slate-700 border border-slate-200 hover:bg-slate-50 transition-all';
+      });
+      renderMenu();
+    }
+
+    function renderMenu() {
+      const grid = document.getElementById('food-menu-grid');
+      const filtered = selectedCategory === 'ALL' 
+        ? menuItems 
+        : menuItems.filter(item => item.category === selectedCategory);
+
+      grid.innerHTML = filtered.map(item => {
+        const qty = cart[item.id] || 0;
+        return `
+          <div class="bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-xs hover:shadow-md transition-all flex flex-col justify-between">
+            <div>
+              <div class="relative h-44 overflow-hidden bg-slate-100">
+                <img src="${item.image}" alt="${item.name}" class="w-full h-full object-cover">
+                <span class="absolute top-3 left-3 bg-white/90 backdrop-blur-md text-brand-700 font-extrabold text-[10px] px-2.5 py-1 rounded-full shadow-xs">
+                  ${item.badge}
+                </span>
+                <span class="absolute bottom-3 right-3 bg-slate-900/80 backdrop-blur-md text-white font-bold text-xs px-2 py-0.5 rounded-lg">
+                  ${item.calories} kcal
+                </span>
+              </div>
+
+              <div class="p-4 space-y-2">
+                <div class="flex items-center justify-between">
+                  <span class="text-[11px] font-bold text-slate-400 uppercase tracking-wider">${item.category}</span>
+                  <span class="text-xs font-semibold text-emerald-600">● In Stock</span>
+                </div>
+                <h4 class="font-bold text-slate-900 text-base line-clamp-1">${item.name}</h4>
+                <p class="text-xs text-slate-500 line-clamp-2 leading-relaxed">${item.description}</p>
+              </div>
+            </div>
+
+            <div class="p-4 pt-0 border-t border-slate-100 flex items-center justify-between mt-2">
+              <div>
+                <p class="text-[10px] text-slate-400 font-semibold uppercase">Price</p>
+                <p class="text-base font-extrabold text-brand-600">GH₵ ${item.price.toFixed(2)}</p>
+              </div>
+
+              ${qty === 0 ? `
+                <button onclick="addToCart(${item.id})" class="px-4 py-2 rounded-xl bg-brand-600 hover:bg-brand-700 text-white text-xs font-bold shadow-xs flex items-center gap-1.5 transition-transform active:scale-95">
+                  <i data-lucide="plus" class="w-4 h-4"></i>
+                  <span>Add</span>
+                </button>
+              ` : `
+                <div class="flex items-center space-x-2 bg-slate-100 rounded-xl p-1 border border-slate-200">
+                  <button onclick="removeFromCart(${item.id})" class="w-7 h-7 rounded-lg bg-white text-slate-700 flex items-center justify-center font-bold shadow-xs hover:bg-red-50 hover:text-red-600">
+                    <i data-lucide="minus" class="w-3.5 h-3.5"></i>
+                  </button>
+                  <span class="text-xs font-bold px-1">${qty}</span>
+                  <button onclick="addToCart(${item.id})" class="w-7 h-7 rounded-lg bg-brand-600 text-white flex items-center justify-center font-bold shadow-xs hover:bg-brand-700">
+                    <i data-lucide="plus" class="w-3.5 h-3.5"></i>
+                  </button>
+                </div>
+              `}
+            </div>
+          </div>
+        `;
+      }).join('');
+
+      lucide.createIcons();
+    }
+
+    function addToCart(foodId) {
+      cart[foodId] = (cart[foodId] || 0) + 1;
+      renderMenu();
+      updateCartBar();
+    }
+
+    function removeFromCart(foodId) {
+      if (cart[foodId] > 1) {
+        cart[foodId] -= 1;
+      } else {
+        delete cart[foodId];
+      }
+      renderMenu();
+      updateCartBar();
+    }
+
+    function clearCart() {
+      cart = {};
+      renderMenu();
+      updateCartBar();
+    }
+
+    function updateCartBar() {
+      const bar = document.getElementById('sticky-cart-bar');
+      const countEl = document.getElementById('cart-item-count');
+      const totalEl = document.getElementById('cart-total-display');
+
+      let totalItems = 0;
+      let totalPrice = 0;
+
+      for (const [id, qty] of Object.entries(cart)) {
+        const item = menuItems.find(m => m.id == id);
+        if (item) {
+          totalItems += qty;
+          totalPrice += item.price * qty;
+        }
+      }
+
+      countEl.innerText = totalItems;
+      totalEl.innerText = totalPrice.toFixed(2);
+
+      if (totalItems > 0 && currentRole === 'STUDENT') {
+        bar.classList.remove('hidden');
+      } else {
+        bar.classList.add('hidden');
+      }
+      lucide.createIcons();
+    }
+
+    function checkoutCart() {
+      let totalPrice = 0;
+      const orderedItems = [];
+
+      for (const [id, qty] of Object.entries(cart)) {
+        const item = menuItems.find(m => m.id == id);
+        if (item) {
+          totalPrice += item.price * qty;
+          orderedItems.push({ item, qty });
+        }
+      }
+
+      if (totalPrice > studentBalance) {
+        showToast('Insufficient student wallet balance. Top up to proceed.', 'error');
+        return;
+      }
+
+      studentBalance -= totalPrice;
+      document.getElementById('student-balance-display').innerText = studentBalance.toFixed(2);
+
+      orderedItems.forEach(({ item, qty }) => {
+        const newOrder = {
+          id: Math.floor(1000 + Math.random() * 9000),
+          foodId: item.id,
+          foodName: item.name,
+          quantity: qty,
+          totalPrice: item.price * qty,
+          status: 'RECEIVED',
+          pickupPin: Math.floor(1000 + Math.random() * 9000).toString(),
+          time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+        };
+        orders.unshift(newOrder);
+        auditLogs.unshift(`Order #${newOrder.id} placed by student (${newOrder.quantity}x ${newOrder.foodName}).`);
+      });
+
+      clearCart();
+      renderActiveOrders();
+      renderVendorOrders();
+      renderAdminLogs();
+      showToast('Pre-order placed successfully! Real-time live tracking started.', 'success');
+
+      if (orders.length > 0) {
+        openTrackingModal(orders[0].id);
+      }
+    }
+
+    function getStatusBadge(status) {
+      switch (status) {
+        case 'RECEIVED':
+          return '<span class="bg-amber-100 text-amber-800 text-[10px] font-extrabold px-2.5 py-1 rounded-full">1. Received</span>';
+        case 'PREPARING':
+          return '<span class="bg-blue-100 text-blue-800 text-[10px] font-extrabold px-2.5 py-1 rounded-full">2. Preparing</span>';
+        case 'OUT_FOR_DELIVERY':
+          return '<span class="bg-purple-100 text-purple-800 text-[10px] font-extrabold px-2.5 py-1 rounded-full">3. Counter Ready</span>';
+        case 'DELIVERED':
+          return '<span class="bg-emerald-100 text-emerald-800 text-[10px] font-extrabold px-2.5 py-1 rounded-full">4. Delivered</span>';
+        default:
+          return status;
+      }
+    }
+
+    function renderActiveOrders() {
+      const container = document.getElementById('active-orders-list');
+      const count = document.getElementById('active-order-count');
+      const active = orders.filter(o => o.status !== 'DELIVERED');
+
+      count.innerText = `${active.length} Active`;
+
+      if (orders.length === 0) {
+        container.innerHTML = `
+          <div class="col-span-full bg-white p-8 rounded-2xl border border-slate-200 text-center">
+            <i data-lucide="inbox" class="w-8 h-8 text-slate-400 mx-auto mb-2"></i>
+            <p class="text-sm font-bold text-slate-700">No active campus orders</p>
+            <p class="text-xs text-slate-500 mt-1">Select meals from the menu above to start real-time tracking.</p>
+          </div>
+        `;
+        lucide.createIcons();
+        return;
+      }
+
+      container.innerHTML = orders.map(order => `
+        <div class="bg-white p-4 rounded-2xl border border-slate-200 shadow-xs hover:border-brand-300 transition-all flex flex-col justify-between">
+          <div class="space-y-2">
+            <div class="flex items-center justify-between">
+              <span class="text-xs font-bold text-slate-900">Order #${order.id}</span>
+              ${getStatusBadge(order.status)}
+            </div>
+            <p class="font-extrabold text-sm text-slate-900">${order.quantity}x ${order.foodName}</p>
+            <div class="flex items-center justify-between text-xs text-slate-500">
+              <span>Total: GH₵ ${order.totalPrice.toFixed(2)}</span>
+              <span>PIN: <strong class="text-slate-800 font-mono">${order.pickupPin}</strong></span>
+            </div>
+          </div>
+
+          <div class="mt-4 pt-3 border-t border-slate-100 flex items-center justify-between">
+            <span class="text-[11px] text-slate-400">${order.time}</span>
+            <button onclick="openTrackingModal(${order.id})" class="px-3 py-1.5 rounded-lg bg-brand-50 hover:bg-brand-100 text-brand-700 text-xs font-bold flex items-center gap-1">
+              <i data-lucide="activity" class="w-3.5 h-3.5"></i>
+              <span>Live Progression</span>
+            </button>
+          </div>
+        </div>
+      `).join('');
+
+      lucide.createIcons();
+    }
+
+    function openTrackingModal(orderId) {
+      const order = orders.find(o => o.id === orderId);
+      if (!order) return;
+
+      document.getElementById('modal-order-title').innerText = `Order #${order.id}`;
+      document.getElementById('modal-food-name').innerText = order.foodName;
+      document.getElementById('modal-food-qty').innerText = `Quantity: ${order.quantity} • GH₵ ${order.totalPrice.toFixed(2)}`;
+      document.getElementById('modal-pickup-pin').innerText = order.pickupPin;
+
+      const stages = ['RECEIVED', 'PREPARING', 'OUT_FOR_DELIVERY', 'DELIVERED'];
+      const currentIndex = stages.indexOf(order.status);
+
+      stages.forEach((st, idx) => {
+        const row = document.getElementById(`step-row-${idx}`);
+        const icon = row.querySelector('.step-icon');
+        const line = row.querySelector('.step-line');
+
+        if (idx < currentIndex) {
+          icon.className = 'w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold transition-all step-icon bg-emerald-500 text-white';
+          icon.innerHTML = '<i data-lucide="check" class="w-4 h-4"></i>';
+          if (line) line.className = 'w-0.5 h-8 bg-emerald-500 step-line';
+        } else if (idx === currentIndex) {
+          icon.className = 'w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold transition-all step-icon bg-brand-600 text-white shadow-md shadow-brand-500/30';
+          icon.innerHTML = (idx + 1).toString();
+          if (line) line.className = 'w-0.5 h-8 bg-slate-200 step-line';
+        } else {
+          icon.className = 'w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold transition-all step-icon bg-slate-100 text-slate-400';
+          icon.innerHTML = (idx + 1).toString();
+          if (line) line.className = 'w-0.5 h-8 bg-slate-200 step-line';
+        }
+      });
+
+      document.getElementById('tracking-modal').classList.remove('hidden');
+      lucide.createIcons();
+    }
+
+    function closeTrackingModal() {
+      document.getElementById('tracking-modal').classList.add('hidden');
+    }
+
+    function renderVendorOrders() {
+      const container = document.getElementById('vendor-orders-list');
+      if (!container) return;
+
+      if (orders.length === 0) {
+        container.innerHTML = '<div class="col-span-full bg-white p-8 rounded-2xl border border-slate-200 text-center text-xs text-slate-500">No kitchen orders at the moment.</div>';
+        return;
+      }
+
+      container.innerHTML = orders.map(order => `
+        <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-xs space-y-3">
+          <div class="flex items-center justify-between">
+            <span class="text-sm font-bold text-slate-900">Ticket #${order.id}</span>
+            ${getStatusBadge(order.status)}
+          </div>
+          <p class="text-base font-extrabold text-slate-900">${order.quantity}x ${order.foodName}</p>
+          <div class="text-xs text-slate-600 flex items-center justify-between">
+            <span>GH₵ ${order.totalPrice.toFixed(2)}</span>
+            <span class="font-mono bg-slate-100 px-2 py-0.5 rounded font-bold">PIN: ${order.pickupPin}</span>
+          </div>
+
+          <div class="pt-3 border-t border-slate-100 flex items-center justify-end gap-2">
+            ${order.status === 'RECEIVED' ? `
+              <button onclick="advanceOrderStatus(${order.id}, 'PREPARING')" class="px-3.5 py-1.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold">
+                Start Preparing
+              </button>
+            ` : ''}
+            ${order.status === 'PREPARING' ? `
+              <button onclick="advanceOrderStatus(${order.id}, 'OUT_FOR_DELIVERY')" class="px-3.5 py-1.5 rounded-xl bg-purple-600 hover:bg-purple-700 text-white text-xs font-bold">
+                Mark Ready for Counter
+              </button>
+            ` : ''}
+            ${order.status === 'OUT_FOR_DELIVERY' ? `
+              <button onclick="advanceOrderStatus(${order.id}, 'DELIVERED')" class="px-3.5 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold">
+                Complete Pickup
+              </button>
+            ` : ''}
+            ${order.status === 'DELIVERED' ? `
+              <span class="text-xs font-bold text-emerald-600 flex items-center gap-1">
+                <i data-lucide="check-circle-2" class="w-4 h-4"></i> Collected
+              </span>
+            ` : ''}
+          </div>
+        </div>
+      `).join('');
+
+      lucide.createIcons();
+    }
+
+    function advanceOrderStatus(orderId, nextStatus) {
+      const order = orders.find(o => o.id === orderId);
+      if (order) {
+        order.status = nextStatus;
+        auditLogs.unshift(`Order #${orderId} moved to ${nextStatus} by Kitchen.`);
+        renderActiveOrders();
+        renderVendorOrders();
+        renderAdminLogs();
+        showToast(`Order #${orderId} updated to ${nextStatus.replace(/_/g, ' ')}`, 'info');
+      }
+    }
+
+    function verifyPickupPin() {
+      const input = document.getElementById('verify-pin-input');
+      const pin = input.value.trim();
+      if (!pin) return;
+
+      const matched = orders.find(o => o.pickupPin === pin && o.status !== 'DELIVERED');
+      if (matched) {
+        advanceOrderStatus(matched.id, 'DELIVERED');
+        input.value = '';
+        showToast(`PIN Verified! Order #${matched.id} (${matched.foodName}) marked Delivered.`, 'success');
+      } else {
+        showToast('Invalid PIN or order already collected.', 'error');
+      }
+    }
+
+    function refreshVendorData() {
+      renderVendorOrders();
+      showToast('Kitchen queue refreshed.', 'info');
+    }
+
+    function renderAdminLogs() {
+      const list = document.getElementById('audit-logs-list');
+      const kpiOrders = document.getElementById('kpi-orders-count');
+      const kpiSales = document.getElementById('kpi-sales-sum');
+
+      if (kpiOrders) kpiOrders.innerText = orders.length + 24;
+      if (kpiSales) {
+        const sales = orders.reduce((acc, o) => acc + o.totalPrice, 785.00);
+        kpiSales.innerText = sales.toFixed(2);
+      }
+
+      if (list) {
+        list.innerHTML = auditLogs.slice(0, 5).map(log => `
+          <div class="py-2 flex items-center justify-between">
+            <span>${log}</span>
+            <span class="text-[10px] text-slate-400">Just now</span>
+          </div>
+        `).join('');
+      }
+    }
+
+    function showToast(message, type = 'info') {
+      const container = document.getElementById('toast-container');
+      const toast = document.createElement('div');
+      const bg = type === 'success' ? 'bg-emerald-600' : type === 'error' ? 'bg-red-600' : 'bg-slate-900';
+
+      toast.className = `${bg} text-white px-4 py-3 rounded-2xl shadow-xl text-xs font-bold flex items-center space-x-2 pointer-events-auto transform translate-y-2 opacity-0 transition-all duration-300`;
+      toast.innerHTML = `
+        <i data-lucide="${type === 'success' ? 'check-circle' : type === 'error' ? 'alert-circle' : 'bell'}" class="w-4 h-4"></i>
+        <span>${message}</span>
+      `;
+
+      container.appendChild(toast);
+      lucide.createIcons();
+
+      requestAnimationFrame(() => {
+        toast.classList.remove('translate-y-2', 'opacity-0');
+      });
+
+      setTimeout(() => {
+        toast.classList.add('opacity-0', '-translate-y-2');
+        setTimeout(() => toast.remove(), 300);
+      }, 3500);
+    }
+  </script>
+</body>
+</html>

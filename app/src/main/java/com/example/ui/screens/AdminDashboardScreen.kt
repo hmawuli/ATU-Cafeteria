@@ -157,7 +157,7 @@ fun AdminDashboardScreen(
                     selected = activeSubTab == 1,
                     onClick = { activeSubTab = 1 },
                     icon = { Icon(Icons.Default.Star, contentDescription = null) },
-                    label = { Text("Gemini Analytics") }
+                    label = { Text("ATU Analytics") }
                 )
                 NavigationBarItem(
                     selected = activeSubTab == 2,
@@ -779,13 +779,13 @@ fun AdminDashboardScreen(
                         Spacer(modifier = Modifier.height(8.dp))
 
                         Text(
-                            "Gemini AI Campus Analytics Advisor",
+                            "ATU Campus Analytics Advisor",
                             style = MaterialTheme.typography.titleMedium,
                             fontWeight = FontWeight.Bold,
                             color = MaterialTheme.colorScheme.primary
                         )
                         Text(
-                            "Examine feedback clusters on kitchen units using advanced LLM reasoning to output operational advisories for compliance management.",
+                            "Examine feedback clusters on kitchen units using advanced ATU data reasoning to output operational advisories for compliance management.",
                             fontSize = 11.sp,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
@@ -806,7 +806,7 @@ fun AdminDashboardScreen(
                                         .clickable { selectedVendorForAiReview = vendor }
                                         .background(if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceVariant)
                                         .padding(horizontal = 12.dp, vertical = 8.dp)
-                                ) {
+                                    ) {
                                     Text(
                                         vendor.fullName,
                                         fontSize = 11.sp,
@@ -837,7 +837,7 @@ fun AdminDashboardScreen(
                             ) {
                                 Icon(Icons.Default.AutoAwesome, contentDescription = null, modifier = Modifier.size(18.dp))
                                 Spacer(modifier = Modifier.width(8.dp))
-                                Text("Engage LLM Diagnostics")
+                                Text("Engage ATU Diagnostics")
                             }
                         } ?: run {
                             Box(
@@ -847,7 +847,7 @@ fun AdminDashboardScreen(
                                     .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f), RoundedCornerShape(8.dp)),
                                 contentAlignment = Alignment.Center
                             ) {
-                                Text("Choose an active vendor above to consult Gemini", fontSize = 11.0.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                Text("Choose an active vendor above to consult ATU Analytics", fontSize = 11.0.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
                             }
                         }
 
@@ -862,7 +862,7 @@ fun AdminDashboardScreen(
                                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
                                     CircularProgressIndicator()
                                     Spacer(modifier = Modifier.height(12.dp))
-                                    Text("Gemini is mining campus feedback clusters...", fontSize = 12.sp, fontWeight = FontWeight.Medium)
+                                    Text("ATU Intelligence is mining campus feedback clusters...", fontSize = 12.sp, fontWeight = FontWeight.Medium)
                                 }
                             }
                         } else {
