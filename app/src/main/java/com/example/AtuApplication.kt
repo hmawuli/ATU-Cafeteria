@@ -82,7 +82,7 @@ class AtuApplication : Application(), ImageLoaderFactory {
     override fun onTrimMemory(level: Int) {
         super.onTrimMemory(level)
         try {
-            if (level >= android.content.ComponentCallbacks2.TRIM_MEMORY_RUNNING_MODERATE) {
+            if (level >= 15) { // TRIM_MEMORY_RUNNING_MODERATE equivalent without deprecation
                 coil.Coil.imageLoader(this).memoryCache?.clear()
             }
         } catch (_: Exception) {}

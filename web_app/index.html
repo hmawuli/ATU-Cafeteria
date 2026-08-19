@@ -3,14 +3,14 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>ATU Cafeteria - Smart Food Ordering & Real-Time Tracking</title>
+  <title>ATU Cafeteria - Smart Food Ordering & Management Portal</title>
   
   <!-- Tailwind CSS CDN -->
   <script src="https://cdn.tailwindcss.com"></script>
   <!-- Lucide Icons -->
   <script src="https://unpkg.com/lucide@latest"></script>
   <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.js"></script>
-  <!-- Google Fonts Inter -->
+  <!-- Google Fonts: Plus Jakarta Sans -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
@@ -33,9 +33,10 @@
               900: '#7c2d12',
             },
             atu: {
-              blue: '#0F2C59',
+              navy: '#0F2C59',
               gold: '#D89216',
-              dark: '#1e293b'
+              dark: '#0F172A',
+              slate: '#1E293B'
             }
           }
         }
@@ -47,11 +48,15 @@
       font-family: 'Plus Jakarta Sans', sans-serif;
       -webkit-tap-highlight-color: transparent;
     }
-    .stepper-line {
-      transition: all 0.5s ease-in-out;
-    }
     .badge-pulse {
       animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+    }
+    .wallet-pulse-danger {
+      animation: dangerPulse 1.2s infinite ease-in-out;
+    }
+    @keyframes dangerPulse {
+      0%, 100% { transform: scale(1); box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.7); }
+      50% { transform: scale(1.04); box-shadow: 0 0 0 6px rgba(239, 68, 68, 0); }
     }
     @keyframes pulse {
       0%, 100% { opacity: 1; transform: scale(1); }
@@ -61,194 +66,378 @@
 </head>
 <body class="bg-slate-50 text-slate-900 min-h-screen flex flex-col antialiased selection:bg-brand-500 selection:text-white">
 
+  <!-- Top Announcement Bar (Configurable by Admin) -->
+  <div id="announcement-banner" class="bg-atu-navy text-amber-300 px-4 py-2 text-xs font-bold text-center flex items-center justify-center space-x-2 border-b border-atu-gold/30">
+    <i data-lucide="megaphone" class="w-4 h-4 text-amber-400 animate-bounce"></i>
+    <span id="announcement-text">Welcome to Accra Technical University Cafeteria — Pre-order now to skip campus meal queues!</span>
+  </div>
+
   <!-- Top Navigation Header -->
-  <header class="sticky top-0 z-40 bg-white/90 backdrop-blur-md border-b border-slate-200 shadow-sm">
-    <div class="max-w-6xl mx-auto px-4 py-3 flex items-center justify-between">
-      <div class="flex items-center space-x-3">
+  <header class="sticky top-0 z-40 bg-white/95 backdrop-blur-md border-b border-slate-200 shadow-sm">
+    <div class="max-w-7xl mx-auto px-4 py-3 flex items-center justify-between">
+      
+      <!-- Brand Logo -->
+      <div class="flex items-center space-x-3 cursor-pointer" onclick="switchRole('STUDENT')">
         <div class="w-10 h-10 rounded-xl bg-gradient-to-tr from-brand-600 to-atu-gold flex items-center justify-center text-white shadow-md shadow-brand-500/20">
           <i data-lucide="utensils" class="w-5 h-5"></i>
         </div>
         <div>
-          <h1 class="text-lg font-bold tracking-tight text-slate-900 flex items-center gap-1.5">
+          <h1 class="text-base sm:text-lg font-bold tracking-tight text-slate-900 flex items-center gap-1.5">
             ATU Cafeteria
-            <span class="text-[10px] uppercase font-extrabold bg-brand-100 text-brand-700 px-2 py-0.5 rounded-full">Live</span>
+            <span class="text-[10px] uppercase font-extrabold bg-brand-100 text-brand-700 px-2 py-0.5 rounded-full" id="active-role-tag">Student Mode</span>
           </h1>
-          <p class="text-xs text-slate-500 font-medium">Accra Technical University</p>
+          <p class="text-xs text-slate-500 font-medium hidden sm:block">Accra Technical University Central Food System</p>
         </div>
       </div>
 
-      <!-- Role Switcher & User Profile Pill -->
-      <div class="flex items-center space-x-3">
-        <div class="hidden sm:flex bg-slate-100 p-1 rounded-xl border border-slate-200 text-xs font-semibold" id="role-selector-desktop">
-          <button onclick="switchRole('STUDENT')" id="btn-role-student" class="px-3 py-1.5 rounded-lg transition-all bg-white text-slate-900 shadow-sm">Student</button>
-          <button onclick="switchRole('VENDOR')" id="btn-role-vendor" class="px-3 py-1.5 rounded-lg transition-all text-slate-600 hover:text-slate-900">Vendor Kitchen</button>
-          <button onclick="switchRole('ADMIN')" id="btn-role-admin" class="px-3 py-1.5 rounded-lg transition-all text-slate-600 hover:text-slate-900">Admin</button>
+      <!-- Navigation & Role Switcher -->
+      <div class="flex items-center space-x-2 sm:space-x-3">
+        
+        <!-- Role Switcher (Desktop) -->
+        <div class="hidden md:flex bg-slate-100 p-1 rounded-xl border border-slate-200 text-xs font-semibold" id="role-selector-desktop">
+          <button onclick="switchRole('STUDENT')" id="btn-role-student" class="px-3.5 py-1.5 rounded-lg transition-all bg-white text-slate-900 shadow-sm flex items-center gap-1.5">
+            <i data-lucide="user" class="w-3.5 h-3.5"></i> Student
+          </button>
+          <button onclick="switchRole('VENDOR')" id="btn-role-vendor" class="px-3.5 py-1.5 rounded-lg transition-all text-slate-600 hover:text-slate-900 flex items-center gap-1.5">
+            <i data-lucide="chef-hat" class="w-3.5 h-3.5"></i> Kitchen Station
+          </button>
+          <button onclick="switchRole('ADMIN')" id="btn-role-admin" class="px-3.5 py-1.5 rounded-lg transition-all text-slate-600 hover:text-slate-900 flex items-center gap-1.5">
+            <i data-lucide="shield-check" class="w-3.5 h-3.5"></i> Admin Hub
+          </button>
         </div>
 
-        <div id="user-wallet-pill" class="flex items-center space-x-2 bg-brand-50 border border-brand-200 px-3 py-1.5 rounded-xl text-xs font-bold text-brand-700">
-          <i data-lucide="wallet" class="w-4 h-4 text-brand-600"></i>
+        <!-- Student Dynamic Wallet Pill (Red Pulsating warning when < GH₵ 10.00) -->
+        <div id="user-wallet-pill" onclick="showTopUpModal()" class="cursor-pointer transition-all duration-300 flex items-center space-x-2 bg-brand-50 border border-brand-200 px-3 py-1.5 rounded-xl text-xs font-bold text-brand-700 hover:bg-brand-100">
+          <i data-lucide="wallet" id="wallet-icon" class="w-4 h-4 text-brand-600"></i>
           <span>GH₵ <span id="student-balance-display">150.00</span></span>
+          <span id="wallet-low-indicator" class="hidden text-[10px] uppercase bg-red-600 text-white px-1.5 py-0.5 rounded-md font-black">LOW</span>
         </div>
+
+        <!-- User Profile Avatar & Switch User Button -->
+        <button onclick="openAuthModal()" class="w-9 h-9 rounded-xl bg-slate-100 border border-slate-200 hover:bg-slate-200 flex items-center justify-center text-slate-700 transition-colors" title="User Login & Switch Role">
+          <i data-lucide="user-cog" class="w-4 h-4"></i>
+        </button>
       </div>
     </div>
 
     <!-- Mobile Role Tabs -->
-    <div class="sm:hidden flex border-t border-slate-200 bg-slate-100/70 px-4 py-1.5 justify-around text-xs font-bold">
-      <button onclick="switchRole('STUDENT')" id="m-role-student" class="py-1 px-3 rounded-lg text-brand-600 bg-white shadow-xs">Student Portal</button>
-      <button onclick="switchRole('VENDOR')" id="m-role-vendor" class="py-1 px-3 rounded-lg text-slate-600">Kitchen Orders</button>
-      <button onclick="switchRole('ADMIN')" id="m-role-admin" class="py-1 px-3 rounded-lg text-slate-600">Manager Hub</button>
+    <div class="md:hidden flex border-t border-slate-200 bg-slate-100/80 px-2 py-1.5 justify-around text-xs font-bold">
+      <button onclick="switchRole('STUDENT')" id="m-role-student" class="py-1 px-3 rounded-lg text-brand-600 bg-white shadow-xs flex items-center gap-1">
+        <i data-lucide="user" class="w-3.5 h-3.5"></i> Student
+      </button>
+      <button onclick="switchRole('VENDOR')" id="m-role-vendor" class="py-1 px-3 rounded-lg text-slate-600 flex items-center gap-1">
+        <i data-lucide="chef-hat" class="w-3.5 h-3.5"></i> Kitchen
+      </button>
+      <button onclick="switchRole('ADMIN')" id="m-role-admin" class="py-1 px-3 rounded-lg text-slate-600 flex items-center gap-1">
+        <i data-lucide="shield-check" class="w-3.5 h-3.5"></i> Admin
+      </button>
     </div>
   </header>
 
   <!-- Notification Toast Container -->
   <div id="toast-container" class="fixed top-20 right-4 z-50 flex flex-col space-y-2 pointer-events-none"></div>
 
-  <!-- MAIN APP CONTAINER -->
-  <main class="flex-1 max-w-6xl w-full mx-auto p-4 md:p-6">
+  <!-- MAIN VIEW CONTAINER -->
+  <main class="flex-1 max-w-7xl w-full mx-auto p-4 md:p-6 space-y-6">
 
     <!-- ========================================================================= -->
-    <!-- 1. STUDENT VIEW -->
+    <!-- 1. STUDENT VIEW                                                           -->
     <!-- ========================================================================= -->
     <section id="student-view" class="space-y-6">
       
       <!-- Welcome Hero Banner -->
-      <div class="relative overflow-hidden rounded-2xl bg-gradient-to-r from-atu-blue via-slate-900 to-brand-900 text-white p-6 shadow-xl">
-        <div class="relative z-10 max-w-xl">
-          <div class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-white/10 backdrop-blur-md text-amber-300 text-xs font-semibold mb-3">
+      <div class="relative overflow-hidden rounded-3xl bg-gradient-to-r from-atu-navy via-slate-900 to-brand-900 text-white p-6 sm:p-8 shadow-xl">
+        <div class="relative z-10 max-w-2xl space-y-3">
+          <div class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-white/10 backdrop-blur-md text-amber-300 text-xs font-semibold">
             <i data-lucide="sparkles" class="w-3.5 h-3.5"></i>
-            <span>Pre-order & Skip Cafeteria Queues</span>
+            <span>Smart Cafeteria Pre-Ordering System</span>
           </div>
-          <h2 class="text-2xl md:text-3xl font-extrabold tracking-tight">Enjoy Delicious Hot Campus Meals</h2>
-          <p class="mt-2 text-slate-300 text-sm leading-relaxed">
-            Order fresh meals from Akwaaba Kitchen and track your food status in real-time from the stove to counter pickup.
+          <h2 class="text-2xl sm:text-3xl font-extrabold tracking-tight">Akwaaba Kitchen at ATU</h2>
+          <p class="text-slate-300 text-xs sm:text-sm leading-relaxed">
+            Order fresh meals right from your device, skip long lunchtime counter lines, and pick up your hot meal using your secure 4-digit PIN.
           </p>
+          <div class="flex items-center gap-3 pt-1 text-xs text-amber-300 font-bold">
+            <span class="flex items-center gap-1"><i data-lucide="clock" class="w-3.5 h-3.5"></i> Avg Prep: 8-12 Mins</span>
+            <span>•</span>
+            <span class="flex items-center gap-1"><i data-lucide="shield-check" class="w-3.5 h-3.5"></i> 100% Hygienic</span>
+          </div>
         </div>
-        <div class="absolute right-0 -bottom-10 opacity-15 pointer-events-none">
-          <i data-lucide="utensils-crossed" class="w-64 h-64 text-white"></i>
+        <div class="absolute right-0 -bottom-10 opacity-15 pointer-events-none hidden sm:block">
+          <i data-lucide="utensils-crossed" class="w-72 h-72 text-white"></i>
         </div>
       </div>
 
-      <!-- Active Orders Live Tracking Section -->
-      <div id="active-orders-section" class="space-y-4">
+      <!-- Active Orders Live Tracking Cards -->
+      <div id="active-orders-section" class="space-y-3">
         <div class="flex items-center justify-between">
           <h3 class="text-base font-bold text-slate-900 flex items-center gap-2">
             <span class="w-2.5 h-2.5 rounded-full bg-emerald-500 badge-pulse"></span>
-            Live Order Tracking
+            Active Live Orders
           </h3>
-          <span id="active-order-count" class="text-xs font-semibold text-slate-500 bg-slate-200 px-2 py-0.5 rounded-full">1 Active</span>
+          <span id="active-order-count" class="text-xs font-semibold text-slate-500 bg-slate-200 px-2.5 py-0.5 rounded-full">0 Active</span>
         </div>
 
-        <div id="active-orders-list" class="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <!-- Live order cards rendered here -->
-        </div>
+        <div id="active-orders-list" class="grid grid-cols-1 md:grid-cols-2 gap-4"></div>
       </div>
 
-      <!-- Menu Filter Categories -->
-      <div class="flex items-center space-x-2 overflow-x-auto pb-2 scrollbar-none" id="category-filters">
-        <button onclick="filterCategory('ALL')" class="category-btn active px-4 py-2 rounded-xl text-xs font-bold bg-brand-600 text-white shadow-sm transition-all">All Items</button>
-        <button onclick="filterCategory('Main Dish')" class="category-btn px-4 py-2 rounded-xl text-xs font-bold bg-white text-slate-700 border border-slate-200 hover:bg-slate-50 transition-all">Main Dishes</button>
-        <button onclick="filterCategory('Traditional')" class="category-btn px-4 py-2 rounded-xl text-xs font-bold bg-white text-slate-700 border border-slate-200 hover:bg-slate-50 transition-all">Traditional</button>
-        <button onclick="filterCategory('Drinks')" class="category-btn px-4 py-2 rounded-xl text-xs font-bold bg-white text-slate-700 border border-slate-200 hover:bg-slate-50 transition-all">Chilled Drinks</button>
-        <button onclick="filterCategory('Snacks')" class="category-btn px-4 py-2 rounded-xl text-xs font-bold bg-white text-slate-700 border border-slate-200 hover:bg-slate-50 transition-all">Pastries & Snacks</button>
+      <!-- Search, Categories & Sort Controls -->
+      <div class="bg-white p-4 sm:p-5 rounded-2xl border border-slate-200 shadow-xs space-y-4">
+        
+        <div class="flex flex-col sm:flex-row gap-3 items-stretch sm:items-center justify-between">
+          <!-- Search Bar -->
+          <div class="relative flex-1">
+            <i data-lucide="search" class="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2"></i>
+            <input type="text" id="food-search-input" oninput="handleSearch(this.value)" placeholder="Search for Jollof, Waakye, Sobolo, Pastries..." class="w-full pl-10 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold text-slate-800 outline-none focus:ring-2 focus:ring-brand-500" />
+          </div>
+
+          <!-- Sort by Price Dropdown -->
+          <div class="flex items-center space-x-2 text-xs font-bold text-slate-600 shrink-0">
+            <i data-lucide="arrow-up-down" class="w-4 h-4 text-brand-600"></i>
+            <span>Sort:</span>
+            <select id="price-sort-dropdown" onchange="changeSortOrder(this.value)" class="bg-slate-50 border border-slate-200 text-slate-800 text-xs font-bold rounded-xl px-3 py-2 outline-none focus:ring-2 focus:ring-brand-500">
+              <option value="DEFAULT">Recommended / Featured</option>
+              <option value="PRICE_ASC">Price: Low to High (GH₵ ↑)</option>
+              <option value="PRICE_DESC">Price: High to Low (GH₵ ↓)</option>
+              <option value="CALORIES_ASC">Calories: Low to High</option>
+            </select>
+          </div>
+        </div>
+
+        <!-- Category Pill Buttons -->
+        <div class="flex items-center space-x-2 overflow-x-auto pb-1 scrollbar-none" id="category-filters">
+          <button onclick="filterCategory('ALL')" class="category-btn active px-4 py-2 rounded-xl text-xs font-bold bg-brand-600 text-white shadow-sm transition-all">All Dishes</button>
+          <button onclick="filterCategory('Main Dish')" class="category-btn px-4 py-2 rounded-xl text-xs font-bold bg-slate-100 text-slate-700 hover:bg-slate-200 transition-all">Main Dishes</button>
+          <button onclick="filterCategory('Traditional')" class="category-btn px-4 py-2 rounded-xl text-xs font-bold bg-slate-100 text-slate-700 hover:bg-slate-200 transition-all">Traditional</button>
+          <button onclick="filterCategory('Drinks')" class="category-btn px-4 py-2 rounded-xl text-xs font-bold bg-slate-100 text-slate-700 hover:bg-slate-200 transition-all">Drinks & Sobolo</button>
+          <button onclick="filterCategory('Snacks')" class="category-btn px-4 py-2 rounded-xl text-xs font-bold bg-slate-100 text-slate-700 hover:bg-slate-200 transition-all">Pastries & Meat Pies</button>
+        </div>
       </div>
 
       <!-- Food Menu Grid -->
-      <div id="food-menu-grid" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
-        <!-- Rendered by JS -->
+      <div id="food-menu-grid" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5"></div>
+
+      <!-- 📜 ORDER HISTORY SECTION (Completed Orders with Date Stamps & Ratings) -->
+      <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm space-y-4">
+        <div class="flex items-center justify-between">
+          <div class="flex items-center gap-2">
+            <div class="w-9 h-9 rounded-xl bg-slate-100 flex items-center justify-center text-slate-700">
+              <i data-lucide="history" class="w-4 h-4"></i>
+            </div>
+            <div>
+              <h3 class="text-base font-bold text-slate-900">Order History & Receipts</h3>
+              <p class="text-xs text-slate-500">Completed cafeteria transactions with pickup stamps</p>
+            </div>
+          </div>
+          <span id="completed-count-badge" class="text-xs font-bold bg-emerald-100 text-emerald-800 px-3 py-0.5 rounded-full">1 Completed</span>
+        </div>
+
+        <div id="order-history-list" class="space-y-3 divide-y divide-slate-100 max-h-96 overflow-y-auto pr-1"></div>
       </div>
     </section>
 
-
     <!-- ========================================================================= -->
-    <!-- 2. VENDOR KITCHEN VIEW -->
+    <!-- 2. VENDOR KITCHEN VIEW                                                    -->
     <!-- ========================================================================= -->
     <section id="vendor-view" class="hidden space-y-6">
-      <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white p-5 rounded-2xl border border-slate-200 shadow-sm">
-        <div>
-          <div class="flex items-center gap-2">
-            <span class="w-3 h-3 rounded-full bg-emerald-500"></span>
-            <h2 class="text-xl font-bold text-slate-900">Akwaaba Kitchen Hub</h2>
-            <span class="text-xs font-extrabold bg-emerald-100 text-emerald-800 px-2.5 py-0.5 rounded-full">ONLINE</span>
+      
+      <!-- Vendor Kitchen Control Banner -->
+      <div class="bg-white p-5 sm:p-6 rounded-3xl border border-slate-200 shadow-sm space-y-4">
+        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div>
+            <div class="flex items-center gap-2">
+              <span class="w-3 h-3 rounded-full bg-emerald-500 badge-pulse"></span>
+              <h2 class="text-xl font-extrabold text-slate-900">Akwaaba Kitchen Order Dispatch</h2>
+              <span class="text-xs font-black bg-emerald-100 text-emerald-800 px-2.5 py-0.5 rounded-full">LIVE</span>
+            </div>
+            <p class="text-xs text-slate-500 mt-1">Advance ticket status, monitor ingredient demand, and verify 4-digit pickup PINs for meal release.</p>
           </div>
-          <p class="text-xs text-slate-500 mt-1">Manage kitchen incoming tickets, advance order statuses, and verify student pickup PINs.</p>
+
+          <!-- Quick PIN Verification Bar -->
+          <div class="flex items-center bg-slate-100 border border-slate-200 rounded-2xl p-1.5">
+            <i data-lucide="key-round" class="w-4 h-4 text-slate-400 ml-2 mr-1"></i>
+            <input type="text" id="verify-pin-input" placeholder="Enter 4-Digit PIN" maxlength="4" class="w-32 bg-transparent text-xs font-bold outline-none text-slate-800 tracking-widest text-center" />
+            <button onclick="verifyPickupPin()" class="bg-brand-600 hover:bg-brand-700 text-white text-xs font-bold px-4 py-1.5 rounded-xl shadow-xs transition-transform active:scale-95">Verify & Hand Over</button>
+          </div>
         </div>
 
-        <div class="flex items-center gap-2">
-          <!-- Counter PIN verification input -->
-          <div class="flex items-center bg-slate-100 border border-slate-200 rounded-xl px-3 py-1.5">
-            <i data-lucide="key-round" class="w-4 h-4 text-slate-400 mr-2"></i>
-            <input type="text" id="verify-pin-input" placeholder="Enter Pickup PIN" maxlength="4" class="w-28 bg-transparent text-xs font-bold outline-none text-slate-800" />
-            <button onclick="verifyPickupPin()" class="ml-1 bg-brand-600 hover:bg-brand-700 text-white text-xs font-bold px-3 py-1 rounded-lg">Verify</button>
+        <!-- Vendor Quick Metrics -->
+        <div class="grid grid-cols-2 sm:grid-cols-4 gap-3 pt-2">
+          <div class="bg-slate-50 p-3 rounded-xl border border-slate-100">
+            <p class="text-[11px] font-semibold text-slate-500">Active Kitchen Tickets</p>
+            <p class="text-xl font-extrabold text-slate-900 mt-0.5" id="v-metric-active">1</p>
+          </div>
+          <div class="bg-slate-50 p-3 rounded-xl border border-slate-100">
+            <p class="text-[11px] font-semibold text-slate-500">Completed Today</p>
+            <p class="text-xl font-extrabold text-emerald-600 mt-0.5" id="v-metric-completed">14</p>
+          </div>
+          <div class="bg-slate-50 p-3 rounded-xl border border-slate-100">
+            <p class="text-[11px] font-semibold text-slate-500">Stock Availability</p>
+            <p class="text-xl font-extrabold text-brand-600 mt-0.5">100% In-Stock</p>
+          </div>
+          <div class="bg-slate-50 p-3 rounded-xl border border-slate-100">
+            <p class="text-[11px] font-semibold text-slate-500">Kitchen Rating</p>
+            <p class="text-xl font-extrabold text-amber-500 mt-0.5">4.9 ★</p>
           </div>
         </div>
       </div>
 
-      <!-- Vendor Orders Queue -->
+      <!-- Live Order Tickets Queue -->
       <div class="space-y-4">
-        <h3 class="text-base font-bold text-slate-900 flex items-center justify-between">
-          <span>Active Kitchen Queue</span>
+        <div class="flex items-center justify-between">
+          <h3 class="text-base font-bold text-slate-900 flex items-center gap-2">
+            <i data-lucide="clipboard-list" class="w-4 h-4 text-brand-600"></i>
+            Live Kitchen Order Tickets
+          </h3>
           <button onclick="refreshVendorData()" class="text-xs text-brand-600 font-bold hover:underline flex items-center gap-1">
-            <i data-lucide="refresh-cw" class="w-3.5 h-3.5"></i> Refresh
+            <i data-lucide="refresh-cw" class="w-3.5 h-3.5"></i> Refresh Tickets
           </button>
-        </h3>
-
-        <div id="vendor-orders-list" class="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <!-- Vendor tickets rendered here -->
         </div>
+        <div id="vendor-orders-list" class="grid grid-cols-1 md:grid-cols-2 gap-4"></div>
       </div>
     </section>
 
-
     <!-- ========================================================================= -->
-    <!-- 3. ADMIN MANAGEMENT VIEW -->
+    <!-- 3. ADMIN OVERSIGHT & MANAGEMENT HUB                                       -->
     <!-- ========================================================================= -->
     <section id="admin-view" class="hidden space-y-6">
-      <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm">
-        <h2 class="text-xl font-bold text-slate-900 flex items-center gap-2">
-          <i data-lucide="shield-check" class="w-5 h-5 text-brand-600"></i>
-          ATU Cafeteria Oversight Dashboard
-        </h2>
-        <p class="text-xs text-slate-500 mt-1">Real-time financial summaries, vendor performance indicators, and order telemetry.</p>
-
-        <!-- KPI Cards -->
-        <div class="grid grid-cols-2 sm:grid-cols-4 gap-4 mt-5">
-          <div class="bg-slate-50 p-4 rounded-xl border border-slate-200">
-            <p class="text-xs font-semibold text-slate-500">Total Volume</p>
-            <p class="text-2xl font-extrabold text-slate-900 mt-1" id="kpi-orders-count">24</p>
-            <p class="text-[11px] text-emerald-600 font-semibold mt-1">↑ 100% on campus</p>
+      
+      <!-- Admin Hub Top Header & Action Controls -->
+      <div class="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm space-y-5">
+        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div>
+            <h2 class="text-xl font-extrabold text-slate-900 flex items-center gap-2">
+              <i data-lucide="shield-check" class="w-6 h-6 text-brand-600"></i>
+              ATU Cafeteria Administration Hub
+            </h2>
+            <p class="text-xs text-slate-500 mt-1">Full system governance, financial telemetry, menu CRUD management, and campus user balance oversight.</p>
           </div>
-          <div class="bg-slate-50 p-4 rounded-xl border border-slate-200">
-            <p class="text-xs font-semibold text-slate-500">Gross Sales</p>
-            <p class="text-2xl font-extrabold text-brand-600 mt-1">GH₵ <span id="kpi-sales-sum">785.00</span></p>
+
+          <div class="flex flex-wrap items-center gap-2">
+            <button onclick="openAddMenuModal()" class="px-3.5 py-2 rounded-xl bg-brand-600 hover:bg-brand-700 text-white text-xs font-bold shadow-xs flex items-center gap-1.5">
+              <i data-lucide="plus-circle" class="w-4 h-4"></i> Add Food Item
+            </button>
+            <button onclick="openBroadcastModal()" class="px-3.5 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-800 text-xs font-bold flex items-center gap-1.5">
+              <i data-lucide="megaphone" class="w-4 h-4 text-brand-600"></i> Broadcast Notice
+            </button>
+            <button onclick="exportSalesReport()" class="px-3.5 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-800 text-xs font-bold flex items-center gap-1.5">
+              <i data-lucide="download" class="w-4 h-4 text-emerald-600"></i> Export CSV
+            </button>
+          </div>
+        </div>
+
+        <!-- 4 Key Financial & Performance KPIs -->
+        <div class="grid grid-cols-2 sm:grid-cols-4 gap-4">
+          <div class="bg-slate-50 p-4 rounded-2xl border border-slate-200">
+            <div class="flex items-center justify-between text-slate-500">
+              <p class="text-xs font-semibold">Total Campus Orders</p>
+              <i data-lucide="shopping-bag" class="w-4 h-4 text-slate-400"></i>
+            </div>
+            <p class="text-2xl font-extrabold text-slate-900 mt-1" id="kpi-orders-count">38</p>
+            <p class="text-[11px] text-emerald-600 font-semibold mt-1">↑ 100% digital fulfillment</p>
+          </div>
+          
+          <div class="bg-slate-50 p-4 rounded-2xl border border-slate-200">
+            <div class="flex items-center justify-between text-slate-500">
+              <p class="text-xs font-semibold">Gross Sales Volume</p>
+              <i data-lucide="circle-dollar-sign" class="w-4 h-4 text-brand-600"></i>
+            </div>
+            <p class="text-2xl font-extrabold text-brand-600 mt-1">GH₵ <span id="kpi-sales-sum">1,280.00</span></p>
             <p class="text-[11px] text-slate-500 mt-1">Settled in GHS</p>
           </div>
-          <div class="bg-slate-50 p-4 rounded-xl border border-slate-200">
-            <p class="text-xs font-semibold text-slate-500">Active Vendors</p>
-            <p class="text-2xl font-extrabold text-slate-900 mt-1">3</p>
-            <p class="text-[11px] text-slate-500 mt-1">All Kitchens Online</p>
+
+          <div class="bg-slate-50 p-4 rounded-2xl border border-slate-200">
+            <div class="flex items-center justify-between text-slate-500">
+              <p class="text-xs font-semibold">Avg Satisfaction</p>
+              <i data-lucide="star" class="w-4 h-4 text-amber-500"></i>
+            </div>
+            <p class="text-2xl font-extrabold text-amber-500 mt-1" id="kpi-avg-rating">4.85 ★</p>
+            <p class="text-[11px] text-slate-500 mt-1">From student reviews</p>
           </div>
-          <div class="bg-slate-50 p-4 rounded-xl border border-slate-200">
-            <p class="text-xs font-semibold text-slate-500">Avg Fulfillment</p>
-            <p class="text-2xl font-extrabold text-slate-900 mt-1">12 min</p>
-            <p class="text-[11px] text-emerald-600 font-semibold mt-1">Lightning Fast</p>
+
+          <div class="bg-slate-50 p-4 rounded-2xl border border-slate-200">
+            <div class="flex items-center justify-between text-slate-500">
+              <p class="text-xs font-semibold">Avg Preparation</p>
+              <i data-lucide="timer" class="w-4 h-4 text-emerald-600"></i>
+            </div>
+            <p class="text-2xl font-extrabold text-slate-900 mt-1">9.5 min</p>
+            <p class="text-[11px] text-emerald-600 font-semibold mt-1">Fast Counter Pickup</p>
           </div>
         </div>
       </div>
 
-      <!-- Recent System Audit Logs -->
-      <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm space-y-3">
-        <h3 class="text-sm font-bold text-slate-900">System Activity & Audit Telemetry</h3>
-        <div id="audit-logs-list" class="space-y-2 text-xs font-medium text-slate-600 divide-y divide-slate-100">
-          <!-- Logs rendered by JS -->
+      <!-- Admin Tab Switcher: 1. Menu Management, 2. Student Accounts, 3. Audit Logs -->
+      <div class="bg-white rounded-3xl border border-slate-200 p-5 shadow-sm space-y-4">
+        
+        <div class="flex items-center justify-between border-b border-slate-100 pb-3">
+          <div class="flex items-center space-x-2" id="admin-subtabs">
+            <button onclick="switchAdminTab('menu')" id="atab-menu" class="px-4 py-2 rounded-xl text-xs font-bold bg-brand-600 text-white shadow-sm">Menu Management</button>
+            <button onclick="switchAdminTab('students')" id="atab-students" class="px-4 py-2 rounded-xl text-xs font-bold bg-slate-100 text-slate-700 hover:bg-slate-200">Student Accounts & Wallets</button>
+            <button onclick="switchAdminTab('logs')" id="atab-logs" class="px-4 py-2 rounded-xl text-xs font-bold bg-slate-100 text-slate-700 hover:bg-slate-200">System Logs</button>
+          </div>
+        </div>
+
+        <!-- 1. Admin Menu Management Table -->
+        <div id="admin-sec-menu" class="space-y-4">
+          <div class="flex items-center justify-between">
+            <h4 class="text-xs font-bold text-slate-700 uppercase tracking-wider">Active Dishes in ATU Cafeteria</h4>
+            <span class="text-xs text-slate-500 font-medium" id="admin-menu-count">5 Items</span>
+          </div>
+
+          <div class="overflow-x-auto">
+            <table class="w-full text-left text-xs">
+              <thead class="bg-slate-50 text-slate-500 border-b border-slate-200">
+                <tr>
+                  <th class="p-3">Dish Name</th>
+                  <th class="p-3">Category</th>
+                  <th class="p-3">Price (GHS)</th>
+                  <th class="p-3">Calories</th>
+                  <th class="p-3">Status</th>
+                  <th class="p-3 text-right">Actions</th>
+                </tr>
+              </thead>
+              <tbody id="admin-menu-table-body" class="divide-y divide-slate-100 text-slate-700 font-medium"></tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- 2. Student Accounts & Wallets Table -->
+        <div id="admin-sec-students" class="space-y-4 hidden">
+          <div class="flex items-center justify-between">
+            <h4 class="text-xs font-bold text-slate-700 uppercase tracking-wider">Registered Student Accounts & Balances</h4>
+            <button onclick="creditAllStudentsBonus()" class="text-xs text-brand-600 font-bold hover:underline">
+              + Credit GH₵ 20.00 Campus Bonus to All
+            </button>
+          </div>
+
+          <div class="overflow-x-auto">
+            <table class="w-full text-left text-xs">
+              <thead class="bg-slate-50 text-slate-500 border-b border-slate-200">
+                <tr>
+                  <th class="p-3">Student Name</th>
+                  <th class="p-3">Index / ID</th>
+                  <th class="p-3">Email Address</th>
+                  <th class="p-3">Wallet Balance</th>
+                  <th class="p-3 text-right">Wallet Top-Up</th>
+                </tr>
+              </thead>
+              <tbody id="admin-students-table-body" class="divide-y divide-slate-100 text-slate-700 font-medium"></tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- 3. System Logs Feed -->
+        <div id="admin-sec-logs" class="space-y-3 hidden">
+          <h4 class="text-xs font-bold text-slate-700 uppercase tracking-wider">System Event & Transaction Feed</h4>
+          <div id="admin-audit-logs" class="space-y-2 divide-y divide-slate-100 max-h-80 overflow-y-auto pr-2"></div>
         </div>
       </div>
     </section>
 
   </main>
 
-  <!-- Sticky Bottom Cart Bar (Student only) -->
+  <!-- Sticky Bottom Cart Bar (Student Mode) -->
   <div id="sticky-cart-bar" class="sticky bottom-0 z-30 bg-white/95 backdrop-blur-md border-t border-slate-200 p-4 shadow-lg hidden">
-    <div class="max-w-6xl mx-auto flex items-center justify-between">
+    <div class="max-w-7xl mx-auto flex items-center justify-between">
       <div class="flex items-center space-x-3">
         <div class="w-10 h-10 rounded-xl bg-brand-100 text-brand-700 flex items-center justify-center font-bold">
           <i data-lucide="shopping-bag" class="w-5 h-5"></i>
@@ -260,18 +449,22 @@
       </div>
 
       <div class="flex items-center space-x-2">
-        <button onclick="clearCart()" class="px-3 py-2 text-xs font-bold text-slate-600 hover:text-red-600 transition-colors">Clear</button>
+        <button onclick="clearCart()" class="px-3 py-2 text-xs font-bold text-slate-600 hover:text-red-600 transition-colors">Clear Tray</button>
         <button onclick="checkoutCart()" class="px-5 py-2.5 rounded-xl bg-brand-600 hover:bg-brand-700 text-white text-xs font-extrabold shadow-md shadow-brand-500/25 flex items-center gap-1.5 transition-transform active:scale-95">
-          <span>Checkout Pre-order</span>
+          <span>Place Pre-Order</span>
           <i data-lucide="arrow-right" class="w-4 h-4"></i>
         </button>
       </div>
     </div>
   </div>
 
-  <!-- Order Detail & Live Stepper Modal -->
+  <!-- ========================================================================= -->
+  <!-- MODALS                                                                    -->
+  <!-- ========================================================================= -->
+
+  <!-- 1. Live Stepper & Star Rating Modal -->
   <div id="tracking-modal" class="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm hidden flex items-center justify-center p-4">
-    <div class="bg-white rounded-3xl max-w-md w-full p-6 shadow-2xl space-y-5 animate-in fade-in zoom-in-95 duration-200">
+    <div class="bg-white rounded-3xl max-w-md w-full p-6 shadow-2xl space-y-5 max-h-[90vh] overflow-y-auto">
       <div class="flex items-center justify-between border-b border-slate-100 pb-3">
         <div>
           <h3 class="text-lg font-bold text-slate-900" id="modal-order-title">Order #1042</h3>
@@ -282,10 +475,9 @@
         </button>
       </div>
 
-      <!-- Meal Summary -->
       <div class="bg-brand-50 border border-brand-100 rounded-2xl p-4 flex items-center justify-between">
         <div>
-          <p class="text-sm font-extrabold text-slate-900" id="modal-food-name">Spiced Jollof Rice with Chicken</p>
+          <p class="text-sm font-extrabold text-slate-900" id="modal-food-name">Spiced Jollof Rice</p>
           <p class="text-xs text-slate-500" id="modal-food-qty">Quantity: 1 • GH₵ 35.00</p>
         </div>
         <div class="text-right">
@@ -294,12 +486,10 @@
         </div>
       </div>
 
-      <!-- 4-Stage Stepper Progression -->
+      <!-- Live Stepper -->
       <div class="space-y-4 pt-2">
         <h4 class="text-xs font-bold text-slate-700 uppercase tracking-wider">Live Status Progression</h4>
-
         <div class="space-y-4">
-          <!-- Step 1: Received -->
           <div class="flex items-start gap-3" id="step-row-0">
             <div class="flex flex-col items-center">
               <div class="w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold transition-all step-icon bg-emerald-500 text-white">
@@ -309,30 +499,22 @@
             </div>
             <div>
               <p class="text-xs font-bold text-slate-900">1. Order Received</p>
-              <p class="text-[11px] text-slate-500">Ticket printed at vendor station</p>
+              <p class="text-[11px] text-slate-500">Ticket printed at vendor kitchen</p>
             </div>
           </div>
-
-          <!-- Step 2: Preparing -->
           <div class="flex items-start gap-3" id="step-row-1">
             <div class="flex flex-col items-center">
-              <div class="w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold transition-all step-icon bg-slate-200 text-slate-600">
-                2
-              </div>
+              <div class="w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold transition-all step-icon bg-slate-200 text-slate-600">2</div>
               <div class="w-0.5 h-8 bg-slate-200 step-line"></div>
             </div>
             <div>
               <p class="text-xs font-bold text-slate-900">2. Kitchen Preparing</p>
-              <p class="text-[11px] text-slate-500">Meal is on the stove / plated</p>
+              <p class="text-[11px] text-slate-500">Meal is actively cooking on stove</p>
             </div>
           </div>
-
-          <!-- Step 3: Out for Delivery / Ready -->
           <div class="flex items-start gap-3" id="step-row-2">
             <div class="flex flex-col items-center">
-              <div class="w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold transition-all step-icon bg-slate-200 text-slate-600">
-                3
-              </div>
+              <div class="w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold transition-all step-icon bg-slate-200 text-slate-600">3</div>
               <div class="w-0.5 h-8 bg-slate-200 step-line"></div>
             </div>
             <div>
@@ -340,13 +522,9 @@
               <p class="text-[11px] text-slate-500">Ready at counter with your PIN</p>
             </div>
           </div>
-
-          <!-- Step 4: Delivered -->
           <div class="flex items-start gap-3" id="step-row-3">
             <div class="flex flex-col items-center">
-              <div class="w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold transition-all step-icon bg-slate-200 text-slate-600">
-                4
-              </div>
+              <div class="w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold transition-all step-icon bg-slate-200 text-slate-600">4</div>
             </div>
             <div>
               <p class="text-xs font-bold text-slate-900">4. Delivered / Collected</p>
@@ -356,23 +534,181 @@
         </div>
       </div>
 
+      <!-- ⭐ STAR-RATING SYSTEM (Appears when DELIVERED) -->
+      <div id="modal-rating-section" class="bg-amber-50/70 border border-amber-200 rounded-2xl p-4 space-y-3 hidden">
+        <div class="flex items-center justify-between">
+          <p class="text-xs font-bold text-slate-900 flex items-center gap-1.5">
+            <i data-lucide="star" class="w-4 h-4 text-amber-500 fill-amber-500"></i>
+            <span>Rate Vendor & Meal Quality</span>
+          </p>
+          <span id="rating-score-text" class="text-xs font-extrabold text-amber-700">Tap to rate</span>
+        </div>
+
+        <div class="flex items-center justify-center space-x-2 py-1" id="star-rating-buttons">
+          <button onclick="setRating(1)" class="star-btn text-2xl text-slate-300 hover:text-amber-400 transition-transform active:scale-125">★</button>
+          <button onclick="setRating(2)" class="star-btn text-2xl text-slate-300 hover:text-amber-400 transition-transform active:scale-125">★</button>
+          <button onclick="setRating(3)" class="star-btn text-2xl text-slate-300 hover:text-amber-400 transition-transform active:scale-125">★</button>
+          <button onclick="setRating(4)" class="star-btn text-2xl text-slate-300 hover:text-amber-400 transition-transform active:scale-125">★</button>
+          <button onclick="setRating(5)" class="star-btn text-2xl text-slate-300 hover:text-amber-400 transition-transform active:scale-125">★</button>
+        </div>
+
+        <input type="text" id="rating-comment-input" placeholder="Optional review comment..." class="w-full bg-white border border-amber-200 rounded-xl px-3 py-2 text-xs outline-none focus:ring-2 focus:ring-amber-500 font-medium" />
+
+        <button onclick="submitOrderRating()" id="submit-rating-btn" class="w-full py-2 rounded-xl bg-amber-500 hover:bg-amber-600 text-white text-xs font-bold shadow-xs transition-colors">
+          Submit Review
+        </button>
+      </div>
+
       <button onclick="closeTrackingModal()" class="w-full py-2.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-800 text-xs font-bold transition-colors">
-        Close Window
+        Close
       </button>
     </div>
   </div>
 
-  <!-- Application Logic JavaScript -->
+  <!-- 2. Add New Food Item Modal (Admin) -->
+  <div id="add-menu-modal" class="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm hidden flex items-center justify-center p-4">
+    <div class="bg-white rounded-3xl max-w-md w-full p-6 shadow-2xl space-y-4">
+      <div class="flex items-center justify-between border-b border-slate-100 pb-3">
+        <h3 class="text-base font-bold text-slate-900">Add New Dish to Menu</h3>
+        <button onclick="closeAddMenuModal()" class="w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center text-slate-500 hover:bg-slate-200">
+          <i data-lucide="x" class="w-4 h-4"></i>
+        </button>
+      </div>
+
+      <div class="space-y-3 text-xs font-semibold text-slate-700">
+        <div>
+          <label class="block mb-1">Dish Name</label>
+          <input type="text" id="new-item-name" placeholder="e.g. Banku with Tilapia & Pepper" class="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-brand-500" />
+        </div>
+
+        <div class="grid grid-cols-2 gap-3">
+          <div>
+            <label class="block mb-1">Price (GH₵)</label>
+            <input type="number" id="new-item-price" placeholder="40.00" step="0.5" class="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-brand-500" />
+          </div>
+          <div>
+            <label class="block mb-1">Calories (kcal)</label>
+            <input type="number" id="new-item-calories" placeholder="520" class="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-brand-500" />
+          </div>
+        </div>
+
+        <div>
+          <label class="block mb-1">Category</label>
+          <select id="new-item-category" class="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-brand-500">
+            <option value="Main Dish">Main Dish</option>
+            <option value="Traditional">Traditional</option>
+            <option value="Drinks">Drinks</option>
+            <option value="Snacks">Snacks</option>
+          </select>
+        </div>
+
+        <div>
+          <label class="block mb-1">Description</label>
+          <textarea id="new-item-desc" rows="2" placeholder="Freshly steamed fermented corn & cassava dough served with grilled tilapia..." class="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-brand-500"></textarea>
+        </div>
+
+        <div>
+          <label class="block mb-1">Image URL</label>
+          <input type="text" id="new-item-image" placeholder="https://..." value="https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=400&q=80" class="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-brand-500" />
+        </div>
+      </div>
+
+      <div class="flex items-center space-x-2 pt-2">
+        <button onclick="closeAddMenuModal()" class="flex-1 py-2.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-800 text-xs font-bold">Cancel</button>
+        <button onclick="saveNewMenuItem()" class="flex-1 py-2.5 rounded-xl bg-brand-600 hover:bg-brand-700 text-white text-xs font-bold shadow-xs">Publish Item</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 3. Broadcast Announcement Modal (Admin) -->
+  <div id="broadcast-modal" class="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm hidden flex items-center justify-center p-4">
+    <div class="bg-white rounded-3xl max-w-md w-full p-6 shadow-2xl space-y-4">
+      <div class="flex items-center justify-between border-b border-slate-100 pb-3">
+        <h3 class="text-base font-bold text-slate-900">Broadcast Campus Notice</h3>
+        <button onclick="closeBroadcastModal()" class="w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center text-slate-500 hover:bg-slate-200">
+          <i data-lucide="x" class="w-4 h-4"></i>
+        </button>
+      </div>
+
+      <div class="space-y-3 text-xs font-semibold text-slate-700">
+        <label class="block">Announcement Message</label>
+        <textarea id="broadcast-input-text" rows="3" class="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-brand-500">Special Lunch Promo: Sobolo 20% off with any Waakye order today!</textarea>
+      </div>
+
+      <div class="flex items-center space-x-2 pt-2">
+        <button onclick="closeBroadcastModal()" class="flex-1 py-2.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-800 text-xs font-bold">Cancel</button>
+        <button onclick="publishBroadcast()" class="flex-1 py-2.5 rounded-xl bg-brand-600 hover:bg-brand-700 text-white text-xs font-bold shadow-xs">Broadcast Live</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 4. User Auth / Role Switcher Modal -->
+  <div id="auth-modal" class="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm hidden flex items-center justify-center p-4">
+    <div class="bg-white rounded-3xl max-w-sm w-full p-6 shadow-2xl space-y-4">
+      <div class="flex items-center justify-between border-b border-slate-100 pb-3">
+        <h3 class="text-base font-bold text-slate-900">Switch Role & User</h3>
+        <button onclick="closeAuthModal()" class="w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center text-slate-500 hover:bg-slate-200">
+          <i data-lucide="x" class="w-4 h-4"></i>
+        </button>
+      </div>
+
+      <p class="text-xs text-slate-500">Select any role to test and showcase all student, kitchen vendor, and administrative privileges instantly:</p>
+
+      <div class="space-y-2">
+        <button onclick="switchRole('STUDENT'); closeAuthModal();" class="w-full p-3 rounded-2xl border border-slate-200 hover:border-brand-500 hover:bg-brand-50/50 flex items-center justify-between text-left transition-all">
+          <div class="flex items-center space-x-3">
+            <div class="w-9 h-9 rounded-xl bg-brand-100 text-brand-700 flex items-center justify-center">
+              <i data-lucide="user" class="w-5 h-5"></i>
+            </div>
+            <div>
+              <p class="text-xs font-bold text-slate-900">Kofi Mensah (Student)</p>
+              <p class="text-[10px] text-slate-500">Index: 01210492B • Wallet: GH₵ 150.00</p>
+            </div>
+          </div>
+          <i data-lucide="chevron-right" class="w-4 h-4 text-slate-400"></i>
+        </button>
+
+        <button onclick="switchRole('VENDOR'); closeAuthModal();" class="w-full p-3 rounded-2xl border border-slate-200 hover:border-brand-500 hover:bg-brand-50/50 flex items-center justify-between text-left transition-all">
+          <div class="flex items-center space-x-3">
+            <div class="w-9 h-9 rounded-xl bg-blue-100 text-blue-700 flex items-center justify-center">
+              <i data-lucide="chef-hat" class="w-5 h-5"></i>
+            </div>
+            <div>
+              <p class="text-xs font-bold text-slate-900">Akwaaba Kitchen (Vendor)</p>
+              <p class="text-[10px] text-slate-500">Live Queue & PIN Verification</p>
+            </div>
+          </div>
+          <i data-lucide="chevron-right" class="w-4 h-4 text-slate-400"></i>
+        </button>
+
+        <button onclick="switchRole('ADMIN'); closeAuthModal();" class="w-full p-3 rounded-2xl border border-slate-200 hover:border-brand-500 hover:bg-brand-50/50 flex items-center justify-between text-left transition-all">
+          <div class="flex items-center space-x-3">
+            <div class="w-9 h-9 rounded-xl bg-purple-100 text-purple-700 flex items-center justify-center">
+              <i data-lucide="shield-check" class="w-5 h-5"></i>
+            </div>
+            <div>
+              <p class="text-xs font-bold text-slate-900">Dean of Student Affairs (Admin)</p>
+              <p class="text-[10px] text-slate-500">Oversight, Menu CRUD & Finances</p>
+            </div>
+          </div>
+          <i data-lucide="chevron-right" class="w-4 h-4 text-slate-400"></i>
+        </button>
+      </div>
+    </div>
+  </div>
+
   <script>
-    // ==========================================
-    // DATA STATE & STORE
-    // ==========================================
+    // State management
     let currentRole = 'STUDENT';
     let studentBalance = 150.00;
     let selectedCategory = 'ALL';
-    let cart = {}; // foodId -> qty
+    let searchQuery = '';
+    let currentSortOrder = 'DEFAULT';
+    let cart = {};
+    let activeModalOrderId = null;
+    let currentSelectedRating = 5;
 
-    const menuItems = [
+    let menuItems = [
       {
         id: 1,
         vendorId: 201,
@@ -383,7 +719,8 @@
         image: 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=400&q=80',
         description: 'Fragrant seasoned long-grain rice served with tender quarter grilled chicken, coleslaw, and shito.',
         calories: 480,
-        badge: 'Popular Today'
+        badge: 'Popular Today',
+        inStock: true
       },
       {
         id: 2,
@@ -395,7 +732,8 @@
         image: 'https://images.unsplash.com/photo-1565299624946-b28f40a0ae38?w=400&q=80',
         description: 'Authentic Ghanaian rice and beans with spaghetti, gari foto, boiled egg, and spicy black shito.',
         calories: 540,
-        badge: 'Campus Favorite'
+        badge: 'Campus Favorite',
+        inStock: true
       },
       {
         id: 3,
@@ -407,7 +745,8 @@
         image: 'https://images.unsplash.com/photo-1540420773420-3366772f4999?w=400&q=80',
         description: 'Sweet golden fried plantains served with rich palm-nut black-eyed bean stew and gari.',
         calories: 390,
-        badge: 'Vegetarian'
+        badge: 'Vegetarian',
+        inStock: true
       },
       {
         id: 4,
@@ -419,7 +758,8 @@
         image: 'https://images.unsplash.com/photo-1513558161293-cdaf765ed2fd?w=400&q=80',
         description: 'Cold brewed hibiscus beverage infused with fresh cloves, ginger, and pineapple juice.',
         calories: 95,
-        badge: 'Refreshing'
+        badge: 'Refreshing',
+        inStock: true
       },
       {
         id: 5,
@@ -431,8 +771,16 @@
         image: 'https://images.unsplash.com/photo-1509440159596-0249088772ff?w=400&q=80',
         description: 'Flaky baked butter pastry filled with seasoned minced beef and herbs.',
         calories: 310,
-        badge: 'Quick Bite'
+        badge: 'Quick Bite',
+        inStock: true
       }
+    ];
+
+    let registeredStudents = [
+      { id: 1, name: 'Kofi Mensah', indexNo: '01210492B', email: 'k.mensah@atu.edu.gh', balance: 150.00 },
+      { id: 2, name: 'Ama Osei', indexNo: '01210833B', email: 'a.osei@atu.edu.gh', balance: 85.00 },
+      { id: 3, name: 'Kwame Asante', indexNo: '01211029B', email: 'k.asante@atu.edu.gh', balance: 5.00 },
+      { id: 4, name: 'Abena Boateng', indexNo: '01210714B', email: 'a.boateng@atu.edu.gh', balance: 120.00 }
     ];
 
     let orders = [
@@ -442,36 +790,83 @@
         foodName: 'Spiced Jollof Rice with Grilled Chicken',
         quantity: 1,
         totalPrice: 35.00,
-        status: 'PREPARING', // 'RECEIVED', 'PREPARING', 'OUT_FOR_DELIVERY', 'DELIVERED'
+        status: 'PREPARING',
         pickupPin: '5821',
-        time: '12:15 PM'
+        time: '12:15 PM',
+        dateStamp: '18 Aug 2026, 12:15 PM',
+        rating: null,
+        ratingComment: null
+      },
+      {
+        id: 1018,
+        foodId: 2,
+        foodName: 'Waakye Deluxe with Egg & Wele',
+        quantity: 1,
+        totalPrice: 30.00,
+        status: 'DELIVERED',
+        pickupPin: '4192',
+        time: '10:30 AM',
+        dateStamp: '18 Aug 2026, 10:30 AM',
+        rating: 5,
+        ratingComment: 'Hot, fast and very tasty!'
       }
     ];
 
     let auditLogs = [
       'Order #1024 status updated to PREPARING by Akwaaba Kitchen.',
       'Daily menu inventory synchronized with ATU campus database.',
-      'Student wallet top-up GH₵ 50.00 completed successfully via Mobile Money.'
+      'Order #1018 rated 5-stars by student.',
+      'Student Kofi Mensah logged into student portal.'
     ];
 
-    // ==========================================
-    // INITIALIZATION
-    // ==========================================
     document.addEventListener('DOMContentLoaded', () => {
       lucide.createIcons();
+      updateWalletPill();
       renderMenu();
       renderActiveOrders();
+      renderOrderHistory();
       renderVendorOrders();
-      renderAdminLogs();
+      renderAdminDashboard();
     });
 
-    // ==========================================
-    // ROLE SWITCHING
-    // ==========================================
+    // 💰 Dynamic Wallet Pill (< GH₵ 10.00 triggers red pulsating warning)
+    function updateWalletPill() {
+      const pill = document.getElementById('user-wallet-pill');
+      const balanceEl = document.getElementById('student-balance-display');
+      const lowIndicator = document.getElementById('wallet-low-indicator');
+      const walletIcon = document.getElementById('wallet-icon');
+
+      if (!balanceEl || !pill) return;
+      balanceEl.innerText = studentBalance.toFixed(2);
+
+      if (studentBalance < 10.00) {
+        pill.className = 'cursor-pointer transition-all duration-300 flex items-center space-x-2 bg-red-100 border-2 border-red-500 px-3 py-1.5 rounded-xl text-xs font-black text-red-700 wallet-pulse-danger shadow-md shadow-red-500/30';
+        if (lowIndicator) lowIndicator.classList.remove('hidden');
+        if (walletIcon) walletIcon.className = 'w-4 h-4 text-red-600';
+      } else {
+        pill.className = 'cursor-pointer transition-all duration-300 flex items-center space-x-2 bg-brand-50 border border-brand-200 px-3 py-1.5 rounded-xl text-xs font-bold text-brand-700 hover:bg-brand-100';
+        if (lowIndicator) lowIndicator.classList.add('hidden');
+        if (walletIcon) walletIcon.className = 'w-4 h-4 text-brand-600';
+      }
+    }
+
+    function showTopUpModal() {
+      const addAmount = 50.00;
+      studentBalance += addAmount;
+      registeredStudents[0].balance = studentBalance;
+      updateWalletPill();
+      auditLogs.unshift(`Student topped up GH₵ ${addAmount.toFixed(2)} via Mobile Money.`);
+      renderAdminDashboard();
+      showToast(`Wallet topped up with GH₵ ${addAmount.toFixed(2)}!`, 'success');
+    }
+
     function switchRole(role) {
       currentRole = role;
+      const tag = document.getElementById('active-role-tag');
+      if (tag) {
+        tag.innerText = role === 'STUDENT' ? 'Student Mode' : role === 'VENDOR' ? 'Vendor Kitchen Mode' : 'Admin Hub Mode';
+      }
 
-      // Update Desktop Buttons
       ['student', 'vendor', 'admin'].forEach(r => {
         const btn = document.getElementById(`btn-role-${r}`);
         const mBtn = document.getElementById(`m-role-${r}`);
@@ -479,88 +874,130 @@
 
         if (btn) {
           btn.className = isCurrent 
-            ? 'px-3 py-1.5 rounded-lg transition-all bg-white text-slate-900 shadow-sm'
-            : 'px-3 py-1.5 rounded-lg transition-all text-slate-600 hover:text-slate-900';
+            ? 'px-3.5 py-1.5 rounded-lg transition-all bg-white text-slate-900 shadow-sm flex items-center gap-1.5'
+            : 'px-3.5 py-1.5 rounded-lg transition-all text-slate-600 hover:text-slate-900 flex items-center gap-1.5';
         }
         if (mBtn) {
           mBtn.className = isCurrent
-            ? 'py-1 px-3 rounded-lg text-brand-600 bg-white shadow-xs'
-            : 'py-1 px-3 rounded-lg text-slate-600';
+            ? 'py-1 px-3 rounded-lg text-brand-600 bg-white shadow-xs flex items-center gap-1'
+            : 'py-1 px-3 rounded-lg text-slate-600 flex items-center gap-1';
         }
       });
 
-      // Show/Hide Views
       document.getElementById('student-view').classList.toggle('hidden', role !== 'STUDENT');
       document.getElementById('vendor-view').classList.toggle('hidden', role !== 'VENDOR');
       document.getElementById('admin-view').classList.toggle('hidden', role !== 'ADMIN');
       document.getElementById('user-wallet-pill').classList.toggle('hidden', role !== 'STUDENT');
 
       updateCartBar();
+      if (role === 'VENDOR') renderVendorOrders();
+      if (role === 'ADMIN') renderAdminDashboard();
+
       lucide.createIcons();
     }
 
-    // ==========================================
-    // MENU RENDERING & FILTERING
-    // ==========================================
+    function handleSearch(val) {
+      searchQuery = val.toLowerCase().trim();
+      renderMenu();
+    }
+
     function filterCategory(category) {
       selectedCategory = category;
       document.querySelectorAll('.category-btn').forEach(btn => {
         const isActive = (category === 'ALL' && btn.innerText.includes('All')) || btn.innerText.includes(category);
         btn.className = isActive
           ? 'category-btn active px-4 py-2 rounded-xl text-xs font-bold bg-brand-600 text-white shadow-sm transition-all'
-          : 'category-btn px-4 py-2 rounded-xl text-xs font-bold bg-white text-slate-700 border border-slate-200 hover:bg-slate-50 transition-all';
+          : 'category-btn px-4 py-2 rounded-xl text-xs font-bold bg-slate-100 text-slate-700 hover:bg-slate-200 transition-all';
       });
+      renderMenu();
+    }
+
+    function changeSortOrder(order) {
+      currentSortOrder = order;
       renderMenu();
     }
 
     function renderMenu() {
       const grid = document.getElementById('food-menu-grid');
-      const filtered = selectedCategory === 'ALL' 
-        ? menuItems 
+      if (!grid) return;
+
+      let filtered = selectedCategory === 'ALL' 
+        ? [...menuItems] 
         : menuItems.filter(item => item.category === selectedCategory);
+
+      if (searchQuery) {
+        filtered = filtered.filter(item => 
+          item.name.toLowerCase().includes(searchQuery) ||
+          item.description.toLowerCase().includes(searchQuery) ||
+          item.category.toLowerCase().includes(searchQuery)
+        );
+      }
+
+      // Sort Handling
+      if (currentSortOrder === 'PRICE_ASC') {
+        filtered.sort((a, b) => a.price - b.price);
+      } else if (currentSortOrder === 'PRICE_DESC') {
+        filtered.sort((a, b) => b.price - a.price);
+      } else if (currentSortOrder === 'CALORIES_ASC') {
+        filtered.sort((a, b) => a.calories - b.calories);
+      }
+
+      if (filtered.length === 0) {
+        grid.innerHTML = `
+          <div class="col-span-full bg-white p-8 rounded-3xl border border-slate-200 text-center space-y-2">
+            <i data-lucide="utensils" class="w-8 h-8 text-slate-300 mx-auto"></i>
+            <p class="text-sm font-bold text-slate-700">No menu items match your search.</p>
+            <p class="text-xs text-slate-400">Try searching for other dish names or resetting filters.</p>
+          </div>
+        `;
+        lucide.createIcons();
+        return;
+      }
 
       grid.innerHTML = filtered.map(item => {
         const qty = cart[item.id] || 0;
         return `
-          <div class="bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-xs hover:shadow-md transition-all flex flex-col justify-between">
+          <div class="bg-white rounded-3xl border border-slate-200 overflow-hidden shadow-xs hover:shadow-md transition-all flex flex-col justify-between">
             <div>
               <div class="relative h-44 overflow-hidden bg-slate-100">
-                <img src="${item.image}" alt="${item.name}" class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300">
+                <img src="${item.image}" alt="${item.name}" class="w-full h-full object-cover">
                 <span class="absolute top-3 left-3 bg-white/90 backdrop-blur-md text-brand-700 font-extrabold text-[10px] px-2.5 py-1 rounded-full shadow-xs">
                   ${item.badge}
                 </span>
-                <span class="absolute bottom-3 right-3 bg-slate-900/80 backdrop-blur-md text-white font-bold text-xs px-2 py-0.5 rounded-lg">
+                <span class="absolute bottom-3 right-3 bg-slate-900/80 backdrop-blur-md text-white font-bold text-xs px-2.5 py-1 rounded-xl">
                   ${item.calories} kcal
                 </span>
               </div>
 
-              <div class="p-4 space-y-2">
+              <div class="p-4 sm:p-5 space-y-2">
                 <div class="flex items-center justify-between">
                   <span class="text-[11px] font-bold text-slate-400 uppercase tracking-wider">${item.category}</span>
-                  <span class="text-xs font-semibold text-emerald-600">● In Stock</span>
+                  <span class="text-xs font-semibold ${item.inStock ? 'text-emerald-600' : 'text-red-500'}">● ${item.inStock ? 'In Stock' : 'Sold Out'}</span>
                 </div>
                 <h4 class="font-bold text-slate-900 text-base line-clamp-1">${item.name}</h4>
                 <p class="text-xs text-slate-500 line-clamp-2 leading-relaxed">${item.description}</p>
               </div>
             </div>
 
-            <div class="p-4 pt-0 border-t border-slate-100 flex items-center justify-between mt-2">
+            <div class="p-4 sm:p-5 pt-0 border-t border-slate-100 flex items-center justify-between mt-2">
               <div>
                 <p class="text-[10px] text-slate-400 font-semibold uppercase">Price</p>
                 <p class="text-base font-extrabold text-brand-600">GH₵ ${item.price.toFixed(2)}</p>
               </div>
 
-              ${qty === 0 ? `
+              ${!item.inStock ? `
+                <span class="text-xs font-bold text-slate-400 bg-slate-100 px-3 py-1.5 rounded-xl">Unavailable</span>
+              ` : qty === 0 ? `
                 <button onclick="addToCart(${item.id})" class="px-4 py-2 rounded-xl bg-brand-600 hover:bg-brand-700 text-white text-xs font-bold shadow-xs flex items-center gap-1.5 transition-transform active:scale-95">
                   <i data-lucide="plus" class="w-4 h-4"></i>
-                  <span>Add</span>
+                  <span>Add to Tray</span>
                 </button>
               ` : `
                 <div class="flex items-center space-x-2 bg-slate-100 rounded-xl p-1 border border-slate-200">
                   <button onclick="removeFromCart(${item.id})" class="w-7 h-7 rounded-lg bg-white text-slate-700 flex items-center justify-center font-bold shadow-xs hover:bg-red-50 hover:text-red-600">
                     <i data-lucide="minus" class="w-3.5 h-3.5"></i>
                   </button>
-                  <span class="text-xs font-bold px-1">${qty}</span>
+                  <span class="text-xs font-bold px-1.5">${qty}</span>
                   <button onclick="addToCart(${item.id})" class="w-7 h-7 rounded-lg bg-brand-600 text-white flex items-center justify-center font-bold shadow-xs hover:bg-brand-700">
                     <i data-lucide="plus" class="w-3.5 h-3.5"></i>
                   </button>
@@ -574,9 +1011,6 @@
       lucide.createIcons();
     }
 
-    // ==========================================
-    // CART & CHECKOUT
-    // ==========================================
     function addToCart(foodId) {
       cart[foodId] = (cart[foodId] || 0) + 1;
       renderMenu();
@@ -615,8 +1049,8 @@
         }
       }
 
-      countEl.innerText = totalItems;
-      totalEl.innerText = totalPrice.toFixed(2);
+      if (countEl) countEl.innerText = totalItems;
+      if (totalEl) totalEl.innerText = totalPrice.toFixed(2);
 
       if (totalItems > 0 && currentRole === 'STUDENT') {
         bar.classList.remove('hidden');
@@ -639,15 +1073,18 @@
       }
 
       if (totalPrice > studentBalance) {
-        showToast('Insufficient student wallet balance. Top up to proceed.', 'error');
+        showToast('Insufficient student balance! Top up wallet to proceed.', 'error');
         return;
       }
 
-      // Deduct balance
       studentBalance -= totalPrice;
-      document.getElementById('student-balance-display').innerText = studentBalance.toFixed(2);
+      registeredStudents[0].balance = studentBalance;
+      updateWalletPill();
 
-      // Create new orders
+      const now = new Date();
+      const timeStr = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+      const dateStampStr = `${now.getDate()} Aug ${now.getFullYear()}, ${timeStr}`;
+
       orderedItems.forEach(({ item, qty }) => {
         const newOrder = {
           id: Math.floor(1000 + Math.random() * 9000),
@@ -657,27 +1094,27 @@
           totalPrice: item.price * qty,
           status: 'RECEIVED',
           pickupPin: Math.floor(1000 + Math.random() * 9000).toString(),
-          time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+          time: timeStr,
+          dateStamp: dateStampStr,
+          rating: null,
+          ratingComment: null
         };
         orders.unshift(newOrder);
-        auditLogs.unshift(`Order #${newOrder.id} placed by student (${newOrder.quantity}x ${newOrder.foodName}).`);
+        auditLogs.unshift(`Order #${newOrder.id} placed by Kofi Mensah (${newOrder.quantity}x ${newOrder.foodName}).`);
       });
 
       clearCart();
       renderActiveOrders();
+      renderOrderHistory();
       renderVendorOrders();
-      renderAdminLogs();
+      renderAdminDashboard();
       showToast('Pre-order placed successfully! Real-time live tracking started.', 'success');
 
-      // Automatically open modal for the newest order
       if (orders.length > 0) {
         openTrackingModal(orders[0].id);
       }
     }
 
-    // ==========================================
-    // ORDER TRACKING MODAL & RENDERING
-    // ==========================================
     function getStatusBadge(status) {
       switch (status) {
         case 'RECEIVED':
@@ -685,7 +1122,7 @@
         case 'PREPARING':
           return '<span class="bg-blue-100 text-blue-800 text-[10px] font-extrabold px-2.5 py-1 rounded-full">2. Preparing</span>';
         case 'OUT_FOR_DELIVERY':
-          return '<span class="bg-purple-100 text-purple-800 text-[10px] font-extrabold px-2.5 py-1 rounded-full">3. Counter Ready</span>';
+          return '<span class="bg-purple-100 text-purple-800 text-[10px] font-extrabold px-2.5 py-1 rounded-full">3. Ready for Pickup</span>';
         case 'DELIVERED':
           return '<span class="bg-emerald-100 text-emerald-800 text-[10px] font-extrabold px-2.5 py-1 rounded-full">4. Delivered</span>';
         default:
@@ -698,21 +1135,22 @@
       const count = document.getElementById('active-order-count');
       const active = orders.filter(o => o.status !== 'DELIVERED');
 
-      count.innerText = `${active.length} Active`;
+      if (count) count.innerText = `${active.length} Active`;
+      if (!container) return;
 
-      if (orders.length === 0) {
+      if (active.length === 0) {
         container.innerHTML = `
-          <div class="col-span-full bg-white p-8 rounded-2xl border border-slate-200 text-center">
-            <i data-lucide="inbox" class="w-8 h-8 text-slate-400 mx-auto mb-2"></i>
-            <p class="text-sm font-bold text-slate-700">No active campus orders</p>
-            <p class="text-xs text-slate-500 mt-1">Select meals from the menu above to start real-time tracking.</p>
+          <div class="col-span-full bg-white p-6 rounded-2xl border border-slate-200 text-center">
+            <i data-lucide="inbox" class="w-7 h-7 text-slate-400 mx-auto mb-1"></i>
+            <p class="text-xs font-bold text-slate-700">No active kitchen orders</p>
+            <p class="text-[11px] text-slate-500">Select items from the menu to start real-time tracking.</p>
           </div>
         `;
         lucide.createIcons();
         return;
       }
 
-      container.innerHTML = orders.map(order => `
+      container.innerHTML = active.map(order => `
         <div class="bg-white p-4 rounded-2xl border border-slate-200 shadow-xs hover:border-brand-300 transition-all flex flex-col justify-between">
           <div class="space-y-2">
             <div class="flex items-center justify-between">
@@ -722,15 +1160,56 @@
             <p class="font-extrabold text-sm text-slate-900">${order.quantity}x ${order.foodName}</p>
             <div class="flex items-center justify-between text-xs text-slate-500">
               <span>Total: GH₵ ${order.totalPrice.toFixed(2)}</span>
-              <span>PIN: <strong class="text-slate-800 font-mono">${order.pickupPin}</strong></span>
+              <span>Pickup PIN: <strong class="text-brand-700 bg-brand-50 px-2 py-0.5 rounded font-mono font-bold">${order.pickupPin}</strong></span>
             </div>
           </div>
 
-          <div class="mt-4 pt-3 border-t border-slate-100 flex items-center justify-between">
+          <div class="mt-3 pt-3 border-t border-slate-100 flex items-center justify-between">
             <span class="text-[11px] text-slate-400">${order.time}</span>
             <button onclick="openTrackingModal(${order.id})" class="px-3 py-1.5 rounded-lg bg-brand-50 hover:bg-brand-100 text-brand-700 text-xs font-bold flex items-center gap-1">
               <i data-lucide="activity" class="w-3.5 h-3.5"></i>
-              <span>Live Progression</span>
+              <span>Track Live</span>
+            </button>
+          </div>
+        </div>
+      `).join('');
+
+      lucide.createIcons();
+    }
+
+    function renderOrderHistory() {
+      const list = document.getElementById('order-history-list');
+      const badge = document.getElementById('completed-count-badge');
+      const completed = orders.filter(o => o.status === 'DELIVERED');
+
+      if (badge) badge.innerText = `${completed.length} Completed`;
+      if (!list) return;
+
+      if (completed.length === 0) {
+        list.innerHTML = '<p class="text-xs text-slate-400 py-4 text-center">No completed orders in your history yet.</p>';
+        return;
+      }
+
+      list.innerHTML = completed.map(order => `
+        <div class="py-3 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+          <div class="space-y-1">
+            <div class="flex items-center gap-2">
+              <span class="text-xs font-extrabold text-slate-900">Order #${order.id}</span>
+              <span class="text-[10px] font-bold bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded-md">DELIVERED</span>
+              ${order.rating ? `<span class="text-xs font-bold text-amber-500">${order.rating} ★</span>` : ''}
+            </div>
+            <p class="text-xs font-bold text-slate-700">${order.quantity}x ${order.foodName}</p>
+            <p class="text-[11px] text-slate-400 flex items-center gap-1">
+              <i data-lucide="calendar" class="w-3 h-3"></i>
+              <span>${order.dateStamp || order.time}</span>
+            </p>
+          </div>
+
+          <div class="flex items-center space-x-3 self-end sm:self-center">
+            <p class="text-sm font-extrabold text-slate-900">GH₵ ${order.totalPrice.toFixed(2)}</p>
+            <button onclick="openTrackingModal(${order.id})" class="px-3 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold flex items-center gap-1 transition-colors">
+              <i data-lucide="star" class="w-3.5 h-3.5 text-amber-500"></i>
+              <span>${order.rating ? 'Edit Review' : 'Rate Order'}</span>
             </button>
           </div>
         </div>
@@ -740,6 +1219,7 @@
     }
 
     function openTrackingModal(orderId) {
+      activeModalOrderId = orderId;
       const order = orders.find(o => o.id === orderId);
       if (!order) return;
 
@@ -748,7 +1228,6 @@
       document.getElementById('modal-food-qty').innerText = `Quantity: ${order.quantity} • GH₵ ${order.totalPrice.toFixed(2)}`;
       document.getElementById('modal-pickup-pin').innerText = order.pickupPin;
 
-      // Update stepper stages
       const stages = ['RECEIVED', 'PREPARING', 'OUT_FOR_DELIVERY', 'DELIVERED'];
       const currentIndex = stages.indexOf(order.status);
 
@@ -772,20 +1251,66 @@
         }
       });
 
+      const ratingSection = document.getElementById('modal-rating-section');
+      if (order.status === 'DELIVERED') {
+        ratingSection.classList.remove('hidden');
+        setRating(order.rating || 5);
+        if (order.ratingComment) {
+          document.getElementById('rating-comment-input').value = order.ratingComment;
+        }
+      } else {
+        ratingSection.classList.add('hidden');
+      }
+
       document.getElementById('tracking-modal').classList.remove('hidden');
       lucide.createIcons();
     }
 
-    function closeTrackingModal() {
-      document.getElementById('tracking-modal').classList.add('hidden');
+    function setRating(score) {
+      currentSelectedRating = score;
+      const buttons = document.querySelectorAll('#star-rating-buttons .star-btn');
+      buttons.forEach((btn, index) => {
+        if (index < score) {
+          btn.className = 'star-btn text-2xl text-amber-400 transition-transform active:scale-125';
+        } else {
+          btn.className = 'star-btn text-2xl text-slate-300 hover:text-amber-300 transition-transform active:scale-125';
+        }
+      });
+      document.getElementById('rating-score-text').innerText = `${score} of 5 Stars`;
     }
 
-    // ==========================================
-    // VENDOR ACTIONS
-    // ==========================================
+    function submitOrderRating() {
+      if (!activeModalOrderId) return;
+      const order = orders.find(o => o.id === activeModalOrderId);
+      if (!order) return;
+
+      const comment = document.getElementById('rating-comment-input').value.trim();
+      order.rating = currentSelectedRating;
+      order.ratingComment = comment || 'Great meal!';
+
+      auditLogs.unshift(`Order #${order.id} was rated ${order.rating}★ by student.`);
+      renderOrderHistory();
+      renderAdminDashboard();
+      showToast(`Thank you! Order #${order.id} rated ${order.rating}★`, 'success');
+      closeTrackingModal();
+    }
+
+    function closeTrackingModal() {
+      document.getElementById('tracking-modal').classList.add('hidden');
+      activeModalOrderId = null;
+    }
+
     function renderVendorOrders() {
       const container = document.getElementById('vendor-orders-list');
+      const vActive = document.getElementById('v-metric-active');
+      const vComp = document.getElementById('v-metric-completed');
       if (!container) return;
+
+      const active = orders.filter(o => o.status !== 'DELIVERED');
+      const completed = orders.filter(o => o.status === 'DELIVERED');
+
+      if (vActive) vActive.innerText = active.length;
+      if (vComp) vComp.innerText = completed.length + 14;
 
       if (orders.length === 0) {
         container.innerHTML = '<div class="col-span-full bg-white p-8 rounded-2xl border border-slate-200 text-center text-xs text-slate-500">No kitchen orders at the moment.</div>';
@@ -806,23 +1331,23 @@
 
           <div class="pt-3 border-t border-slate-100 flex items-center justify-end gap-2">
             ${order.status === 'RECEIVED' ? `
-              <button onclick="advanceOrderStatus(${order.id}, 'PREPARING')" class="px-3.5 py-1.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold">
+              <button onclick="advanceOrderStatus(${order.id}, 'PREPARING')" class="px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold shadow-xs">
                 Start Preparing
               </button>
             ` : ''}
             ${order.status === 'PREPARING' ? `
-              <button onclick="advanceOrderStatus(${order.id}, 'OUT_FOR_DELIVERY')" class="px-3.5 py-1.5 rounded-xl bg-purple-600 hover:bg-purple-700 text-white text-xs font-bold">
+              <button onclick="advanceOrderStatus(${order.id}, 'OUT_FOR_DELIVERY')" class="px-4 py-2 rounded-xl bg-purple-600 hover:bg-purple-700 text-white text-xs font-bold shadow-xs">
                 Mark Ready for Counter
               </button>
             ` : ''}
             ${order.status === 'OUT_FOR_DELIVERY' ? `
-              <button onclick="advanceOrderStatus(${order.id}, 'DELIVERED')" class="px-3.5 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold">
+              <button onclick="advanceOrderStatus(${order.id}, 'DELIVERED')" class="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold shadow-xs">
                 Complete Pickup
               </button>
             ` : ''}
             ${order.status === 'DELIVERED' ? `
               <span class="text-xs font-bold text-emerald-600 flex items-center gap-1">
-                <i data-lucide="check-circle-2" class="w-4 h-4"></i> Collected
+                <i data-lucide="check-circle-2" class="w-4 h-4"></i> Collected & Settled
               </span>
             ` : ''}
           </div>
@@ -838,8 +1363,9 @@
         order.status = nextStatus;
         auditLogs.unshift(`Order #${orderId} moved to ${nextStatus} by Kitchen.`);
         renderActiveOrders();
+        renderOrderHistory();
         renderVendorOrders();
-        renderAdminLogs();
+        renderAdminDashboard();
         showToast(`Order #${orderId} updated to ${nextStatus.replace(/_/g, ' ')}`, 'info');
       }
     }
@@ -864,28 +1390,221 @@
       showToast('Kitchen queue refreshed.', 'info');
     }
 
-    // ==========================================
-    // ADMIN LOGS & TOAST
-    // ==========================================
-    function renderAdminLogs() {
-      const list = document.getElementById('audit-logs-list');
+    // =========================================================================
+    // ADMIN FUNCTIONS & PRIVILEGES
+    // =========================================================================
+    function switchAdminTab(tab) {
+      ['menu', 'students', 'logs'].forEach(t => {
+        const btn = document.getElementById(`atab-${t}`);
+        const sec = document.getElementById(`admin-sec-${t}`);
+        const isCurrent = t === tab;
+
+        if (btn) {
+          btn.className = isCurrent
+            ? 'px-4 py-2 rounded-xl text-xs font-bold bg-brand-600 text-white shadow-sm'
+            : 'px-4 py-2 rounded-xl text-xs font-bold bg-slate-100 text-slate-700 hover:bg-slate-200';
+        }
+        if (sec) {
+          sec.classList.toggle('hidden', !isCurrent);
+        }
+      });
+      lucide.createIcons();
+    }
+
+    function renderAdminDashboard() {
       const kpiOrders = document.getElementById('kpi-orders-count');
       const kpiSales = document.getElementById('kpi-sales-sum');
+      const adminMenuCount = document.getElementById('admin-menu-count');
+      const adminMenuBody = document.getElementById('admin-menu-table-body');
+      const adminStudentsBody = document.getElementById('admin-students-table-body');
+      const adminLogs = document.getElementById('admin-audit-logs');
 
-      if (kpiOrders) kpiOrders.innerText = orders.length + 24;
+      if (kpiOrders) kpiOrders.innerText = orders.length + 36;
       if (kpiSales) {
-        const sales = orders.reduce((acc, o) => acc + o.totalPrice, 785.00);
+        const sales = orders.reduce((acc, o) => acc + o.totalPrice, 1280.00);
         kpiSales.innerText = sales.toFixed(2);
       }
+      if (adminMenuCount) adminMenuCount.innerText = `${menuItems.length} Items`;
 
-      if (list) {
-        list.innerHTML = auditLogs.slice(0, 5).map(log => `
-          <div class="py-2 flex items-center justify-between">
+      // 1. Render Admin Menu CRUD Table
+      if (adminMenuBody) {
+        adminMenuBody.innerHTML = menuItems.map(item => `
+          <tr class="hover:bg-slate-50/70">
+            <td class="p-3 font-bold text-slate-900">${item.name}</td>
+            <td class="p-3">${item.category}</td>
+            <td class="p-3 font-bold text-brand-600">GH₵ ${item.price.toFixed(2)}</td>
+            <td class="p-3">${item.calories} kcal</td>
+            <td class="p-3">
+              <button onclick="toggleItemStock(${item.id})" class="px-2 py-0.5 rounded-full font-bold text-[10px] ${item.inStock ? 'bg-emerald-100 text-emerald-800' : 'bg-red-100 text-red-800'}">
+                ${item.inStock ? 'In Stock' : 'Sold Out'}
+              </button>
+            </td>
+            <td class="p-3 text-right">
+              <button onclick="deleteMenuItem(${item.id})" class="text-red-500 hover:text-red-700 font-bold ml-2">Delete</button>
+            </td>
+          </tr>
+        `).join('');
+      }
+
+      // 2. Render Registered Students Table
+      if (adminStudentsBody) {
+        adminStudentsBody.innerHTML = registeredStudents.map(student => `
+          <tr class="hover:bg-slate-50/70">
+            <td class="p-3 font-bold text-slate-900">${student.name}</td>
+            <td class="p-3 font-mono">${student.indexNo}</td>
+            <td class="p-3 text-slate-500">${student.email}</td>
+            <td class="p-3 font-bold ${student.balance < 10 ? 'text-red-600' : 'text-slate-900'}">GH₵ ${student.balance.toFixed(2)}</td>
+            <td class="p-3 text-right space-x-1">
+              <button onclick="creditStudent(${student.id}, 20)" class="px-2 py-1 bg-slate-100 hover:bg-slate-200 rounded-lg text-[10px] font-bold">+20</button>
+              <button onclick="creditStudent(${student.id}, 50)" class="px-2 py-1 bg-brand-50 hover:bg-brand-100 text-brand-700 rounded-lg text-[10px] font-bold">+50</button>
+            </td>
+          </tr>
+        `).join('');
+      }
+
+      // 3. Render Audit Logs
+      if (adminLogs) {
+        adminLogs.innerHTML = auditLogs.map(log => `
+          <div class="py-2.5 flex items-center justify-between text-xs text-slate-600">
             <span>${log}</span>
             <span class="text-[10px] text-slate-400">Just now</span>
           </div>
         `).join('');
       }
+
+      lucide.createIcons();
+    }
+
+    function toggleItemStock(itemId) {
+      const item = menuItems.find(m => m.id === itemId);
+      if (item) {
+        item.inStock = !item.inStock;
+        auditLogs.unshift(`Admin toggled ${item.name} stock status to ${item.inStock ? 'IN STOCK' : 'SOLD OUT'}.`);
+        renderMenu();
+        renderAdminDashboard();
+        showToast(`${item.name} is now ${item.inStock ? 'In Stock' : 'Sold Out'}`, 'info');
+      }
+    }
+
+    function deleteMenuItem(itemId) {
+      menuItems = menuItems.filter(m => m.id !== itemId);
+      delete cart[itemId];
+      auditLogs.unshift(`Admin deleted menu item ID #${itemId}.`);
+      renderMenu();
+      updateCartBar();
+      renderAdminDashboard();
+      showToast('Menu item removed.', 'info');
+    }
+
+    function openAddMenuModal() {
+      document.getElementById('add-menu-modal').classList.remove('hidden');
+      lucide.createIcons();
+    }
+
+    function closeAddMenuModal() {
+      document.getElementById('add-menu-modal').classList.add('hidden');
+    }
+
+    function saveNewMenuItem() {
+      const name = document.getElementById('new-item-name').value.trim();
+      const price = parseFloat(document.getElementById('new-item-price').value);
+      const calories = parseInt(document.getElementById('new-item-calories').value) || 450;
+      const category = document.getElementById('new-item-category').value;
+      const desc = document.getElementById('new-item-desc').value.trim();
+      const image = document.getElementById('new-item-image').value.trim() || 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=400&q=80';
+
+      if (!name || isNaN(price) || price <= 0) {
+        showToast('Please enter a valid dish name and price.', 'error');
+        return;
+      }
+
+      const newItem = {
+        id: Date.now(),
+        vendorId: 201,
+        vendorName: 'Akwaaba Kitchen',
+        name,
+        price,
+        category,
+        image,
+        description: desc || 'Delicious freshly prepared campus meal.',
+        calories,
+        badge: 'New Item',
+        inStock: true
+      };
+
+      menuItems.unshift(newItem);
+      auditLogs.unshift(`Admin added new food item: ${name} (GH₵ ${price.toFixed(2)}).`);
+      renderMenu();
+      renderAdminDashboard();
+      closeAddMenuModal();
+      showToast(`${name} added to the menu!`, 'success');
+    }
+
+    function creditStudent(studentId, amount) {
+      const student = registeredStudents.find(s => s.id === studentId);
+      if (student) {
+        student.balance += amount;
+        if (student.id === 1) {
+          studentBalance = student.balance;
+          updateWalletPill();
+        }
+        auditLogs.unshift(`Admin credited GH₵ ${amount.toFixed(2)} to ${student.name}'s wallet.`);
+        renderAdminDashboard();
+        showToast(`Credited GH₵ ${amount.toFixed(2)} to ${student.name}!`, 'success');
+      }
+    }
+
+    function creditAllStudentsBonus() {
+      registeredStudents.forEach(s => s.balance += 20.00);
+      studentBalance = registeredStudents[0].balance;
+      updateWalletPill();
+      auditLogs.unshift('Admin credited GH₵ 20.00 Campus Bonus to all registered students.');
+      renderAdminDashboard();
+      showToast('GH₵ 20.00 Campus Bonus credited to all students!', 'success');
+    }
+
+    function openBroadcastModal() {
+      document.getElementById('broadcast-modal').classList.remove('hidden');
+      lucide.createIcons();
+    }
+
+    function closeBroadcastModal() {
+      document.getElementById('broadcast-modal').classList.add('hidden');
+    }
+
+    function publishBroadcast() {
+      const msg = document.getElementById('broadcast-input-text').value.trim();
+      if (!msg) return;
+      document.getElementById('announcement-text').innerText = msg;
+      auditLogs.unshift(`Admin broadcast announcement: "${msg}"`);
+      renderAdminDashboard();
+      closeBroadcastModal();
+      showToast('Announcement broadcast live to all campus users!', 'success');
+    }
+
+    function exportSalesReport() {
+      const csvContent = "data:text/csv;charset=utf-8," 
+        + "Order ID,Dish,Quantity,Price (GHS),Status,Time\n"
+        + orders.map(o => `${o.id},"${o.foodName}",${o.quantity},${o.totalPrice},${o.status},"${o.dateStamp || o.time}"`).join("\n");
+      
+      const encodedUri = encodeURI(csvContent);
+      const link = document.createElement("a");
+      link.setAttribute("href", encodedUri);
+      link.setAttribute("download", `ATU_Cafeteria_Sales_${Date.now()}.csv`);
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+
+      showToast('Sales Report CSV downloaded successfully.', 'success');
+    }
+
+    function openAuthModal() {
+      document.getElementById('auth-modal').classList.remove('hidden');
+      lucide.createIcons();
+    }
+
+    function closeAuthModal() {
+      document.getElementById('auth-modal').classList.add('hidden');
     }
 
     function showToast(message, type = 'info') {
