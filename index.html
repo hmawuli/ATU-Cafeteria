@@ -76,173 +76,227 @@
   <!-- ========================================================================= -->
   <!-- 0. ATU CENTRAL AUTHENTICATION GATEWAY (Shown before login)                 -->
   <!-- ========================================================================= -->
-  <div id="auth-gate-view" class="min-h-screen flex flex-col justify-between bg-gradient-to-b from-slate-900 via-atu-navy to-slate-950 text-white p-4 sm:p-6 md:p-10 relative overflow-hidden">
+  <div id="auth-gate-view" class="min-h-screen flex flex-col justify-between bg-slate-900 text-slate-100 relative overflow-hidden">
     
-    <!-- Decorative background elements -->
-    <div class="absolute -top-24 -left-24 w-96 h-96 bg-brand-500/10 rounded-full blur-3xl pointer-events-none"></div>
-    <div class="absolute -bottom-24 -right-24 w-96 h-96 bg-atu-gold/10 rounded-full blur-3xl pointer-events-none"></div>
-
-    <!-- Header / Brand -->
-    <div class="max-w-5xl w-full mx-auto flex items-center justify-between z-10">
-      <div class="flex items-center space-x-3">
-        <div class="w-11 h-11 rounded-2xl bg-gradient-to-tr from-brand-500 to-atu-gold flex items-center justify-center text-white shadow-lg shadow-brand-500/30">
-          <i data-lucide="utensils" class="w-6 h-6"></i>
+    <!-- Top Navy App Bar (Matching Screenshot) -->
+    <div class="w-full bg-[#0d1e38] text-white py-3.5 px-6 shadow-md flex items-center justify-between border-b border-white/10 z-20">
+      <div class="flex items-center space-x-2.5">
+        <div class="w-8 h-8 rounded-xl bg-brand-500/20 text-brand-400 flex items-center justify-center">
+          <i data-lucide="utensils" class="w-4 h-4 text-amber-400"></i>
         </div>
-        <div>
-          <h1 class="text-lg sm:text-xl font-black tracking-tight text-white flex items-center gap-2">
-            ATU Cafeteria
-            <span class="text-[10px] font-black bg-atu-gold/20 text-amber-300 border border-atu-gold/40 px-2 py-0.5 rounded-full uppercase">Official</span>
-          </h1>
-          <p class="text-xs text-slate-300 font-medium">Accra Technical University Central Food System</p>
-        </div>
+        <h1 class="text-sm sm:text-base font-black tracking-wider uppercase text-white">ATU CAFETERIA HUB</h1>
       </div>
-
       <div class="flex items-center gap-2">
-        <span class="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-pulse"></span>
-        <span class="text-xs font-bold text-slate-300 hidden sm:inline">Campus Cloud Online</span>
+        <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+        <span class="text-[11px] font-bold text-slate-300">Campus Cloud Online</span>
       </div>
     </div>
 
-    <!-- Central Login Card -->
-    <div class="max-w-md w-full mx-auto my-8 bg-white/95 backdrop-blur-xl rounded-3xl p-6 sm:p-8 shadow-2xl text-slate-900 border border-white/40 z-10 space-y-6">
-      <div class="text-center space-y-1.5">
-        <div class="w-12 h-12 rounded-2xl bg-brand-50 text-brand-600 flex items-center justify-center mx-auto mb-2 shadow-xs border border-brand-100">
-          <i data-lucide="lock" class="w-6 h-6"></i>
-        </div>
-        <h2 class="text-xl sm:text-2xl font-black text-slate-900">Sign In to Continue</h2>
-        <p class="text-xs text-slate-500 font-semibold">Select your role to access your dedicated campus portal</p>
-      </div>
+    <!-- Decorative background elements -->
+    <div class="absolute -top-24 -left-24 w-96 h-96 bg-brand-500/10 rounded-full blur-3xl pointer-events-none"></div>
+    <div class="absolute -bottom-24 -right-24 w-96 h-96 bg-amber-500/10 rounded-full blur-3xl pointer-events-none"></div>
 
-      <!-- Role Selector Tabs -->
-      <div class="grid grid-cols-3 gap-1 bg-slate-100 p-1 rounded-2xl text-xs font-bold text-slate-600">
-        <button onclick="selectAuthRoleTab('STUDENT')" id="auth-tab-student" class="py-2 rounded-xl bg-brand-600 text-white shadow-sm flex flex-col sm:flex-row items-center justify-center gap-1">
-          <i data-lucide="user" class="w-3.5 h-3.5"></i>
-          <span>Student</span>
-        </button>
-        <button onclick="selectAuthRoleTab('VENDOR')" id="auth-tab-vendor" class="py-2 rounded-xl hover:text-slate-900 flex flex-col sm:flex-row items-center justify-center gap-1">
-          <i data-lucide="chef-hat" class="w-3.5 h-3.5"></i>
-          <span>Vendor</span>
-        </button>
-        <button onclick="selectAuthRoleTab('ADMIN')" id="auth-tab-admin" class="py-2 rounded-xl hover:text-slate-900 flex flex-col sm:flex-row items-center justify-center gap-1">
-          <i data-lucide="shield-check" class="w-3.5 h-3.5"></i>
-          <span>Admin</span>
-        </button>
-      </div>
+    <!-- Central Mobile-Style Login Card (Matching Screenshot exactly) -->
+    <div class="max-w-md w-full mx-auto my-6 sm:my-10 px-4 z-10">
+      <div class="bg-white rounded-3xl p-6 sm:p-8 shadow-2xl text-slate-900 border border-slate-100 space-y-6">
+        
+        <!-- Circular Food Crest & ATU Title (From Screenshot) -->
+        <div class="text-center space-y-2">
+          <div class="w-24 h-24 rounded-full bg-gradient-to-tr from-[#0d1e38] to-[#1e3a66] border-4 border-amber-400/80 shadow-xl flex items-center justify-center mx-auto relative overflow-hidden group">
+            <div class="w-16 h-16 rounded-full bg-amber-500/20 flex items-center justify-center text-amber-400">
+              <i data-lucide="soup" class="w-10 h-10 text-amber-300"></i>
+            </div>
+            <div class="absolute bottom-1 text-[8px] font-black uppercase text-amber-200 tracking-wider">ATU FOOD HUB</div>
+          </div>
 
-      <!-- 1. STUDENT LOGIN FORM -->
-      <div id="auth-form-student" class="space-y-4">
-        <div>
-          <label class="block text-xs font-bold text-slate-700 mb-1">Student Index Number</label>
-          <div class="relative">
-            <i data-lucide="id-card" class="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2"></i>
-            <input type="text" id="login-student-index" value="01210492B" placeholder="e.g. 01210492B" class="w-full pl-10 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-800 outline-none focus:ring-2 focus:ring-brand-500 uppercase" />
+          <div>
+            <h2 class="text-base sm:text-lg font-black text-slate-900 tracking-tight">Accra Technical University</h2>
+            <p class="text-xs text-slate-500 font-semibold">Secure Campus Food Portal</p>
           </div>
         </div>
 
-        <div>
-          <label class="block text-xs font-bold text-slate-700 mb-1">Student Security PIN / Password</label>
-          <div class="relative">
-            <i data-lucide="key-round" class="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2"></i>
-            <input type="password" id="login-student-pin" value="1234" placeholder="4-digit PIN" class="w-full pl-10 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-800 outline-none focus:ring-2 focus:ring-brand-500" />
-          </div>
-        </div>
-
-        <button onclick="loginAsStudent()" class="w-full py-3 bg-brand-600 hover:bg-brand-700 text-white rounded-xl text-xs font-black shadow-md shadow-brand-600/30 flex items-center justify-center gap-2 transition-transform active:scale-95">
-          <span>Enter Student Food Hub</span>
-          <i data-lucide="arrow-right" class="w-4 h-4"></i>
-        </button>
-
-        <!-- Quick 1-Click Demo Accounts -->
-        <div class="pt-2 border-t border-slate-100">
-          <p class="text-[10px] font-bold uppercase text-slate-400 mb-2 text-center">Quick Demo Student Profiles</p>
-          <div class="grid grid-cols-2 gap-2">
-            <button onclick="quickStudentLogin('01210492B')" class="p-2 bg-slate-50 hover:bg-brand-50 border border-slate-200 hover:border-brand-300 rounded-xl text-[11px] font-bold text-slate-700 text-left">
-              <p class="font-extrabold text-slate-900">Kofi Mensah</p>
-              <p class="text-[9px] text-slate-500">GH₵ 150.00</p>
-            </button>
-            <button onclick="quickStudentLogin('01210833B')" class="p-2 bg-slate-50 hover:bg-brand-50 border border-slate-200 hover:border-brand-300 rounded-xl text-[11px] font-bold text-slate-700 text-left">
-              <p class="font-extrabold text-slate-900">Ama Osei</p>
-              <p class="text-[9px] text-slate-500">GH₵ 85.00</p>
-            </button>
-          </div>
-        </div>
-      </div>
-
-      <!-- 2. VENDOR LOGIN FORM -->
-      <div id="auth-form-vendor" class="space-y-4 hidden">
-        <div>
-          <label class="block text-xs font-bold text-slate-700 mb-1">Select Kitchen Vendor Stall</label>
-          <div class="relative">
-            <i data-lucide="store" class="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2"></i>
-            <select id="login-vendor-id" class="w-full pl-10 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-800 outline-none focus:ring-2 focus:ring-brand-500">
-              <option value="201">Akwaaba Kitchen (Stall #01)</option>
-              <option value="202">Campus Chillers & Bakes (Stall #04)</option>
-              <option value="203">Tasty Bites Grill (Stall #07)</option>
-            </select>
-          </div>
-        </div>
-
-        <div>
-          <label class="block text-xs font-bold text-slate-700 mb-1">Kitchen Terminal Access PIN</label>
-          <div class="relative">
-            <i data-lucide="key-round" class="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2"></i>
-            <input type="password" id="login-vendor-pin" value="1234" placeholder="Enter 4-Digit Terminal PIN" class="w-full pl-10 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-800 outline-none focus:ring-2 focus:ring-brand-500" />
-          </div>
-        </div>
-
-        <button onclick="loginAsVendor()" class="w-full py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-black shadow-md shadow-blue-600/30 flex items-center justify-center gap-2 transition-transform active:scale-95">
-          <span>Open Kitchen Station</span>
-          <i data-lucide="arrow-right" class="w-4 h-4"></i>
-        </button>
-
-        <div class="pt-2 border-t border-slate-100">
-          <p class="text-[10px] font-bold uppercase text-slate-400 mb-2 text-center">Quick Select Kitchen Stall</p>
-          <div class="grid grid-cols-1 gap-1.5">
-            <button onclick="quickVendorLogin(201)" class="p-2 bg-slate-50 hover:bg-blue-50 border border-slate-200 hover:border-blue-300 rounded-xl text-[11px] font-bold text-slate-800 text-left flex items-center justify-between">
-              <span>Akwaaba Kitchen (Stall #01)</span>
-              <span class="text-[9px] bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded font-black">ONLINE</span>
-            </button>
-            <button onclick="quickVendorLogin(202)" class="p-2 bg-slate-50 hover:bg-blue-50 border border-slate-200 hover:border-blue-300 rounded-xl text-[11px] font-bold text-slate-800 text-left flex items-center justify-between">
-              <span>Campus Chillers & Bakes (Stall #04)</span>
-              <span class="text-[9px] bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded font-black">ONLINE</span>
-            </button>
-          </div>
-        </div>
-      </div>
-
-      <!-- 3. ADMIN LOGIN FORM -->
-      <div id="auth-form-admin" class="space-y-4 hidden">
-        <div>
-          <label class="block text-xs font-bold text-slate-700 mb-1">Administrative Email / ID</label>
-          <div class="relative">
-            <i data-lucide="shield-check" class="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2"></i>
-            <input type="text" id="login-admin-email" value="admin@atu.edu.gh" placeholder="admin@atu.edu.gh" class="w-full pl-10 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-800 outline-none focus:ring-2 focus:ring-brand-500" />
-          </div>
-        </div>
-
-        <div>
-          <label class="block text-xs font-bold text-slate-700 mb-1">Director Master Key / Password</label>
-          <div class="relative">
-            <i data-lucide="lock" class="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2"></i>
-            <input type="password" id="login-admin-pass" value="admin123" placeholder="••••••••" class="w-full pl-10 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-800 outline-none focus:ring-2 focus:ring-brand-500" />
-          </div>
-        </div>
-
-        <button onclick="loginAsAdmin()" class="w-full py-3 bg-slate-900 hover:bg-black text-white rounded-xl text-xs font-black shadow-md flex items-center justify-center gap-2 transition-transform active:scale-95">
-          <span>Access Central Admin Hub</span>
-          <i data-lucide="arrow-right" class="w-4 h-4"></i>
-        </button>
-
-        <div class="pt-2 border-t border-slate-100">
-          <button onclick="quickAdminLogin()" class="w-full p-2 bg-purple-50 hover:bg-purple-100 border border-purple-200 rounded-xl text-xs font-black text-purple-900 text-center">
-            ⚡ Quick Demo: Login as Dean of Student Affairs
+        <!-- Role Mode Switcher Tabs -->
+        <div class="grid grid-cols-3 gap-1 bg-slate-100 p-1 rounded-2xl text-xs font-bold text-slate-600">
+          <button onclick="selectAuthRoleTab('STUDENT')" id="auth-tab-student" class="py-2 rounded-xl bg-brand-600 text-white shadow-sm flex items-center justify-center gap-1">
+            <i data-lucide="user" class="w-3.5 h-3.5"></i>
+            <span>Student</span>
           </button>
+          <button onclick="selectAuthRoleTab('VENDOR')" id="auth-tab-vendor" class="py-2 rounded-xl hover:text-slate-900 flex items-center justify-center gap-1">
+            <i data-lucide="chef-hat" class="w-3.5 h-3.5"></i>
+            <span>Vendor</span>
+          </button>
+          <button onclick="selectAuthRoleTab('ADMIN')" id="auth-tab-admin" class="py-2 rounded-xl hover:text-slate-900 flex items-center justify-center gap-1">
+            <i data-lucide="shield-check" class="w-3.5 h-3.5"></i>
+            <span>Admin</span>
+          </button>
+        </div>
+
+        <!-- 1. STUDENT AUTHENTICATION FORM (Email / Gmail & Social Login) -->
+        <div id="auth-form-student" class="space-y-4">
+          <div class="flex items-center justify-between">
+            <h3 class="text-sm font-black text-slate-900">Student Sign In</h3>
+            <span class="text-[10px] font-bold text-brand-600 bg-brand-50 px-2 py-0.5 rounded-md border border-brand-100">Gmail / Social Supported</span>
+          </div>
+
+          <!-- Social Login: Google / Gmail Button -->
+          <button onclick="loginWithGoogle()" class="w-full py-2.5 px-4 bg-white hover:bg-slate-50 border-2 border-slate-200 hover:border-slate-300 rounded-2xl text-xs font-black text-slate-700 shadow-2xs flex items-center justify-center gap-2.5 transition-all active:scale-98">
+            <svg class="w-4 h-4" viewBox="0 0 24 24">
+              <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
+              <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
+              <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z"/>
+              <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z"/>
+            </svg>
+            <span>Continue with Google (Gmail)</span>
+          </button>
+
+          <!-- Divider -->
+          <div class="relative flex py-1 items-center">
+            <div class="flex-grow border-t border-slate-200"></div>
+            <span class="shrink-0 mx-3 text-[10px] uppercase font-bold text-slate-400">or sign in with email</span>
+            <div class="flex-grow border-t border-slate-200"></div>
+          </div>
+
+          <!-- Email or Username Input -->
+          <div>
+            <div class="relative">
+              <i data-lucide="mail" class="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2"></i>
+              <input type="email" id="login-student-email" value="hormekumawuli93@gmail.com" placeholder="Gmail or Email Address" class="w-full pl-10 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-800 outline-none focus:ring-2 focus:ring-brand-500" />
+            </div>
+          </div>
+
+          <!-- Password / Access PIN Input with Visibility Toggle -->
+          <div>
+            <div class="relative">
+              <i data-lucide="lock" class="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2"></i>
+              <input type="password" id="login-student-password" value="123456" placeholder="Access PIN or Password" class="w-full pl-10 pr-10 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-800 outline-none focus:ring-2 focus:ring-brand-500" />
+              <button type="button" onclick="togglePasswordVisibility('login-student-password', 'eye-student')" class="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600">
+                <i data-lucide="eye" id="eye-student" class="w-4 h-4"></i>
+              </button>
+            </div>
+          </div>
+
+          <!-- Forgot Password & Need Help Links (Matching Screenshot) -->
+          <div class="flex items-center justify-between text-[11px] font-bold text-slate-500 px-1">
+            <button type="button" onclick="showToast('Password reset link sent to your registered Gmail.', 'info')" class="hover:text-brand-600">Forgot Password?</button>
+            <button type="button" onclick="showToast('Campus IT Helpdesk: helpdesk@atu.edu.gh / +233 24 100 2000', 'info')" class="hover:text-brand-600 flex items-center gap-1">
+              <i data-lucide="help-circle" class="w-3.5 h-3.5"></i> Need Help?
+            </button>
+          </div>
+
+          <!-- Secure Login Button (Matching Screenshot) -->
+          <button onclick="loginAsStudent()" class="w-full py-3 bg-[#0d1e38] hover:bg-[#162d50] text-white rounded-xl text-xs font-black shadow-md flex items-center justify-center gap-2 transition-transform active:scale-95">
+            <i data-lucide="lock" class="w-4 h-4 text-amber-400"></i>
+            <span>Secure Login</span>
+          </button>
+
+          <!-- Quick 1-Click Demo Profiles -->
+          <div class="pt-2 border-t border-slate-100">
+            <p class="text-[10px] font-bold uppercase text-slate-400 mb-2 text-center">Quick 1-Click Demo Accounts</p>
+            <div class="grid grid-cols-2 gap-2">
+              <button onclick="quickStudentLogin('hormekumawuli93@gmail.com', 'Mawuli Hormeku')" class="p-2 bg-slate-50 hover:bg-brand-50 border border-slate-200 hover:border-brand-300 rounded-xl text-[11px] font-bold text-slate-700 text-left">
+                <p class="font-extrabold text-slate-900 truncate">Mawuli Hormeku</p>
+                <p class="text-[9px] text-slate-500 truncate">hormeku...93@gmail.com</p>
+              </button>
+              <button onclick="quickStudentLogin('kofi.mensah@atu.edu.gh', 'Kofi Mensah')" class="p-2 bg-slate-50 hover:bg-brand-50 border border-slate-200 hover:border-brand-300 rounded-xl text-[11px] font-bold text-slate-700 text-left">
+                <p class="font-extrabold text-slate-900 truncate">Kofi Mensah</p>
+                <p class="text-[9px] text-slate-500 truncate">kofi.mensah@atu.edu.gh</p>
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- 2. VENDOR AUTHENTICATION FORM -->
+        <div id="auth-form-vendor" class="space-y-4 hidden">
+          <div class="flex items-center justify-between">
+            <h3 class="text-sm font-black text-slate-900">Kitchen Vendor Sign In</h3>
+            <span class="text-[10px] font-bold text-blue-600 bg-blue-50 px-2 py-0.5 rounded-md border border-blue-100">Stall Terminal</span>
+          </div>
+
+          <div>
+            <label class="block text-xs font-bold text-slate-700 mb-1">Select Kitchen Vendor Stall</label>
+            <div class="relative">
+              <i data-lucide="store" class="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2"></i>
+              <select id="login-vendor-id" class="w-full pl-10 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-800 outline-none focus:ring-2 focus:ring-brand-500">
+                <option value="201">Akwaaba Kitchen (Stall #01)</option>
+                <option value="202">Campus Chillers & Bakes (Stall #04)</option>
+                <option value="203">Tasty Bites Grill (Stall #07)</option>
+              </select>
+            </div>
+          </div>
+
+          <div>
+            <label class="block text-xs font-bold text-slate-700 mb-1">Kitchen Terminal Access PIN / Password</label>
+            <div class="relative">
+              <i data-lucide="key-round" class="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2"></i>
+              <input type="password" id="login-vendor-pin" value="1234" placeholder="Enter 4-Digit Terminal PIN" class="w-full pl-10 pr-10 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-800 outline-none focus:ring-2 focus:ring-brand-500" />
+              <button type="button" onclick="togglePasswordVisibility('login-vendor-pin', 'eye-vendor')" class="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600">
+                <i data-lucide="eye" id="eye-vendor" class="w-4 h-4"></i>
+              </button>
+            </div>
+          </div>
+
+          <button onclick="loginAsVendor()" class="w-full py-3 bg-[#0d1e38] hover:bg-[#162d50] text-white rounded-xl text-xs font-black shadow-md flex items-center justify-center gap-2 transition-transform active:scale-95">
+            <i data-lucide="chef-hat" class="w-4 h-4 text-amber-400"></i>
+            <span>Open Kitchen Station</span>
+          </button>
+
+          <div class="pt-2 border-t border-slate-100">
+            <p class="text-[10px] font-bold uppercase text-slate-400 mb-2 text-center">Quick Select Kitchen Stall</p>
+            <div class="grid grid-cols-1 gap-1.5">
+              <button onclick="quickVendorLogin(201)" class="p-2 bg-slate-50 hover:bg-blue-50 border border-slate-200 hover:border-blue-300 rounded-xl text-[11px] font-bold text-slate-800 text-left flex items-center justify-between">
+                <span>Akwaaba Kitchen (Stall #01)</span>
+                <span class="text-[9px] bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded font-black">ONLINE</span>
+              </button>
+              <button onclick="quickVendorLogin(202)" class="p-2 bg-slate-50 hover:bg-blue-50 border border-slate-200 hover:border-blue-300 rounded-xl text-[11px] font-bold text-slate-800 text-left flex items-center justify-between">
+                <span>Campus Chillers & Bakes (Stall #04)</span>
+                <span class="text-[9px] bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded font-black">ONLINE</span>
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- 3. ADMIN AUTHENTICATION FORM -->
+        <div id="auth-form-admin" class="space-y-4 hidden">
+          <div class="flex items-center justify-between">
+            <h3 class="text-sm font-black text-slate-900">Administrator Sign In</h3>
+            <span class="text-[10px] font-bold text-purple-600 bg-purple-50 px-2 py-0.5 rounded-md border border-purple-100">Directorate</span>
+          </div>
+
+          <div>
+            <label class="block text-xs font-bold text-slate-700 mb-1">Administrative Email / ID</label>
+            <div class="relative">
+              <i data-lucide="shield-check" class="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2"></i>
+              <input type="text" id="login-admin-email" value="admin@atu.edu.gh" placeholder="admin@atu.edu.gh" class="w-full pl-10 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-800 outline-none focus:ring-2 focus:ring-brand-500" />
+            </div>
+          </div>
+
+          <div>
+            <label class="block text-xs font-bold text-slate-700 mb-1">Director Master Key / Password</label>
+            <div class="relative">
+              <i data-lucide="lock" class="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2"></i>
+              <input type="password" id="login-admin-pass" value="admin123" placeholder="••••••••" class="w-full pl-10 pr-10 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-800 outline-none focus:ring-2 focus:ring-brand-500" />
+              <button type="button" onclick="togglePasswordVisibility('login-admin-pass', 'eye-admin')" class="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600">
+                <i data-lucide="eye" id="eye-admin" class="w-4 h-4"></i>
+              </button>
+            </div>
+          </div>
+
+          <button onclick="loginAsAdmin()" class="w-full py-3 bg-[#0d1e38] hover:bg-[#162d50] text-white rounded-xl text-xs font-black shadow-md flex items-center justify-center gap-2 transition-transform active:scale-95">
+            <i data-lucide="shield-check" class="w-4 h-4 text-amber-400"></i>
+            <span>Access Central Admin Hub</span>
+          </button>
+
+          <div class="pt-2 border-t border-slate-100">
+            <button onclick="quickAdminLogin()" class="w-full p-2 bg-purple-50 hover:bg-purple-100 border border-purple-200 rounded-xl text-xs font-black text-purple-900 text-center">
+              ⚡ Quick Demo: Login as Dean of Student Affairs
+            </button>
+          </div>
         </div>
       </div>
     </div>
 
     <!-- Footer -->
-    <div class="max-w-5xl w-full mx-auto text-center text-[11px] text-slate-400 font-semibold z-10">
+    <div class="max-w-5xl w-full mx-auto text-center text-[11px] text-slate-400 font-semibold p-4 z-10">
       Accra Technical University Central Cafeteria Food Management System • Project Defense Build
     </div>
   </div>
@@ -1326,12 +1380,12 @@
         if (tab) {
           if (isSelected) {
             tab.className = r === 'student' 
-              ? 'py-2 rounded-xl bg-brand-600 text-white shadow-sm flex flex-col sm:flex-row items-center justify-center gap-1 font-bold'
+              ? 'py-2 rounded-xl bg-brand-600 text-white shadow-sm flex items-center justify-center gap-1 font-bold'
               : r === 'vendor'
-                ? 'py-2 rounded-xl bg-blue-600 text-white shadow-sm flex flex-col sm:flex-row items-center justify-center gap-1 font-bold'
-                : 'py-2 rounded-xl bg-slate-900 text-white shadow-sm flex flex-col sm:flex-row items-center justify-center gap-1 font-bold';
+                ? 'py-2 rounded-xl bg-blue-600 text-white shadow-sm flex items-center justify-center gap-1 font-bold'
+                : 'py-2 rounded-xl bg-slate-900 text-white shadow-sm flex items-center justify-center gap-1 font-bold';
           } else {
-            tab.className = 'py-2 rounded-xl hover:text-slate-900 flex flex-col sm:flex-row items-center justify-center gap-1 font-bold';
+            tab.className = 'py-2 rounded-xl hover:text-slate-900 flex items-center justify-center gap-1 font-bold';
           }
         }
 
@@ -1342,24 +1396,31 @@
       lucide.createIcons();
     }
 
-    function loginAsStudent() {
-      const indexInput = document.getElementById('login-student-index').value.trim().toUpperCase();
-      const pinInput = document.getElementById('login-student-pin').value.trim();
+    function togglePasswordVisibility(inputId, iconId) {
+      const input = document.getElementById(inputId);
+      const icon = document.getElementById(iconId);
+      if (!input) return;
 
-      if (!indexInput) {
-        showToast('Please enter your student index number.', 'error');
-        return;
+      if (input.type === 'password') {
+        input.type = 'text';
+        if (icon) icon.setAttribute('data-lucide', 'eye-off');
+      } else {
+        input.type = 'password';
+        if (icon) icon.setAttribute('data-lucide', 'eye');
       }
+      lucide.createIcons();
+    }
 
-      // Check registered students or create session
-      let student = registeredStudents.find(s => s.indexNo.toUpperCase() === indexInput);
+    function loginWithGoogle() {
+      const googleEmail = 'hormekumawuli93@gmail.com';
+      let student = registeredStudents.find(s => s.email.toLowerCase() === googleEmail.toLowerCase());
       if (!student) {
         student = {
           id: Date.now(),
-          name: indexInput === '01210833B' ? 'Ama Osei' : 'Student (' + indexInput + ')',
-          indexNo: indexInput,
-          email: `${indexInput.toLowerCase()}@atu.edu.gh`,
-          balance: indexInput === '01210833B' ? 85.00 : 150.00
+          name: 'Mawuli Hormeku',
+          indexNo: '01210492B',
+          email: googleEmail,
+          balance: 150.00
         };
         registeredStudents.push(student);
       }
@@ -1369,20 +1430,71 @@
         name: student.name,
         indexNo: student.indexNo,
         email: student.email,
-        balance: student.balance
+        balance: student.balance,
+        authProvider: 'Google'
       };
 
       studentBalance = student.balance;
       applyUserSession();
       switchRole('STUDENT');
-      auditLogs.unshift(`Student ${student.name} (${student.indexNo}) authenticated into ATU Cafeteria.`);
+      auditLogs.unshift(`Student ${student.name} logged in via Google Account (${student.email}).`);
+      showToast(`Google Sign-In successful! Welcome, ${student.name}.`, 'success');
+      playChime(659.25);
+    }
+
+    function loginAsStudent() {
+      const emailInput = (document.getElementById('login-student-email') ? document.getElementById('login-student-email').value.trim() : '').toLowerCase();
+      const passInput = document.getElementById('login-student-password') ? document.getElementById('login-student-password').value.trim() : '';
+
+      if (!emailInput) {
+        showToast('Please enter your Gmail or Email address.', 'error');
+        return;
+      }
+
+      // Check registered students or create session
+      let student = registeredStudents.find(s => s.email.toLowerCase() === emailInput || s.indexNo.toLowerCase() === emailInput);
+      if (!student) {
+        const derivedName = emailInput.includes('hormeku') 
+          ? 'Mawuli Hormeku' 
+          : emailInput.includes('kofi') 
+            ? 'Kofi Mensah' 
+            : emailInput.includes('ama') 
+              ? 'Ama Osei' 
+              : emailInput.split('@')[0].replace('.', ' ').toUpperCase();
+        student = {
+          id: Date.now(),
+          name: derivedName,
+          indexNo: '01210' + Math.floor(100 + Math.random() * 900) + 'B',
+          email: emailInput,
+          balance: 150.00
+        };
+        registeredStudents.push(student);
+      }
+
+      currentLoggedInUser = {
+        role: 'STUDENT',
+        name: student.name,
+        indexNo: student.indexNo,
+        email: student.email,
+        balance: student.balance,
+        authProvider: 'Email'
+      };
+
+      studentBalance = student.balance;
+      applyUserSession();
+      switchRole('STUDENT');
+      auditLogs.unshift(`Student ${student.name} (${student.email}) authenticated into ATU Cafeteria.`);
       showToast(`Welcome back, ${student.name}! Pre-order ready.`, 'success');
       playChime(659.25);
     }
 
-    function quickStudentLogin(indexNo) {
-      document.getElementById('login-student-index').value = indexNo;
-      document.getElementById('login-student-pin').value = '1234';
+    function quickStudentLogin(email, name) {
+      if (document.getElementById('login-student-email')) {
+        document.getElementById('login-student-email').value = email;
+      }
+      if (document.getElementById('login-student-password')) {
+        document.getElementById('login-student-password').value = '123456';
+      }
       loginAsStudent();
     }
 
@@ -1453,7 +1565,7 @@
       }
       if (userRole) {
         userRole.innerText = currentLoggedInUser.role === 'STUDENT' 
-          ? `Student (${currentLoggedInUser.indexNo || 'ATU'})` 
+          ? (currentLoggedInUser.email || 'ATU Student') 
           : currentLoggedInUser.role === 'VENDOR' 
             ? 'Kitchen Terminal' 
             : 'Campus Administrator';
