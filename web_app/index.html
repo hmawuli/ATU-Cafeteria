@@ -10,6 +10,8 @@
   <!-- Lucide Icons -->
   <script src="https://unpkg.com/lucide@latest"></script>
   <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.js"></script>
+  <!-- QRCode.js for Standout Digital QR Code Generation -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
   <!-- Google Fonts: Plus Jakarta Sans -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -62,6 +64,11 @@
       0%, 100% { opacity: 1; transform: scale(1); }
       50% { opacity: .7; transform: scale(1.05); }
     }
+    @media print {
+      body * { visibility: hidden; }
+      #printable-receipt, #printable-receipt * { visibility: visible; }
+      #printable-receipt { position: absolute; left: 0; top: 0; width: 100%; }
+    }
   </style>
 </head>
 <body class="bg-slate-50 text-slate-900 min-h-screen flex flex-col antialiased selection:bg-brand-500 selection:text-white">
@@ -105,6 +112,11 @@
             <i data-lucide="shield-check" class="w-3.5 h-3.5"></i> Admin Hub
           </button>
         </div>
+
+        <!-- Audio Alert Toggle Button -->
+        <button onclick="toggleAudioChime()" id="audio-toggle-btn" class="w-9 h-9 rounded-xl bg-slate-100 border border-slate-200 hover:bg-slate-200 flex items-center justify-center text-slate-700 transition-colors" title="Toggle Kitchen Audio Alerts">
+          <i data-lucide="volume-2" id="audio-icon" class="w-4 h-4 text-emerald-600"></i>
+        </button>
 
         <!-- Student Dynamic Wallet Pill (Red Pulsating warning when < GH₵ 10.00) -->
         <div id="user-wallet-pill" onclick="showTopUpModal()" class="cursor-pointer transition-all duration-300 flex items-center space-x-2 bg-brand-50 border border-brand-200 px-3 py-1.5 rounded-xl text-xs font-bold text-brand-700 hover:bg-brand-100">
@@ -150,14 +162,16 @@
         <div class="relative z-10 max-w-2xl space-y-3">
           <div class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-white/10 backdrop-blur-md text-amber-300 text-xs font-semibold">
             <i data-lucide="sparkles" class="w-3.5 h-3.5"></i>
-            <span>Smart Cafeteria Pre-Ordering System</span>
+            <span>Smart Cafeteria Pre-Ordering & QR Pickup System</span>
           </div>
           <h2 class="text-2xl sm:text-3xl font-extrabold tracking-tight">ATU Cafeteria Multi-Vendor Hub</h2>
           <p class="text-slate-300 text-xs sm:text-sm leading-relaxed">
-            Order fresh meals right from verified campus vendors, skip long lunchtime counter lines, and pick up your food using your secure 4-digit PIN.
+            Order fresh meals right from verified campus vendors, skip long lunchtime counter lines, and pick up your food instantly using your secure 4-digit PIN or digital QR Pass.
           </p>
           <div class="flex items-center gap-3 pt-1 text-xs text-amber-300 font-bold">
             <span class="flex items-center gap-1"><i data-lucide="clock" class="w-3.5 h-3.5"></i> Avg Prep: 8-12 Mins</span>
+            <span>•</span>
+            <span class="flex items-center gap-1"><i data-lucide="qr-code" class="w-3.5 h-3.5"></i> Instant QR Fast-Pass</span>
             <span>•</span>
             <span class="flex items-center gap-1"><i data-lucide="shield-check" class="w-3.5 h-3.5"></i> Certified Vendors</span>
           </div>
@@ -228,7 +242,7 @@
       <!-- Food Menu Grid -->
       <div id="food-menu-grid" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5"></div>
 
-      <!-- 📜 ORDER HISTORY SECTION (Completed Orders with Date Stamps & Ratings) -->
+      <!-- 📜 ORDER HISTORY SECTION (Completed Orders with Date Stamps, Receipts & Ratings) -->
       <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm space-y-4">
         <div class="flex items-center justify-between">
           <div class="flex items-center gap-2">
@@ -237,7 +251,7 @@
             </div>
             <div>
               <h3 class="text-base font-bold text-slate-900">Order History & Receipts</h3>
-              <p class="text-xs text-slate-500">Completed cafeteria transactions with pickup stamps</p>
+              <p class="text-xs text-slate-500">Completed cafeteria transactions with pickup stamps & printable receipts</p>
             </div>
           </div>
           <span id="completed-count-badge" class="text-xs font-bold bg-emerald-100 text-emerald-800 px-3 py-0.5 rounded-full">1 Completed</span>
@@ -261,7 +275,7 @@
               <h2 class="text-xl font-extrabold text-slate-900" id="current-kitchen-name">Akwaaba Kitchen Order Dispatch</h2>
               <span class="text-xs font-black bg-emerald-100 text-emerald-800 px-2.5 py-0.5 rounded-full">ONLINE</span>
             </div>
-            <p class="text-xs text-slate-500 mt-1">Advance ticket status, monitor ingredient demand, and verify 4-digit pickup PINs for meal release.</p>
+            <p class="text-xs text-slate-500 mt-1">Advance ticket status, monitor ingredient demand, and verify 4-digit pickup PINs or QR passes.</p>
           </div>
 
           <!-- Quick PIN Verification Bar -->
@@ -407,7 +421,7 @@
               <h4 class="text-xs font-bold text-slate-700 uppercase tracking-wider">Registered Campus Vendors & Kitchen Stalls</h4>
               <p class="text-[11px] text-slate-400">Admins can approve, open/close stalls, or onboard new food vendors.</p>
             </div>
-            <button onclick="openAddVendorModal()" class="px-3 py-1.5 rounded-xl bg-brand-50 hover:bg-brand-100 text-brand-700 text-xs font-bold flex items-center gap-1">
+            <button onclick="openAddVendorModal()" class="px-3.5 py-1.5 rounded-xl bg-brand-50 hover:bg-brand-100 text-brand-700 text-xs font-bold flex items-center gap-1">
               <i data-lucide="plus" class="w-3.5 h-3.5"></i> Register New Vendor
             </button>
           </div>
@@ -490,21 +504,27 @@
 
   </main>
 
-  <!-- Sticky Bottom Cart Bar (Student Mode) -->
+  <!-- Sticky Bottom Cart Bar (Student Mode with Dietary Notes) -->
   <div id="sticky-cart-bar" class="sticky bottom-0 z-30 bg-white/95 backdrop-blur-md border-t border-slate-200 p-4 shadow-lg hidden">
-    <div class="max-w-7xl mx-auto flex items-center justify-between">
+    <div class="max-w-7xl mx-auto flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
+      
       <div class="flex items-center space-x-3">
-        <div class="w-10 h-10 rounded-xl bg-brand-100 text-brand-700 flex items-center justify-center font-bold">
+        <div class="w-10 h-10 rounded-xl bg-brand-100 text-brand-700 flex items-center justify-center font-bold shrink-0">
           <i data-lucide="shopping-bag" class="w-5 h-5"></i>
         </div>
         <div>
-          <p class="text-xs text-slate-500 font-semibold"><span id="cart-item-count">0</span> items in tray</p>
+          <p class="text-xs text-slate-500 font-semibold"><span id="cart-item-count">0</span> items in meal tray</p>
           <p class="text-lg font-extrabold text-brand-600">GH₵ <span id="cart-total-display">0.00</span></p>
         </div>
       </div>
 
-      <div class="flex items-center space-x-2">
-        <button onclick="clearCart()" class="px-3 py-2 text-xs font-bold text-slate-600 hover:text-red-600 transition-colors">Clear Tray</button>
+      <!-- Special Dietary / Preparation Instructions -->
+      <div class="flex-1 max-w-md mx-0 sm:mx-4">
+        <input type="text" id="cart-special-notes" placeholder="Special notes: e.g. Less pepper, extra shito, takeaway pack..." class="w-full text-xs font-semibold bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 outline-none focus:ring-2 focus:ring-brand-500" />
+      </div>
+
+      <div class="flex items-center space-x-2 shrink-0 justify-end">
+        <button onclick="clearCart()" class="px-3 py-2 text-xs font-bold text-slate-600 hover:text-red-600 transition-colors">Clear</button>
         <button onclick="checkoutCart()" class="px-5 py-2.5 rounded-xl bg-brand-600 hover:bg-brand-700 text-white text-xs font-extrabold shadow-md shadow-brand-500/25 flex items-center gap-1.5 transition-transform active:scale-95">
           <span>Place Pre-Order</span>
           <i data-lucide="arrow-right" class="w-4 h-4"></i>
@@ -514,7 +534,7 @@
   </div>
 
   <!-- ========================================================================= -->
-  <!-- MODALS                                                                    -->
+  <!-- MODALS & POPUPS                                                           -->
   <!-- ========================================================================= -->
 
   <!-- 1. 🏪 Add New Vendor Modal (Admin) -->
@@ -630,73 +650,91 @@
     </div>
   </div>
 
-  <!-- 3. Live Stepper & Star Rating Modal -->
+  <!-- 3. Live Stepper, QR Pass & Star Rating Modal -->
   <div id="tracking-modal" class="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm hidden flex items-center justify-center p-4">
-    <div class="bg-white rounded-3xl max-w-md w-full p-6 shadow-2xl space-y-5 max-h-[90vh] overflow-y-auto">
+    <div class="bg-white rounded-3xl max-w-md w-full p-6 shadow-2xl space-y-4 max-h-[92vh] overflow-y-auto">
+      
       <div class="flex items-center justify-between border-b border-slate-100 pb-3">
         <div>
           <h3 class="text-lg font-bold text-slate-900" id="modal-order-title">Order #1042</h3>
           <p class="text-xs text-slate-500 font-medium" id="modal-vendor-label">Akwaaba Kitchen • Counter Pickup</p>
         </div>
-        <button onclick="closeTrackingModal()" class="w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center text-slate-500 hover:bg-slate-200">
-          <i data-lucide="x" class="w-4 h-4"></i>
-        </button>
+        <div class="flex items-center space-x-1.5">
+          <button onclick="printOrderReceipt(activeModalOrderId)" class="w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center text-slate-600 hover:bg-slate-200" title="Print Official Receipt">
+            <i data-lucide="printer" class="w-4 h-4"></i>
+          </button>
+          <button onclick="closeTrackingModal()" class="w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center text-slate-500 hover:bg-slate-200">
+            <i data-lucide="x" class="w-4 h-4"></i>
+          </button>
+        </div>
       </div>
 
+      <!-- Meal Summary Card with PIN & QR Code Trigger -->
       <div class="bg-brand-50 border border-brand-100 rounded-2xl p-4 flex items-center justify-between">
         <div>
           <p class="text-sm font-extrabold text-slate-900" id="modal-food-name">Spiced Jollof Rice</p>
           <p class="text-xs text-slate-500" id="modal-food-qty">Quantity: 1 • GH₵ 35.00</p>
+          <p class="text-[10px] text-brand-700 font-bold mt-0.5" id="modal-notes-preview"></p>
         </div>
-        <div class="text-right">
+        <div class="text-right flex flex-col items-end">
           <p class="text-[10px] uppercase font-bold text-brand-700">Pickup PIN</p>
           <p class="text-xl font-black tracking-widest text-brand-600 bg-white px-2.5 py-1 rounded-lg border border-brand-200 shadow-xs" id="modal-pickup-pin">8842</p>
         </div>
       </div>
 
+      <!-- 📱 STANDOUT FEATURE: Digital QR Pass (Scan at counter) -->
+      <div class="bg-slate-50 p-3 rounded-2xl border border-slate-200 text-center space-y-2">
+        <div class="flex items-center justify-center gap-1.5 text-xs font-bold text-slate-700">
+          <i data-lucide="qr-code" class="w-4 h-4 text-brand-600"></i>
+          <span>Digital Fast-Pass QR Code</span>
+        </div>
+        <div id="qrcode-container" class="flex justify-center p-2 bg-white rounded-xl border border-slate-200 mx-auto w-32 h-32"></div>
+        <p class="text-[10px] text-slate-400 font-semibold">Vendor kitchen scans this to instantly dispense your meal</p>
+      </div>
+
       <!-- Live Stepper -->
-      <div class="space-y-4 pt-2">
+      <div class="space-y-3 pt-1">
         <h4 class="text-xs font-bold text-slate-700 uppercase tracking-wider">Live Status Progression</h4>
-        <div class="space-y-4">
+        <div class="space-y-3">
           <div class="flex items-start gap-3" id="step-row-0">
             <div class="flex flex-col items-center">
-              <div class="w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold transition-all step-icon bg-emerald-500 text-white">
-                <i data-lucide="check" class="w-4 h-4"></i>
+              <div class="w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold transition-all step-icon bg-emerald-500 text-white">
+                <i data-lucide="check" class="w-3.5 h-3.5"></i>
               </div>
-              <div class="w-0.5 h-8 bg-slate-200 step-line"></div>
+              <div class="w-0.5 h-6 bg-slate-200 step-line"></div>
             </div>
             <div>
               <p class="text-xs font-bold text-slate-900">1. Order Received</p>
-              <p class="text-[11px] text-slate-500">Ticket printed at vendor kitchen</p>
+              <p class="text-[10px] text-slate-500">Ticket registered at vendor kitchen</p>
             </div>
           </div>
           <div class="flex items-start gap-3" id="step-row-1">
             <div class="flex flex-col items-center">
-              <div class="w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold transition-all step-icon bg-slate-200 text-slate-600">2</div>
-              <div class="w-0.5 h-8 bg-slate-200 step-line"></div>
+              <div class="w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold transition-all step-icon bg-slate-200 text-slate-600">2</div>
+              <div class="w-0.5 h-6 bg-slate-200 step-line"></div>
             </div>
             <div>
               <p class="text-xs font-bold text-slate-900">2. Kitchen Preparing</p>
-              <p class="text-[11px] text-slate-500">Meal is actively cooking on stove</p>
+              <p class="text-[10px] text-slate-500">Meal is actively cooking on stove</p>
             </div>
           </div>
           <div class="flex items-start gap-3" id="step-row-2">
             <div class="flex flex-col items-center">
-              <div class="w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold transition-all step-icon bg-slate-200 text-slate-600">3</div>
-              <div class="w-0.5 h-8 bg-slate-200 step-line"></div>
+              <div class="w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold transition-all step-icon bg-slate-200 text-slate-600">3</div>
+              <div class="w-0.5 h-6 bg-slate-200 step-line"></div>
             </div>
             <div>
               <p class="text-xs font-bold text-slate-900">3. Out for Delivery / Counter Ready</p>
-              <p class="text-[11px] text-slate-500">Ready at counter with your PIN</p>
+              <p class="text-[10px] text-slate-500">Ready at counter with PIN or QR Code</p>
             </div>
           </div>
           <div class="flex items-start gap-3" id="step-row-3">
             <div class="flex flex-col items-center">
-              <div class="w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold transition-all step-icon bg-slate-200 text-slate-600">4</div>
+              <div class="w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold transition-all step-icon bg-slate-200 text-slate-600">4</div>
             </div>
             <div>
               <p class="text-xs font-bold text-slate-900">4. Delivered / Collected</p>
-              <p class="text-[11px] text-slate-500">Transaction completed. Enjoy!</p>
+              <p class="text-[10px] text-slate-500">Meal collected. Enjoy your lunch!</p>
             </div>
           </div>
         </div>
@@ -727,9 +765,15 @@
         </button>
       </div>
 
-      <button onclick="closeTrackingModal()" class="w-full py-2.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-800 text-xs font-bold transition-colors">
-        Close
-      </button>
+      <div class="flex items-center space-x-2">
+        <button onclick="printOrderReceipt(activeModalOrderId)" class="flex-1 py-2.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-800 text-xs font-bold flex items-center justify-center gap-1.5 transition-colors">
+          <i data-lucide="printer" class="w-3.5 h-3.5"></i>
+          <span>Print Receipt</span>
+        </button>
+        <button onclick="closeTrackingModal()" class="flex-1 py-2.5 rounded-xl bg-brand-600 hover:bg-brand-700 text-white text-xs font-bold transition-colors">
+          Done
+        </button>
+      </div>
     </div>
   </div>
 
@@ -810,6 +854,38 @@
     </div>
   </div>
 
+  <!-- 🖨️ PRINTABLE RECEIPT TEMPLATE (Hidden from screen, visible when printing) -->
+  <div id="printable-receipt" class="hidden p-8 max-w-sm mx-auto bg-white border border-slate-300 rounded-lg text-slate-900 text-xs font-mono space-y-4">
+    <div class="text-center border-b border-dashed border-slate-400 pb-3">
+      <h2 class="text-base font-bold">ACCRA TECHNICAL UNIVERSITY</h2>
+      <p class="text-[10px]">Central Cafeteria Food Services</p>
+      <p class="text-[10px]" id="rcpt-timestamp">18 Aug 2026, 12:30 PM</p>
+    </div>
+
+    <div class="space-y-1 text-[11px]">
+      <p><strong>Order ID:</strong> <span id="rcpt-id">#1024</span></p>
+      <p><strong>Vendor:</strong> <span id="rcpt-vendor">Akwaaba Kitchen</span></p>
+      <p><strong>Student:</strong> Kofi Mensah (01210492B)</p>
+      <p><strong>Pickup PIN:</strong> <span id="rcpt-pin" class="font-bold text-sm">5821</span></p>
+    </div>
+
+    <div class="border-t border-b border-dashed border-slate-400 py-2 space-y-1">
+      <div class="flex justify-between">
+        <span id="rcpt-dish">1x Spiced Jollof Rice</span>
+        <span id="rcpt-price">GH₵ 35.00</span>
+      </div>
+      <div class="flex justify-between font-bold text-xs pt-1">
+        <span>TOTAL PAID (MOMO/WALLET):</span>
+        <span id="rcpt-total">GH₵ 35.00</span>
+      </div>
+    </div>
+
+    <div class="text-center space-y-1 text-[9px] text-slate-500 pt-1">
+      <p>Present your 4-digit PIN or QR Code at the counter.</p>
+      <p>Thank you for dining at ATU Cafeteria!</p>
+    </div>
+  </div>
+
   <script>
     // State management
     let currentRole = 'STUDENT';
@@ -821,6 +897,36 @@
     let cart = {};
     let activeModalOrderId = null;
     let currentSelectedRating = 5;
+    let audioChimeEnabled = true;
+
+    // Web Audio Sound Chime Generator (No external MP3 files needed!)
+    function playChime(freq = 587.33, type = 'sine') {
+      if (!audioChimeEnabled) return;
+      try {
+        const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        const osc = audioCtx.createOscillator();
+        const gain = audioCtx.createGain();
+        osc.type = type;
+        osc.frequency.setValueAtTime(freq, audioCtx.currentTime);
+        gain.gain.setValueAtTime(0.2, audioCtx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.5);
+        osc.connect(gain);
+        gain.connect(audioCtx.destination);
+        osc.start();
+        osc.stop(audioCtx.currentTime + 0.5);
+      } catch (e) {
+        console.warn('Audio Context:', e);
+      }
+    }
+
+    function toggleAudioChime() {
+      audioChimeEnabled = !audioChimeEnabled;
+      const icon = document.getElementById('audio-icon');
+      if (icon) {
+        icon.className = audioChimeEnabled ? 'w-4 h-4 text-emerald-600' : 'w-4 h-4 text-slate-400';
+      }
+      showToast(audioChimeEnabled ? 'Audio alerts enabled' : 'Audio alerts muted', 'info');
+    }
 
     // 🏪 Vendors Array (Fully managed by Admin)
     let vendors = [
@@ -941,6 +1047,7 @@
         pickupPin: '5821',
         time: '12:15 PM',
         dateStamp: '18 Aug 2026, 12:15 PM',
+        specialNotes: 'Extra shito please',
         rating: null,
         ratingComment: null
       },
@@ -956,6 +1063,7 @@
         pickupPin: '4192',
         time: '10:30 AM',
         dateStamp: '18 Aug 2026, 10:30 AM',
+        specialNotes: '',
         rating: 5,
         ratingComment: 'Hot, fast and very tasty!'
       }
@@ -1006,6 +1114,7 @@
       studentBalance += addAmount;
       registeredStudents[0].balance = studentBalance;
       updateWalletPill();
+      playChime(880);
       auditLogs.unshift(`Student topped up GH₵ ${addAmount.toFixed(2)} via Mobile Money.`);
       renderAdminDashboard();
       showToast(`Wallet topped up with GH₵ ${addAmount.toFixed(2)}!`, 'success');
@@ -1198,6 +1307,7 @@
 
     function addToCart(foodId) {
       cart[foodId] = (cart[foodId] || 0) + 1;
+      playChime(659.25);
       renderMenu();
       updateCartBar();
     }
@@ -1248,6 +1358,7 @@
     function checkoutCart() {
       let totalPrice = 0;
       const orderedItems = [];
+      const specialNotes = document.getElementById('cart-special-notes').value.trim();
 
       for (const [id, qty] of Object.entries(cart)) {
         const item = menuItems.find(m => m.id == id);
@@ -1259,6 +1370,7 @@
 
       if (totalPrice > studentBalance) {
         showToast('Insufficient student balance! Top up wallet to proceed.', 'error');
+        playChime(300, 'sawtooth');
         return;
       }
 
@@ -1283,6 +1395,7 @@
           pickupPin: Math.floor(1000 + Math.random() * 9000).toString(),
           time: timeStr,
           dateStamp: dateStampStr,
+          specialNotes: specialNotes,
           rating: null,
           ratingComment: null
         };
@@ -1290,7 +1403,9 @@
         auditLogs.unshift(`Order #${newOrder.id} placed by Kofi Mensah at ${item.vendorName} (${newOrder.quantity}x ${newOrder.foodName}).`);
       });
 
+      playChime(783.99);
       clearCart();
+      document.getElementById('cart-special-notes').value = '';
       renderActiveOrders();
       renderOrderHistory();
       renderVendorOrders();
@@ -1345,6 +1460,7 @@
               ${getStatusBadge(order.status)}
             </div>
             <p class="font-extrabold text-sm text-slate-900">${order.quantity}x ${order.foodName}</p>
+            ${order.specialNotes ? `<p class="text-[11px] text-amber-700 bg-amber-50 px-2 py-0.5 rounded-md font-semibold">Note: ${order.specialNotes}</p>` : ''}
             <div class="flex items-center justify-between text-xs text-slate-500">
               <span>Total: GH₵ ${order.totalPrice.toFixed(2)}</span>
               <span>Pickup PIN: <strong class="text-brand-700 bg-brand-50 px-2 py-0.5 rounded font-mono font-bold">${order.pickupPin}</strong></span>
@@ -1353,10 +1469,15 @@
 
           <div class="mt-3 pt-3 border-t border-slate-100 flex items-center justify-between">
             <span class="text-[11px] text-slate-400">${order.time}</span>
-            <button onclick="openTrackingModal(${order.id})" class="px-3 py-1.5 rounded-lg bg-brand-50 hover:bg-brand-100 text-brand-700 text-xs font-bold flex items-center gap-1">
-              <i data-lucide="activity" class="w-3.5 h-3.5"></i>
-              <span>Track Live</span>
-            </button>
+            <div class="flex items-center gap-1.5">
+              <button onclick="printOrderReceipt(${order.id})" class="px-2.5 py-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold flex items-center gap-1" title="Print Receipt">
+                <i data-lucide="printer" class="w-3.5 h-3.5"></i>
+              </button>
+              <button onclick="openTrackingModal(${order.id})" class="px-3 py-1.5 rounded-lg bg-brand-50 hover:bg-brand-100 text-brand-700 text-xs font-bold flex items-center gap-1">
+                <i data-lucide="qr-code" class="w-3.5 h-3.5"></i>
+                <span>Track & QR</span>
+              </button>
+            </div>
           </div>
         </div>
       `).join('');
@@ -1393,8 +1514,11 @@
             </p>
           </div>
 
-          <div class="flex items-center space-x-3 self-end sm:self-center">
-            <p class="text-sm font-extrabold text-slate-900">GH₵ ${order.totalPrice.toFixed(2)}</p>
+          <div class="flex items-center space-x-2 self-end sm:self-center">
+            <p class="text-sm font-extrabold text-slate-900 mr-2">GH₵ ${order.totalPrice.toFixed(2)}</p>
+            <button onclick="printOrderReceipt(${order.id})" class="px-2.5 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold flex items-center gap-1" title="Print Receipt">
+              <i data-lucide="printer" class="w-3.5 h-3.5"></i>
+            </button>
             <button onclick="openTrackingModal(${order.id})" class="px-3 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold flex items-center gap-1 transition-colors">
               <i data-lucide="star" class="w-3.5 h-3.5 text-amber-500"></i>
               <span>${order.rating ? 'Edit Review' : 'Rate Order'}</span>
@@ -1416,6 +1540,25 @@
       document.getElementById('modal-food-name').innerText = order.foodName;
       document.getElementById('modal-food-qty').innerText = `Quantity: ${order.quantity} • GH₵ ${order.totalPrice.toFixed(2)}`;
       document.getElementById('modal-pickup-pin').innerText = order.pickupPin;
+      
+      const notesEl = document.getElementById('modal-notes-preview');
+      if (notesEl) {
+        notesEl.innerText = order.specialNotes ? `Note: ${order.specialNotes}` : '';
+      }
+
+      // Generate Dynamic QR Code
+      const qrContainer = document.getElementById('qrcode-container');
+      if (qrContainer && window.QRCode) {
+        qrContainer.innerHTML = '';
+        new QRCode(qrContainer, {
+          text: `ATU-ORDER-${order.id}-${order.pickupPin}`,
+          width: 112,
+          height: 112,
+          colorDark: "#0F2C59",
+          colorLight: "#ffffff",
+          correctLevel: QRCode.CorrectLevel.H
+        });
+      }
 
       const stages = ['RECEIVED', 'PREPARING', 'OUT_FOR_DELIVERY', 'DELIVERED'];
       const currentIndex = stages.indexOf(order.status);
@@ -1426,17 +1569,17 @@
         const line = row.querySelector('.step-line');
 
         if (idx < currentIndex) {
-          icon.className = 'w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold transition-all step-icon bg-emerald-500 text-white';
-          icon.innerHTML = '<i data-lucide="check" class="w-4 h-4"></i>';
-          if (line) line.className = 'w-0.5 h-8 bg-emerald-500 step-line';
+          icon.className = 'w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold transition-all step-icon bg-emerald-500 text-white';
+          icon.innerHTML = '<i data-lucide="check" class="w-3.5 h-3.5"></i>';
+          if (line) line.className = 'w-0.5 h-6 bg-emerald-500 step-line';
         } else if (idx === currentIndex) {
-          icon.className = 'w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold transition-all step-icon bg-brand-600 text-white shadow-md shadow-brand-500/30';
+          icon.className = 'w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold transition-all step-icon bg-brand-600 text-white shadow-md shadow-brand-500/30';
           icon.innerHTML = (idx + 1).toString();
-          if (line) line.className = 'w-0.5 h-8 bg-slate-200 step-line';
+          if (line) line.className = 'w-0.5 h-6 bg-slate-200 step-line';
         } else {
-          icon.className = 'w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold transition-all step-icon bg-slate-100 text-slate-400';
+          icon.className = 'w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold transition-all step-icon bg-slate-100 text-slate-400';
           icon.innerHTML = (idx + 1).toString();
-          if (line) line.className = 'w-0.5 h-8 bg-slate-200 step-line';
+          if (line) line.className = 'w-0.5 h-6 bg-slate-200 step-line';
         }
       });
 
@@ -1477,6 +1620,7 @@
       order.rating = currentSelectedRating;
       order.ratingComment = comment || 'Great meal!';
 
+      playChime(987.77);
       auditLogs.unshift(`Order #${order.id} was rated ${order.rating}★ by student.`);
       renderOrderHistory();
       renderAdminDashboard();
@@ -1487,6 +1631,21 @@
     function closeTrackingModal() {
       document.getElementById('tracking-modal').classList.add('hidden');
       activeModalOrderId = null;
+    }
+
+    function printOrderReceipt(orderId) {
+      const order = orders.find(o => o.id === orderId);
+      if (!order) return;
+
+      document.getElementById('rcpt-id').innerText = `#${order.id}`;
+      document.getElementById('rcpt-vendor').innerText = order.vendorName;
+      document.getElementById('rcpt-pin').innerText = order.pickupPin;
+      document.getElementById('rcpt-dish').innerText = `${order.quantity}x ${order.foodName}`;
+      document.getElementById('rcpt-price').innerText = `GH₵ ${order.totalPrice.toFixed(2)}`;
+      document.getElementById('rcpt-total').innerText = `GH₵ ${order.totalPrice.toFixed(2)}`;
+      document.getElementById('rcpt-timestamp').innerText = order.dateStamp || order.time;
+
+      window.print();
     }
 
     function renderVendorOrders() {
@@ -1513,6 +1672,7 @@
             ${getStatusBadge(order.status)}
           </div>
           <p class="text-base font-extrabold text-slate-900">${order.quantity}x ${order.foodName}</p>
+          ${order.specialNotes ? `<p class="text-xs text-amber-700 bg-amber-50 px-2.5 py-1 rounded-lg font-bold">Kitchen Note: ${order.specialNotes}</p>` : ''}
           <div class="text-xs text-slate-600 flex items-center justify-between">
             <span>GH₵ ${order.totalPrice.toFixed(2)} • ${order.vendorName}</span>
             <span class="font-mono bg-slate-100 px-2 py-0.5 rounded font-bold">PIN: ${order.pickupPin}</span>
@@ -1550,6 +1710,7 @@
       const order = orders.find(o => o.id === orderId);
       if (order) {
         order.status = nextStatus;
+        playChime(nextStatus === 'OUT_FOR_DELIVERY' ? 880 : 523.25);
         auditLogs.unshift(`Order #${orderId} moved to ${nextStatus} by Kitchen.`);
         renderActiveOrders();
         renderOrderHistory();
@@ -1568,8 +1729,10 @@
       if (matched) {
         advanceOrderStatus(matched.id, 'DELIVERED');
         input.value = '';
+        playChime(1046.5);
         showToast(`PIN Verified! Order #${matched.id} (${matched.foodName}) marked Delivered.`, 'success');
       } else {
+        playChime(250, 'sawtooth');
         showToast('Invalid PIN or order already collected.', 'error');
       }
     }
@@ -1836,6 +1999,7 @@
           studentBalance = student.balance;
           updateWalletPill();
         }
+        playChime(600);
         auditLogs.unshift(`Admin credited GH₵ ${amount.toFixed(2)} to ${student.name}'s wallet.`);
         renderAdminDashboard();
         showToast(`Credited GH₵ ${amount.toFixed(2)} to ${student.name}!`, 'success');
@@ -1846,6 +2010,7 @@
       registeredStudents.forEach(s => s.balance += 20.00);
       studentBalance = registeredStudents[0].balance;
       updateWalletPill();
+      playChime(700);
       auditLogs.unshift('Admin credited GH₵ 20.00 Campus Bonus to all registered students.');
       renderAdminDashboard();
       showToast('GH₵ 20.00 Campus Bonus credited to all students!', 'success');

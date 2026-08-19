@@ -10,6 +10,8 @@
   <!-- Lucide Icons -->
   <script src="https://unpkg.com/lucide@latest"></script>
   <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.js"></script>
+  <!-- QRCode.js for Standout Digital QR Code Generation -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
   <!-- Google Fonts: Plus Jakarta Sans -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -62,6 +64,11 @@
       0%, 100% { opacity: 1; transform: scale(1); }
       50% { opacity: .7; transform: scale(1.05); }
     }
+    @media print {
+      body * { visibility: hidden; }
+      #printable-receipt, #printable-receipt * { visibility: visible; }
+      #printable-receipt { position: absolute; left: 0; top: 0; width: 100%; }
+    }
   </style>
 </head>
 <body class="bg-slate-50 text-slate-900 min-h-screen flex flex-col antialiased selection:bg-brand-500 selection:text-white">
@@ -105,6 +112,11 @@
             <i data-lucide="shield-check" class="w-3.5 h-3.5"></i> Admin Hub
           </button>
         </div>
+
+        <!-- Audio Alert Toggle Button -->
+        <button onclick="toggleAudioChime()" id="audio-toggle-btn" class="w-9 h-9 rounded-xl bg-slate-100 border border-slate-200 hover:bg-slate-200 flex items-center justify-center text-slate-700 transition-colors" title="Toggle Kitchen Audio Alerts">
+          <i data-lucide="volume-2" id="audio-icon" class="w-4 h-4 text-emerald-600"></i>
+        </button>
 
         <!-- Student Dynamic Wallet Pill (Red Pulsating warning when < GH₵ 10.00) -->
         <div id="user-wallet-pill" onclick="showTopUpModal()" class="cursor-pointer transition-all duration-300 flex items-center space-x-2 bg-brand-50 border border-brand-200 px-3 py-1.5 rounded-xl text-xs font-bold text-brand-700 hover:bg-brand-100">
@@ -150,14 +162,16 @@
         <div class="relative z-10 max-w-2xl space-y-3">
           <div class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-white/10 backdrop-blur-md text-amber-300 text-xs font-semibold">
             <i data-lucide="sparkles" class="w-3.5 h-3.5"></i>
-            <span>Smart Cafeteria Pre-Ordering System</span>
+            <span>Smart Cafeteria Pre-Ordering & QR Pickup System</span>
           </div>
           <h2 class="text-2xl sm:text-3xl font-extrabold tracking-tight">ATU Cafeteria Multi-Vendor Hub</h2>
           <p class="text-slate-300 text-xs sm:text-sm leading-relaxed">
-            Order fresh meals right from verified campus vendors, skip long lunchtime counter lines, and pick up your food using your secure 4-digit PIN.
+            Order fresh meals right from verified campus vendors, skip long lunchtime counter lines, and pick up your food instantly using your secure 4-digit PIN or digital QR Pass.
           </p>
           <div class="flex items-center gap-3 pt-1 text-xs text-amber-300 font-bold">
             <span class="flex items-center gap-1"><i data-lucide="clock" class="w-3.5 h-3.5"></i> Avg Prep: 8-12 Mins</span>
+            <span>•</span>
+            <span class="flex items-center gap-1"><i data-lucide="qr-code" class="w-3.5 h-3.5"></i> Instant QR Fast-Pass</span>
             <span>•</span>
             <span class="flex items-center gap-1"><i data-lucide="shield-check" class="w-3.5 h-3.5"></i> Certified Vendors</span>
           </div>
@@ -228,7 +242,7 @@
       <!-- Food Menu Grid -->
       <div id="food-menu-grid" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5"></div>
 
-      <!-- 📜 ORDER HISTORY SECTION (Completed Orders with Date Stamps & Ratings) -->
+      <!-- 📜 ORDER HISTORY SECTION (Completed Orders with Date Stamps, Receipts & Ratings) -->
       <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm space-y-4">
         <div class="flex items-center justify-between">
           <div class="flex items-center gap-2">
@@ -237,7 +251,7 @@
             </div>
             <div>
               <h3 class="text-base font-bold text-slate-900">Order History & Receipts</h3>
-              <p class="text-xs text-slate-500">Completed cafeteria transactions with pickup stamps</p>
+              <p class="text-xs text-slate-500">Completed cafeteria transactions with pickup stamps & printable receipts</p>
             </div>
           </div>
           <span id="completed-count-badge" class="text-xs font-bold bg-emerald-100 text-emerald-800 px-3 py-0.5 rounded-full">1 Completed</span>
@@ -247,6 +261,7 @@
       </div>
     </section>
 
+    <!-- ========================================================================= -->
     <!-- ========================================================================= -->
     <!-- 2. VENDOR KITCHEN VIEW                                                    -->
     <!-- ========================================================================= -->
@@ -258,10 +273,10 @@
           <div>
             <div class="flex items-center gap-2">
               <span class="w-3 h-3 rounded-full bg-emerald-500 badge-pulse"></span>
-              <h2 class="text-xl font-extrabold text-slate-900" id="current-kitchen-name">Akwaaba Kitchen Order Dispatch</h2>
-              <span class="text-xs font-black bg-emerald-100 text-emerald-800 px-2.5 py-0.5 rounded-full">ONLINE</span>
+              <h2 class="text-xl font-extrabold text-slate-900" id="current-kitchen-name">Akwaaba Kitchen</h2>
+              <span class="text-xs font-black bg-emerald-100 text-emerald-800 px-2.5 py-0.5 rounded-full" id="vendor-status-badge">ONLINE • STALL #01</span>
             </div>
-            <p class="text-xs text-slate-500 mt-1">Advance ticket status, monitor ingredient demand, and verify 4-digit pickup PINs for meal release.</p>
+            <p class="text-xs text-slate-500 mt-1">Vendor Kitchen Portal: Manage food dishes, kitchen staff/workers, stall profile, and live counter orders.</p>
           </div>
 
           <!-- Quick PIN Verification Bar -->
@@ -279,22 +294,38 @@
             <p class="text-xl font-extrabold text-slate-900 mt-0.5" id="v-metric-active">1</p>
           </div>
           <div class="bg-slate-50 p-3 rounded-xl border border-slate-100">
-            <p class="text-[11px] font-semibold text-slate-500">Completed Today</p>
-            <p class="text-xl font-extrabold text-emerald-600 mt-0.5" id="v-metric-completed">14</p>
+            <p class="text-[11px] font-semibold text-slate-500">Menu Dishes</p>
+            <p class="text-xl font-extrabold text-brand-600 mt-0.5" id="v-metric-dishes">3 Items</p>
           </div>
           <div class="bg-slate-50 p-3 rounded-xl border border-slate-100">
-            <p class="text-[11px] font-semibold text-slate-500">Stall Location</p>
-            <p class="text-xl font-extrabold text-brand-600 mt-0.5" id="v-metric-location">Stall #01</p>
+            <p class="text-[11px] font-semibold text-slate-500">Kitchen Workers</p>
+            <p class="text-xl font-extrabold text-blue-600 mt-0.5" id="v-metric-workers">3 Staff</p>
           </div>
           <div class="bg-slate-50 p-3 rounded-xl border border-slate-100">
             <p class="text-[11px] font-semibold text-slate-500">Kitchen Rating</p>
-            <p class="text-xl font-extrabold text-amber-500 mt-0.5">4.9 ★</p>
+            <p class="text-xl font-extrabold text-amber-500 mt-0.5" id="v-metric-rating">4.9 ★</p>
           </div>
+        </div>
+
+        <!-- Vendor Sub-Navigation Tabs: 1. Live Orders, 2. Manage Menu, 3. Workers, 4. Profile -->
+        <div class="flex items-center space-x-2 pt-2 border-t border-slate-100 overflow-x-auto pb-1 scrollbar-none">
+          <button onclick="switchVendorTab('orders')" id="vtab-orders" class="px-4 py-2 rounded-xl text-xs font-bold bg-brand-600 text-white shadow-sm flex items-center gap-1.5 whitespace-nowrap">
+            <i data-lucide="clipboard-list" class="w-3.5 h-3.5"></i> Live Orders Queue
+          </button>
+          <button onclick="switchVendorTab('menu')" id="vtab-menu" class="px-4 py-2 rounded-xl text-xs font-bold bg-slate-100 text-slate-700 hover:bg-slate-200 flex items-center gap-1.5 whitespace-nowrap">
+            <i data-lucide="utensils" class="w-3.5 h-3.5"></i> Food Menu Dishes
+          </button>
+          <button onclick="switchVendorTab('workers')" id="vtab-workers" class="px-4 py-2 rounded-xl text-xs font-bold bg-slate-100 text-slate-700 hover:bg-slate-200 flex items-center gap-1.5 whitespace-nowrap">
+            <i data-lucide="users" class="w-3.5 h-3.5"></i> Kitchen Workers / Staff
+          </button>
+          <button onclick="switchVendorTab('profile')" id="vtab-profile" class="px-4 py-2 rounded-xl text-xs font-bold bg-slate-100 text-slate-700 hover:bg-slate-200 flex items-center gap-1.5 whitespace-nowrap">
+            <i data-lucide="store" class="w-3.5 h-3.5"></i> Stall Profile Settings
+          </button>
         </div>
       </div>
 
-      <!-- Live Order Tickets Queue -->
-      <div class="space-y-4">
+      <!-- VENDOR SUBSECTION 1: Live Order Tickets Queue -->
+      <div id="vendor-sec-orders" class="space-y-4">
         <div class="flex items-center justify-between">
           <h3 class="text-base font-bold text-slate-900 flex items-center gap-2">
             <i data-lucide="clipboard-list" class="w-4 h-4 text-brand-600"></i>
@@ -305,6 +336,126 @@
           </button>
         </div>
         <div id="vendor-orders-list" class="grid grid-cols-1 md:grid-cols-2 gap-4"></div>
+      </div>
+
+      <!-- VENDOR SUBSECTION 2: Vendor Menu Management (Done by Vendor) -->
+      <div id="vendor-sec-menu" class="space-y-4 hidden">
+        <div class="bg-white p-5 rounded-3xl border border-slate-200 shadow-sm space-y-4">
+          <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <div>
+              <h3 class="text-base font-bold text-slate-900 flex items-center gap-2">
+                <i data-lucide="utensils" class="w-4 h-4 text-brand-600"></i>
+                My Kitchen Food Menu
+              </h3>
+              <p class="text-xs text-slate-500">Add, edit, delete, or toggle instant stock availability for your stall's dishes.</p>
+            </div>
+            <button onclick="openVendorDishModal()" class="px-4 py-2 rounded-xl bg-brand-600 hover:bg-brand-700 text-white text-xs font-bold shadow-sm flex items-center gap-1.5 self-start sm:self-auto">
+              <i data-lucide="plus-circle" class="w-4 h-4"></i> Add New Dish
+            </button>
+          </div>
+
+          <div class="overflow-x-auto">
+            <table class="w-full text-left text-xs">
+              <thead class="bg-slate-50 text-slate-500 border-b border-slate-200">
+                <tr>
+                  <th class="p-3">Dish Name</th>
+                  <th class="p-3">Category</th>
+                  <th class="p-3">Price (GH₵)</th>
+                  <th class="p-3">Calories</th>
+                  <th class="p-3">Stock Status</th>
+                  <th class="p-3 text-right">Actions</th>
+                </tr>
+              </thead>
+              <tbody id="vendor-menu-table-body" class="divide-y divide-slate-100 text-slate-700 font-medium"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- VENDOR SUBSECTION 3: Vendor Workers / Staff Management (Done by Vendor) -->
+      <div id="vendor-sec-workers" class="space-y-4 hidden">
+        <div class="bg-white p-5 rounded-3xl border border-slate-200 shadow-sm space-y-4">
+          <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <div>
+              <h3 class="text-base font-bold text-slate-900 flex items-center gap-2">
+                <i data-lucide="users" class="w-4 h-4 text-brand-600"></i>
+                Kitchen Workers & Counter Staff
+              </h3>
+              <p class="text-xs text-slate-500">Add, update, or remove your chefs, cashiers, and kitchen assistants.</p>
+            </div>
+            <button onclick="openVendorWorkerModal()" class="px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold shadow-sm flex items-center gap-1.5 self-start sm:self-auto">
+              <i data-lucide="user-plus" class="w-4 h-4"></i> Add Kitchen Worker
+            </button>
+          </div>
+
+          <div class="overflow-x-auto">
+            <table class="w-full text-left text-xs">
+              <thead class="bg-slate-50 text-slate-500 border-b border-slate-200">
+                <tr>
+                  <th class="p-3">Staff Name</th>
+                  <th class="p-3">Role / Designation</th>
+                  <th class="p-3">Assigned Shift</th>
+                  <th class="p-3">Contact Phone</th>
+                  <th class="p-3">Status</th>
+                  <th class="p-3 text-right">Actions</th>
+                </tr>
+              </thead>
+              <tbody id="vendor-workers-table-body" class="divide-y divide-slate-100 text-slate-700 font-medium"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- VENDOR SUBSECTION 4: Vendor Stall Profile Management (Done by Vendor) -->
+      <div id="vendor-sec-profile" class="space-y-4 hidden">
+        <div class="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm space-y-5">
+          <div class="flex items-center justify-between border-b border-slate-100 pb-3">
+            <div>
+              <h3 class="text-base font-bold text-slate-900 flex items-center gap-2">
+                <i data-lucide="store" class="w-4 h-4 text-brand-600"></i>
+                Vendor Stall & Kitchen Profile
+              </h3>
+              <p class="text-xs text-slate-500">Update your public brand name, location, contacts, and opening hours.</p>
+            </div>
+            <span class="text-xs font-bold text-brand-600 bg-brand-50 px-3 py-1 rounded-full">Vendor Self-Service</span>
+          </div>
+
+          <form id="vendor-profile-form" onsubmit="saveVendorProfile(event)" class="space-y-4 text-xs font-semibold text-slate-700">
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div>
+                <label class="block mb-1">Stall / Kitchen Name</label>
+                <input type="text" id="vprofile-name" class="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-brand-500" />
+              </div>
+              <div>
+                <label class="block mb-1">Campus Location / Stall No.</label>
+                <input type="text" id="vprofile-location" class="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-brand-500" />
+              </div>
+            </div>
+
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div>
+                <label class="block mb-1">Cuisine Specialty</label>
+                <input type="text" id="vprofile-specialty" class="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-brand-500" />
+              </div>
+              <div>
+                <label class="block mb-1">Contact Phone / MoMo Dispatch</label>
+                <input type="text" id="vprofile-phone" class="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-brand-500" />
+              </div>
+            </div>
+
+            <div>
+              <label class="block mb-1">Kitchen Bio / Student Description</label>
+              <textarea id="vprofile-desc" rows="3" class="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-brand-500"></textarea>
+            </div>
+
+            <div class="flex items-center justify-end space-x-3 pt-2">
+              <button type="button" onclick="loadVendorProfileForm()" class="px-4 py-2.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold">Reset</button>
+              <button type="submit" class="px-6 py-2.5 rounded-xl bg-brand-600 hover:bg-brand-700 text-white text-xs font-bold shadow-md shadow-brand-500/20 flex items-center gap-1.5">
+                <i data-lucide="save" class="w-4 h-4"></i> Save Profile Changes
+              </button>
+            </div>
+          </form>
+        </div>
       </div>
     </section>
 
@@ -319,17 +470,14 @@
           <div>
             <h2 class="text-xl font-extrabold text-slate-900 flex items-center gap-2">
               <i data-lucide="shield-check" class="w-6 h-6 text-brand-600"></i>
-              ATU Cafeteria Administration Hub
+              ATU Cafeteria Administration & Oversight Hub
             </h2>
-            <p class="text-xs text-slate-500 mt-1">Full system governance: Vendor registration & management, Menu CRUD, financial telemetry, and student wallets.</p>
+            <p class="text-xs text-slate-500 mt-1">Admin registers vendors and maintains full live oversight over menus, kitchen workers, profile updates, and audit trails.</p>
           </div>
 
           <div class="flex flex-wrap items-center gap-2">
-            <button onclick="openAddVendorModal()" class="px-3.5 py-2 rounded-xl bg-atu-navy hover:bg-slate-800 text-white text-xs font-bold shadow-xs flex items-center gap-1.5">
-              <i data-lucide="store" class="w-4 h-4 text-amber-400"></i> Register Vendor
-            </button>
-            <button onclick="openAddMenuModal()" class="px-3.5 py-2 rounded-xl bg-brand-600 hover:bg-brand-700 text-white text-xs font-bold shadow-xs flex items-center gap-1.5">
-              <i data-lucide="plus-circle" class="w-4 h-4"></i> Add Food Item
+            <button onclick="openAddVendorModal()" class="px-4 py-2 rounded-xl bg-brand-600 hover:bg-brand-700 text-white text-xs font-bold shadow-xs flex items-center gap-1.5">
+              <i data-lucide="store" class="w-4 h-4 text-amber-300"></i> Register New Vendor
             </button>
             <button onclick="openBroadcastModal()" class="px-3.5 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-800 text-xs font-bold flex items-center gap-1.5">
               <i data-lucide="megaphone" class="w-4 h-4 text-brand-600"></i> Broadcast Notice
@@ -366,21 +514,21 @@
               <i data-lucide="store" class="w-4 h-4 text-amber-500"></i>
             </div>
             <p class="text-2xl font-extrabold text-amber-500 mt-1" id="kpi-vendors-count">3</p>
-            <p class="text-[11px] text-slate-500 mt-1">Approved Cafeteria Stalls</p>
+            <p class="text-[11px] text-slate-500 mt-1">Authorized Kitchen Stalls</p>
           </div>
 
           <div class="bg-slate-50 p-4 rounded-2xl border border-slate-200">
             <div class="flex items-center justify-between text-slate-500">
-              <p class="text-xs font-semibold">Avg Preparation</p>
-              <i data-lucide="timer" class="w-4 h-4 text-emerald-600"></i>
+              <p class="text-xs font-semibold">Total Kitchen Workers</p>
+              <i data-lucide="users" class="w-4 h-4 text-blue-600"></i>
             </div>
-            <p class="text-2xl font-extrabold text-slate-900 mt-1">9.5 min</p>
-            <p class="text-[11px] text-emerald-600 font-semibold mt-1">Fast Counter Pickup</p>
+            <p class="text-2xl font-extrabold text-slate-900 mt-1" id="kpi-workers-count">5</p>
+            <p class="text-[11px] text-blue-600 font-semibold mt-1">Across all stalls</p>
           </div>
         </div>
       </div>
 
-      <!-- Admin Tab Switcher: 1. Vendors, 2. Menu Management, 3. Student Accounts, 4. Audit Logs -->
+      <!-- Admin Tab Switcher: 1. Vendors, 2. Menu Oversight, 3. Workers Oversight, 4. Students, 5. Audit Logs -->
       <div class="bg-white rounded-3xl border border-slate-200 p-5 shadow-sm space-y-4">
         
         <div class="flex items-center justify-between border-b border-slate-100 pb-3">
@@ -389,13 +537,16 @@
               <i data-lucide="store" class="w-3.5 h-3.5"></i> Manage Vendors
             </button>
             <button onclick="switchAdminTab('menu')" id="atab-menu" class="px-4 py-2 rounded-xl text-xs font-bold bg-slate-100 text-slate-700 hover:bg-slate-200 flex items-center gap-1.5 whitespace-nowrap">
-              <i data-lucide="utensils" class="w-3.5 h-3.5"></i> Menu Dishes
+              <i data-lucide="utensils" class="w-3.5 h-3.5"></i> Menu Oversight
+            </button>
+            <button onclick="switchAdminTab('workers')" id="atab-workers" class="px-4 py-2 rounded-xl text-xs font-bold bg-slate-100 text-slate-700 hover:bg-slate-200 flex items-center gap-1.5 whitespace-nowrap">
+              <i data-lucide="users" class="w-3.5 h-3.5"></i> Vendor Workers
             </button>
             <button onclick="switchAdminTab('students')" id="atab-students" class="px-4 py-2 rounded-xl text-xs font-bold bg-slate-100 text-slate-700 hover:bg-slate-200 flex items-center gap-1.5 whitespace-nowrap">
-              <i data-lucide="users" class="w-3.5 h-3.5"></i> Student Wallets
+              <i data-lucide="wallet" class="w-3.5 h-3.5"></i> Student Wallets
             </button>
             <button onclick="switchAdminTab('logs')" id="atab-logs" class="px-4 py-2 rounded-xl text-xs font-bold bg-slate-100 text-slate-700 hover:bg-slate-200 flex items-center gap-1.5 whitespace-nowrap">
-              <i data-lucide="history" class="w-3.5 h-3.5"></i> System Logs
+              <i data-lucide="history" class="w-3.5 h-3.5"></i> Live Audit Feed
             </button>
           </div>
         </div>
@@ -405,7 +556,7 @@
           <div class="flex items-center justify-between">
             <div>
               <h4 class="text-xs font-bold text-slate-700 uppercase tracking-wider">Registered Campus Vendors & Kitchen Stalls</h4>
-              <p class="text-[11px] text-slate-400">Admins can approve, open/close stalls, or onboard new food vendors.</p>
+              <p class="text-[11px] text-slate-400">Admin adds & authorizes vendors. Vendors subsequently manage their own food menus and workers.</p>
             </div>
             <button onclick="openAddVendorModal()" class="px-3.5 py-1.5 rounded-xl bg-brand-50 hover:bg-brand-100 text-brand-700 text-xs font-bold flex items-center gap-1">
               <i data-lucide="plus" class="w-3.5 h-3.5"></i> Register New Vendor
@@ -418,7 +569,7 @@
                 <tr>
                   <th class="p-3">Vendor Name</th>
                   <th class="p-3">Location / Stall</th>
-                  <th class="p-3">Cuisine / Category</th>
+                  <th class="p-3">Cuisine Specialty</th>
                   <th class="p-3">Contact</th>
                   <th class="p-3">Rating</th>
                   <th class="p-3">Status</th>
@@ -430,11 +581,14 @@
           </div>
         </div>
 
-        <!-- 2. Admin Menu Management Table -->
+        <!-- 2. Admin Menu Oversight Table (Read-Only Transparency) -->
         <div id="admin-sec-menu" class="space-y-4 hidden">
           <div class="flex items-center justify-between">
-            <h4 class="text-xs font-bold text-slate-700 uppercase tracking-wider">Active Dishes in ATU Cafeteria</h4>
-            <span class="text-xs text-slate-500 font-medium" id="admin-menu-count">5 Items</span>
+            <div>
+              <h4 class="text-xs font-bold text-slate-700 uppercase tracking-wider">Live Campus Menu Oversight (Managed by Vendors)</h4>
+              <p class="text-[11px] text-slate-400">Dishes and prices are updated directly by respective vendor stalls. Real-time audit visibility for Admin.</p>
+            </div>
+            <span class="text-xs text-brand-600 font-bold bg-brand-50 px-3 py-1 rounded-full" id="admin-menu-count">5 Items</span>
           </div>
 
           <div class="overflow-x-auto">
@@ -442,15 +596,41 @@
               <thead class="bg-slate-50 text-slate-500 border-b border-slate-200">
                 <tr>
                   <th class="p-3">Dish Name</th>
-                  <th class="p-3">Vendor</th>
+                  <th class="p-3">Vendor Stall</th>
                   <th class="p-3">Category</th>
-                  <th class="p-3">Price (GHS)</th>
+                  <th class="p-3">Price (GH₵)</th>
                   <th class="p-3">Calories</th>
-                  <th class="p-3">Status</th>
-                  <th class="p-3 text-right">Actions</th>
+                  <th class="p-3">Counter Stock</th>
                 </tr>
               </thead>
               <tbody id="admin-menu-table-body" class="divide-y divide-slate-100 text-slate-700 font-medium"></tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- 3. Admin Vendor Workers Oversight Table -->
+        <div id="admin-sec-workers" class="space-y-4 hidden">
+          <div class="flex items-center justify-between">
+            <div>
+              <h4 class="text-xs font-bold text-slate-700 uppercase tracking-wider">Campus Kitchen Workers Oversight</h4>
+              <p class="text-[11px] text-slate-400">Live roster of kitchen workers & staff registered by vendors across all cafeteria stalls.</p>
+            </div>
+            <span class="text-xs text-blue-600 font-bold bg-blue-50 px-3 py-1 rounded-full" id="admin-workers-count">5 Workers</span>
+          </div>
+
+          <div class="overflow-x-auto">
+            <table class="w-full text-left text-xs">
+              <thead class="bg-slate-50 text-slate-500 border-b border-slate-200">
+                <tr>
+                  <th class="p-3">Worker Name</th>
+                  <th class="p-3">Vendor Stall</th>
+                  <th class="p-3">Designation / Role</th>
+                  <th class="p-3">Assigned Shift</th>
+                  <th class="p-3">Contact</th>
+                  <th class="p-3">Shift Status</th>
+                </tr>
+              </thead>
+              <tbody id="admin-workers-table-body" class="divide-y divide-slate-100 text-slate-700 font-medium"></tbody>
             </table>
           </div>
         </div>
@@ -490,21 +670,27 @@
 
   </main>
 
-  <!-- Sticky Bottom Cart Bar (Student Mode) -->
+  <!-- Sticky Bottom Cart Bar (Student Mode with Dietary Notes) -->
   <div id="sticky-cart-bar" class="sticky bottom-0 z-30 bg-white/95 backdrop-blur-md border-t border-slate-200 p-4 shadow-lg hidden">
-    <div class="max-w-7xl mx-auto flex items-center justify-between">
+    <div class="max-w-7xl mx-auto flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
+      
       <div class="flex items-center space-x-3">
-        <div class="w-10 h-10 rounded-xl bg-brand-100 text-brand-700 flex items-center justify-center font-bold">
+        <div class="w-10 h-10 rounded-xl bg-brand-100 text-brand-700 flex items-center justify-center font-bold shrink-0">
           <i data-lucide="shopping-bag" class="w-5 h-5"></i>
         </div>
         <div>
-          <p class="text-xs text-slate-500 font-semibold"><span id="cart-item-count">0</span> items in tray</p>
+          <p class="text-xs text-slate-500 font-semibold"><span id="cart-item-count">0</span> items in meal tray</p>
           <p class="text-lg font-extrabold text-brand-600">GH₵ <span id="cart-total-display">0.00</span></p>
         </div>
       </div>
 
-      <div class="flex items-center space-x-2">
-        <button onclick="clearCart()" class="px-3 py-2 text-xs font-bold text-slate-600 hover:text-red-600 transition-colors">Clear Tray</button>
+      <!-- Special Dietary / Preparation Instructions -->
+      <div class="flex-1 max-w-md mx-0 sm:mx-4">
+        <input type="text" id="cart-special-notes" placeholder="Special notes: e.g. Less pepper, extra shito, takeaway pack..." class="w-full text-xs font-semibold bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 outline-none focus:ring-2 focus:ring-brand-500" />
+      </div>
+
+      <div class="flex items-center space-x-2 shrink-0 justify-end">
+        <button onclick="clearCart()" class="px-3 py-2 text-xs font-bold text-slate-600 hover:text-red-600 transition-colors">Clear</button>
         <button onclick="checkoutCart()" class="px-5 py-2.5 rounded-xl bg-brand-600 hover:bg-brand-700 text-white text-xs font-extrabold shadow-md shadow-brand-500/25 flex items-center gap-1.5 transition-transform active:scale-95">
           <span>Place Pre-Order</span>
           <i data-lucide="arrow-right" class="w-4 h-4"></i>
@@ -514,7 +700,7 @@
   </div>
 
   <!-- ========================================================================= -->
-  <!-- MODALS                                                                    -->
+  <!-- MODALS & POPUPS                                                           -->
   <!-- ========================================================================= -->
 
   <!-- 1. 🏪 Add New Vendor Modal (Admin) -->
@@ -570,133 +756,242 @@
     </div>
   </div>
 
-  <!-- 2. Add New Food Item Modal (Admin) -->
-  <div id="add-menu-modal" class="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm hidden flex items-center justify-center p-4">
+  <!-- 2. Vendor Food Dish Modal (Vendor Add / Edit Menu Items) -->
+  <div id="vendor-dish-modal" class="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm hidden flex items-center justify-center p-4">
     <div class="bg-white rounded-3xl max-w-md w-full p-6 shadow-2xl space-y-4">
       <div class="flex items-center justify-between border-b border-slate-100 pb-3">
-        <h3 class="text-base font-bold text-slate-900">Add New Dish to Menu</h3>
-        <button onclick="closeAddMenuModal()" class="w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center text-slate-500 hover:bg-slate-200">
+        <div class="flex items-center gap-2">
+          <div class="w-8 h-8 rounded-xl bg-brand-100 text-brand-700 flex items-center justify-center font-bold">
+            <i data-lucide="utensils" class="w-4 h-4"></i>
+          </div>
+          <div>
+            <h3 class="text-base font-bold text-slate-900" id="dish-modal-title">Add New Food Dish</h3>
+            <p class="text-[11px] text-slate-500">Dish published directly to your kitchen menu</p>
+          </div>
+        </div>
+        <button onclick="closeVendorDishModal()" class="w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center text-slate-500 hover:bg-slate-200">
           <i data-lucide="x" class="w-4 h-4"></i>
         </button>
       </div>
 
+      <input type="hidden" id="editing-dish-id" value="" />
+
       <div class="space-y-3 text-xs font-semibold text-slate-700">
         <div>
-          <label class="block mb-1">Select Vendor</label>
-          <select id="new-item-vendor-select" class="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-brand-500"></select>
-        </div>
-
-        <div>
           <label class="block mb-1">Dish Name</label>
-          <input type="text" id="new-item-name" placeholder="e.g. Banku with Tilapia & Pepper" class="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-brand-500" />
+          <input type="text" id="vdish-name" placeholder="e.g. Special Assorted Jollof with Fried Chicken" class="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-brand-500" />
         </div>
 
         <div class="grid grid-cols-2 gap-3">
           <div>
             <label class="block mb-1">Price (GH₵)</label>
-            <input type="number" id="new-item-price" placeholder="40.00" step="0.5" class="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-brand-500" />
+            <input type="number" id="vdish-price" placeholder="38.00" step="0.5" class="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-brand-500" />
           </div>
           <div>
             <label class="block mb-1">Calories (kcal)</label>
-            <input type="number" id="new-item-calories" placeholder="520" class="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-brand-500" />
+            <input type="number" id="vdish-calories" placeholder="520" class="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-brand-500" />
+          </div>
+        </div>
+
+        <div class="grid grid-cols-2 gap-3">
+          <div>
+            <label class="block mb-1">Category</label>
+            <select id="vdish-category" class="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-brand-500">
+              <option value="Main Dish">Main Dish</option>
+              <option value="Traditional">Traditional</option>
+              <option value="Fast Food">Fast Food</option>
+              <option value="Drinks">Drinks</option>
+              <option value="Snacks & Pastries">Snacks & Pastries</option>
+            </select>
+          </div>
+          <div>
+            <label class="block mb-1">Stock Availability</label>
+            <select id="vdish-instock" class="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-brand-500">
+              <option value="true">In Stock (Available)</option>
+              <option value="false">Sold Out</option>
+            </select>
           </div>
         </div>
 
         <div>
-          <label class="block mb-1">Category</label>
-          <select id="new-item-category" class="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-brand-500">
-            <option value="Main Dish">Main Dish</option>
-            <option value="Traditional">Traditional</option>
-            <option value="Drinks">Drinks</option>
-            <option value="Snacks">Snacks</option>
-          </select>
+          <label class="block mb-1">Ingredients & Description</label>
+          <textarea id="vdish-desc" rows="2" placeholder="Freshly prepared spiced rice served with shito, coleslaw, and grilled chicken..." class="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-brand-500"></textarea>
         </div>
 
         <div>
-          <label class="block mb-1">Description</label>
-          <textarea id="new-item-desc" rows="2" placeholder="Freshly steamed fermented corn & cassava dough served with grilled tilapia..." class="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-brand-500"></textarea>
-        </div>
-
-        <div>
-          <label class="block mb-1">Image URL</label>
-          <input type="text" id="new-item-image" placeholder="https://..." value="https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=400&q=80" class="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-brand-500" />
+          <label class="block mb-1">Photo Image URL</label>
+          <input type="text" id="vdish-image" placeholder="https://..." value="https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=400&q=80" class="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-brand-500" />
         </div>
       </div>
 
       <div class="flex items-center space-x-2 pt-2">
-        <button onclick="closeAddMenuModal()" class="flex-1 py-2.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-800 text-xs font-bold">Cancel</button>
-        <button onclick="saveNewMenuItem()" class="flex-1 py-2.5 rounded-xl bg-brand-600 hover:bg-brand-700 text-white text-xs font-bold shadow-xs">Publish Item</button>
+        <button onclick="closeVendorDishModal()" class="flex-1 py-2.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-800 text-xs font-bold">Cancel</button>
+        <button onclick="saveVendorDish()" class="flex-1 py-2.5 rounded-xl bg-brand-600 hover:bg-brand-700 text-white text-xs font-bold shadow-xs flex items-center justify-center gap-1">
+          <i data-lucide="check" class="w-3.5 h-3.5"></i>
+          <span id="dish-modal-btn-text">Save Food Item</span>
+        </button>
       </div>
     </div>
   </div>
 
-  <!-- 3. Live Stepper & Star Rating Modal -->
+  <!-- 2B. Vendor Kitchen Worker / Staff Modal (Vendor Add / Edit Worker) -->
+  <div id="vendor-worker-modal" class="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm hidden flex items-center justify-center p-4">
+    <div class="bg-white rounded-3xl max-w-md w-full p-6 shadow-2xl space-y-4">
+      <div class="flex items-center justify-between border-b border-slate-100 pb-3">
+        <div class="flex items-center gap-2">
+          <div class="w-8 h-8 rounded-xl bg-blue-100 text-blue-700 flex items-center justify-center font-bold">
+            <i data-lucide="user-plus" class="w-4 h-4"></i>
+          </div>
+          <div>
+            <h3 class="text-base font-bold text-slate-900" id="worker-modal-title">Add Kitchen Worker</h3>
+            <p class="text-[11px] text-slate-500">Manage kitchen & counter staff members</p>
+          </div>
+        </div>
+        <button onclick="closeVendorWorkerModal()" class="w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center text-slate-500 hover:bg-slate-200">
+          <i data-lucide="x" class="w-4 h-4"></i>
+        </button>
+      </div>
+
+      <input type="hidden" id="editing-worker-id" value="" />
+
+      <div class="space-y-3 text-xs font-semibold text-slate-700">
+        <div>
+          <label class="block mb-1">Staff Member Full Name</label>
+          <input type="text" id="vworker-name" placeholder="e.g. Kwame Mensah" class="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-brand-500" />
+        </div>
+
+        <div class="grid grid-cols-2 gap-3">
+          <div>
+            <label class="block mb-1">Role / Designation</label>
+            <select id="vworker-role" class="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-brand-500">
+              <option value="Head Chef">Head Chef</option>
+              <option value="Assistant Cook">Assistant Cook</option>
+              <option value="Cashier & Dispatch">Cashier & Dispatch</option>
+              <option value="Kitchen Assistant">Kitchen Assistant</option>
+              <option value="Pastry Baker">Pastry Baker</option>
+              <option value="Grill Specialist">Grill Specialist</option>
+            </select>
+          </div>
+          <div>
+            <label class="block mb-1">Assigned Shift</label>
+            <select id="vworker-shift" class="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-brand-500">
+              <option value="Morning (06:00 - 14:00)">Morning (06:00 - 14:00)</option>
+              <option value="Afternoon (12:00 - 20:00)">Afternoon (12:00 - 20:00)</option>
+              <option value="Full Day (07:00 - 17:00)">Full Day (07:00 - 17:00)</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="grid grid-cols-2 gap-3">
+          <div>
+            <label class="block mb-1">Contact Phone</label>
+            <input type="text" id="vworker-phone" placeholder="+233 24 000 0000" class="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-brand-500" />
+          </div>
+          <div>
+            <label class="block mb-1">Status</label>
+            <select id="vworker-status" class="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-brand-500">
+              <option value="ACTIVE">Active (On Duty)</option>
+              <option value="OFF_DUTY">Off Duty</option>
+            </select>
+          </div>
+        </div>
+      </div>
+
+      <div class="flex items-center space-x-2 pt-2">
+        <button onclick="closeVendorWorkerModal()" class="flex-1 py-2.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-800 text-xs font-bold">Cancel</button>
+        <button onclick="saveVendorWorker()" class="flex-1 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold shadow-xs flex items-center justify-center gap-1">
+          <i data-lucide="check" class="w-3.5 h-3.5"></i>
+          <span id="worker-modal-btn-text">Save Staff Member</span>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 3. Live Stepper, QR Pass & Star Rating Modal -->
   <div id="tracking-modal" class="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm hidden flex items-center justify-center p-4">
-    <div class="bg-white rounded-3xl max-w-md w-full p-6 shadow-2xl space-y-5 max-h-[90vh] overflow-y-auto">
+    <div class="bg-white rounded-3xl max-w-md w-full p-6 shadow-2xl space-y-4 max-h-[92vh] overflow-y-auto">
+      
       <div class="flex items-center justify-between border-b border-slate-100 pb-3">
         <div>
           <h3 class="text-lg font-bold text-slate-900" id="modal-order-title">Order #1042</h3>
           <p class="text-xs text-slate-500 font-medium" id="modal-vendor-label">Akwaaba Kitchen • Counter Pickup</p>
         </div>
-        <button onclick="closeTrackingModal()" class="w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center text-slate-500 hover:bg-slate-200">
-          <i data-lucide="x" class="w-4 h-4"></i>
-        </button>
+        <div class="flex items-center space-x-1.5">
+          <button onclick="printOrderReceipt(activeModalOrderId)" class="w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center text-slate-600 hover:bg-slate-200" title="Print Official Receipt">
+            <i data-lucide="printer" class="w-4 h-4"></i>
+          </button>
+          <button onclick="closeTrackingModal()" class="w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center text-slate-500 hover:bg-slate-200">
+            <i data-lucide="x" class="w-4 h-4"></i>
+          </button>
+        </div>
       </div>
 
+      <!-- Meal Summary Card with PIN & QR Code Trigger -->
       <div class="bg-brand-50 border border-brand-100 rounded-2xl p-4 flex items-center justify-between">
         <div>
           <p class="text-sm font-extrabold text-slate-900" id="modal-food-name">Spiced Jollof Rice</p>
           <p class="text-xs text-slate-500" id="modal-food-qty">Quantity: 1 • GH₵ 35.00</p>
+          <p class="text-[10px] text-brand-700 font-bold mt-0.5" id="modal-notes-preview"></p>
         </div>
-        <div class="text-right">
+        <div class="text-right flex flex-col items-end">
           <p class="text-[10px] uppercase font-bold text-brand-700">Pickup PIN</p>
           <p class="text-xl font-black tracking-widest text-brand-600 bg-white px-2.5 py-1 rounded-lg border border-brand-200 shadow-xs" id="modal-pickup-pin">8842</p>
         </div>
       </div>
 
+      <!-- 📱 STANDOUT FEATURE: Digital QR Pass (Scan at counter) -->
+      <div class="bg-slate-50 p-3 rounded-2xl border border-slate-200 text-center space-y-2">
+        <div class="flex items-center justify-center gap-1.5 text-xs font-bold text-slate-700">
+          <i data-lucide="qr-code" class="w-4 h-4 text-brand-600"></i>
+          <span>Digital Fast-Pass QR Code</span>
+        </div>
+        <div id="qrcode-container" class="flex justify-center p-2 bg-white rounded-xl border border-slate-200 mx-auto w-32 h-32"></div>
+        <p class="text-[10px] text-slate-400 font-semibold">Vendor kitchen scans this to instantly dispense your meal</p>
+      </div>
+
       <!-- Live Stepper -->
-      <div class="space-y-4 pt-2">
+      <div class="space-y-3 pt-1">
         <h4 class="text-xs font-bold text-slate-700 uppercase tracking-wider">Live Status Progression</h4>
-        <div class="space-y-4">
+        <div class="space-y-3">
           <div class="flex items-start gap-3" id="step-row-0">
             <div class="flex flex-col items-center">
-              <div class="w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold transition-all step-icon bg-emerald-500 text-white">
-                <i data-lucide="check" class="w-4 h-4"></i>
+              <div class="w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold transition-all step-icon bg-emerald-500 text-white">
+                <i data-lucide="check" class="w-3.5 h-3.5"></i>
               </div>
-              <div class="w-0.5 h-8 bg-slate-200 step-line"></div>
+              <div class="w-0.5 h-6 bg-slate-200 step-line"></div>
             </div>
             <div>
               <p class="text-xs font-bold text-slate-900">1. Order Received</p>
-              <p class="text-[11px] text-slate-500">Ticket printed at vendor kitchen</p>
+              <p class="text-[10px] text-slate-500">Ticket registered at vendor kitchen</p>
             </div>
           </div>
           <div class="flex items-start gap-3" id="step-row-1">
             <div class="flex flex-col items-center">
-              <div class="w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold transition-all step-icon bg-slate-200 text-slate-600">2</div>
-              <div class="w-0.5 h-8 bg-slate-200 step-line"></div>
+              <div class="w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold transition-all step-icon bg-slate-200 text-slate-600">2</div>
+              <div class="w-0.5 h-6 bg-slate-200 step-line"></div>
             </div>
             <div>
               <p class="text-xs font-bold text-slate-900">2. Kitchen Preparing</p>
-              <p class="text-[11px] text-slate-500">Meal is actively cooking on stove</p>
+              <p class="text-[10px] text-slate-500">Meal is actively cooking on stove</p>
             </div>
           </div>
           <div class="flex items-start gap-3" id="step-row-2">
             <div class="flex flex-col items-center">
-              <div class="w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold transition-all step-icon bg-slate-200 text-slate-600">3</div>
-              <div class="w-0.5 h-8 bg-slate-200 step-line"></div>
+              <div class="w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold transition-all step-icon bg-slate-200 text-slate-600">3</div>
+              <div class="w-0.5 h-6 bg-slate-200 step-line"></div>
             </div>
             <div>
               <p class="text-xs font-bold text-slate-900">3. Out for Delivery / Counter Ready</p>
-              <p class="text-[11px] text-slate-500">Ready at counter with your PIN</p>
+              <p class="text-[10px] text-slate-500">Ready at counter with PIN or QR Code</p>
             </div>
           </div>
           <div class="flex items-start gap-3" id="step-row-3">
             <div class="flex flex-col items-center">
-              <div class="w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold transition-all step-icon bg-slate-200 text-slate-600">4</div>
+              <div class="w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold transition-all step-icon bg-slate-200 text-slate-600">4</div>
             </div>
             <div>
               <p class="text-xs font-bold text-slate-900">4. Delivered / Collected</p>
-              <p class="text-[11px] text-slate-500">Transaction completed. Enjoy!</p>
+              <p class="text-[10px] text-slate-500">Meal collected. Enjoy your lunch!</p>
             </div>
           </div>
         </div>
@@ -727,9 +1022,15 @@
         </button>
       </div>
 
-      <button onclick="closeTrackingModal()" class="w-full py-2.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-800 text-xs font-bold transition-colors">
-        Close
-      </button>
+      <div class="flex items-center space-x-2">
+        <button onclick="printOrderReceipt(activeModalOrderId)" class="flex-1 py-2.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-800 text-xs font-bold flex items-center justify-center gap-1.5 transition-colors">
+          <i data-lucide="printer" class="w-3.5 h-3.5"></i>
+          <span>Print Receipt</span>
+        </button>
+        <button onclick="closeTrackingModal()" class="flex-1 py-2.5 rounded-xl bg-brand-600 hover:bg-brand-700 text-white text-xs font-bold transition-colors">
+          Done
+        </button>
+      </div>
     </div>
   </div>
 
@@ -810,6 +1111,38 @@
     </div>
   </div>
 
+  <!-- 🖨️ PRINTABLE RECEIPT TEMPLATE (Hidden from screen, visible when printing) -->
+  <div id="printable-receipt" class="hidden p-8 max-w-sm mx-auto bg-white border border-slate-300 rounded-lg text-slate-900 text-xs font-mono space-y-4">
+    <div class="text-center border-b border-dashed border-slate-400 pb-3">
+      <h2 class="text-base font-bold">ACCRA TECHNICAL UNIVERSITY</h2>
+      <p class="text-[10px]">Central Cafeteria Food Services</p>
+      <p class="text-[10px]" id="rcpt-timestamp">18 Aug 2026, 12:30 PM</p>
+    </div>
+
+    <div class="space-y-1 text-[11px]">
+      <p><strong>Order ID:</strong> <span id="rcpt-id">#1024</span></p>
+      <p><strong>Vendor:</strong> <span id="rcpt-vendor">Akwaaba Kitchen</span></p>
+      <p><strong>Student:</strong> Kofi Mensah (01210492B)</p>
+      <p><strong>Pickup PIN:</strong> <span id="rcpt-pin" class="font-bold text-sm">5821</span></p>
+    </div>
+
+    <div class="border-t border-b border-dashed border-slate-400 py-2 space-y-1">
+      <div class="flex justify-between">
+        <span id="rcpt-dish">1x Spiced Jollof Rice</span>
+        <span id="rcpt-price">GH₵ 35.00</span>
+      </div>
+      <div class="flex justify-between font-bold text-xs pt-1">
+        <span>TOTAL PAID (MOMO/WALLET):</span>
+        <span id="rcpt-total">GH₵ 35.00</span>
+      </div>
+    </div>
+
+    <div class="text-center space-y-1 text-[9px] text-slate-500 pt-1">
+      <p>Present your 4-digit PIN or QR Code at the counter.</p>
+      <p>Thank you for dining at ATU Cafeteria!</p>
+    </div>
+  </div>
+
   <script>
     // State management
     let currentRole = 'STUDENT';
@@ -821,6 +1154,36 @@
     let cart = {};
     let activeModalOrderId = null;
     let currentSelectedRating = 5;
+    let audioChimeEnabled = true;
+
+    // Web Audio Sound Chime Generator (No external MP3 files needed!)
+    function playChime(freq = 587.33, type = 'sine') {
+      if (!audioChimeEnabled) return;
+      try {
+        const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        const osc = audioCtx.createOscillator();
+        const gain = audioCtx.createGain();
+        osc.type = type;
+        osc.frequency.setValueAtTime(freq, audioCtx.currentTime);
+        gain.gain.setValueAtTime(0.2, audioCtx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.5);
+        osc.connect(gain);
+        gain.connect(audioCtx.destination);
+        osc.start();
+        osc.stop(audioCtx.currentTime + 0.5);
+      } catch (e) {
+        console.warn('Audio Context:', e);
+      }
+    }
+
+    function toggleAudioChime() {
+      audioChimeEnabled = !audioChimeEnabled;
+      const icon = document.getElementById('audio-icon');
+      if (icon) {
+        icon.className = audioChimeEnabled ? 'w-4 h-4 text-emerald-600' : 'w-4 h-4 text-slate-400';
+      }
+      showToast(audioChimeEnabled ? 'Audio alerts enabled' : 'Audio alerts muted', 'info');
+    }
 
     // 🏪 Vendors Array (Fully managed by Admin)
     let vendors = [
@@ -941,6 +1304,7 @@
         pickupPin: '5821',
         time: '12:15 PM',
         dateStamp: '18 Aug 2026, 12:15 PM',
+        specialNotes: 'Extra shito please',
         rating: null,
         ratingComment: null
       },
@@ -956,6 +1320,7 @@
         pickupPin: '4192',
         time: '10:30 AM',
         dateStamp: '18 Aug 2026, 10:30 AM',
+        specialNotes: '',
         rating: 5,
         ratingComment: 'Hot, fast and very tasty!'
       }
@@ -976,7 +1341,7 @@
       renderMenu();
       renderActiveOrders();
       renderOrderHistory();
-      renderVendorOrders();
+      renderVendorDashboard();
       renderAdminDashboard();
     });
 
@@ -1006,6 +1371,7 @@
       studentBalance += addAmount;
       registeredStudents[0].balance = studentBalance;
       updateWalletPill();
+      playChime(880);
       auditLogs.unshift(`Student topped up GH₵ ${addAmount.toFixed(2)} via Mobile Money.`);
       renderAdminDashboard();
       showToast(`Wallet topped up with GH₵ ${addAmount.toFixed(2)}!`, 'success');
@@ -1041,7 +1407,7 @@
       document.getElementById('user-wallet-pill').classList.toggle('hidden', role !== 'STUDENT');
 
       updateCartBar();
-      if (role === 'VENDOR') renderVendorOrders();
+      if (role === 'VENDOR') renderVendorDashboard();
       if (role === 'ADMIN') renderAdminDashboard();
 
       lucide.createIcons();
@@ -1198,6 +1564,7 @@
 
     function addToCart(foodId) {
       cart[foodId] = (cart[foodId] || 0) + 1;
+      playChime(659.25);
       renderMenu();
       updateCartBar();
     }
@@ -1248,6 +1615,7 @@
     function checkoutCart() {
       let totalPrice = 0;
       const orderedItems = [];
+      const specialNotes = document.getElementById('cart-special-notes').value.trim();
 
       for (const [id, qty] of Object.entries(cart)) {
         const item = menuItems.find(m => m.id == id);
@@ -1259,6 +1627,7 @@
 
       if (totalPrice > studentBalance) {
         showToast('Insufficient student balance! Top up wallet to proceed.', 'error');
+        playChime(300, 'sawtooth');
         return;
       }
 
@@ -1283,6 +1652,7 @@
           pickupPin: Math.floor(1000 + Math.random() * 9000).toString(),
           time: timeStr,
           dateStamp: dateStampStr,
+          specialNotes: specialNotes,
           rating: null,
           ratingComment: null
         };
@@ -1290,7 +1660,9 @@
         auditLogs.unshift(`Order #${newOrder.id} placed by Kofi Mensah at ${item.vendorName} (${newOrder.quantity}x ${newOrder.foodName}).`);
       });
 
+      playChime(783.99);
       clearCart();
+      document.getElementById('cart-special-notes').value = '';
       renderActiveOrders();
       renderOrderHistory();
       renderVendorOrders();
@@ -1345,6 +1717,7 @@
               ${getStatusBadge(order.status)}
             </div>
             <p class="font-extrabold text-sm text-slate-900">${order.quantity}x ${order.foodName}</p>
+            ${order.specialNotes ? `<p class="text-[11px] text-amber-700 bg-amber-50 px-2 py-0.5 rounded-md font-semibold">Note: ${order.specialNotes}</p>` : ''}
             <div class="flex items-center justify-between text-xs text-slate-500">
               <span>Total: GH₵ ${order.totalPrice.toFixed(2)}</span>
               <span>Pickup PIN: <strong class="text-brand-700 bg-brand-50 px-2 py-0.5 rounded font-mono font-bold">${order.pickupPin}</strong></span>
@@ -1353,10 +1726,15 @@
 
           <div class="mt-3 pt-3 border-t border-slate-100 flex items-center justify-between">
             <span class="text-[11px] text-slate-400">${order.time}</span>
-            <button onclick="openTrackingModal(${order.id})" class="px-3 py-1.5 rounded-lg bg-brand-50 hover:bg-brand-100 text-brand-700 text-xs font-bold flex items-center gap-1">
-              <i data-lucide="activity" class="w-3.5 h-3.5"></i>
-              <span>Track Live</span>
-            </button>
+            <div class="flex items-center gap-1.5">
+              <button onclick="printOrderReceipt(${order.id})" class="px-2.5 py-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold flex items-center gap-1" title="Print Receipt">
+                <i data-lucide="printer" class="w-3.5 h-3.5"></i>
+              </button>
+              <button onclick="openTrackingModal(${order.id})" class="px-3 py-1.5 rounded-lg bg-brand-50 hover:bg-brand-100 text-brand-700 text-xs font-bold flex items-center gap-1">
+                <i data-lucide="qr-code" class="w-3.5 h-3.5"></i>
+                <span>Track & QR</span>
+              </button>
+            </div>
           </div>
         </div>
       `).join('');
@@ -1393,8 +1771,11 @@
             </p>
           </div>
 
-          <div class="flex items-center space-x-3 self-end sm:self-center">
-            <p class="text-sm font-extrabold text-slate-900">GH₵ ${order.totalPrice.toFixed(2)}</p>
+          <div class="flex items-center space-x-2 self-end sm:self-center">
+            <p class="text-sm font-extrabold text-slate-900 mr-2">GH₵ ${order.totalPrice.toFixed(2)}</p>
+            <button onclick="printOrderReceipt(${order.id})" class="px-2.5 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold flex items-center gap-1" title="Print Receipt">
+              <i data-lucide="printer" class="w-3.5 h-3.5"></i>
+            </button>
             <button onclick="openTrackingModal(${order.id})" class="px-3 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold flex items-center gap-1 transition-colors">
               <i data-lucide="star" class="w-3.5 h-3.5 text-amber-500"></i>
               <span>${order.rating ? 'Edit Review' : 'Rate Order'}</span>
@@ -1416,6 +1797,25 @@
       document.getElementById('modal-food-name').innerText = order.foodName;
       document.getElementById('modal-food-qty').innerText = `Quantity: ${order.quantity} • GH₵ ${order.totalPrice.toFixed(2)}`;
       document.getElementById('modal-pickup-pin').innerText = order.pickupPin;
+      
+      const notesEl = document.getElementById('modal-notes-preview');
+      if (notesEl) {
+        notesEl.innerText = order.specialNotes ? `Note: ${order.specialNotes}` : '';
+      }
+
+      // Generate Dynamic QR Code
+      const qrContainer = document.getElementById('qrcode-container');
+      if (qrContainer && window.QRCode) {
+        qrContainer.innerHTML = '';
+        new QRCode(qrContainer, {
+          text: `ATU-ORDER-${order.id}-${order.pickupPin}`,
+          width: 112,
+          height: 112,
+          colorDark: "#0F2C59",
+          colorLight: "#ffffff",
+          correctLevel: QRCode.CorrectLevel.H
+        });
+      }
 
       const stages = ['RECEIVED', 'PREPARING', 'OUT_FOR_DELIVERY', 'DELIVERED'];
       const currentIndex = stages.indexOf(order.status);
@@ -1426,17 +1826,17 @@
         const line = row.querySelector('.step-line');
 
         if (idx < currentIndex) {
-          icon.className = 'w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold transition-all step-icon bg-emerald-500 text-white';
-          icon.innerHTML = '<i data-lucide="check" class="w-4 h-4"></i>';
-          if (line) line.className = 'w-0.5 h-8 bg-emerald-500 step-line';
+          icon.className = 'w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold transition-all step-icon bg-emerald-500 text-white';
+          icon.innerHTML = '<i data-lucide="check" class="w-3.5 h-3.5"></i>';
+          if (line) line.className = 'w-0.5 h-6 bg-emerald-500 step-line';
         } else if (idx === currentIndex) {
-          icon.className = 'w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold transition-all step-icon bg-brand-600 text-white shadow-md shadow-brand-500/30';
+          icon.className = 'w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold transition-all step-icon bg-brand-600 text-white shadow-md shadow-brand-500/30';
           icon.innerHTML = (idx + 1).toString();
-          if (line) line.className = 'w-0.5 h-8 bg-slate-200 step-line';
+          if (line) line.className = 'w-0.5 h-6 bg-slate-200 step-line';
         } else {
-          icon.className = 'w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold transition-all step-icon bg-slate-100 text-slate-400';
+          icon.className = 'w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold transition-all step-icon bg-slate-100 text-slate-400';
           icon.innerHTML = (idx + 1).toString();
-          if (line) line.className = 'w-0.5 h-8 bg-slate-200 step-line';
+          if (line) line.className = 'w-0.5 h-6 bg-slate-200 step-line';
         }
       });
 
@@ -1477,6 +1877,7 @@
       order.rating = currentSelectedRating;
       order.ratingComment = comment || 'Great meal!';
 
+      playChime(987.77);
       auditLogs.unshift(`Order #${order.id} was rated ${order.rating}★ by student.`);
       renderOrderHistory();
       renderAdminDashboard();
@@ -1487,6 +1888,21 @@
     function closeTrackingModal() {
       document.getElementById('tracking-modal').classList.add('hidden');
       activeModalOrderId = null;
+    }
+
+    function printOrderReceipt(orderId) {
+      const order = orders.find(o => o.id === orderId);
+      if (!order) return;
+
+      document.getElementById('rcpt-id').innerText = `#${order.id}`;
+      document.getElementById('rcpt-vendor').innerText = order.vendorName;
+      document.getElementById('rcpt-pin').innerText = order.pickupPin;
+      document.getElementById('rcpt-dish').innerText = `${order.quantity}x ${order.foodName}`;
+      document.getElementById('rcpt-price').innerText = `GH₵ ${order.totalPrice.toFixed(2)}`;
+      document.getElementById('rcpt-total').innerText = `GH₵ ${order.totalPrice.toFixed(2)}`;
+      document.getElementById('rcpt-timestamp').innerText = order.dateStamp || order.time;
+
+      window.print();
     }
 
     function renderVendorOrders() {
@@ -1513,6 +1929,7 @@
             ${getStatusBadge(order.status)}
           </div>
           <p class="text-base font-extrabold text-slate-900">${order.quantity}x ${order.foodName}</p>
+          ${order.specialNotes ? `<p class="text-xs text-amber-700 bg-amber-50 px-2.5 py-1 rounded-lg font-bold">Kitchen Note: ${order.specialNotes}</p>` : ''}
           <div class="text-xs text-slate-600 flex items-center justify-between">
             <span>GH₵ ${order.totalPrice.toFixed(2)} • ${order.vendorName}</span>
             <span class="font-mono bg-slate-100 px-2 py-0.5 rounded font-bold">PIN: ${order.pickupPin}</span>
@@ -1550,6 +1967,7 @@
       const order = orders.find(o => o.id === orderId);
       if (order) {
         order.status = nextStatus;
+        playChime(nextStatus === 'OUT_FOR_DELIVERY' ? 880 : 523.25);
         auditLogs.unshift(`Order #${orderId} moved to ${nextStatus} by Kitchen.`);
         renderActiveOrders();
         renderOrderHistory();
@@ -1568,8 +1986,10 @@
       if (matched) {
         advanceOrderStatus(matched.id, 'DELIVERED');
         input.value = '';
+        playChime(1046.5);
         showToast(`PIN Verified! Order #${matched.id} (${matched.foodName}) marked Delivered.`, 'success');
       } else {
+        playChime(250, 'sawtooth');
         showToast('Invalid PIN or order already collected.', 'error');
       }
     }
@@ -1579,11 +1999,445 @@
       showToast('Kitchen queue refreshed.', 'info');
     }
 
+    let activeVendorId = 201;
+
+    let vendorWorkers = [
+      { id: 1, vendorId: 201, vendorName: 'Akwaaba Kitchen', name: 'Kwame Mensah', role: 'Head Chef', shift: 'Morning (06:00 - 14:00)', phone: '+233 24 411 2233', status: 'ACTIVE' },
+      { id: 2, vendorId: 201, vendorName: 'Akwaaba Kitchen', name: 'Abena Darko', role: 'Cashier & Counter Dispatch', shift: 'Full Day (07:00 - 17:00)', phone: '+233 20 555 6677', status: 'ACTIVE' },
+      { id: 3, vendorId: 201, vendorName: 'Akwaaba Kitchen', name: 'Emmanuel Tetteh', role: 'Kitchen Assistant', shift: 'Afternoon (12:00 - 20:00)', phone: '+233 55 888 9900', status: 'ACTIVE' },
+      { id: 4, vendorId: 202, vendorName: 'Campus Chillers & Bakes', name: 'Grace Addo', role: 'Pastry Baker', shift: 'Morning (05:30 - 13:30)', phone: '+233 24 990 1122', status: 'ACTIVE' },
+      { id: 5, vendorId: 203, vendorName: 'Tasty Bites Grill', name: 'Kweku Appiah', role: 'Grill Specialist', shift: 'Afternoon (11:00 - 19:30)', phone: '+233 50 123 7890', status: 'ACTIVE' }
+    ];
+
     // =========================================================================
-    // ADMIN FUNCTIONS & PRIVILEGES (INCLUDING VENDOR MANAGEMENT)
+    // VENDOR PORTAL SUB-NAVIGATION & SELF-SERVICE MANAGEMENT
+    // =========================================================================
+    function switchVendorTab(tab) {
+      ['orders', 'menu', 'workers', 'profile'].forEach(t => {
+        const btn = document.getElementById(`vtab-${t}`);
+        const sec = document.getElementById(`vendor-sec-${t}`);
+        const isCurrent = t === tab;
+
+        if (btn) {
+          btn.className = isCurrent
+            ? 'px-4 py-2 rounded-xl text-xs font-bold bg-brand-600 text-white shadow-sm flex items-center gap-1.5 whitespace-nowrap'
+            : 'px-4 py-2 rounded-xl text-xs font-bold bg-slate-100 text-slate-700 hover:bg-slate-200 flex items-center gap-1.5 whitespace-nowrap';
+        }
+        if (sec) {
+          sec.classList.toggle('hidden', !isCurrent);
+        }
+      });
+
+      if (tab === 'menu') renderVendorMenu();
+      if (tab === 'workers') renderVendorWorkers();
+      if (tab === 'profile') loadVendorProfileForm();
+      lucide.createIcons();
+    }
+
+    function renderVendorDashboard() {
+      const activeVendor = vendors.find(v => v.id === activeVendorId) || vendors[0];
+      if (!activeVendor) return;
+
+      const titleEl = document.getElementById('current-kitchen-name');
+      const badgeEl = document.getElementById('vendor-status-badge');
+      const dishMetric = document.getElementById('v-metric-dishes');
+      const workerMetric = document.getElementById('v-metric-workers');
+      const ratingMetric = document.getElementById('v-metric-rating');
+
+      if (titleEl) titleEl.innerText = `${activeVendor.name}`;
+      if (badgeEl) badgeEl.innerText = `${activeVendor.isOpen ? 'ONLINE' : 'CLOSED'} • ${activeVendor.location.toUpperCase()}`;
+      
+      const vendorDishes = menuItems.filter(m => m.vendorId === activeVendor.id);
+      const myWorkers = vendorWorkers.filter(w => w.vendorId === activeVendor.id);
+
+      if (dishMetric) dishMetric.innerText = `${vendorDishes.length} Items`;
+      if (workerMetric) workerMetric.innerText = `${myWorkers.length} Staff`;
+      if (ratingMetric) ratingMetric.innerText = `${activeVendor.rating.toFixed(1)} ★`;
+
+      renderVendorOrders();
+      renderVendorMenu();
+      renderVendorWorkers();
+    }
+
+    // --- VENDOR DISH MANAGEMENT (Done by Vendor) ---
+    function renderVendorMenu() {
+      const tableBody = document.getElementById('vendor-menu-table-body');
+      if (!tableBody) return;
+
+      const activeVendor = vendors.find(v => v.id === activeVendorId) || vendors[0];
+      const vendorDishes = menuItems.filter(m => m.vendorId === activeVendor.id);
+
+      if (vendorDishes.length === 0) {
+        tableBody.innerHTML = `
+          <tr>
+            <td colspan="6" class="p-6 text-center text-slate-400">No dishes on your kitchen menu yet. Tap "Add New Dish" above.</td>
+          </tr>
+        `;
+        return;
+      }
+
+      tableBody.innerHTML = vendorDishes.map(item => `
+        <tr class="hover:bg-slate-50/80">
+          <td class="p-3">
+            <div class="flex items-center space-x-3">
+              <img src="${item.image}" alt="${item.name}" class="w-10 h-10 rounded-xl object-cover border border-slate-200" />
+              <div>
+                <p class="font-bold text-slate-900">${item.name}</p>
+                <p class="text-[10px] text-slate-400 line-clamp-1">${item.description}</p>
+              </div>
+            </div>
+          </td>
+          <td class="p-3 font-semibold text-slate-600">${item.category}</td>
+          <td class="p-3 font-bold text-brand-600">GH₵ ${item.price.toFixed(2)}</td>
+          <td class="p-3 text-slate-500">${item.calories} kcal</td>
+          <td class="p-3">
+            <button onclick="toggleVendorDishStock(${item.id})" class="px-2.5 py-1 rounded-full font-bold text-[10px] transition-colors ${item.inStock ? 'bg-emerald-100 text-emerald-800 hover:bg-emerald-200' : 'bg-red-100 text-red-800 hover:bg-red-200'}">
+              ${item.inStock ? 'In Stock' : 'Sold Out'}
+            </button>
+          </td>
+          <td class="p-3 text-right space-x-1">
+            <button onclick="editVendorDish(${item.id})" class="px-2 py-1 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 text-[11px] font-bold">Edit</button>
+            <button onclick="deleteVendorDish(${item.id})" class="px-2 py-1 rounded-lg bg-red-50 hover:bg-red-100 text-red-600 text-[11px] font-bold">Delete</button>
+          </td>
+        </tr>
+      `).join('');
+
+      lucide.createIcons();
+    }
+
+    function openVendorDishModal() {
+      document.getElementById('editing-dish-id').value = '';
+      document.getElementById('dish-modal-title').innerText = 'Add New Food Dish';
+      document.getElementById('dish-modal-btn-text').innerText = 'Publish Item';
+      document.getElementById('vdish-name').value = '';
+      document.getElementById('vdish-price').value = '';
+      document.getElementById('vdish-calories').value = '480';
+      document.getElementById('vdish-desc').value = '';
+      document.getElementById('vdish-image').value = 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=400&q=80';
+      document.getElementById('vdish-instock').value = 'true';
+
+      document.getElementById('vendor-dish-modal').classList.remove('hidden');
+      lucide.createIcons();
+    }
+
+    function editVendorDish(dishId) {
+      const item = menuItems.find(m => m.id === dishId);
+      if (!item) return;
+
+      document.getElementById('editing-dish-id').value = item.id;
+      document.getElementById('dish-modal-title').innerText = 'Edit Food Dish';
+      document.getElementById('dish-modal-btn-text').innerText = 'Save Dish Updates';
+      document.getElementById('vdish-name').value = item.name;
+      document.getElementById('vdish-price').value = item.price;
+      document.getElementById('vdish-calories').value = item.calories;
+      document.getElementById('vdish-category').value = item.category;
+      document.getElementById('vdish-desc').value = item.description;
+      document.getElementById('vdish-image').value = item.image;
+      document.getElementById('vdish-instock').value = item.inStock ? 'true' : 'false';
+
+      document.getElementById('vendor-dish-modal').classList.remove('hidden');
+      lucide.createIcons();
+    }
+
+    function closeVendorDishModal() {
+      document.getElementById('vendor-dish-modal').classList.add('hidden');
+    }
+
+    function saveVendorDish() {
+      const editingId = document.getElementById('editing-dish-id').value;
+      const name = document.getElementById('vdish-name').value.trim();
+      const price = parseFloat(document.getElementById('vdish-price').value);
+      const calories = parseInt(document.getElementById('vdish-calories').value) || 450;
+      const category = document.getElementById('vdish-category').value;
+      const desc = document.getElementById('vdish-desc').value.trim();
+      const image = document.getElementById('vdish-image').value.trim() || 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=400&q=80';
+      const inStock = document.getElementById('vdish-instock').value === 'true';
+
+      const activeVendor = vendors.find(v => v.id === activeVendorId) || vendors[0];
+
+      if (!name || isNaN(price) || price <= 0) {
+        showToast('Please enter a valid dish name and price.', 'error');
+        return;
+      }
+
+      if (editingId) {
+        const item = menuItems.find(m => m.id == editingId);
+        if (item) {
+          item.name = name;
+          item.price = price;
+          item.calories = calories;
+          item.category = category;
+          item.description = desc;
+          item.image = image;
+          item.inStock = inStock;
+          auditLogs.unshift(`Vendor (${activeVendor.name}) updated menu item "${name}" (GH₵ ${price.toFixed(2)}).`);
+          showToast(`Dish "${name}" updated successfully!`, 'success');
+        }
+      } else {
+        const newItem = {
+          id: Date.now(),
+          vendorId: activeVendor.id,
+          vendorName: activeVendor.name,
+          name,
+          price,
+          category,
+          image,
+          description: desc || 'Freshly prepared meal.',
+          calories,
+          badge: 'Chef Special',
+          inStock
+        };
+        menuItems.unshift(newItem);
+        auditLogs.unshift(`Vendor (${activeVendor.name}) published new dish "${name}" to campus menu.`);
+        showToast(`New dish "${name}" added to menu!`, 'success');
+      }
+
+      renderMenu();
+      renderVendorDashboard();
+      renderAdminDashboard();
+      closeVendorDishModal();
+    }
+
+    function toggleVendorDishStock(dishId) {
+      const item = menuItems.find(m => m.id === dishId);
+      const activeVendor = vendors.find(v => v.id === activeVendorId) || vendors[0];
+      if (item) {
+        item.inStock = !item.inStock;
+        auditLogs.unshift(`Vendor (${activeVendor.name}) marked "${item.name}" as ${item.inStock ? 'IN STOCK' : 'SOLD OUT'}.`);
+        renderMenu();
+        renderVendorMenu();
+        renderAdminDashboard();
+        showToast(`${item.name} is now ${item.inStock ? 'In Stock' : 'Sold Out'}`, 'info');
+      }
+    }
+
+    function deleteVendorDish(dishId) {
+      const item = menuItems.find(m => m.id === dishId);
+      const activeVendor = vendors.find(v => v.id === activeVendorId) || vendors[0];
+      if (item) {
+        menuItems = menuItems.filter(m => m.id !== dishId);
+        delete cart[dishId];
+        auditLogs.unshift(`Vendor (${activeVendor.name}) deleted menu dish "${item.name}".`);
+        renderMenu();
+        updateCartBar();
+        renderVendorDashboard();
+        renderAdminDashboard();
+        showToast(`Dish "${item.name}" removed from menu.`, 'info');
+      }
+    }
+
+    // --- VENDOR WORKER MANAGEMENT (Done by Vendor) ---
+    function renderVendorWorkers() {
+      const tableBody = document.getElementById('vendor-workers-table-body');
+      if (!tableBody) return;
+
+      const activeVendor = vendors.find(v => v.id === activeVendorId) || vendors[0];
+      const myWorkers = vendorWorkers.filter(w => w.vendorId === activeVendor.id);
+
+      if (myWorkers.length === 0) {
+        tableBody.innerHTML = `
+          <tr>
+            <td colspan="6" class="p-6 text-center text-slate-400">No kitchen staff registered. Tap "Add Kitchen Worker" to onboard team members.</td>
+          </tr>
+        `;
+        return;
+      }
+
+      tableBody.innerHTML = myWorkers.map(w => `
+        <tr class="hover:bg-slate-50/80">
+          <td class="p-3">
+            <div class="flex items-center space-x-2.5">
+              <div class="w-8 h-8 rounded-full bg-blue-100 text-blue-700 flex items-center justify-center font-bold text-xs">
+                ${w.name.charAt(0)}
+              </div>
+              <p class="font-bold text-slate-900">${w.name}</p>
+            </div>
+          </td>
+          <td class="p-3 font-semibold text-slate-700">${w.role}</td>
+          <td class="p-3 text-slate-500">${w.shift}</td>
+          <td class="p-3 font-mono text-slate-600">${w.phone}</td>
+          <td class="p-3">
+            <button onclick="toggleWorkerStatus(${w.id})" class="px-2.5 py-1 rounded-full font-bold text-[10px] transition-colors ${w.status === 'ACTIVE' ? 'bg-emerald-100 text-emerald-800' : 'bg-slate-100 text-slate-600'}">
+              ${w.status === 'ACTIVE' ? 'Active On Duty' : 'Off Duty'}
+            </button>
+          </td>
+          <td class="p-3 text-right space-x-1">
+            <button onclick="editVendorWorker(${w.id})" class="px-2 py-1 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 text-[11px] font-bold">Edit</button>
+            <button onclick="deleteVendorWorker(${w.id})" class="px-2 py-1 rounded-lg bg-red-50 hover:bg-red-100 text-red-600 text-[11px] font-bold">Delete</button>
+          </td>
+        </tr>
+      `).join('');
+
+      lucide.createIcons();
+    }
+
+    function openVendorWorkerModal() {
+      document.getElementById('editing-worker-id').value = '';
+      document.getElementById('worker-modal-title').innerText = 'Add Kitchen Worker';
+      document.getElementById('worker-modal-btn-text').innerText = 'Save Staff Member';
+      document.getElementById('vworker-name').value = '';
+      document.getElementById('vworker-phone').value = '';
+      document.getElementById('vworker-role').value = 'Head Chef';
+      document.getElementById('vworker-shift').value = 'Morning (06:00 - 14:00)';
+      document.getElementById('vworker-status').value = 'ACTIVE';
+
+      document.getElementById('vendor-worker-modal').classList.remove('hidden');
+      lucide.createIcons();
+    }
+
+    function editVendorWorker(workerId) {
+      const worker = vendorWorkers.find(w => w.id === workerId);
+      if (!worker) return;
+
+      document.getElementById('editing-worker-id').value = worker.id;
+      document.getElementById('worker-modal-title').innerText = 'Edit Kitchen Worker';
+      document.getElementById('worker-modal-btn-text').innerText = 'Update Staff Member';
+      document.getElementById('vworker-name').value = worker.name;
+      document.getElementById('vworker-phone').value = worker.phone;
+      document.getElementById('vworker-role').value = worker.role;
+      document.getElementById('vworker-shift').value = worker.shift;
+      document.getElementById('vworker-status').value = worker.status;
+
+      document.getElementById('vendor-worker-modal').classList.remove('hidden');
+      lucide.createIcons();
+    }
+
+    function closeVendorWorkerModal() {
+      document.getElementById('vendor-worker-modal').classList.add('hidden');
+    }
+
+    function saveVendorWorker() {
+      const editingId = document.getElementById('editing-worker-id').value;
+      const name = document.getElementById('vworker-name').value.trim();
+      const phone = document.getElementById('vworker-phone').value.trim();
+      const role = document.getElementById('vworker-role').value;
+      const shift = document.getElementById('vworker-shift').value;
+      const status = document.getElementById('vworker-status').value;
+
+      const activeVendor = vendors.find(v => v.id === activeVendorId) || vendors[0];
+
+      if (!name) {
+        showToast('Please enter the staff member name.', 'error');
+        return;
+      }
+
+      if (editingId) {
+        const worker = vendorWorkers.find(w => w.id == editingId);
+        if (worker) {
+          worker.name = name;
+          worker.phone = phone || '+233 24 000 0000';
+          worker.role = role;
+          worker.shift = shift;
+          worker.status = status;
+          auditLogs.unshift(`Vendor (${activeVendor.name}) updated worker profile for ${name} (${role}).`);
+          showToast(`Staff member "${name}" updated!`, 'success');
+        }
+      } else {
+        const newWorker = {
+          id: Date.now(),
+          vendorId: activeVendor.id,
+          vendorName: activeVendor.name,
+          name,
+          role,
+          shift,
+          phone: phone || '+233 24 000 0000',
+          status
+        };
+        vendorWorkers.unshift(newWorker);
+        auditLogs.unshift(`Vendor (${activeVendor.name}) registered new worker: ${name} as ${role}.`);
+        showToast(`Staff member "${name}" registered!`, 'success');
+      }
+
+      renderVendorDashboard();
+      renderAdminDashboard();
+      closeVendorWorkerModal();
+    }
+
+    function toggleWorkerStatus(workerId) {
+      const worker = vendorWorkers.find(w => w.id === workerId);
+      const activeVendor = vendors.find(v => v.id === activeVendorId) || vendors[0];
+      if (worker) {
+        worker.status = worker.status === 'ACTIVE' ? 'OFF_DUTY' : 'ACTIVE';
+        auditLogs.unshift(`Vendor (${activeVendor.name}) changed shift status of ${worker.name} to ${worker.status}.`);
+        renderVendorWorkers();
+        renderAdminDashboard();
+        showToast(`${worker.name} is now ${worker.status === 'ACTIVE' ? 'Active On Duty' : 'Off Duty'}`, 'info');
+      }
+    }
+
+    function deleteVendorWorker(workerId) {
+      const worker = vendorWorkers.find(w => w.id === workerId);
+      const activeVendor = vendors.find(v => v.id === activeVendorId) || vendors[0];
+      if (worker) {
+        vendorWorkers = vendorWorkers.filter(w => w.id !== workerId);
+        auditLogs.unshift(`Vendor (${activeVendor.name}) removed worker ${worker.name} from staff roster.`);
+        renderVendorDashboard();
+        renderAdminDashboard();
+        showToast(`Worker ${worker.name} removed.`, 'info');
+      }
+    }
+
+    // --- VENDOR STALL PROFILE MANAGEMENT (Done by Vendor) ---
+    function loadVendorProfileForm() {
+      const activeVendor = vendors.find(v => v.id === activeVendorId) || vendors[0];
+      if (!activeVendor) return;
+
+      document.getElementById('vprofile-name').value = activeVendor.name;
+      document.getElementById('vprofile-location').value = activeVendor.location;
+      document.getElementById('vprofile-specialty').value = activeVendor.specialty;
+      document.getElementById('vprofile-phone').value = activeVendor.phone;
+      document.getElementById('vprofile-desc').value = activeVendor.description || 'Authentic campus kitchen offering delicious hot meals.';
+    }
+
+    function saveVendorProfile(e) {
+      if (e) e.preventDefault();
+      const activeVendor = vendors.find(v => v.id === activeVendorId) || vendors[0];
+      if (!activeVendor) return;
+
+      const name = document.getElementById('vprofile-name').value.trim();
+      const location = document.getElementById('vprofile-location').value.trim();
+      const specialty = document.getElementById('vprofile-specialty').value.trim();
+      const phone = document.getElementById('vprofile-phone').value.trim();
+      const desc = document.getElementById('vprofile-desc').value.trim();
+
+      if (!name || !location) {
+        showToast('Please provide stall name and location.', 'error');
+        return;
+      }
+
+      activeVendor.name = name;
+      activeVendor.location = location;
+      activeVendor.specialty = specialty;
+      activeVendor.phone = phone;
+      activeVendor.description = desc;
+
+      // Update in menu items vendorName
+      menuItems.forEach(m => {
+        if (m.vendorId === activeVendor.id) {
+          m.vendorName = name;
+        }
+      });
+
+      // Update in workers vendorName
+      vendorWorkers.forEach(w => {
+        if (w.vendorId === activeVendor.id) {
+          w.vendorName = name;
+        }
+      });
+
+      auditLogs.unshift(`Vendor (${name}) updated their stall profile and operating information.`);
+      renderVendorPills();
+      renderMenu();
+      renderVendorDashboard();
+      renderAdminDashboard();
+      showToast('Stall profile saved and updated live across campus!', 'success');
+    }
+
+    // =========================================================================
+    // ADMIN FUNCTIONS & OVERSIGHT (ADMIN ADDS VENDORS, AUDITS ACTIONS)
     // =========================================================================
     function switchAdminTab(tab) {
-      ['vendors', 'menu', 'students', 'logs'].forEach(t => {
+      ['vendors', 'menu', 'workers', 'students', 'logs'].forEach(t => {
         const btn = document.getElementById(`atab-${t}`);
         const sec = document.getElementById(`admin-sec-${t}`);
         const isCurrent = t === tab;
@@ -1604,9 +2458,12 @@
       const kpiOrders = document.getElementById('kpi-orders-count');
       const kpiSales = document.getElementById('kpi-sales-sum');
       const kpiVendors = document.getElementById('kpi-vendors-count');
+      const kpiWorkers = document.getElementById('kpi-workers-count');
       const adminVendorsBody = document.getElementById('admin-vendors-table-body');
       const adminMenuCount = document.getElementById('admin-menu-count');
       const adminMenuBody = document.getElementById('admin-menu-table-body');
+      const adminWorkersCount = document.getElementById('admin-workers-count');
+      const adminWorkersBody = document.getElementById('admin-workers-table-body');
       const adminStudentsBody = document.getElementById('admin-students-table-body');
       const adminLogs = document.getElementById('admin-audit-logs');
 
@@ -1616,9 +2473,11 @@
         kpiSales.innerText = sales.toFixed(2);
       }
       if (kpiVendors) kpiVendors.innerText = vendors.length;
-      if (adminMenuCount) adminMenuCount.innerText = `${menuItems.length} Items`;
+      if (kpiWorkers) kpiWorkers.innerText = vendorWorkers.length;
+      if (adminMenuCount) adminMenuCount.innerText = `${menuItems.length} Dishes`;
+      if (adminWorkersCount) adminWorkersCount.innerText = `${vendorWorkers.length} Workers`;
 
-      // 1. 🏪 Render Vendors Table
+      // 1. 🏪 Render Registered Vendors Table (Admin Manages Vendors)
       if (adminVendorsBody) {
         adminVendorsBody.innerHTML = vendors.map(vendor => `
           <tr class="hover:bg-slate-50/70">
@@ -1642,28 +2501,48 @@
         `).join('');
       }
 
-      // 2. Render Menu Dishes Table
+      // 2. Render Menu Oversight (Admin sees all items managed by vendors)
       if (adminMenuBody) {
         adminMenuBody.innerHTML = menuItems.map(item => `
           <tr class="hover:bg-slate-50/70">
-            <td class="p-3 font-bold text-slate-900">${item.name}</td>
+            <td class="p-3">
+              <div class="flex items-center space-x-2.5">
+                <img src="${item.image}" alt="${item.name}" class="w-8 h-8 rounded-lg object-cover" />
+                <span class="font-bold text-slate-900">${item.name}</span>
+              </div>
+            </td>
             <td class="p-3 font-semibold text-brand-700">${item.vendorName}</td>
             <td class="p-3">${item.category}</td>
             <td class="p-3 font-bold text-brand-600">GH₵ ${item.price.toFixed(2)}</td>
             <td class="p-3">${item.calories} kcal</td>
             <td class="p-3">
-              <button onclick="toggleItemStock(${item.id})" class="px-2 py-0.5 rounded-full font-bold text-[10px] ${item.inStock ? 'bg-emerald-100 text-emerald-800' : 'bg-red-100 text-red-800'}">
+              <span class="px-2 py-0.5 rounded-full font-bold text-[10px] ${item.inStock ? 'bg-emerald-100 text-emerald-800' : 'bg-red-100 text-red-800'}">
                 ${item.inStock ? 'In Stock' : 'Sold Out'}
-              </button>
-            </td>
-            <td class="p-3 text-right">
-              <button onclick="deleteMenuItem(${item.id})" class="text-red-500 hover:text-red-700 font-bold ml-2">Delete</button>
+              </span>
             </td>
           </tr>
         `).join('');
       }
 
-      // 3. Render Registered Students Table
+      // 3. Render Workers Oversight (Admin sees all staff hired by vendors)
+      if (adminWorkersBody) {
+        adminWorkersBody.innerHTML = vendorWorkers.map(w => `
+          <tr class="hover:bg-slate-50/70">
+            <td class="p-3 font-bold text-slate-900">${w.name}</td>
+            <td class="p-3 font-semibold text-blue-700">${w.vendorName}</td>
+            <td class="p-3 text-slate-700 font-medium">${w.role}</td>
+            <td class="p-3 text-slate-500">${w.shift}</td>
+            <td class="p-3 font-mono text-slate-600">${w.phone}</td>
+            <td class="p-3">
+              <span class="px-2 py-0.5 rounded-full font-bold text-[10px] ${w.status === 'ACTIVE' ? 'bg-emerald-100 text-emerald-800' : 'bg-slate-100 text-slate-600'}">
+                ${w.status === 'ACTIVE' ? 'Active On Duty' : 'Off Duty'}
+              </span>
+            </td>
+          </tr>
+        `).join('');
+      }
+
+      // 4. Render Registered Students Table
       if (adminStudentsBody) {
         adminStudentsBody.innerHTML = registeredStudents.map(student => `
           <tr class="hover:bg-slate-50/70">
@@ -1679,12 +2558,15 @@
         `).join('');
       }
 
-      // 4. Render Audit Logs
+      // 5. Render Live Audit Stream (Everything vendors and admins do)
       if (adminLogs) {
         adminLogs.innerHTML = auditLogs.map(log => `
           <div class="py-2.5 flex items-center justify-between text-xs text-slate-600">
-            <span>${log}</span>
-            <span class="text-[10px] text-slate-400">Just now</span>
+            <div class="flex items-center gap-2">
+              <i data-lucide="activity" class="w-3.5 h-3.5 text-brand-600"></i>
+              <span>${log}</span>
+            </div>
+            <span class="text-[10px] text-slate-400 font-medium">Recorded live</span>
           </div>
         `).join('');
       }
@@ -1692,7 +2574,7 @@
       lucide.createIcons();
     }
 
-    // 🏪 VENDOR MANAGEMENT ACTIONS
+    // 🏪 ADMIN VENDOR MANAGEMENT
     function openAddVendorModal() {
       document.getElementById('add-vendor-modal').classList.remove('hidden');
       lucide.createIcons();
@@ -1724,11 +2606,11 @@
       };
 
       vendors.push(newVendor);
-      auditLogs.unshift(`Admin onboarded new vendor: ${name} (${newVendor.location}).`);
+      auditLogs.unshift(`Admin registered and authorized new vendor: ${name} (${newVendor.location}).`);
       renderVendorPills();
       renderAdminDashboard();
       closeAddVendorModal();
-      showToast(`Vendor '${name}' registered successfully!`, 'success');
+      showToast(`Vendor '${name}' registered! Vendor can now log in to add food & workers.`, 'success');
     }
 
     function toggleVendorStatus(vendorId) {
@@ -1747,85 +2629,13 @@
       if (vendor) {
         vendors = vendors.filter(v => v.id !== vendorId);
         menuItems = menuItems.filter(m => m.vendorId !== vendorId);
-        auditLogs.unshift(`Admin removed vendor ${vendor.name} and related menu items.`);
+        vendorWorkers = vendorWorkers.filter(w => w.vendorId !== vendorId);
+        auditLogs.unshift(`Admin removed vendor ${vendor.name}, along with dishes and registered workers.`);
         renderVendorPills();
         renderMenu();
         renderAdminDashboard();
         showToast(`Vendor ${vendor.name} deleted.`, 'info');
       }
-    }
-
-    function toggleItemStock(itemId) {
-      const item = menuItems.find(m => m.id === itemId);
-      if (item) {
-        item.inStock = !item.inStock;
-        auditLogs.unshift(`Admin toggled ${item.name} stock status to ${item.inStock ? 'IN STOCK' : 'SOLD OUT'}.`);
-        renderMenu();
-        renderAdminDashboard();
-        showToast(`${item.name} is now ${item.inStock ? 'In Stock' : 'Sold Out'}`, 'info');
-      }
-    }
-
-    function deleteMenuItem(itemId) {
-      menuItems = menuItems.filter(m => m.id !== itemId);
-      delete cart[itemId];
-      auditLogs.unshift(`Admin deleted menu item ID #${itemId}.`);
-      renderMenu();
-      updateCartBar();
-      renderAdminDashboard();
-      showToast('Menu item removed.', 'info');
-    }
-
-    function openAddMenuModal() {
-      const select = document.getElementById('new-item-vendor-select');
-      if (select) {
-        select.innerHTML = vendors.map(v => `<option value="${v.id}">${v.name} (${v.location})</option>`).join('');
-      }
-      document.getElementById('add-menu-modal').classList.remove('hidden');
-      lucide.createIcons();
-    }
-
-    function closeAddMenuModal() {
-      document.getElementById('add-menu-modal').classList.add('hidden');
-    }
-
-    function saveNewMenuItem() {
-      const vendorSelect = document.getElementById('new-item-vendor-select');
-      const vendorId = parseInt(vendorSelect.value);
-      const vendor = vendors.find(v => v.id === vendorId) || vendors[0];
-
-      const name = document.getElementById('new-item-name').value.trim();
-      const price = parseFloat(document.getElementById('new-item-price').value);
-      const calories = parseInt(document.getElementById('new-item-calories').value) || 450;
-      const category = document.getElementById('new-item-category').value;
-      const desc = document.getElementById('new-item-desc').value.trim();
-      const image = document.getElementById('new-item-image').value.trim() || 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=400&q=80';
-
-      if (!name || isNaN(price) || price <= 0) {
-        showToast('Please enter a valid dish name and price.', 'error');
-        return;
-      }
-
-      const newItem = {
-        id: Date.now(),
-        vendorId: vendor.id,
-        vendorName: vendor.name,
-        name,
-        price,
-        category,
-        image,
-        description: desc || 'Delicious freshly prepared campus meal.',
-        calories,
-        badge: 'New Item',
-        inStock: true
-      };
-
-      menuItems.unshift(newItem);
-      auditLogs.unshift(`Admin added new food item: ${name} to ${vendor.name} (GH₵ ${price.toFixed(2)}).`);
-      renderMenu();
-      renderAdminDashboard();
-      closeAddMenuModal();
-      showToast(`${name} added to ${vendor.name}!`, 'success');
     }
 
     function creditStudent(studentId, amount) {
@@ -1836,6 +2646,7 @@
           studentBalance = student.balance;
           updateWalletPill();
         }
+        playChime(600);
         auditLogs.unshift(`Admin credited GH₵ ${amount.toFixed(2)} to ${student.name}'s wallet.`);
         renderAdminDashboard();
         showToast(`Credited GH₵ ${amount.toFixed(2)} to ${student.name}!`, 'success');
@@ -1846,6 +2657,7 @@
       registeredStudents.forEach(s => s.balance += 20.00);
       studentBalance = registeredStudents[0].balance;
       updateWalletPill();
+      playChime(700);
       auditLogs.unshift('Admin credited GH₵ 20.00 Campus Bonus to all registered students.');
       renderAdminDashboard();
       showToast('GH₵ 20.00 Campus Bonus credited to all students!', 'success');
