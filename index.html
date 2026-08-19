@@ -1268,60 +1268,7 @@
     </div>
   </div>
 
-  <!-- 5. User Auth / Role Switcher Modal -->
-  <div id="auth-modal" class="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm hidden flex items-center justify-center p-4">
-    <div class="bg-white rounded-3xl max-w-sm w-full p-6 shadow-2xl space-y-4">
-      <div class="flex items-center justify-between border-b border-slate-100 pb-3">
-        <h3 class="text-base font-bold text-slate-900">Switch Role & User</h3>
-        <button onclick="closeAuthModal()" class="w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center text-slate-500 hover:bg-slate-200">
-          <i data-lucide="x" class="w-4 h-4"></i>
-        </button>
-      </div>
 
-      <p class="text-xs text-slate-500">Select any role to test and showcase all student, kitchen vendor, and administrative privileges instantly:</p>
-
-      <div class="space-y-2">
-        <button onclick="switchRole('STUDENT'); closeAuthModal();" class="w-full p-3 rounded-2xl border border-slate-200 hover:border-brand-500 hover:bg-brand-50/50 flex items-center justify-between text-left transition-all">
-          <div class="flex items-center space-x-3">
-            <div class="w-9 h-9 rounded-xl bg-brand-100 text-brand-700 flex items-center justify-center">
-              <i data-lucide="user" class="w-5 h-5"></i>
-            </div>
-            <div>
-              <p class="text-xs font-bold text-slate-900">Kofi Mensah (Student)</p>
-              <p class="text-[10px] text-slate-500">Index: 01210492B • Wallet: GH₵ 150.00</p>
-            </div>
-          </div>
-          <i data-lucide="chevron-right" class="w-4 h-4 text-slate-400"></i>
-        </button>
-
-        <button onclick="switchRole('VENDOR'); closeAuthModal();" class="w-full p-3 rounded-2xl border border-slate-200 hover:border-brand-500 hover:bg-brand-50/50 flex items-center justify-between text-left transition-all">
-          <div class="flex items-center space-x-3">
-            <div class="w-9 h-9 rounded-xl bg-blue-100 text-blue-700 flex items-center justify-center">
-              <i data-lucide="chef-hat" class="w-5 h-5"></i>
-            </div>
-            <div>
-              <p class="text-xs font-bold text-slate-900">Akwaaba Kitchen (Vendor)</p>
-              <p class="text-[10px] text-slate-500">Live Queue & PIN Verification</p>
-            </div>
-          </div>
-          <i data-lucide="chevron-right" class="w-4 h-4 text-slate-400"></i>
-        </button>
-
-        <button onclick="switchRole('ADMIN'); closeAuthModal();" class="w-full p-3 rounded-2xl border border-slate-200 hover:border-brand-500 hover:bg-brand-50/50 flex items-center justify-between text-left transition-all">
-          <div class="flex items-center space-x-3">
-            <div class="w-9 h-9 rounded-xl bg-purple-100 text-purple-700 flex items-center justify-center">
-              <i data-lucide="shield-check" class="w-5 h-5"></i>
-            </div>
-            <div>
-              <p class="text-xs font-bold text-slate-900">Dean of Student Affairs (Admin)</p>
-              <p class="text-[10px] text-slate-500">Oversight, Vendor Management & Finances</p>
-            </div>
-          </div>
-          <i data-lucide="chevron-right" class="w-4 h-4 text-slate-400"></i>
-        </button>
-      </div>
-    </div>
-  </div>
 
   <!-- 🖨️ PRINTABLE RECEIPT TEMPLATE (Hidden from screen, visible when printing) -->
   <div id="printable-receipt" class="hidden p-8 max-w-sm mx-auto bg-white border border-slate-300 rounded-lg text-slate-900 text-xs font-mono space-y-4">
@@ -3247,15 +3194,6 @@
       document.body.removeChild(link);
 
       showToast('Sales Report CSV downloaded successfully.', 'success');
-    }
-
-    function openAuthModal() {
-      document.getElementById('auth-modal').classList.remove('hidden');
-      lucide.createIcons();
-    }
-
-    function closeAuthModal() {
-      document.getElementById('auth-modal').classList.add('hidden');
     }
 
     function showToast(message, type = 'info') {
