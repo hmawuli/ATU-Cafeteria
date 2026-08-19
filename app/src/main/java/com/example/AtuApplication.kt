@@ -77,6 +77,25 @@ class AtuApplication : Application(), ImageLoaderFactory {
     }
 
     /**
+     * Handle system memory trim requests to comply with modern Android Q+ memory management.
+     */
+    override fun onTrimMemory(level: Int) {
+        super.onTrimMemory(level)
+        try {
+            if (level >= android.content.ComponentCallbacks2.TRIM_MEMORY_RUNNING_MODERATE) {
+                coil.Coil.imageLoader(this).memoryCache?.clear()
+            }
+        } catch (_: Exception) {}
+    }
+
+    override fun onLowMemory() {
+        super.onLowMemory()
+        try {
+            coil.Coil.imageLoader(this).memoryCache?.clear()
+        } catch (_: Exception) {}
+    }
+
+    /**
      * Custom Exception Handler to capture and report non-fatal and uncaught
      * UI thread exceptions to console.
      */
