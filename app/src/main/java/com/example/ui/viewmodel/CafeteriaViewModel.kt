@@ -1549,6 +1549,52 @@ class CafeteriaViewModel @Inject constructor(
         }
     }
 
+    fun loginAsGuest(onComplete: (Boolean) -> Unit) {
+        viewModelScope.launch {
+            _isLoading.value = true
+            _loginError.value = null
+            try {
+                val guestSuffix = (1000..9999).random()
+                val guestUsername = "guest_$guestSuffix"
+                val guestId = "GUEST-$guestSuffix"
+                val guestFullName = "Campus Visitor"
+                
+                var user = repository.registerUser(
+                    username = guestUsername,
+                    pinCode = "1234",
+                    role = "STUDENT",
+                    fullName = guestFullName,
+                    info = guestId
+                )
+                
+                if (user == null) {
+                    user = repository.authenticateUser("guest", "1234")
+                }
+                
+                if (user != null) {
+                    _currentUser.value = user
+                    userSessionRepo.saveSession(
+                        token = "GUEST_TOKEN_${System.currentTimeMillis()}_${user.id}",
+                        userId = user.id,
+                        userName = user.username,
+                        role = user.role
+                    )
+                    repository.insertAuditLog(user.id, "GUEST_LOGIN", "Campus visitor logged in with Pass #$guestId.")
+                    _isLoading.value = false
+                    onComplete(true)
+                } else {
+                    _loginError.value = "Unable to create visitor session. Please try again."
+                    _isLoading.value = false
+                    onComplete(false)
+                }
+            } catch (e: Exception) {
+                _loginError.value = "Guest login error: ${e.localizedMessage}"
+                _isLoading.value = false
+                onComplete(false)
+            }
+        }
+    }
+
     fun registerUser(username: String, pinCode: String, role: String, fullName: String, info: String) {
         viewModelScope.launch {
             _isLoading.value = true

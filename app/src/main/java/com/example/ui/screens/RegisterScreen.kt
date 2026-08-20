@@ -74,7 +74,8 @@ fun RegisterScreen(
     var pinCode by remember { mutableStateOf("") }
     var fullName by remember { mutableStateOf("") }
     var info by remember { mutableStateOf("") }
-    var role by remember { mutableStateOf("STUDENT") } // "STUDENT" or "VENDOR"
+    var userCategory by remember { mutableStateOf("STUDENT") } // "STUDENT" or "GUEST"
+    var role by remember { mutableStateOf("STUDENT") }
 
     val regSuccess by viewModel.registrationSuccess.collectAsStateWithLifecycle()
     val loginError by viewModel.loginError.collectAsStateWithLifecycle()
@@ -103,18 +104,48 @@ fun RegisterScreen(
             verticalArrangement = Arrangement.Top
         ) {
             Text(
-                "Create Student Account",
+                if (userCategory == "GUEST") "Create Visitor Account" else "Create Student Account",
                 style = MaterialTheme.typography.headlineSmall,
                 fontWeight = FontWeight.Bold,
                 color = MaterialTheme.colorScheme.primary
             )
             Text(
-                "Create your account to order meals, track deliveries, and manage your campus cafeteria wallet",
+                if (userCategory == "GUEST") 
+                    "Visiting Accra Technical University? Register for instant food ordering with MoMo/Card wallet" 
+                else 
+                    "Create your account to order meals, track deliveries, and manage your campus cafeteria wallet",
                 style = MaterialTheme.typography.bodySmall,
                 textAlign = TextAlign.Center,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.padding(top = 4.dp, bottom = 24.dp)
+                modifier = Modifier.padding(top = 4.dp, bottom = 16.dp)
             )
+
+            // Account Type Selector Tabs (Student vs Visitor)
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(bottom = 16.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                FilterChip(
+                    selected = userCategory == "STUDENT",
+                    onClick = { userCategory = "STUDENT" },
+                    label = { Text("ATU Student", fontWeight = FontWeight.Bold) },
+                    leadingIcon = {
+                        Icon(Icons.Default.School, contentDescription = null, modifier = Modifier.size(16.dp))
+                    },
+                    modifier = Modifier.weight(1f)
+                )
+                FilterChip(
+                    selected = userCategory == "GUEST",
+                    onClick = { userCategory = "GUEST" },
+                    label = { Text("Guest / Visitor", fontWeight = FontWeight.Bold) },
+                    leadingIcon = {
+                        Icon(Icons.Default.PersonOutline, contentDescription = null, modifier = Modifier.size(16.dp))
+                    },
+                    modifier = Modifier.weight(1f)
+                )
+            }
 
             Card(
                 modifier = Modifier.fillMaxWidth(),
@@ -129,21 +160,39 @@ fun RegisterScreen(
                         value = fullName,
                         onValueChange = { fullName = it },
                         label = { Text("Full Name") },
-                        placeholder = { Text("e.g. Mawuli Hormeku") },
+                        placeholder = { Text(if (userCategory == "GUEST") "e.g. Visitor Kwesi" else "e.g. Mawuli Hormeku") },
                         modifier = Modifier.fillMaxWidth(),
                         singleLine = true
                     )
 
                     Spacer(modifier = Modifier.height(12.dp))
 
-                    OutlinedTextField(
-                        value = info,
-                        onValueChange = { info = it },
-                        label = { Text("Student Index / Matric ID Number") },
-                        placeholder = { Text("e.g., 01210492B or ATU-2024-X45") },
-                        modifier = Modifier.fillMaxWidth(),
-                        singleLine = true
-                    )
+                    if (userCategory == "STUDENT") {
+                        OutlinedTextField(
+                            value = info,
+                            onValueChange = { info = it },
+                            label = { Text("Student Index / Matric ID Number") },
+                            placeholder = { Text("e.g., 01210492B or ATU-2024-X45") },
+                            modifier = Modifier.fillMaxWidth(),
+                            singleLine = true
+                        )
+                    } else {
+                        OutlinedTextField(
+                            value = info,
+                            onValueChange = { info = it },
+                            label = { Text("Phone / National ID / Pass (Optional)") },
+                            placeholder = { Text("e.g., 0244123456 or leave blank") },
+                            modifier = Modifier.fillMaxWidth(),
+                            singleLine = true
+                        )
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Text(
+                            "✨ No student ID needed! A digital visitor dining pass will be generated automatically.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.primary,
+                            fontSize = 11.sp
+                        )
+                    }
 
                     Spacer(modifier = Modifier.height(12.dp))
 
@@ -151,7 +200,7 @@ fun RegisterScreen(
                         value = username,
                         onValueChange = { username = it },
                         label = { Text("Email or Username") },
-                        placeholder = { Text("e.g. student@atu.edu.gh") },
+                        placeholder = { Text(if (userCategory == "GUEST") "e.g. visitor@gmail.com or kwame" else "e.g. student@atu.edu.gh") },
                         modifier = Modifier.fillMaxWidth(),
                         singleLine = true
                     )
@@ -203,7 +252,10 @@ fun RegisterScreen(
                                 }
                                 Spacer(modifier = Modifier.height(6.dp))
                                 Text(
-                                    "Your profile has been enlisted with GH₵ 150.00 starting wallet credit.",
+                                    if (userCategory == "GUEST")
+                                        "Your visitor pass is ready with GH₵ 150.00 starting cafeteria balance."
+                                    else
+                                        "Your profile has been enlisted with GH₵ 150.00 starting wallet credit.",
                                     color = Color(0xFF1B5E20),
                                     fontSize = 12.sp,
                                     textAlign = TextAlign.Center
@@ -228,18 +280,22 @@ fun RegisterScreen(
                     } else if (!regSuccess) {
                         Button(
                             onClick = {
+                                val generatedId = if (info.isBlank()) {
+                                    if (userCategory == "GUEST") "GUEST-${(1000..9999).random()}" else "01210${(100..999).random()}B"
+                                } else info
+
                                 viewModel.registerUser(
                                     username = username.trim().lowercase(),
                                     pinCode = pinCode,
                                     role = role,
                                     fullName = fullName,
-                                    info = info
+                                    info = generatedId
                                 )
                             },
                             modifier = Modifier.fillMaxWidth(),
                             shape = RoundedCornerShape(8.dp)
                         ) {
-                            Text("Enlist New Profile", fontWeight = FontWeight.Bold)
+                            Text(if (userCategory == "GUEST") "Create Visitor Account" else "Enlist New Profile", fontWeight = FontWeight.Bold)
                         }
                     }
 

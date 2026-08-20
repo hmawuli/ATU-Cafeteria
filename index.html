@@ -252,6 +252,19 @@
               <span>Secure Login</span>
             </button>
 
+            <!-- Campus Guest & Visitor Fast Track Button -->
+            <div class="pt-2">
+              <div class="relative flex py-1 items-center">
+                <div class="flex-grow border-t border-slate-200"></div>
+                <span class="shrink-0 mx-3 text-[10px] uppercase font-bold text-amber-600 bg-amber-50 px-2 py-0.5 rounded-full border border-amber-200">Campus Visitor?</span>
+                <div class="flex-grow border-t border-slate-200"></div>
+              </div>
+              <button type="button" onclick="loginAsGuest()" class="w-full mt-1.5 py-2.5 px-4 bg-amber-50 hover:bg-amber-100/80 border border-amber-300 rounded-xl text-xs font-black text-amber-900 flex items-center justify-center gap-2 transition-all active:scale-98">
+                <i data-lucide="user-check" class="w-4 h-4 text-amber-600"></i>
+                <span>Continue as Campus Guest / Visitor (No Student ID Required)</span>
+              </button>
+            </div>
+
             <!-- Prompt to create account -->
             <div class="text-center pt-2">
               <p class="text-xs text-slate-500">
@@ -265,10 +278,29 @@
           <div id="auth-signup-form" class="hidden space-y-4">
             <div class="flex items-center justify-between pb-1 border-b border-slate-100">
               <div>
-                <h3 class="text-base font-black text-slate-900">Create Student Account</h3>
-                <p class="text-xs text-slate-500">Enlist to order meals & receive GH₵ 150.00 wallet</p>
+                <h3 class="text-base font-black text-slate-900">Create Account</h3>
+                <p class="text-xs text-slate-500">For students, staff, and campus visitors</p>
               </div>
-              <span class="text-[10px] font-bold text-brand-700 bg-brand-50 px-2.5 py-1 rounded-full border border-brand-200">New Registration</span>
+              <span class="text-[10px] font-bold text-brand-700 bg-brand-50 px-2.5 py-1 rounded-full border border-brand-200">Registration</span>
+            </div>
+
+            <!-- User Account Category (Student vs Campus Guest/Visitor) -->
+            <div>
+              <label class="block text-xs font-bold text-slate-700 mb-1.5">I am registering as a:</label>
+              <div class="grid grid-cols-2 gap-2">
+                <label class="flex items-center gap-2 p-2 rounded-xl border-2 border-brand-500 bg-brand-50/50 cursor-pointer" id="user-type-label-student">
+                  <input type="radio" name="reg-user-type" value="STUDENT" checked onchange="toggleUserRegistrationType('STUDENT')" class="text-brand-600 focus:ring-brand-500">
+                  <span class="text-xs font-bold text-slate-800 flex items-center gap-1">
+                    <i data-lucide="graduation-cap" class="w-3.5 h-3.5 text-brand-600"></i> ATU Student
+                  </span>
+                </label>
+                <label class="flex items-center gap-2 p-2 rounded-xl border-2 border-slate-200 bg-slate-50 cursor-pointer" id="user-type-label-guest">
+                  <input type="radio" name="reg-user-type" value="GUEST" onchange="toggleUserRegistrationType('GUEST')" class="text-brand-600 focus:ring-brand-500">
+                  <span class="text-xs font-bold text-slate-800 flex items-center gap-1">
+                    <i data-lucide="user" class="w-3.5 h-3.5 text-amber-600"></i> Guest / Visitor
+                  </span>
+                </label>
+              </div>
             </div>
 
             <!-- Social Quick Sign Up: Google / Gmail Button -->
@@ -298,13 +330,19 @@
               </div>
             </div>
 
-            <!-- Student Index No / ID -->
+            <!-- Student Index No or Visitor Phone / Tag -->
             <div>
-              <label class="block text-xs font-bold text-slate-700 mb-1">Student Index / ID Number</label>
+              <div class="flex items-center justify-between mb-1">
+                <label id="reg-id-label" class="block text-xs font-bold text-slate-700">Student Index / ID Number</label>
+                <span id="reg-id-badge" class="text-[10px] text-slate-400">Required for students</span>
+              </div>
               <div class="relative">
-                <i data-lucide="badge-check" class="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2"></i>
+                <i data-lucide="badge-check" id="reg-id-icon" class="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2"></i>
                 <input type="text" id="reg-extra-info" placeholder="e.g. 01210492B" class="w-full pl-10 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-800 outline-none focus:ring-2 focus:ring-brand-500" />
               </div>
+              <p id="reg-id-hint" class="text-[10px] text-slate-400 mt-1 hidden text-amber-700 bg-amber-50/70 px-2 py-1 rounded-lg border border-amber-200">
+                ✨ <strong>No student ID needed!</strong> You can leave this blank or enter your phone number. A guest dining pass will be generated automatically.
+              </p>
             </div>
 
             <!-- Username / Email -->
@@ -312,7 +350,7 @@
               <label class="block text-xs font-bold text-slate-700 mb-1">Email or Username</label>
               <div class="relative">
                 <i data-lucide="mail" class="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2"></i>
-                <input type="email" id="reg-email" placeholder="e.g. student@atu.edu.gh" class="w-full pl-10 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-800 outline-none focus:ring-2 focus:ring-brand-500" />
+                <input type="email" id="reg-email" placeholder="e.g. visitor@gmail.com or kwame" class="w-full pl-10 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-800 outline-none focus:ring-2 focus:ring-brand-500" />
               </div>
             </div>
 
@@ -331,7 +369,7 @@
             <!-- Submit Registration Button -->
             <button onclick="handleUserRegistration()" class="w-full py-3 bg-[#0d1e38] hover:bg-[#162d50] text-white rounded-xl text-xs font-black shadow-md flex items-center justify-center gap-2 transition-transform active:scale-95">
               <i data-lucide="user-plus" class="w-4 h-4 text-amber-400"></i>
-              <span>Create Account & Sign In</span>
+              <span id="reg-submit-btn-text">Create Account & Sign In</span>
             </button>
 
             <!-- Back to Sign In Link -->
@@ -1431,15 +1469,74 @@
       if (tab === 'signup') {
         signinForm.classList.add('hidden');
         signupForm.classList.remove('hidden');
-        btnSignin.className = 'flex-1 py-2 rounded-xl text-xs font-bold transition-all text-slate-500 hover:text-slate-900 flex items-center justify-center gap-1.5';
-        btnSignup.className = 'flex-1 py-2 rounded-xl text-xs font-black transition-all bg-white text-slate-900 shadow-xs flex items-center justify-center gap-1.5';
+        btnSignin.className = 'flex-1 py-2.5 rounded-xl text-xs font-bold transition-all text-slate-500 hover:text-slate-900 flex items-center justify-center gap-2';
+        btnSignup.className = 'flex-1 py-2.5 rounded-xl text-xs font-black transition-all bg-white text-slate-900 shadow-xs flex items-center justify-center gap-2';
       } else {
         signupForm.classList.add('hidden');
         signinForm.classList.remove('hidden');
-        btnSignup.className = 'flex-1 py-2 rounded-xl text-xs font-bold transition-all text-slate-500 hover:text-slate-900 flex items-center justify-center gap-1.5';
-        btnSignin.className = 'flex-1 py-2 rounded-xl text-xs font-black transition-all bg-white text-slate-900 shadow-xs flex items-center justify-center gap-1.5';
+        btnSignup.className = 'flex-1 py-2.5 rounded-xl text-xs font-bold transition-all text-slate-500 hover:text-slate-900 flex items-center justify-center gap-2';
+        btnSignin.className = 'flex-1 py-2.5 rounded-xl text-xs font-black transition-all bg-white text-slate-900 shadow-xs flex items-center justify-center gap-2';
       }
       lucide.createIcons();
+    }
+
+    function toggleUserRegistrationType(type) {
+      const studentLabel = document.getElementById('user-type-label-student');
+      const guestLabel = document.getElementById('user-type-label-guest');
+      const idLabel = document.getElementById('reg-id-label');
+      const idBadge = document.getElementById('reg-id-badge');
+      const idInput = document.getElementById('reg-extra-info');
+      const idHint = document.getElementById('reg-id-hint');
+      const submitText = document.getElementById('reg-submit-btn-text');
+
+      if (type === 'GUEST') {
+        studentLabel.className = 'flex items-center gap-2 p-2 rounded-xl border-2 border-slate-200 bg-slate-50 cursor-pointer';
+        guestLabel.className = 'flex items-center gap-2 p-2 rounded-xl border-2 border-brand-500 bg-brand-50/50 cursor-pointer';
+        if (idLabel) idLabel.innerText = 'Phone / National ID / Guest Pass';
+        if (idBadge) idBadge.innerText = 'Optional for visitors';
+        if (idInput) idInput.placeholder = 'e.g. 0244123456 or leave blank';
+        if (idHint) idHint.classList.remove('hidden');
+        if (submitText) submitText.innerText = 'Create Visitor Account & Sign In';
+      } else {
+        studentLabel.className = 'flex items-center gap-2 p-2 rounded-xl border-2 border-brand-500 bg-brand-50/50 cursor-pointer';
+        guestLabel.className = 'flex items-center gap-2 p-2 rounded-xl border-2 border-slate-200 bg-slate-50 cursor-pointer';
+        if (idLabel) idLabel.innerText = 'Student Index / ID Number';
+        if (idBadge) idBadge.innerText = 'Required for students';
+        if (idInput) idInput.placeholder = 'e.g. 01210492B';
+        if (idHint) idHint.classList.add('hidden');
+        if (submitText) submitText.innerText = 'Create Account & Sign In';
+      }
+      lucide.createIcons();
+    }
+
+    function loginAsGuest() {
+      const guestId = 'GUEST-' + Math.floor(1000 + Math.random() * 9000);
+      const guestUser = {
+        id: Date.now(),
+        name: 'Campus Guest',
+        indexNo: guestId,
+        email: 'guest@atu-cafeteria.campus',
+        balance: 150.00,
+        isGuest: true
+      };
+      registeredStudents.push(guestUser);
+
+      currentLoggedInUser = {
+        role: 'STUDENT',
+        name: guestUser.name,
+        indexNo: guestUser.indexNo,
+        email: guestUser.email,
+        balance: guestUser.balance,
+        authProvider: 'Campus Visitor Pass',
+        isGuest: true
+      };
+
+      studentBalance = guestUser.balance;
+      applyUserSession();
+      switchRole('STUDENT');
+      auditLogs.unshift(`Campus visitor entered system with Pass #${guestId} and GH₵ 150.00 trial balance.`);
+      showToast(`Welcome to ATU Campus! You are dining as a Campus Guest (Pass #${guestId}).`, 'success');
+      playChime(659.25);
     }
 
     function handleUserRegistration() {
@@ -1447,6 +1544,12 @@
       const indexInput = (document.getElementById('reg-extra-info') ? document.getElementById('reg-extra-info').value.trim() : '');
       const email = (document.getElementById('reg-email') ? document.getElementById('reg-email').value.trim() : '');
       const pass = (document.getElementById('reg-pass') ? document.getElementById('reg-pass').value.trim() : '');
+      
+      const typeRadios = document.getElementsByName('reg-user-type');
+      let selectedType = 'STUDENT';
+      for (const r of typeRadios) {
+        if (r.checked) selectedType = r.value;
+      }
 
       if (!fullName) {
         showToast('Please enter your full name.', 'error');
@@ -1461,13 +1564,17 @@
         return;
       }
 
-      const indexNo = indexInput || ('01210' + Math.floor(100 + Math.random() * 900) + 'B');
+      const indexNo = indexInput || (selectedType === 'GUEST' 
+        ? ('GUEST-' + Math.floor(1000 + Math.random() * 9000))
+        : ('01210' + Math.floor(100 + Math.random() * 900) + 'B'));
+
       const newStudent = {
         id: Date.now(),
         name: fullName,
         indexNo: indexNo,
         email: email,
-        balance: 150.00
+        balance: 150.00,
+        isGuest: (selectedType === 'GUEST')
       };
       registeredStudents.push(newStudent);
 
@@ -1477,14 +1584,16 @@
         indexNo: newStudent.indexNo,
         email: newStudent.email,
         balance: newStudent.balance,
-        authProvider: 'Registered Account'
+        authProvider: selectedType === 'GUEST' ? 'Visitor Registration' : 'Student Registration',
+        isGuest: (selectedType === 'GUEST')
       };
 
       studentBalance = newStudent.balance;
       applyUserSession();
       switchRole('STUDENT');
-      auditLogs.unshift(`User account created: ${fullName} (${email}, Index: ${indexNo}) with GH₵ 150.00 initial wallet.`);
-      showToast(`Welcome, ${fullName}! Your account is active with GH₵ 150.00 wallet credit.`, 'success');
+      const userLabel = selectedType === 'GUEST' ? `Campus Guest (${fullName})` : `Student (${fullName})`;
+      auditLogs.unshift(`${userLabel} registered with ID ${indexNo} & GH₵ 150.00 wallet.`);
+      showToast(`Account Created Successfully! Welcome to ATU Cafeteria, ${fullName}.`, 'success');
       playChime(659.25);
     }
 
@@ -1663,9 +1772,15 @@
 
       if (activeRoleTag) {
         if (currentLoggedInUser.role === 'STUDENT') {
-          activeRoleTag.innerText = 'Student Hub';
-          activeRoleTag.className = 'text-[10px] uppercase font-black bg-brand-100 text-brand-700 px-2.5 py-0.5 rounded-full border border-brand-200';
-          if (activeRoleSubtext) activeRoleSubtext.innerText = 'Accra Technical University Central Food Pre-Ordering';
+          if (currentLoggedInUser.isGuest || (currentLoggedInUser.indexNo && currentLoggedInUser.indexNo.startsWith('GUEST'))) {
+            activeRoleTag.innerText = 'Campus Visitor Pass';
+            activeRoleTag.className = 'text-[10px] uppercase font-black bg-amber-100 text-amber-800 px-2.5 py-0.5 rounded-full border border-amber-300';
+            if (activeRoleSubtext) activeRoleSubtext.innerText = 'ATU Guest Dining & Food Pre-Ordering Portal';
+          } else {
+            activeRoleTag.innerText = 'Student Hub';
+            activeRoleTag.className = 'text-[10px] uppercase font-black bg-brand-100 text-brand-700 px-2.5 py-0.5 rounded-full border border-brand-200';
+            if (activeRoleSubtext) activeRoleSubtext.innerText = 'Accra Technical University Central Food Pre-Ordering';
+          }
         } else if (currentLoggedInUser.role === 'VENDOR') {
           activeRoleTag.innerText = 'Kitchen Station';
           activeRoleTag.className = 'text-[10px] uppercase font-black bg-blue-100 text-blue-700 px-2.5 py-0.5 rounded-full border border-blue-200';
