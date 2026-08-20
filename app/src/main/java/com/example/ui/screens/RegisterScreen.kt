@@ -103,13 +103,13 @@ fun RegisterScreen(
             verticalArrangement = Arrangement.Top
         ) {
             Text(
-                "Enroll New Account Profile",
+                "Create Student Account",
                 style = MaterialTheme.typography.headlineSmall,
                 fontWeight = FontWeight.Bold,
                 color = MaterialTheme.colorScheme.primary
             )
             Text(
-                "Become a registered guest or secure seller on at ATU Cafeteria campus",
+                "Create your account to order meals, track deliveries, and manage your campus cafeteria wallet",
                 style = MaterialTheme.typography.bodySmall,
                 textAlign = TextAlign.Center,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -122,65 +122,14 @@ fun RegisterScreen(
                 colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
             ) {
                 Column(modifier = Modifier.padding(20.dp)) {
-                    Text("Account Specification", fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleMedium)
-                    Spacer(modifier = Modifier.height(12.dp))
-
-                    // Role Picker Tab
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .clip(RoundedCornerShape(8.dp))
-                            .background(MaterialTheme.colorScheme.surfaceVariant),
-                        horizontalArrangement = Arrangement.SpaceAround
-                    ) {
-                        Box(
-                            modifier = Modifier
-                                .weight(1f)
-                                .clickable { role = "STUDENT" }
-                                .background(if (role == "STUDENT") MaterialTheme.colorScheme.primary else Color.Transparent)
-                                .padding(12.dp),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Text(
-                                "Student Account",
-                                color = if (role == "STUDENT") MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant,
-                                fontWeight = FontWeight.Bold,
-                                fontSize = 12.sp
-                            )
-                        }
-                        Box(
-                            modifier = Modifier
-                                .weight(1f)
-                                .clickable { role = "VENDOR" }
-                                .background(if (role == "VENDOR") MaterialTheme.colorScheme.primary else Color.Transparent)
-                                .padding(12.dp),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Text(
-                                "Vendor Account",
-                                color = if (role == "VENDOR") MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant,
-                                fontWeight = FontWeight.Bold,
-                                fontSize = 12.sp
-                            )
-                        }
-                    }
-
+                    Text("Account Details", fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleMedium)
                     Spacer(modifier = Modifier.height(16.dp))
-
-                    OutlinedTextField(
-                        value = username,
-                        onValueChange = { username = it },
-                        label = { Text("Unified Login Username") },
-                        modifier = Modifier.fillMaxWidth(),
-                        singleLine = true
-                    )
-
-                    Spacer(modifier = Modifier.height(12.dp))
 
                     OutlinedTextField(
                         value = fullName,
                         onValueChange = { fullName = it },
-                        label = { Text("Full Profile Name") },
+                        label = { Text("Full Name") },
+                        placeholder = { Text("e.g. Mawuli Hormeku") },
                         modifier = Modifier.fillMaxWidth(),
                         singleLine = true
                     )
@@ -190,12 +139,19 @@ fun RegisterScreen(
                     OutlinedTextField(
                         value = info,
                         onValueChange = { info = it },
-                        label = {
-                            Text(if (role == "STUDENT") "Student Matric Card ID Number" else "Vendor Kitchen Brand Title (e.g. Sobolo Palace)")
-                        },
-                        placeholder = {
-                            Text(if (role == "STUDENT") "e.g., ATU-2024-X45" else "e.g., Auntie Mary Delight")
-                        },
+                        label = { Text("Student Index / Matric ID Number") },
+                        placeholder = { Text("e.g., 01210492B or ATU-2024-X45") },
+                        modifier = Modifier.fillMaxWidth(),
+                        singleLine = true
+                    )
+
+                    Spacer(modifier = Modifier.height(12.dp))
+
+                    OutlinedTextField(
+                        value = username,
+                        onValueChange = { username = it },
+                        label = { Text("Email or Username") },
+                        placeholder = { Text("e.g. student@atu.edu.gh") },
                         modifier = Modifier.fillMaxWidth(),
                         singleLine = true
                     )
