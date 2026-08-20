@@ -54,6 +54,9 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.delay
 import androidx.navigation.NavController
 import com.example.data.*
+import com.example.data.recommendation.*
+import com.example.ui.components.FoodRecommendationSection
+import com.example.ui.components.DietaryPreferencesDialog
 import com.example.ui.components.D3DashboardChart
 import com.example.ui.components.D3MonthlySpendingChart
 import com.example.ui.components.RechartsDashboardChart
@@ -163,6 +166,12 @@ fun StudentDashboardScreen(
     val popularTodayContent by viewModel.popularTodayContent.collectAsStateWithLifecycle()
     val isPopularTodayLoading by viewModel.isPopularTodayLoading.collectAsStateWithLifecycle()
     val isLoading by viewModel.isLoading.collectAsStateWithLifecycle()
+
+    // Recommendation Engine Reactive States
+    val recommendedItems by viewModel.recommendedItems.collectAsStateWithLifecycle()
+    val activeRecommendationStrategy by viewModel.activeRecommendationStrategy.collectAsStateWithLifecycle()
+    val dietaryPreferences by viewModel.dietaryPreferences.collectAsStateWithLifecycle()
+    var showDietaryPreferencesDialog by remember { mutableStateOf(false) }
     val currentTotalPoints = remember(studentOrders) {
         studentOrders.sumOf { order ->
             if (order.status.uppercase() == "COMPLETED") 25 else 10
@@ -1445,207 +1454,26 @@ fun StudentDashboardScreen(
                         }
 
                         item {
-                            // Intelligent AI Recommendations Section (Recommendation Engine)
-                            data class RecommendedFood(val foodItem: FoodItem, val reason: String)
-                            val recommendationsList = remember(allFoodItems, studentOrders, allOrdersSnapshot) {
-                                if (allFoodItems.isEmpty()) {
-                                    emptyList()
-                                } else if (studentOrders.isEmpty()) {
-                                    // New User algorithm: recommend based on system-wide order popularity
-                                    val orderCounts = allOrdersSnapshot.groupBy { it.foodItemId }.mapValues { it.value.sumOf { o -> o.quantity } }
-                                    allFoodItems
-                                        .sortedByDescending { orderCounts[it.id] ?: 0 }
-                                        .take(4)
-                                        .map { item ->
-                                            val qtySold = orderCounts[item.id] ?: 0
-                                            val reason = if (qtySold > 0) "Popular choice among ATU students ($qtySold portions sold)" else "Highly rated campus local specialty"
-                                            RecommendedFood(item, reason)
-                                        }
-                                } else {
-                                    // Retrospective existing user algorithm: calculate category affinity & frequency
-                                    val userItemCounts = studentOrders.groupBy { it.foodItemId }.mapValues { it.value.sumOf { o -> o.quantity } }
-                                    val userCategoryCounts = studentOrders.groupBy { o -> 
-                                        allFoodItems.find { it.id == o.foodItemId }?.category ?: "Local Dish"
-                                    }.mapValues { it.value.size }
-                                    
-                                    val favoriteCategory = userCategoryCounts.maxByOrNull { it.value }?.key ?: "Local Dish"
-                                    val recommended = mutableListOf<RecommendedFood>()
-
-                                    // 1. Re-purchase items (highly ordered items)
-                                    val highlyOrderedIds = userItemCounts.filter { it.value > 1 }.keys
-                                    allFoodItems.filter { it.id in highlyOrderedIds }.take(2).forEach { item ->
-                                        recommended.add(RecommendedFood(item, "You ordered this ${userItemCounts[item.id]}x recently"))
-                                    }
-
-                                    // 2. Cross-promote popular in favorite category (which user hasn't ordered yet)
-                                    val orderedIds = studentOrders.map { it.foodItemId }.toSet()
-                                    allFoodItems
-                                        .filter { it.category == favoriteCategory && it.id !in orderedIds && it.isAvailable }
-                                        .take(2)
-                                        .forEach { item ->
-                                            recommended.add(RecommendedFood(item, "Special recipe in your favorite category: ${item.category}"))
-                                        }
-
-                                    // 3. Fallback: general trending popular items that are not ordered yet
-                                    if (recommended.size < 4) {
-                                        val orderCounts = allOrdersSnapshot.groupBy { it.foodItemId }.mapValues { it.value.sumOf { o -> o.quantity } }
-                                        allFoodItems
-                                            .filter { it.id !in orderedIds && it.isAvailable }
-                                            .sortedByDescending { orderCounts[it.id] ?: 0 }
-                                            .take(4 - recommended.size)
-                                            .forEach { item ->
-                                                val qty = orderCounts[item.id] ?: 0
-                                                val reason = if (qty > 0) "Trending high in cafeteria ($qty portions sold)" else "Highly rated campus local specialty"
-                                                recommended.add(RecommendedFood(item, reason))
-                                            }
-                                    }
-                                    recommended.distinctBy { it.foodItem.id }.take(4)
+                            // Smart Food Recommendation Engine Section
+                            FoodRecommendationSection(
+                                recommendedItems = recommendedItems,
+                                activeStrategy = activeRecommendationStrategy,
+                                dietaryPreferences = dietaryPreferences,
+                                onStrategySelected = { strategy ->
+                                    viewModel.setRecommendationStrategy(strategy)
+                                },
+                                onOpenDietaryPreferences = {
+                                    showDietaryPreferencesDialog = true
+                                },
+                                onAddToCart = { foodItem: FoodItem ->
+                                    viewModel.addToCart(foodItem, 1)
+                                    android.widget.Toast.makeText(context, "Added '${foodItem.name}' to cart!", android.widget.Toast.LENGTH_SHORT).show()
+                                },
+                                onItemClick = { foodItem: FoodItem ->
+                                    selectedFoodForOrder = foodItem
+                                    orderQuantity = 1
                                 }
-                            }
-
-                            if (recommendationsList.isNotEmpty()) {
-                                Column(modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp).testTag("ai_food_recommendations_section")) {
-                                    Row(
-                                        modifier = Modifier.fillMaxWidth(),
-                                        horizontalArrangement = Arrangement.SpaceBetween,
-                                        verticalAlignment = Alignment.CenterVertically
-                                    ) {
-                                        Row(verticalAlignment = Alignment.CenterVertically) {
-                                            Text("🧠", fontSize = 18.sp)
-                                            Spacer(modifier = Modifier.width(6.dp))
-                                            Text(
-                                                text = "AI Personalized Recommendations",
-                                                fontWeight = FontWeight.Bold,
-                                                style = MaterialTheme.typography.titleSmall,
-                                                color = MaterialTheme.colorScheme.primary
-                                            )
-                                        }
-                                        Box(
-                                            modifier = Modifier
-                                                .background(
-                                                    color = Color(0xFFFF9100).copy(alpha = 0.2f),
-                                                    shape = RoundedCornerShape(8.dp)
-                                                )
-                                                .padding(horizontal = 6.dp, vertical = 2.dp)
-                                        ) {
-                                            Text("Gemini Pick", fontSize = 8.sp, fontWeight = FontWeight.Bold, color = Color(0xFFFF9100))
-                                        }
-                                    }
-                                    
-                                    Spacer(modifier = Modifier.height(8.dp))
-                                    
-                                    LazyRow(
-                                        horizontalArrangement = Arrangement.spacedBy(10.dp),
-                                        modifier = Modifier.fillMaxWidth()
-                                    ) {
-                                        items(recommendationsList) { rec ->
-                                            val foodItem = rec.foodItem
-                                            val reason = rec.reason
-                                            val profile = getNutritionalProfile(foodItem)
-                                            val kcal = profile.first * 4f + profile.second * 4f + profile.third * 9f
-                                            
-                                            Card(
-                                                modifier = Modifier
-                                                    .width(225.dp)
-                                                    .clickable { 
-                                                        selectedFoodForOrder = foodItem
-                                                        orderQuantity = 1
-                                                    }
-                                                    .testTag("recommended_food_card_${foodItem.id}"),
-                                                shape = RoundedCornerShape(12.dp),
-                                                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-                                                border = androidx.compose.foundation.BorderStroke(1.2.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.3f))
-                                            ) {
-                                                Column(modifier = Modifier.padding(12.dp)) {
-                                                    Row(
-                                                        modifier = Modifier.fillMaxWidth(),
-                                                        horizontalArrangement = Arrangement.SpaceBetween,
-                                                        verticalAlignment = Alignment.CenterVertically
-                                                    ) {
-                                                        Text(
-                                                            text = foodItem.category,
-                                                            fontSize = 8.sp,
-                                                            color = MaterialTheme.colorScheme.primary,
-                                                            fontWeight = FontWeight.Bold
-                                                        )
-                                                        Text(
-                                                            text = "${kcal.toInt()} kcal",
-                                                            fontSize = 8.sp,
-                                                            fontWeight = FontWeight.Bold,
-                                                            color = Color.Gray
-                                                        )
-                                                    }
-                                                    
-                                                    Spacer(modifier = Modifier.height(4.dp))
-                                                    Text(
-                                                        text = foodItem.name,
-                                                        fontWeight = FontWeight.Bold,
-                                                        fontSize = 13.sp,
-                                                        maxLines = 1,
-                                                        color = MaterialTheme.colorScheme.onSurface
-                                                    )
-                                                    
-                                                    Spacer(modifier = Modifier.height(2.dp))
-                                                    Text(
-                                                        text = foodItem.description,
-                                                        fontSize = 9.sp,
-                                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                                        maxLines = 2,
-                                                        lineHeight = 11.sp,
-                                                        modifier = Modifier.height(22.dp)
-                                                    )
-
-                                                    Spacer(modifier = Modifier.height(4.dp))
-                                                    // Recommendation Reason Badge
-                                                    Box(
-                                                        modifier = Modifier
-                                                            .fillMaxWidth()
-                                                            .clip(RoundedCornerShape(4.dp))
-                                                            .background(MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.5f))
-                                                            .padding(horizontal = 6.dp, vertical = 3.dp)
-                                                    ) {
-                                                        Text(
-                                                            text = reason,
-                                                            fontSize = 8.sp,
-                                                            color = MaterialTheme.colorScheme.onSecondaryContainer,
-                                                            fontWeight = FontWeight.Bold,
-                                                            maxLines = 1
-                                                        )
-                                                    }
-                                                    
-                                                    Spacer(modifier = Modifier.height(8.dp))
-                                                    Row(
-                                                        modifier = Modifier.fillMaxWidth(),
-                                                        horizontalArrangement = Arrangement.SpaceBetween,
-                                                        verticalAlignment = Alignment.CenterVertically
-                                                    ) {
-                                                        Text(
-                                                            text = "GH₵ ${"%.2f".format(foodItem.price)}",
-                                                            fontSize = 12.sp,
-                                                            fontWeight = FontWeight.ExtraBold,
-                                                            color = MaterialTheme.colorScheme.primary
-                                                        )
-                                                        
-                                                        Box(
-                                                            modifier = Modifier
-                                                                .clip(RoundedCornerShape(6.dp))
-                                                                .background(MaterialTheme.colorScheme.primary)
-                                                                .padding(horizontal = 8.dp, vertical = 4.dp)
-                                                        ) {
-                                                            Text(
-                                                                text = "Select",
-                                                                color = Color.White,
-                                                                fontSize = 9.sp,
-                                                                fontWeight = FontWeight.Bold
-                                                            )
-                                                        }
-                                                    }
-                                                }
-                                            }
-                                        }
-                                    }
-                                }
-                            }
+                            )
                         }
 
                         item {
@@ -11949,6 +11777,17 @@ fun StudentDashboardScreen(
                     availableMenu = allFoodItems,
                     viewModel = viewModel,
                     onDismiss = { showDailyHealthSummaryDialog = false }
+                )
+            }
+
+            if (showDietaryPreferencesDialog) {
+                DietaryPreferencesDialog(
+                    currentPreferences = dietaryPreferences,
+                    onSavePreferences = { newPrefs ->
+                        viewModel.updateDietaryPreferences(newPrefs)
+                        android.widget.Toast.makeText(context, "Dietary profile updated! Recommendations refreshed.", android.widget.Toast.LENGTH_SHORT).show()
+                    },
+                    onDismiss = { showDietaryPreferencesDialog = false }
                 )
             }
         }

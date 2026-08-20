@@ -33,13 +33,16 @@ import androidx.navigation.NavController
 import coil.compose.AsyncImage
 import com.airbnb.lottie.compose.*
 import com.example.data.FoodItem
+import com.example.data.recommendation.RecommendationStrategy
+import com.example.ui.components.DietaryPreferencesDialog
+import com.example.ui.components.FoodRecommendationSection
 import com.example.ui.viewmodel.CafeteriaViewModel
 
 /**
  * Daily Cafeteria Menu Screen.
  * Fetches and displays the daily cafeteria menu from the API/local cache
  * with smooth Lottie animations for loading and empty states, category filtering,
- * search, and quick ordering affordances.
+ * search, smart food recommendation engine, and quick ordering affordances.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -48,11 +51,17 @@ fun DailyMenuScreen(
     navController: NavController,
     onFoodClick: ((FoodItem) -> Unit)? = null
 ) {
+    val context = androidx.compose.ui.platform.LocalContext.current
     val allFoodItems by viewModel.allFoodItems.collectAsStateWithLifecycle()
     val isOnline by viewModel.isOnline.collectAsStateWithLifecycle()
+    val recommendedItems by viewModel.recommendedItems.collectAsStateWithLifecycle()
+    val activeRecommendationStrategy by viewModel.activeRecommendationStrategy.collectAsStateWithLifecycle()
+    val dietaryPreferences by viewModel.dietaryPreferences.collectAsStateWithLifecycle()
+
     var searchQuery by remember { mutableStateOf("") }
     var selectedCategory by remember { mutableStateOf("All") }
     var isRefreshing by remember { mutableStateOf(false) }
+    var showDietaryPreferencesDialog by remember { mutableStateOf(false) }
 
     val categories = remember(allFoodItems) {
         listOf("All") + allFoodItems.map { it.category }.distinct().filter { it.isNotBlank() }
@@ -216,6 +225,31 @@ fun DailyMenuScreen(
                         verticalArrangement = Arrangement.spacedBy(12.dp),
                         contentPadding = PaddingValues(bottom = 24.dp)
                     ) {
+                        if (searchQuery.isBlank() && selectedCategory == "All" && recommendedItems.isNotEmpty()) {
+                            item {
+                                FoodRecommendationSection(
+                                    recommendedItems = recommendedItems,
+                                    activeStrategy = activeRecommendationStrategy,
+                                    dietaryPreferences = dietaryPreferences,
+                                    onStrategySelected = { strategy ->
+                                        viewModel.setRecommendationStrategy(strategy)
+                                    },
+                                    onOpenDietaryPreferences = {
+                                        showDietaryPreferencesDialog = true
+                                    },
+                                    onAddToCart = { foodItem: FoodItem ->
+                                        viewModel.addToCart(foodItem, 1)
+                                        android.widget.Toast.makeText(context, "Added '${foodItem.name}' to tray!", android.widget.Toast.LENGTH_SHORT).show()
+                                    },
+                                    onItemClick = { foodItem: FoodItem ->
+                                        onFoodClick?.invoke(foodItem) ?: run {
+                                            navController.navigate("student_home")
+                                        }
+                                    }
+                                )
+                            }
+                        }
+
                         item {
                             Text(
                                 text = "Available Today (${filteredItems.size} items)",
@@ -239,6 +273,17 @@ fun DailyMenuScreen(
                     }
                 }
             }
+        }
+
+        if (showDietaryPreferencesDialog) {
+            DietaryPreferencesDialog(
+                currentPreferences = dietaryPreferences,
+                onSavePreferences = { newPrefs ->
+                    viewModel.updateDietaryPreferences(newPrefs)
+                    android.widget.Toast.makeText(context, "Dietary profile updated! Recommendations refreshed.", android.widget.Toast.LENGTH_SHORT).show()
+                },
+                onDismiss = { showDietaryPreferencesDialog = false }
+            )
         }
     }
 }

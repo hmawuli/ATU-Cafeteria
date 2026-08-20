@@ -115,8 +115,20 @@
           </div>
         </div>
 
+        <!-- AUTH TABS: SIGN IN vs CREATE ACCOUNT -->
+        <div class="flex items-center p-1 bg-slate-100 rounded-2xl border border-slate-200">
+          <button id="tab-btn-signin" onclick="switchAuthTab('signin')" class="flex-1 py-2 rounded-xl text-xs font-black transition-all bg-white text-slate-900 shadow-xs flex items-center justify-center gap-1.5">
+            <i data-lucide="log-in" class="w-3.5 h-3.5 text-brand-600"></i>
+            <span>Sign In</span>
+          </button>
+          <button id="tab-btn-signup" onclick="switchAuthTab('signup')" class="flex-1 py-2 rounded-xl text-xs font-bold transition-all text-slate-500 hover:text-slate-900 flex items-center justify-center gap-1.5">
+            <i data-lucide="user-plus" class="w-3.5 h-3.5 text-amber-500"></i>
+            <span>Create Account</span>
+          </button>
+        </div>
+
         <!-- UNIFIED USER SIGN IN FORM -->
-        <div class="space-y-4 pt-1">
+        <div id="auth-signin-form" class="space-y-4 pt-1">
           <div class="flex items-center justify-between pb-1 border-b border-slate-100">
             <h3 class="text-base font-black text-slate-900">User Sign In</h3>
             <span class="text-[10px] font-bold text-slate-500 bg-slate-100 px-2.5 py-0.5 rounded-full border border-slate-200">Secure Portal</span>
@@ -174,6 +186,94 @@
             <i data-lucide="lock" class="w-4 h-4 text-amber-400"></i>
             <span>Secure Login</span>
           </button>
+
+          <!-- Prompt to create account -->
+          <div class="text-center pt-2">
+            <p class="text-xs text-slate-500">
+              Don't have an account? 
+              <button type="button" onclick="switchAuthTab('signup')" class="font-bold text-brand-600 hover:underline">Create Account</button>
+            </p>
+          </div>
+        </div>
+
+        <!-- NEW USER SIGN UP / REGISTRATION FORM -->
+        <div id="auth-signup-form" class="hidden space-y-4 pt-1">
+          <div class="flex items-center justify-between pb-1 border-b border-slate-100">
+            <h3 class="text-base font-black text-slate-900">Create New Account</h3>
+            <span class="text-[10px] font-bold text-amber-700 bg-amber-50 px-2.5 py-0.5 rounded-full border border-amber-200">New Registration</span>
+          </div>
+
+          <!-- Role Selection (Student vs Vendor) -->
+          <div>
+            <label class="block text-xs font-bold text-slate-700 mb-1.5">Select Account Type</label>
+            <div class="grid grid-cols-2 gap-2">
+              <label class="flex items-center gap-2 p-2.5 rounded-xl border-2 border-brand-500 bg-brand-50/50 cursor-pointer" id="role-label-student">
+                <input type="radio" name="signup-role" value="STUDENT" checked onchange="toggleSignupRole('STUDENT')" class="text-brand-600 focus:ring-brand-500">
+                <span class="text-xs font-bold text-slate-800 flex items-center gap-1">
+                  <i data-lucide="graduation-cap" class="w-3.5 h-3.5 text-brand-600"></i> Student
+                </span>
+              </label>
+              <label class="flex items-center gap-2 p-2.5 rounded-xl border-2 border-slate-200 bg-slate-50 cursor-pointer" id="role-label-vendor">
+                <input type="radio" name="signup-role" value="VENDOR" onchange="toggleSignupRole('VENDOR')" class="text-brand-600 focus:ring-brand-500">
+                <span class="text-xs font-bold text-slate-800 flex items-center gap-1">
+                  <i data-lucide="store" class="w-3.5 h-3.5 text-slate-500"></i> Vendor
+                </span>
+              </label>
+            </div>
+          </div>
+
+          <!-- Full Name -->
+          <div>
+            <label class="block text-xs font-bold text-slate-700 mb-1">Full Name</label>
+            <div class="relative">
+              <i data-lucide="user-check" class="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2"></i>
+              <input type="text" id="reg-fullname" placeholder="e.g. Mawuli Hormeku" class="w-full pl-10 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-800 outline-none focus:ring-2 focus:ring-brand-500" />
+            </div>
+          </div>
+
+          <!-- Username / Email -->
+          <div>
+            <label class="block text-xs font-bold text-slate-700 mb-1">Email or Username</label>
+            <div class="relative">
+              <i data-lucide="mail" class="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2"></i>
+              <input type="email" id="reg-email" placeholder="e.g. student@atu.edu.gh" class="w-full pl-10 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-800 outline-none focus:ring-2 focus:ring-brand-500" />
+            </div>
+          </div>
+
+          <!-- Student Index No or Vendor Stall Location -->
+          <div>
+            <label id="reg-ext-label" class="block text-xs font-bold text-slate-700 mb-1">Student Index / Matric No.</label>
+            <div class="relative">
+              <i data-lucide="badge-check" class="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2"></i>
+              <input type="text" id="reg-extra-info" placeholder="e.g. 01210492B" class="w-full pl-10 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-800 outline-none focus:ring-2 focus:ring-brand-500" />
+            </div>
+          </div>
+
+          <!-- 4-Digit Access PIN or Password -->
+          <div>
+            <label class="block text-xs font-bold text-slate-700 mb-1">Access PIN or Password (Min 4 characters)</label>
+            <div class="relative">
+              <i data-lucide="key" class="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2"></i>
+              <input type="password" id="reg-pass" placeholder="Create 4-Digit PIN or Password" class="w-full pl-10 pr-10 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-800 outline-none focus:ring-2 focus:ring-brand-500" />
+              <button type="button" onclick="togglePasswordVisibility('reg-pass', 'reg-eye-toggle')" class="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600">
+                <i data-lucide="eye" id="reg-eye-toggle" class="w-4 h-4"></i>
+              </button>
+            </div>
+          </div>
+
+          <!-- Submit Registration Button -->
+          <button onclick="handleUserRegistration()" class="w-full py-3 bg-gradient-to-r from-[#0d1e38] to-brand-700 hover:from-[#162d50] hover:to-brand-800 text-white rounded-xl text-xs font-black shadow-md flex items-center justify-center gap-2 transition-transform active:scale-95">
+            <i data-lucide="user-plus" class="w-4 h-4 text-amber-400"></i>
+            <span>Register & Log In</span>
+          </button>
+
+          <!-- Back to Sign In Link -->
+          <div class="text-center pt-2">
+            <p class="text-xs text-slate-500">
+              Already have an account? 
+              <button type="button" onclick="switchAuthTab('signin')" class="font-bold text-brand-600 hover:underline">Sign In here</button>
+            </p>
+          </div>
         </div>
       </div>
     </div>
@@ -1254,6 +1354,130 @@
     let audioChimeEnabled = true;
 
     // --- AUTHENTICATION & LOGIN GATEWAY CONTROLLER ---
+    function switchAuthTab(tab) {
+      const signinForm = document.getElementById('auth-signin-form');
+      const signupForm = document.getElementById('auth-signup-form');
+      const btnSignin = document.getElementById('tab-btn-signin');
+      const btnSignup = document.getElementById('tab-btn-signup');
+
+      if (tab === 'signup') {
+        signinForm.classList.add('hidden');
+        signupForm.classList.remove('hidden');
+        btnSignin.className = 'flex-1 py-2 rounded-xl text-xs font-bold transition-all text-slate-500 hover:text-slate-900 flex items-center justify-center gap-1.5';
+        btnSignup.className = 'flex-1 py-2 rounded-xl text-xs font-black transition-all bg-white text-slate-900 shadow-xs flex items-center justify-center gap-1.5';
+      } else {
+        signupForm.classList.add('hidden');
+        signinForm.classList.remove('hidden');
+        btnSignup.className = 'flex-1 py-2 rounded-xl text-xs font-bold transition-all text-slate-500 hover:text-slate-900 flex items-center justify-center gap-1.5';
+        btnSignin.className = 'flex-1 py-2 rounded-xl text-xs font-black transition-all bg-white text-slate-900 shadow-xs flex items-center justify-center gap-1.5';
+      }
+      lucide.createIcons();
+    }
+
+    function toggleSignupRole(role) {
+      const studentLabel = document.getElementById('role-label-student');
+      const vendorLabel = document.getElementById('role-label-vendor');
+      const extLabel = document.getElementById('reg-ext-label');
+      const extInput = document.getElementById('reg-extra-info');
+
+      if (role === 'VENDOR') {
+        studentLabel.className = 'flex items-center gap-2 p-2.5 rounded-xl border-2 border-slate-200 bg-slate-50 cursor-pointer';
+        vendorLabel.className = 'flex items-center gap-2 p-2.5 rounded-xl border-2 border-brand-500 bg-brand-50/50 cursor-pointer';
+        if (extLabel) extLabel.innerText = 'Kitchen Stall Location / Name';
+        if (extInput) extInput.placeholder = 'e.g. Food Court Stall 04 (Sobolo Palace)';
+      } else {
+        studentLabel.className = 'flex items-center gap-2 p-2.5 rounded-xl border-2 border-brand-500 bg-brand-50/50 cursor-pointer';
+        vendorLabel.className = 'flex items-center gap-2 p-2.5 rounded-xl border-2 border-slate-200 bg-slate-50 cursor-pointer';
+        if (extLabel) extLabel.innerText = 'Student Index / Matric No.';
+        if (extInput) extInput.placeholder = 'e.g. 01210492B';
+      }
+      lucide.createIcons();
+    }
+
+    function handleUserRegistration() {
+      const fullName = (document.getElementById('reg-fullname') ? document.getElementById('reg-fullname').value.trim() : '');
+      const email = (document.getElementById('reg-email') ? document.getElementById('reg-email').value.trim() : '');
+      const extraInfo = (document.getElementById('reg-extra-info') ? document.getElementById('reg-extra-info').value.trim() : '');
+      const pass = (document.getElementById('reg-pass') ? document.getElementById('reg-pass').value.trim() : '');
+      
+      const roleRadios = document.getElementsByName('signup-role');
+      let selectedRole = 'STUDENT';
+      for (const r of roleRadios) {
+        if (r.checked) selectedRole = r.value;
+      }
+
+      if (!fullName) {
+        showToast('Please enter your full name.', 'error');
+        return;
+      }
+      if (!email) {
+        showToast('Please enter an email or username.', 'error');
+        return;
+      }
+      if (!pass || pass.length < 4) {
+        showToast('Password or PIN must be at least 4 characters.', 'error');
+        return;
+      }
+
+      if (selectedRole === 'VENDOR') {
+        const newVendorId = Date.now();
+        const vendorName = extraInfo ? extraInfo : `${fullName}'s Kitchen`;
+        const newVendor = {
+          id: newVendorId,
+          name: vendorName,
+          location: extraInfo || 'Campus Food Court',
+          specialty: 'Campus Eatery',
+          phone: '+233 24 000 0000',
+          rating: 5.0,
+          isOpen: true,
+          email: email
+        };
+        vendors.push(newVendor);
+        activeVendorId = newVendorId;
+
+        currentLoggedInUser = {
+          role: 'VENDOR',
+          vendorId: newVendorId,
+          name: newVendor.name,
+          location: newVendor.location,
+          email: email
+        };
+
+        applyUserSession();
+        switchRole('VENDOR');
+        auditLogs.unshift(`New vendor registered: ${vendorName} (${email}). Kitchen station activated.`);
+        showToast(`Welcome, Chef ${fullName}! Your kitchen "${vendorName}" is now active.`, 'success');
+        playChime(783.99);
+      } else {
+        // STUDENT REGISTRATION
+        const indexNo = extraInfo || ('01210' + Math.floor(100 + Math.random() * 900) + 'B');
+        const newStudent = {
+          id: Date.now(),
+          name: fullName,
+          indexNo: indexNo,
+          email: email,
+          balance: 150.00
+        };
+        registeredStudents.push(newStudent);
+
+        currentLoggedInUser = {
+          role: 'STUDENT',
+          name: newStudent.name,
+          indexNo: newStudent.indexNo,
+          email: newStudent.email,
+          balance: newStudent.balance,
+          authProvider: 'Registered Account'
+        };
+
+        studentBalance = newStudent.balance;
+        applyUserSession();
+        switchRole('STUDENT');
+        auditLogs.unshift(`Student ${fullName} (${email}, Index: ${indexNo}) completed registration with GH₵ 150.00 wallet.`);
+        showToast(`Registration Successful! Welcome to ATU Cafeteria, ${fullName}.`, 'success');
+        playChime(659.25);
+      }
+    }
+
     function togglePasswordVisibility(inputId, iconId) {
       const input = document.getElementById(inputId);
       const icon = document.getElementById(iconId);

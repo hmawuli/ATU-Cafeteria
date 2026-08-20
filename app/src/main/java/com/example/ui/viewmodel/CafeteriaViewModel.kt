@@ -8,6 +8,7 @@ import android.net.NetworkRequest
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.data.*
+import com.example.data.recommendation.*
 import com.example.data.repository.UserSessionRepository
 import com.example.data.sync.FirestoreOrderTrackingManager
 import com.example.data.sync.FirestoreVendorStatusManager
@@ -257,6 +258,62 @@ class CafeteriaViewModel @Inject constructor(
 
     fun deletePromotionalOffer(offerId: Int) {
         _promotionalOffers.value = _promotionalOffers.value.filter { it.id != offerId }
+    }
+
+    // --- Dynamic Food Recommendation Engine Integration ---
+    private val _dietaryPreferences = MutableStateFlow(loadInitialDietaryPreferences())
+    val dietaryPreferences: StateFlow<DietaryPreferences> = _dietaryPreferences.asStateFlow()
+
+    private val _activeRecommendationStrategy = MutableStateFlow(RecommendationStrategy.TOP_PICKS)
+    val activeRecommendationStrategy: StateFlow<RecommendationStrategy> = _activeRecommendationStrategy.asStateFlow()
+
+    private val _studentOrdersFlow = _currentUser.flatMapLatest { user ->
+        if (user != null && user.role == "STUDENT") repository.getOrdersForCustomer(user.id) else flowOf(emptyList())
+    }
+
+    val recommendedItems: StateFlow<List<RecommendedItem>> = combine(
+        combine(repository.allFoodItems, _studentOrdersFlow, repository.allOrders) { food, student, campus ->
+            Triple(food, student, campus)
+        },
+        combine(repository.allVendors, _dietaryPreferences, _activeRecommendationStrategy) { vendors, prefs, strategy ->
+            Triple(vendors, prefs, strategy)
+        }
+    ) { (foodItems, studentOrders, campusOrders), (vendors, prefs, strategy) ->
+        FoodRecommendationEngine.generateRecommendations(
+            availableFoodItems = foodItems,
+            studentOrders = studentOrders,
+            allCampusOrders = campusOrders,
+            vendors = vendors,
+            dietaryPreferences = prefs,
+            strategy = strategy,
+            limit = 10
+        )
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
+    private fun loadInitialDietaryPreferences(): DietaryPreferences {
+        val prefs = getApplication<Application>().getSharedPreferences("atu_dietary_prefs", Context.MODE_PRIVATE)
+        val serialized = prefs.getString("user_dietary_settings", null)
+        return DietaryPreferences.fromSerializedString(serialized)
+    }
+
+    fun updateDietaryPreferences(newPreferences: DietaryPreferences) {
+        _dietaryPreferences.value = newPreferences
+        val prefs = getApplication<Application>().getSharedPreferences("atu_dietary_prefs", Context.MODE_PRIVATE)
+        prefs.edit().putString("user_dietary_settings", newPreferences.toSerializedString()).apply()
+        
+        viewModelScope.launch {
+            val user = _currentUser.value
+            if (user != null) {
+                val updated = user.copy(dietaryPreferences = newPreferences.toSerializedString())
+                repository.userDao.insertUser(updated)
+                _currentUser.value = updated
+            }
+        }
+        com.example.ui.util.SnackbarManager.showMessage("Dietary preferences updated! Recommendations refreshed.")
+    }
+
+    fun setRecommendationStrategy(strategy: RecommendationStrategy) {
+        _activeRecommendationStrategy.value = strategy
     }
 
     // --- Dynamic Shopping Cart States & Controls ---

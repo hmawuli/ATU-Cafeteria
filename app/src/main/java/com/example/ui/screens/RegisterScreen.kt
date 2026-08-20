@@ -202,12 +202,22 @@ fun RegisterScreen(
 
                     Spacer(modifier = Modifier.height(12.dp))
 
+                    var isPinVisible by remember { mutableStateOf(false) }
+
                     OutlinedTextField(
                         value = pinCode,
                         onValueChange = { pinCode = it },
-                        label = { Text("4-Digit Access PIN") },
-                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.NumberPassword),
-                        visualTransformation = PasswordVisualTransformation(),
+                        label = { Text("4-Digit Access PIN or Password") },
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
+                        visualTransformation = if (isPinVisible) androidx.compose.ui.text.input.VisualTransformation.None else PasswordVisualTransformation(),
+                        trailingIcon = {
+                            IconButton(onClick = { isPinVisible = !isPinVisible }) {
+                                Icon(
+                                    if (isPinVisible) Icons.Default.VisibilityOff else Icons.Default.Visibility,
+                                    contentDescription = if (isPinVisible) "Hide PIN" else "Show PIN"
+                                )
+                            }
+                        },
                         modifier = Modifier.fillMaxWidth(),
                         singleLine = true
                     )
@@ -218,19 +228,40 @@ fun RegisterScreen(
                     }
 
                     if (regSuccess) {
-                        Spacer(modifier = Modifier.height(12.dp))
+                        Spacer(modifier = Modifier.height(14.dp))
                         Card(
                             colors = CardDefaults.cardColors(containerColor = Color(0xFFE8F5E9)),
-                            modifier = Modifier.fillMaxWidth()
+                            modifier = Modifier.fillMaxWidth(),
+                            shape = RoundedCornerShape(12.dp)
                         ) {
-                            Text(
-                                "Registration Success! Return to login to access.",
-                                color = Color(0xFF2E7D32),
-                                fontWeight = FontWeight.Bold,
-                                modifier = Modifier.padding(12.dp),
-                                fontSize = 12.sp,
-                                textAlign = TextAlign.Center
-                            )
+                            Column(modifier = Modifier.padding(14.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Icon(Icons.Default.CheckCircle, contentDescription = null, tint = Color(0xFF2E7D32), modifier = Modifier.size(20.dp))
+                                    Spacer(modifier = Modifier.width(8.dp))
+                                    Text(
+                                        "Account Created Successfully!",
+                                        color = Color(0xFF2E7D32),
+                                        fontWeight = FontWeight.Bold,
+                                        fontSize = 14.sp
+                                    )
+                                }
+                                Spacer(modifier = Modifier.height(6.dp))
+                                Text(
+                                    "Your profile has been enlisted with GH₵ 150.00 starting wallet credit.",
+                                    color = Color(0xFF1B5E20),
+                                    fontSize = 12.sp,
+                                    textAlign = TextAlign.Center
+                                )
+                                Spacer(modifier = Modifier.height(10.dp))
+                                Button(
+                                    onClick = { navController.popBackStack() },
+                                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF2E7D32)),
+                                    shape = RoundedCornerShape(8.dp),
+                                    modifier = Modifier.fillMaxWidth()
+                                ) {
+                                    Text("Proceed to Login Now", color = Color.White, fontWeight = FontWeight.Bold)
+                                }
+                            }
                         }
                     }
 
@@ -238,7 +269,7 @@ fun RegisterScreen(
 
                     if (isLoading) {
                         CircularProgressIndicator(modifier = Modifier.align(Alignment.CenterHorizontally))
-                    } else {
+                    } else if (!regSuccess) {
                         Button(
                             onClick = {
                                 viewModel.registerUser(
@@ -252,8 +283,17 @@ fun RegisterScreen(
                             modifier = Modifier.fillMaxWidth(),
                             shape = RoundedCornerShape(8.dp)
                         ) {
-                            Text("Enlist New Profile")
+                            Text("Enlist New Profile", fontWeight = FontWeight.Bold)
                         }
+                    }
+
+                    Spacer(modifier = Modifier.height(12.dp))
+
+                    TextButton(
+                        onClick = { navController.popBackStack() },
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Text("Already have an account? Sign in here", color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.SemiBold)
                     }
                 }
             }
