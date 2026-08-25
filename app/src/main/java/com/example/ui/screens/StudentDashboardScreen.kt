@@ -9095,13 +9095,11 @@ fun StudentDashboardScreen(
                             HapticHelper.notification(context, "SUCCESS")
                             scanSuccess = true
                             scanSuccessMessage = "Found Order #${foundOrder.id}: ${foundOrder.foodName}! Redirecting..."
-                            coroutineScope.launch {
-                                delay(900)
-                                showGeneralCheckInScanner = false
-                                activeTab = 1
-                                ordersSubTab = 0
-                                showQrForOrder = foundOrder
-                            }
+                            // Immediately close scanner modal upon successful recognition
+                            showGeneralCheckInScanner = false
+                            activeTab = 1
+                            ordersSubTab = 0
+                            showQrForOrder = foundOrder
                             return
                         } else {
                             // If order not yet in list, create quick view with the ID
@@ -9121,13 +9119,11 @@ fun StudentDashboardScreen(
                             HapticHelper.notification(context, "SUCCESS")
                             scanSuccess = true
                             scanSuccessMessage = "Order #${orderIdFromCode} located! Redirecting to food order tracking..."
-                            coroutineScope.launch {
-                                delay(900)
-                                showGeneralCheckInScanner = false
-                                activeTab = 1
-                                ordersSubTab = 0
-                                showQrForOrder = dummyOrder
-                            }
+                            // Immediately close scanner modal upon successful recognition
+                            showGeneralCheckInScanner = false
+                            activeTab = 1
+                            ordersSubTab = 0
+                            showQrForOrder = dummyOrder
                             return
                         }
                     }
@@ -9250,21 +9246,49 @@ fun StudentDashboardScreen(
                                     }
                                 }
                                 
-                                // Decorative corners
-                                Box(modifier = Modifier.size(16.dp).align(Alignment.TopStart).border(2.dp, Color.Green, RoundedCornerShape(topStart = 4.dp)))
-                                Box(modifier = Modifier.size(16.dp).align(Alignment.TopEnd).border(2.dp, Color.Green, RoundedCornerShape(topEnd = 4.dp)))
-                                Box(modifier = Modifier.size(16.dp).align(Alignment.BottomStart).border(2.dp, Color.Green, RoundedCornerShape(bottomStart = 4.dp)))
-                                Box(modifier = Modifier.size(16.dp).align(Alignment.BottomEnd).border(2.dp, Color.Green, RoundedCornerShape(bottomEnd = 4.dp)))
+                                // Visual Targeting Guide - Reticle Corner Brackets & Center Crosshair
+                                Box(modifier = Modifier.size(22.dp).align(Alignment.TopStart).padding(4.dp).border(2.5.dp, if (scanError != null) MaterialTheme.colorScheme.error else Color.Green, RoundedCornerShape(topStart = 6.dp)))
+                                Box(modifier = Modifier.size(22.dp).align(Alignment.TopEnd).padding(4.dp).border(2.5.dp, if (scanError != null) MaterialTheme.colorScheme.error else Color.Green, RoundedCornerShape(topEnd = 6.dp)))
+                                Box(modifier = Modifier.size(22.dp).align(Alignment.BottomStart).padding(4.dp).border(2.5.dp, if (scanError != null) MaterialTheme.colorScheme.error else Color.Green, RoundedCornerShape(bottomStart = 6.dp)))
+                                Box(modifier = Modifier.size(22.dp).align(Alignment.BottomEnd).padding(4.dp).border(2.5.dp, if (scanError != null) MaterialTheme.colorScheme.error else Color.Green, RoundedCornerShape(bottomEnd = 6.dp)))
+                                Box(modifier = Modifier.size(12.dp).align(Alignment.Center).border(1.dp, Color.Green.copy(alpha = 0.5f), CircleShape))
                             }
                             
                             scanError?.let { err ->
-                                Text(
-                                    text = err,
-                                    color = MaterialTheme.colorScheme.error,
-                                    fontSize = 11.sp,
-                                    fontWeight = FontWeight.Bold,
-                                    textAlign = androidx.compose.ui.text.style.TextAlign.Center
-                                )
+                                Card(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.4f)),
+                                    shape = RoundedCornerShape(12.dp),
+                                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.error)
+                                ) {
+                                    Column(
+                                        modifier = Modifier.padding(10.dp),
+                                        horizontalAlignment = Alignment.CenterHorizontally,
+                                        verticalArrangement = Arrangement.spacedBy(6.dp)
+                                    ) {
+                                        Text(
+                                            text = err,
+                                            color = MaterialTheme.colorScheme.error,
+                                            fontSize = 11.sp,
+                                            fontWeight = FontWeight.Bold,
+                                            textAlign = androidx.compose.ui.text.style.TextAlign.Center
+                                        )
+                                        OutlinedButton(
+                                            onClick = {
+                                                scanError = null
+                                                isScanning = false
+                                                manualQrInput = ""
+                                            },
+                                            modifier = Modifier.fillMaxWidth().height(32.dp),
+                                            shape = RoundedCornerShape(8.dp),
+                                            colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.error)
+                                        ) {
+                                            Icon(Icons.Default.Refresh, contentDescription = "Retry", modifier = Modifier.size(14.dp))
+                                            Spacer(modifier = Modifier.width(4.dp))
+                                            Text("Retry Scanner", fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                                        }
+                                    }
+                                }
                             }
                             
                             if (scanSuccess && scanSuccessMessage.isNotEmpty()) {

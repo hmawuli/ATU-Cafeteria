@@ -12,6 +12,15 @@
   <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.js"></script>
   <!-- QRCode.js for Standout Digital QR Code Generation -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+  <!-- React 18 & ReactDOM (for Recharts) -->
+  <script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
+  <!-- PropTypes -->
+  <script src="https://unpkg.com/prop-types@15.8.1/prop-types.min.js"></script>
+  <!-- Recharts CDN -->
+  <script src="https://unpkg.com/recharts@2.12.7/umd/Recharts.min.js"></script>
+  <!-- jsPDF for Instant Automatic Order Receipt PDF Generation -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
   <!-- Google Fonts: Plus Jakarta Sans -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -63,6 +72,17 @@
     @keyframes pulse {
       0%, 100% { opacity: 1; transform: scale(1); }
       50% { opacity: .7; transform: scale(1.05); }
+    }
+    @keyframes scanLaserSweep {
+      0% { top: 12%; opacity: 0.7; }
+      50% { top: 86%; opacity: 1; }
+      100% { top: 12%; opacity: 0.7; }
+    }
+    .scanner-laser-line {
+      animation: scanLaserSweep 2.2s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+    }
+    .reticle-corner {
+      transition: all 0.3s ease;
     }
     @media print {
       body * { visibility: hidden; }
@@ -565,14 +585,29 @@
           </div>
         </div>
 
-        <!-- Category Pill Buttons -->
-        <div class="flex items-center space-x-2 overflow-x-auto pb-1 scrollbar-none" id="category-filters">
-          <button onclick="filterCategory('ALL')" class="category-btn active px-4 py-2 rounded-xl text-xs font-bold bg-brand-600 text-white shadow-sm transition-all">All Dishes</button>
-          <button onclick="filterCategory('Main Dish')" class="category-btn px-4 py-2 rounded-xl text-xs font-bold bg-slate-100 text-slate-700 hover:bg-slate-200 transition-all">Main Dishes</button>
-          <button onclick="filterCategory('Traditional')" class="category-btn px-4 py-2 rounded-xl text-xs font-bold bg-slate-100 text-slate-700 hover:bg-slate-200 transition-all">Traditional</button>
-          <button onclick="filterCategory('Drinks')" class="category-btn px-4 py-2 rounded-xl text-xs font-bold bg-slate-100 text-slate-700 hover:bg-slate-200 transition-all">Drinks & Sobolo</button>
-          <button onclick="filterCategory('Snacks')" class="category-btn px-4 py-2 rounded-xl text-xs font-bold bg-slate-100 text-slate-700 hover:bg-slate-200 transition-all">Pastries & Meat Pies</button>
+        <!-- Category Pill Buttons & Pull-to-Refresh Action -->
+        <div class="flex items-center justify-between gap-2 overflow-x-auto pb-1 scrollbar-none">
+          <div class="flex items-center space-x-2 shrink-0" id="category-filters">
+            <button onclick="filterCategory('ALL')" class="category-btn active px-4 py-2 rounded-xl text-xs font-bold bg-brand-600 text-white shadow-sm transition-all">All Dishes</button>
+            <button onclick="filterCategory('Main Dish')" class="category-btn px-4 py-2 rounded-xl text-xs font-bold bg-slate-100 text-slate-700 hover:bg-slate-200 transition-all">Main Dishes</button>
+            <button onclick="filterCategory('Traditional')" class="category-btn px-4 py-2 rounded-xl text-xs font-bold bg-slate-100 text-slate-700 hover:bg-slate-200 transition-all">Traditional</button>
+            <button onclick="filterCategory('Drinks')" class="category-btn px-4 py-2 rounded-xl text-xs font-bold bg-slate-100 text-slate-700 hover:bg-slate-200 transition-all">Drinks & Sobolo</button>
+            <button onclick="filterCategory('Snacks')" class="category-btn px-4 py-2 rounded-xl text-xs font-bold bg-slate-100 text-slate-700 hover:bg-slate-200 transition-all">Pastries & Meat Pies</button>
+          </div>
+          <button onclick="refreshStudentMenuData(true)" id="btn-pull-refresh-manual" class="px-3.5 py-2 rounded-xl bg-slate-100 hover:bg-brand-50 text-slate-700 hover:text-brand-700 border border-slate-200 text-xs font-bold flex items-center gap-1.5 transition-all shrink-0 shadow-xs active:scale-95" title="Force re-fetch current food stock availability and price updates from backend">
+            <i data-lucide="refresh-cw" id="btn-refresh-icon" class="w-3.5 h-3.5 text-brand-600"></i>
+            <span>Refresh Live Menu</span>
+          </button>
         </div>
+      </div>
+
+      <!-- Pull-to-Refresh Gesture Status Indicator -->
+      <div id="student-pull-refresh-indicator" class="hidden transition-all duration-300 overflow-hidden flex flex-col items-center justify-center text-xs font-bold text-slate-700 py-3.5 bg-brand-50/90 rounded-2xl border border-brand-200/90 shadow-xs mb-2">
+        <div class="flex items-center gap-2 text-brand-700">
+          <i data-lucide="refresh-cw" id="pull-refresh-spinner" class="w-4 h-4 transition-transform duration-200"></i>
+          <span id="pull-refresh-label">Pull down to refresh food stock & prices...</span>
+        </div>
+        <span class="text-[10px] text-slate-500 mt-0.5">Syncing live cafeteria inventory & real-time pricing from backend</span>
       </div>
 
       <!-- Food Menu Grid -->
@@ -895,7 +930,65 @@
         </div>
       </div>
 
-      <!-- Admin Tab Switcher: 1. Vendors, 2. Menu Oversight, 3. Workers Oversight, 4. Students, 5. Audit Logs -->
+      <!-- 📊 RECHARTS ANALYTICS: Daily Sales Volume & Peak Ordering Hours Visualization -->
+      <div class="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm space-y-5">
+        <div class="flex flex-col md:flex-row md:items-center justify-between gap-4">
+          <div>
+            <div class="flex items-center gap-2">
+              <span class="p-2 rounded-xl bg-orange-100 text-brand-600 flex items-center justify-center">
+                <i data-lucide="bar-chart-3" class="w-5 h-5"></i>
+              </span>
+              <div>
+                <h3 class="text-base font-extrabold text-slate-900 flex items-center gap-2">
+                  <span>Campus Sales Volume & Peak Ordering Hours</span>
+                  <span class="text-[10px] font-extrabold bg-brand-100 text-brand-700 px-2.5 py-0.5 rounded-full uppercase tracking-wider">Recharts Engine</span>
+                </h3>
+                <p class="text-xs text-slate-500 mt-0.5">Interactive bar chart analytics visualizing daily sales trends and hourly peak order distribution for vendor performance optimization.</p>
+              </div>
+            </div>
+          </div>
+          
+          <div class="flex flex-wrap items-center gap-1.5 bg-slate-100 p-1.5 rounded-2xl">
+            <button id="btn-chart-daily" onclick="switchRechartsMetric('DAILY_SALES')" class="px-3.5 py-1.5 rounded-xl text-xs font-bold bg-white text-slate-900 shadow-xs flex items-center gap-1.5 transition-all">
+              <i data-lucide="calendar" class="w-3.5 h-3.5 text-brand-600"></i>
+              <span>Daily Sales Volume</span>
+            </button>
+            <button id="btn-chart-hourly" onclick="switchRechartsMetric('PEAK_HOURS')" class="px-3.5 py-1.5 rounded-xl text-xs font-bold text-slate-600 hover:text-slate-900 flex items-center gap-1.5 transition-all">
+              <i data-lucide="clock" class="w-3.5 h-3.5 text-blue-600"></i>
+              <span>Peak Ordering Hours</span>
+            </button>
+            <button id="btn-chart-vendor" onclick="switchRechartsMetric('VENDOR_COMP')" class="px-3.5 py-1.5 rounded-xl text-xs font-bold text-slate-600 hover:text-slate-900 flex items-center gap-1.5 transition-all">
+              <i data-lucide="store" class="w-3.5 h-3.5 text-emerald-600"></i>
+              <span>Vendor Performance</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- Metric Summary Chips -->
+        <div id="recharts-metric-chips" class="grid grid-cols-2 sm:grid-cols-4 gap-3 pt-1"></div>
+
+        <!-- Recharts Interactive Canvas / Mount Viewport -->
+        <div class="bg-slate-50/80 border border-slate-200 rounded-2xl p-4 sm:p-5 relative min-h-[320px]">
+          <div id="admin-recharts-root" class="w-full min-h-[290px] flex items-center justify-center"></div>
+        </div>
+
+        <div class="flex flex-col sm:flex-row sm:items-center justify-between text-[11px] text-slate-500 gap-2 px-1 pt-1 border-t border-slate-100">
+          <div class="flex items-center gap-2">
+            <span class="flex items-center gap-1 font-semibold text-slate-700">
+              <span class="w-2.5 h-2.5 rounded-full bg-brand-500"></span> Sales Volume (GH₵)
+            </span>
+            <span class="flex items-center gap-1 font-semibold text-slate-700 ml-3">
+              <span class="w-2.5 h-2.5 rounded-full bg-sky-500"></span> Order Count
+            </span>
+          </div>
+          <span class="font-bold text-brand-600 flex items-center gap-1">
+            <i data-lucide="zap" class="w-3.5 h-3.5"></i>
+            <span>Peak Campus Ordering Window: 12:00 PM – 1:45 PM (Lunch Rush)</span>
+          </span>
+        </div>
+      </div>
+
+      <!-- Admin Tab Switcher: 1. Vendors, 2. Menu Oversight, 3. Workers Oversight, 4. Students, 5. Audit Logs, 6. Analytics -->
       <div class="bg-white rounded-3xl border border-slate-200 p-5 shadow-sm space-y-4">
         
         <div class="flex items-center justify-between border-b border-slate-100 pb-3">
@@ -1305,24 +1398,69 @@
             <p class="text-[11px] text-slate-500">Scan any order QR pass to view its live tracking page</p>
           </div>
         </div>
-        <button onclick="closeQrScannerModal()" class="w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center text-slate-500 hover:bg-slate-200">
+        <button onclick="closeQrScannerModal()" class="w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center text-slate-500 hover:bg-slate-200 transition-colors">
           <i data-lucide="x" class="w-4 h-4"></i>
         </button>
       </div>
 
-      <!-- Camera Viewport / Laser Scanner Overlay -->
-      <div class="relative bg-slate-950 rounded-2xl h-48 flex items-center justify-center overflow-hidden border-2 border-brand-500 shadow-inner">
-        <div class="absolute inset-x-0 h-0.5 bg-red-500 shadow-lg shadow-red-500/80 animate-pulse top-1/2 -translate-y-1/2"></div>
-        <div class="text-center space-y-2 relative z-10">
-          <i data-lucide="camera" class="w-10 h-10 text-white/60 mx-auto animate-bounce"></i>
-          <p class="text-xs font-bold text-white tracking-wide">CAMERA SCANNER ACTIVE</p>
-          <p class="text-[10px] text-slate-400">Align QR Code within the targeting frame</p>
+      <!-- In-Modal Error Message & Retry Container -->
+      <div id="scanner-error-container" class="hidden p-3.5 rounded-2xl bg-red-50 border border-red-200 text-red-700 space-y-2.5 transition-all">
+        <div class="flex items-start gap-2">
+          <i data-lucide="alert-circle" class="w-4 h-4 text-red-600 shrink-0 mt-0.5"></i>
+          <div class="flex-1 text-xs">
+            <p class="font-bold text-red-800">Scan Failed</p>
+            <p id="scanner-error-msg" class="text-red-600 font-medium text-[11px] mt-0.5">Invalid QR code format. Please scan a valid ATU Order Code.</p>
+          </div>
         </div>
-        <!-- Decorative corner brackets -->
-        <div class="absolute top-3 left-3 w-4 h-4 border-t-2 border-l-2 border-emerald-400 rounded-tl"></div>
-        <div class="absolute top-3 right-3 w-4 h-4 border-t-2 border-r-2 border-emerald-400 rounded-tr"></div>
-        <div class="absolute bottom-3 left-3 w-4 h-4 border-b-2 border-l-2 border-emerald-400 rounded-bl"></div>
-        <div class="absolute bottom-3 right-3 w-4 h-4 border-b-2 border-r-2 border-emerald-400 rounded-br"></div>
+        <button onclick="resetQrScannerState()" class="w-full py-2 px-3 bg-red-600 hover:bg-red-700 text-white rounded-xl text-xs font-bold transition-all shadow-xs flex items-center justify-center gap-1.5">
+          <i data-lucide="refresh-cw" class="w-3.5 h-3.5"></i>
+          <span>Retry Scanner</span>
+        </button>
+      </div>
+
+      <!-- Camera Viewport / Visual Targeting Guide & Laser Overlay -->
+      <div id="qr-scanner-viewport" class="relative bg-slate-950 rounded-2xl h-52 flex items-center justify-center overflow-hidden border-2 border-brand-500 shadow-inner transition-colors">
+        <!-- Targeting Guide Mask & SVG Overlay -->
+        <svg class="absolute inset-0 w-full h-full pointer-events-none z-10" xmlns="http://www.w3.org/2000/svg">
+          <defs>
+            <mask id="scannerHoleMask">
+              <rect width="100%" height="100%" fill="white" />
+              <rect x="20%" y="15%" width="60%" height="70%" rx="16" fill="black" />
+            </mask>
+            <linearGradient id="laserGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+              <stop offset="0%" stop-color="#ef4444" stop-opacity="0" />
+              <stop offset="30%" stop-color="#ef4444" stop-opacity="0.8" />
+              <stop offset="50%" stop-color="#22c55e" stop-opacity="1" />
+              <stop offset="70%" stop-color="#ef4444" stop-opacity="0.8" />
+              <stop offset="100%" stop-color="#ef4444" stop-opacity="0" />
+            </linearGradient>
+          </defs>
+          <!-- Semi-transparent vignette surrounding the targeting aperture -->
+          <rect width="100%" height="100%" fill="rgba(15, 23, 42, 0.45)" mask="url(#scannerHoleMask)" />
+          
+          <!-- Targeting Boundary Rectangle (Subtle dashed border) -->
+          <rect x="20%" y="15%" width="60%" height="70%" rx="16" fill="none" stroke="rgba(255,255,255,0.25)" stroke-width="1.5" stroke-dasharray="6,4" />
+          
+          <!-- Center Crosshair Target -->
+          <line x1="50%" y1="42%" x2="50%" y2="58%" stroke="rgba(34, 197, 94, 0.8)" stroke-width="1.5" stroke-linecap="round" />
+          <line x1="42%" y1="50%" x2="58%" y2="50%" stroke="rgba(34, 197, 94, 0.8)" stroke-width="1.5" stroke-linecap="round" />
+          <circle cx="50%" cy="50%" r="3" fill="#22c55e" />
+        </svg>
+
+        <!-- Animated Laser Sweep Line inside targeting guide -->
+        <div id="scanner-laser-beam" class="absolute inset-x-8 h-0.5 bg-gradient-to-r from-red-500 via-emerald-400 to-red-500 shadow-lg shadow-emerald-500/80 scanner-laser-line z-20 pointer-events-none"></div>
+
+        <!-- Targeting Guide Corner Brackets (CSS/SVG Enhanced) -->
+        <div id="bracket-tl" class="reticle-corner absolute top-6 left-12 w-6 h-6 border-t-3 border-l-3 border-emerald-400 rounded-tl-lg z-20 shadow-xs shadow-emerald-500/50"></div>
+        <div id="bracket-tr" class="reticle-corner absolute top-6 right-12 w-6 h-6 border-t-3 border-r-3 border-emerald-400 rounded-tr-lg z-20 shadow-xs shadow-emerald-500/50"></div>
+        <div id="bracket-bl" class="reticle-corner absolute bottom-6 left-12 w-6 h-6 border-b-3 border-l-3 border-emerald-400 rounded-bl-lg z-20 shadow-xs shadow-emerald-500/50"></div>
+        <div id="bracket-br" class="reticle-corner absolute bottom-6 right-12 w-6 h-6 border-b-3 border-r-3 border-emerald-400 rounded-br-lg z-20 shadow-xs shadow-emerald-500/50"></div>
+
+        <div class="text-center space-y-1.5 relative z-10">
+          <i data-lucide="camera" class="w-8 h-8 text-white/70 mx-auto animate-pulse"></i>
+          <p id="scanner-status-title" class="text-xs font-bold text-white tracking-wide">TARGETING GUIDE ACTIVE</p>
+          <p id="scanner-status-subtitle" class="text-[10.5px] text-emerald-300 font-medium">Align QR Code within the brackets</p>
+        </div>
       </div>
 
       <!-- Quick Scan Active Order Chips -->
@@ -3129,9 +3267,24 @@
       lucide.createIcons();
     }
 
-        function openQrScannerModal() {
+        /**
+     * Haptic feedback vibration trigger for QR scanner events
+     */
+    function triggerScannerHaptic(pattern = [60, 40, 90]) {
+      try {
+        if (typeof navigator !== 'undefined' && 'vibrate' in navigator) {
+          navigator.vibrate(pattern);
+        }
+      } catch (e) {
+        console.log('Haptic feedback unavailable:', e);
+      }
+    }
+
+    function openQrScannerModal() {
       const modal = document.getElementById('qr-scanner-modal');
       if (!modal) return;
+      
+      resetQrScannerState();
       
       const chipsContainer = document.getElementById('scanner-active-orders-chips');
       if (chipsContainer) {
@@ -3150,13 +3303,92 @@
     function closeQrScannerModal() {
       const modal = document.getElementById('qr-scanner-modal');
       if (modal) modal.classList.add('hidden');
+      resetQrScannerState();
+    }
+
+    function resetQrScannerState() {
+      const errorContainer = document.getElementById('scanner-error-container');
+      if (errorContainer) errorContainer.classList.add('hidden');
+
       const input = document.getElementById('manual-qr-input');
       if (input) input.value = '';
+
+      const viewport = document.getElementById('qr-scanner-viewport');
+      if (viewport) {
+        viewport.classList.remove('border-red-500', 'bg-red-950/40');
+        viewport.classList.add('border-brand-500', 'bg-slate-950');
+      }
+
+      const title = document.getElementById('scanner-status-title');
+      if (title) {
+        title.innerText = 'TARGETING GUIDE ACTIVE';
+        title.classList.remove('text-red-400');
+        title.classList.add('text-white');
+      }
+
+      const subtitle = document.getElementById('scanner-status-subtitle');
+      if (subtitle) {
+        subtitle.innerText = 'Align QR Code within the brackets';
+        subtitle.classList.remove('text-red-300');
+        subtitle.classList.add('text-emerald-300');
+      }
+
+      ['bracket-tl', 'bracket-tr', 'bracket-bl', 'bracket-br'].forEach(id => {
+        const el = document.getElementById(id);
+        if (el) {
+          el.classList.remove('border-red-500');
+          el.classList.add('border-emerald-400');
+        }
+      });
+    }
+
+    function showQrScannerError(msg) {
+      triggerScannerHaptic([120, 60, 120]); // Error vibration pattern
+
+      const errorContainer = document.getElementById('scanner-error-container');
+      const errorMsg = document.getElementById('scanner-error-msg');
+      if (errorContainer && errorMsg) {
+        errorMsg.innerText = msg || 'Invalid QR code. Please scan a valid ATU Order Tracking Pass.';
+        errorContainer.classList.remove('hidden');
+      }
+
+      const viewport = document.getElementById('qr-scanner-viewport');
+      if (viewport) {
+        viewport.classList.remove('border-brand-500', 'bg-slate-950');
+        viewport.classList.add('border-red-500', 'bg-red-950/40');
+      }
+
+      const title = document.getElementById('scanner-status-title');
+      if (title) {
+        title.innerText = 'QR SCAN ERROR';
+        title.classList.remove('text-white');
+        title.classList.add('text-red-400');
+      }
+
+      const subtitle = document.getElementById('scanner-status-subtitle');
+      if (subtitle) {
+        subtitle.innerText = 'Code unrecognized. Click Retry or use manual input below.';
+        subtitle.classList.remove('text-emerald-300');
+        subtitle.classList.add('text-red-300');
+      }
+
+      ['bracket-tl', 'bracket-tr', 'bracket-bl', 'bracket-br'].forEach(id => {
+        const el = document.getElementById(id);
+        if (el) {
+          el.classList.remove('border-emerald-400');
+          el.classList.add('border-red-500');
+        }
+      });
+
+      lucide.createIcons();
     }
 
     function handleManualQrSubmit() {
       const input = document.getElementById('manual-qr-input');
-      if (!input || !input.value.trim()) return;
+      if (!input || !input.value.trim()) {
+        showQrScannerError('Please enter a valid tracking code or order number before scanning.');
+        return;
+      }
       scanAndRedirectToOrder(input.value.trim());
     }
 
@@ -3169,8 +3401,15 @@
       }
     }
 
+    /**
+     * Scans and redirects immediately upon recognizing an ATU Order code.
+     * Triggers tactile haptic feedback and automatically closes the scanner modal immediately.
+     */
     function scanAndRedirectToOrder(rawCode) {
-      if (!rawCode) return;
+      if (!rawCode) {
+        showQrScannerError('No QR code detected. Align code with targeting guide.');
+        return;
+      }
       const code = rawCode.toString().trim();
       
       let targetOrderId = null;
@@ -3192,10 +3431,14 @@
         targetOrderId = parseInt(code, 10);
       }
 
-      if (!targetOrderId) {
-        showToast('Invalid QR Code format. Please scan a valid ATU Order Code.', 'error');
+      if (!targetOrderId || isNaN(targetOrderId)) {
+        showQrScannerError(`Invalid QR Code: "${code}". Format not recognized as an ATU Order.`);
+        showToast('Invalid QR Code format. Please check the code or try again.', 'error');
         return;
       }
+
+      // Success! Immediately trigger tactile haptic feedback vibration
+      triggerScannerHaptic([60, 40, 90]);
 
       let matchedOrder = orders.find(o => o.id === targetOrderId);
       if (!matchedOrder) {
@@ -3213,13 +3456,14 @@
         orders.unshift(matchedOrder);
       }
 
+      // CRITICAL: Immediately close scanner modal so user is not left on scanner screen
       closeQrScannerModal();
       
       if (currentRole !== 'STUDENT') {
         switchUserRole('STUDENT');
       }
 
-      showToast(`QR Code Scanned! Redirected to Order #${matchedOrder.id} (${matchedOrder.foodName}).`, 'success');
+      showToast(`QR Code Verified! Opening Order #${matchedOrder.id} (${matchedOrder.foodName}).`, 'success');
       openTrackingModal(matchedOrder.id);
     }
 
