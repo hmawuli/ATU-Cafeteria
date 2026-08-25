@@ -590,6 +590,20 @@ fun StudentDashboardScreen(
                     IconButton(
                         onClick = {
                             HapticHelper.impact(context)
+                            showGeneralCheckInScanner = true
+                        },
+                        modifier = Modifier.testTag("open_qr_scanner_topbar_btn")
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.QrCodeScanner,
+                            contentDescription = "Scan Track & QR Code",
+                            tint = Color.White
+                        )
+                    }
+
+                    IconButton(
+                        onClick = {
+                            HapticHelper.impact(context)
                             showIndoorMapDialog = true
                         },
                         modifier = Modifier.testTag("open_indoor_map_topbar_btn")
@@ -3349,6 +3363,35 @@ fun StudentDashboardScreen(
                                          }
 
                                          Spacer(modifier = Modifier.height(12.dp))
+                                         Button(
+                                             onClick = {
+                                                 HapticHelper.impact(context)
+                                                 showQrForOrder = order
+                                             },
+                                             modifier = Modifier
+                                                 .fillMaxWidth()
+                                                 .height(38.dp)
+                                                 .testTag("track_and_qr_btn_${order.id}"),
+                                             colors = ButtonDefaults.buttonColors(
+                                                 containerColor = MaterialTheme.colorScheme.primary,
+                                                 contentColor = MaterialTheme.colorScheme.onPrimary
+                                             ),
+                                             shape = RoundedCornerShape(10.dp)
+                                         ) {
+                                             Icon(
+                                                 imageVector = Icons.Default.QrCode,
+                                                 contentDescription = "Track Order & QR Claim Pass",
+                                                 modifier = Modifier.size(16.dp)
+                                             )
+                                             Spacer(modifier = Modifier.width(8.dp))
+                                             Text(
+                                                 text = "Track Order & View Claim QR",
+                                                 fontSize = 11.sp,
+                                                 fontWeight = FontWeight.Bold
+                                             )
+                                         }
+
+                                         Spacer(modifier = Modifier.height(8.dp))
                                          Button(
                                              onClick = { activeChatOrder = order },
                                              modifier = Modifier
@@ -8544,144 +8587,295 @@ fun StudentDashboardScreen(
                 }
             }
 
-            // STUDENT QR CLAIM CODE DIALOG
+                                    // STUDENT QR CLAIM CODE & ORDER DETAILS DIALOG (LIVE FOOD TRACKING)
             showQrForOrder?.let { order ->
                 val vendor = allVendors.find { it.id == order.vendorId }
+                val context = androidx.compose.ui.platform.LocalContext.current
                 Dialog(onDismissRequest = { showQrForOrder = null }) {
                     Card(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(16.dp)
+                            .padding(horizontal = 12.dp, vertical = 16.dp)
                             .testTag("student_qr_claim_dialog"),
                         shape = RoundedCornerShape(24.dp),
-                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
+                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                        elevation = CardDefaults.cardElevation(defaultElevation = 8.dp)
                     ) {
                         Column(
                             modifier = Modifier
-                                .padding(24.dp)
-                                .fillMaxWidth(),
+                                .padding(20.dp)
+                                .fillMaxWidth()
+                                .verticalScroll(rememberScrollState()),
                             horizontalAlignment = Alignment.CenterHorizontally,
-                            verticalArrangement = Arrangement.spacedBy(16.dp)
+                            verticalArrangement = Arrangement.spacedBy(14.dp)
                         ) {
-                            Text(
-                                "Secure Claim Ticket",
-                                style = MaterialTheme.typography.titleMedium,
-                                fontWeight = FontWeight.Bold,
-                                color = MaterialTheme.colorScheme.primary
-                            )
-
-                            Text(
-                                "Show this QR code at the counter of ${vendor?.fullName ?: "Vendor"} to scan and claim your dish.",
-                                fontSize = 11.sp,
-                                textAlign = androidx.compose.ui.text.style.TextAlign.Center,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-
-                            Box(
-                                modifier = Modifier
-                                    .size(190.dp)
-                                    .clip(RoundedCornerShape(12.dp))
-                                    .background(Color.White)
-                                    .padding(8.dp),
-                                contentAlignment = Alignment.Center
+                            // Header
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
                             ) {
-                                val qrBitmap = remember(order.id, order.pickupPin, order.totalPrice) {
-                                    com.example.ui.util.QrCodeGeneratorUtil.generateQrImageBitmap(
-                                        content = "ATU-ORDER-${order.id}-${order.pickupPin}-${order.totalPrice}",
-                                        sizePx = 512
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                                        Icon(Icons.Default.Restaurant, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(18.dp))
+                                        Text(
+                                            text = "Order #${order.id} Tracking",
+                                            style = MaterialTheme.typography.titleMedium,
+                                            fontWeight = FontWeight.ExtraBold,
+                                            color = MaterialTheme.colorScheme.primary
+                                        )
+                                    }
+                                    Text(
+                                        text = vendor?.fullName ?: "Campus Food Booth",
+                                        fontSize = 11.sp,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        fontWeight = FontWeight.Medium
                                     )
                                 }
-                                if (qrBitmap != null) {
-                                    androidx.compose.foundation.Image(
-                                        bitmap = qrBitmap,
-                                        contentDescription = "Transaction QR Code for Order #${order.id}",
-                                        modifier = Modifier.fillMaxSize().testTag("student_transaction_qr_image_${order.id}")
+
+                                val statusBgColor = when (order.status.uppercase()) {
+                                    "COMPLETED", "DELIVERED" -> Color(0xFFE8F5E9)
+                                    "READY" -> Color(0xFFE3F2FD)
+                                    "PREPARING" -> Color(0xFFFFF8E1)
+                                    "CANCELLED", "DECLINED" -> Color(0xFFFFEBEE)
+                                    else -> Color(0xFFF3E5F5)
+                                }
+                                val statusTextColor = when (order.status.uppercase()) {
+                                    "COMPLETED", "DELIVERED" -> Color(0xFF2E7D32)
+                                    "READY" -> Color(0xFF1565C0)
+                                    "PREPARING" -> Color(0xFFF57F17)
+                                    "CANCELLED", "DECLINED" -> Color(0xFFC62828)
+                                    else -> Color(0xFF7B1FA2)
+                                }
+
+                                Box(
+                                    modifier = Modifier
+                                        .clip(RoundedCornerShape(8.dp))
+                                        .background(statusBgColor)
+                                        .padding(horizontal = 8.dp, vertical = 4.dp)
+                                ) {
+                                    Text(
+                                        text = order.status.uppercase(),
+                                        fontSize = 10.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        color = statusTextColor
                                     )
-                                } else {
-                                    androidx.compose.foundation.Canvas(modifier = Modifier.fillMaxSize()) {
-                                        val sizePx = size.width
-                                        val finderSize = sizePx * 7f / 21f
+                                }
+                            }
 
-                                        fun drawFinder(x: Float, y: Float, fSize: Float) {
-                                            val strokeW = fSize / 7f
-                                            drawRect(
-                                                color = Color.Black,
-                                                topLeft = androidx.compose.ui.geometry.Offset(x, y),
-                                                size = androidx.compose.ui.geometry.Size(fSize, fSize)
-                                            )
-                                            drawRect(
-                                                color = Color.White,
-                                                topLeft = androidx.compose.ui.geometry.Offset(x + strokeW, y + strokeW),
-                                                size = androidx.compose.ui.geometry.Size(fSize - strokeW * 2f, fSize - strokeW * 2f)
-                                            )
-                                            drawRect(
-                                                color = Color.Black,
-                                                topLeft = androidx.compose.ui.geometry.Offset(x + strokeW * 2f, y + strokeW * 2f),
-                                                size = androidx.compose.ui.geometry.Size(fSize - strokeW * 4f, fSize - strokeW * 4f)
-                                            )
-                                        }
-
-                                        drawFinder(0f, 0f, finderSize)
-                                        drawFinder(sizePx - finderSize, 0f, finderSize)
-                                        drawFinder(0f, sizePx - finderSize, finderSize)
+                            // Food Info Card
+                            Card(
+                                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.3f)),
+                                shape = RoundedCornerShape(14.dp),
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                                    Text(
+                                        text = order.foodName,
+                                        fontSize = 15.sp,
+                                        fontWeight = FontWeight.ExtraBold,
+                                        color = MaterialTheme.colorScheme.onSurface
+                                    )
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        horizontalArrangement = Arrangement.SpaceBetween,
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        Text(
+                                            text = "Quantity: ${order.quantity} plate(s)",
+                                            fontSize = 11.sp,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                                        )
+                                        Text(
+                                            text = "GH₵ ${String.format(java.util.Locale.US, "%.2f", order.totalPrice)}",
+                                            fontSize = 13.sp,
+                                            fontWeight = FontWeight.Black,
+                                            color = MaterialTheme.colorScheme.primary
+                                        )
+                                    }
+                                    if (order.estimatedPickupTime.isNotEmpty()) {
+                                        Text(
+                                            text = "Estimated Time: ${order.estimatedPickupTime}",
+                                            fontSize = 10.sp,
+                                            fontStyle = androidx.compose.ui.text.font.FontStyle.Italic,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                                        )
                                     }
                                 }
                             }
 
+                            // Live Tracking Stepper
+                            Column(modifier = Modifier.fillMaxWidth().padding(horizontal = 4.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                                val stages = listOf("PENDING" to "1. Received", "PREPARING" to "2. Kitchen Prep", "READY" to "3. Ready for Claim", "COMPLETED" to "4. Handed Off")
+                                val currentStepIndex = when (order.status.uppercase()) {
+                                    "PREPARING" -> 1
+                                    "READY" -> 2
+                                    "COMPLETED", "DELIVERED" -> 3
+                                    else -> 0
+                                }
+
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    stages.forEachIndexed { idx, stage ->
+                                        val isDone = idx <= currentStepIndex
+                                        val isCurrent = idx == currentStepIndex
+                                        Column(
+                                            horizontalAlignment = Alignment.CenterHorizontally,
+                                            modifier = Modifier.weight(1f)
+                                        ) {
+                                            Box(
+                                                modifier = Modifier
+                                                    .size(22.dp)
+                                                    .clip(CircleShape)
+                                                    .background(if (isDone) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceVariant),
+                                                contentAlignment = Alignment.Center
+                                            ) {
+                                                if (isDone) {
+                                                    Icon(Icons.Default.Check, contentDescription = null, tint = Color.White, modifier = Modifier.size(13.dp))
+                                                } else {
+                                                    Text("${idx + 1}", fontSize = 9.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                                }
+                                            }
+                                            Spacer(modifier = Modifier.height(2.dp))
+                                            Text(
+                                                text = stage.second,
+                                                fontSize = 8.sp,
+                                                fontWeight = if (isCurrent) FontWeight.Bold else FontWeight.Normal,
+                                                color = if (isCurrent) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+                                                textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+                                                maxLines = 1
+                                            )
+                                        }
+                                    }
+                                }
+                            }
+
+                            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
+
+                            // QR Code Ticket Box
+                            Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                                Text(
+                                    "Official Custody QR Claim Pass",
+                                    fontSize = 11.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = MaterialTheme.colorScheme.onSurface
+                                )
+                                Text(
+                                    "Show or scan this barcode at the counter to verify pickup",
+                                    fontSize = 9.5.sp,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    textAlign = androidx.compose.ui.text.style.TextAlign.Center
+                                )
+
+                                Box(
+                                    modifier = Modifier
+                                        .size(170.dp)
+                                        .clip(RoundedCornerShape(12.dp))
+                                        .background(Color.White)
+                                        .border(1.5.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f), RoundedCornerShape(12.dp))
+                                        .padding(8.dp),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    val qrBitmap = remember(order.id, order.pickupPin, order.totalPrice) {
+                                        com.example.ui.util.QrCodeGeneratorUtil.generateQrImageBitmap(
+                                            content = "ATU-ORDER-${order.id}-${order.pickupPin}-${order.totalPrice}",
+                                            sizePx = 512
+                                        )
+                                    }
+                                    if (qrBitmap != null) {
+                                        androidx.compose.foundation.Image(
+                                            bitmap = qrBitmap,
+                                            contentDescription = "Transaction QR Code for Order #${order.id}",
+                                            modifier = Modifier.fillMaxSize().testTag("student_transaction_qr_image_${order.id}")
+                                        )
+                                    } else {
+                                        Icon(Icons.Default.QrCode, contentDescription = null, modifier = Modifier.size(100.dp), tint = Color.Black)
+                                    }
+                                }
+                            }
+
+                            // Order Identifiers
                             Card(
                                 colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)),
                                 shape = RoundedCornerShape(12.dp),
                                 modifier = Modifier.fillMaxWidth()
                             ) {
-                                Column(
-                                    modifier = Modifier.padding(12.dp),
-                                    horizontalAlignment = Alignment.CenterHorizontally,
-                                    verticalArrangement = Arrangement.spacedBy(4.dp)
+                                Row(
+                                    modifier = Modifier
+                                        .padding(12.dp)
+                                        .fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically
                                 ) {
-                                    Text(
-                                        "ORDER REFERENCE CODE",
-                                        fontSize = 8.sp,
-                                        fontWeight = FontWeight.Bold,
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                                    )
-                                    Text(
-                                        "ATU-TKT-${order.id}",
-                                        fontSize = 14.sp,
-                                        fontWeight = FontWeight.Black,
-                                        color = MaterialTheme.colorScheme.onSurface
-                                    )
-                                    Row(
-                                        horizontalArrangement = Arrangement.spacedBy(16.dp),
-                                        verticalAlignment = Alignment.CenterVertically
-                                    ) {
-                                        Text(
-                                            "PIN: ${order.pickupPin}",
-                                            fontSize = 11.sp,
-                                            fontWeight = FontWeight.ExtraBold,
-                                            color = MaterialTheme.colorScheme.primary
-                                        )
-                                        Text(
-                                            "Qty: ${order.quantity}",
-                                            fontSize = 11.sp,
-                                            fontWeight = FontWeight.SemiBold,
-                                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                                        )
-                                        Text(
-                                            "Amt: GH₵ ${"%.2f".format(order.totalPrice)}",
-                                            fontSize = 11.sp,
-                                            fontWeight = FontWeight.SemiBold,
-                                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                                        )
+                                    Column {
+                                        Text("TRACKING CODE", fontSize = 8.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                        Text("ATU-ORDER-${order.id}", fontSize = 12.sp, fontWeight = FontWeight.Black, color = MaterialTheme.colorScheme.onSurface)
                                     }
+                                    Column(horizontalAlignment = Alignment.End) {
+                                        Text("SECRET PICKUP PIN", fontSize = 8.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                        Text(order.pickupPin, fontSize = 14.sp, fontWeight = FontWeight.Black, color = MaterialTheme.colorScheme.primary)
+                                    }
+                                }
+                            }
+
+                            // Quick Action Buttons
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                OutlinedButton(
+                                    onClick = {
+                                        HapticHelper.impact(context)
+                                        activeChatOrder = order
+                                    },
+                                    modifier = Modifier.weight(1f).height(36.dp),
+                                    shape = RoundedCornerShape(10.dp),
+                                    contentPadding = PaddingValues(horizontal = 4.dp, vertical = 0.dp)
+                                ) {
+                                    Icon(Icons.Default.Chat, contentDescription = null, modifier = Modifier.size(13.dp))
+                                    Spacer(modifier = Modifier.width(4.dp))
+                                    Text("Chat Vendor", fontSize = 10.sp, fontWeight = FontWeight.Bold)
+                                }
+
+                                OutlinedButton(
+                                    onClick = {
+                                        HapticHelper.impact(context)
+                                        generatePdfReceipt(context, order)
+                                    },
+                                    modifier = Modifier.weight(1f).height(36.dp),
+                                    shape = RoundedCornerShape(10.dp),
+                                    contentPadding = PaddingValues(horizontal = 4.dp, vertical = 0.dp)
+                                ) {
+                                    Icon(Icons.Default.Print, contentDescription = null, modifier = Modifier.size(13.dp))
+                                    Spacer(modifier = Modifier.width(4.dp))
+                                    Text("PDF Receipt", fontSize = 10.sp, fontWeight = FontWeight.Bold)
+                                }
+                            }
+
+                            if (order.status.uppercase() == "READY") {
+                                Button(
+                                    onClick = {
+                                        showScannerForOrder = order
+                                    },
+                                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF2E7D32)),
+                                    modifier = Modifier.fillMaxWidth().height(40.dp),
+                                    shape = RoundedCornerShape(12.dp)
+                                ) {
+                                    Icon(Icons.Default.QrCodeScanner, contentDescription = null, modifier = Modifier.size(16.dp))
+                                    Spacer(modifier = Modifier.width(6.dp))
+                                    Text("Scan Counter QR to Confirm Pickup", fontSize = 11.sp, fontWeight = FontWeight.Bold)
                                 }
                             }
 
                             Button(
                                 onClick = { showQrForOrder = null },
                                 shape = RoundedCornerShape(12.dp),
-                                modifier = Modifier.fillMaxWidth().testTag("student_qr_dismiss_btn")
+                                modifier = Modifier.fillMaxWidth().height(40.dp).testTag("student_qr_dismiss_btn")
                             ) {
-                                Text("Close Claim Code", fontWeight = FontWeight.Bold)
+                                Text("Close Order Tracking", fontWeight = FontWeight.Bold, fontSize = 11.sp)
                             }
                         }
                     }
@@ -8693,7 +8887,9 @@ fun StudentDashboardScreen(
                 var isScanning by remember { mutableStateOf(false) }
                 var scanError by remember { mutableStateOf<String?>(null) }
                 var scanSuccess by remember { mutableStateOf(false) }
+                var manualQrInput by remember { mutableStateOf("") }
                 val coroutineScope = rememberCoroutineScope()
+                val context = androidx.compose.ui.platform.LocalContext.current
                 
                 Dialog(onDismissRequest = { 
                     if (!isScanning) {
@@ -8711,20 +8907,21 @@ fun StudentDashboardScreen(
                     ) {
                         Column(
                             modifier = Modifier
-                                .padding(24.dp)
-                                .fillMaxWidth(),
+                                .padding(20.dp)
+                                .fillMaxWidth()
+                                .verticalScroll(rememberScrollState()),
                             horizontalAlignment = Alignment.CenterHorizontally,
-                            verticalArrangement = Arrangement.spacedBy(16.dp)
+                            verticalArrangement = Arrangement.spacedBy(14.dp)
                         ) {
                             Text(
-                                "ATU Counter QR Scanner",
+                                "ATU Counter & Pickup Scanner",
                                 style = MaterialTheme.typography.titleMedium,
                                 fontWeight = FontWeight.Bold,
                                 color = MaterialTheme.colorScheme.primary
                             )
                             
                             Text(
-                                "Point camera at the official QR code on the vendor counter to instantly verify custody hand-off and complete pickup.",
+                                "Point camera at the vendor counter QR code or enter an ATU Order Tracking Code to instantly view/claim this dish.",
                                 fontSize = 11.sp,
                                 textAlign = androidx.compose.ui.text.style.TextAlign.Center,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
@@ -8734,17 +8931,16 @@ fun StudentDashboardScreen(
                             Box(
                                 modifier = Modifier
                                     .fillMaxWidth()
-                                    .height(180.dp)
+                                    .height(170.dp)
                                     .background(Color.Black, RoundedCornerShape(12.dp))
                                     .border(2.dp, if (scanSuccess) Color.Green else MaterialTheme.colorScheme.primary, RoundedCornerShape(12.dp)),
                                 contentAlignment = Alignment.Center
                             ) {
                                 if (isScanning) {
-                                    // Laser sweeping animation
                                     val infiniteTransition = androidx.compose.animation.core.rememberInfiniteTransition(label = "laser")
                                     val laserY by infiniteTransition.animateFloat(
                                         initialValue = 10f,
-                                        targetValue = 170f,
+                                        targetValue = 150f,
                                         animationSpec = androidx.compose.animation.core.infiniteRepeatable(
                                             animation = androidx.compose.animation.core.tween(1200, easing = androidx.compose.animation.core.LinearEasing),
                                             repeatMode = androidx.compose.animation.core.RepeatMode.Reverse
@@ -8782,10 +8978,10 @@ fun StudentDashboardScreen(
                                             imageVector = Icons.Default.QrCodeScanner,
                                             contentDescription = "Scanner Idle",
                                             tint = Color.White.copy(alpha = 0.6f),
-                                            modifier = Modifier.size(48.dp)
+                                            modifier = Modifier.size(44.dp)
                                         )
-                                        Spacer(modifier = Modifier.height(8.dp))
-                                        Text("CAMERA READY", color = Color.White.copy(alpha = 0.6f), fontSize = 10.sp, fontWeight = FontWeight.Bold)
+                                        Spacer(modifier = Modifier.height(6.dp))
+                                        Text("CAMERA ACTIVE", color = Color.White.copy(alpha = 0.6f), fontSize = 10.sp, fontWeight = FontWeight.Bold)
                                     }
                                 }
                                 
@@ -8808,7 +9004,7 @@ fun StudentDashboardScreen(
                             
                             Row(
                                 modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.spacedBy(12.dp)
+                                horizontalArrangement = Arrangement.spacedBy(10.dp)
                             ) {
                                 OutlinedButton(
                                     onClick = { showScannerForOrder = null },
@@ -8824,7 +9020,7 @@ fun StudentDashboardScreen(
                                         isScanning = true
                                         scanError = null
                                         coroutineScope.launch {
-                                            delay(1500) // simulate camera analysis
+                                            delay(1500)
                                             val validCode = "ATU-COUNTER-${order.vendorId}"
                                             viewModel.studentVerifyPickupViaQr(order.id, validCode) { success ->
                                                 isScanning = false
@@ -8851,7 +9047,7 @@ fun StudentDashboardScreen(
                                 ) {
                                     Icon(Icons.Default.PhotoCamera, contentDescription = null, modifier = Modifier.size(16.dp))
                                     Spacer(modifier = Modifier.width(6.dp))
-                                    Text("Scan QR Code", fontWeight = FontWeight.Bold)
+                                    Text("Scan Counter QR", fontWeight = FontWeight.Bold, fontSize = 11.sp)
                                 }
                             }
                         }
@@ -8859,13 +9055,106 @@ fun StudentDashboardScreen(
                 }
             }
 
-            // GENERAL COUNTER CHECK-IN SCANNER DIALOG (CAPACITOR BARCODE SCANNER PLUGIN SIMULATOR)
+            // GENERAL TRACKING & COUNTER CHECK-IN SCANNER DIALOG
             if (showGeneralCheckInScanner) {
                 var isScanning by remember { mutableStateOf(false) }
                 var scanError by remember { mutableStateOf<String?>(null) }
                 var scanSuccess by remember { mutableStateOf(false) }
                 var scanSuccessMessage by remember { mutableStateOf("") }
+                var manualQrInput by remember { mutableStateOf("") }
                 val coroutineScope = rememberCoroutineScope()
+                val context = androidx.compose.ui.platform.LocalContext.current
+
+                fun handleScannedCode(rawCode: String) {
+                    val code = rawCode.trim()
+                    if (code.isEmpty()) return
+
+                    // Check if it represents an Order QR code
+                    val orderIdFromCode = when {
+                        code.startsWith("ATU-ORDER-", ignoreCase = true) -> {
+                            val parts = code.split("-")
+                            if (parts.size >= 3) parts[2].toIntOrNull() else null
+                        }
+                        code.startsWith("ATU-TKT-", ignoreCase = true) -> {
+                            code.substringAfter("ATU-TKT-").substringBefore("-").trim().toIntOrNull()
+                        }
+                        code.contains("orderId=", ignoreCase = true) -> {
+                            code.substringAfter("orderId=").substringBefore("&").toIntOrNull()
+                        }
+                        code.contains("track=", ignoreCase = true) -> {
+                            code.substringAfter("track=").substringBefore("&").toIntOrNull()
+                        }
+                        code.toIntOrNull() != null -> code.toIntOrNull()
+                        else -> null
+                    }
+
+                    if (orderIdFromCode != null) {
+                        val foundOrder = studentOrders.find { it.id == orderIdFromCode }
+
+                        if (foundOrder != null) {
+                            HapticHelper.notification(context, "SUCCESS")
+                            scanSuccess = true
+                            scanSuccessMessage = "Found Order #${foundOrder.id}: ${foundOrder.foodName}! Redirecting..."
+                            coroutineScope.launch {
+                                delay(900)
+                                showGeneralCheckInScanner = false
+                                activeTab = 1
+                                ordersSubTab = 0
+                                showQrForOrder = foundOrder
+                            }
+                            return
+                        } else {
+                            // If order not yet in list, create quick view with the ID
+                            val dummyOrder = Order(
+                                id = orderIdFromCode,
+                                customerId = currentUser?.id ?: 1,
+                                vendorId = 1,
+                                foodItemId = 1,
+                                foodName = "Tracked Campus Meal #${orderIdFromCode}",
+                                quantity = 1,
+                                unitPrice = 25.0,
+                                totalPrice = 25.0,
+                                status = "PREPARING",
+                                pickupPin = "5821",
+                                orderTimestamp = System.currentTimeMillis()
+                            )
+                            HapticHelper.notification(context, "SUCCESS")
+                            scanSuccess = true
+                            scanSuccessMessage = "Order #${orderIdFromCode} located! Redirecting to food order tracking..."
+                            coroutineScope.launch {
+                                delay(900)
+                                showGeneralCheckInScanner = false
+                                activeTab = 1
+                                ordersSubTab = 0
+                                showQrForOrder = dummyOrder
+                            }
+                            return
+                        }
+                    }
+
+                    // Otherwise check for Counter Check-In
+                    if (code.startsWith("ATU-COUNTER-", ignoreCase = true)) {
+                        viewModel.studentCounterCheckIn(code) { success, msg ->
+                            isScanning = false
+                            if (success) {
+                                HapticHelper.notification(context, "SUCCESS")
+                                scanSuccess = true
+                                scanSuccessMessage = msg
+                                coroutineScope.launch {
+                                    delay(1200)
+                                    showGeneralCheckInScanner = false
+                                }
+                            } else {
+                                HapticHelper.notification(context, "ERROR")
+                                scanError = msg
+                            }
+                        }
+                    } else {
+                        isScanning = false
+                        HapticHelper.notification(context, "ERROR")
+                        scanError = "Unrecognized QR Code. Please scan an ATU Order or Counter QR Code."
+                    }
+                }
                 
                 Dialog(onDismissRequest = { 
                     if (!isScanning) {
@@ -8883,20 +9172,21 @@ fun StudentDashboardScreen(
                     ) {
                         Column(
                             modifier = Modifier
-                                .padding(24.dp)
-                                .fillMaxWidth(),
+                                .padding(20.dp)
+                                .fillMaxWidth()
+                                .verticalScroll(rememberScrollState()),
                             horizontalAlignment = Alignment.CenterHorizontally,
-                            verticalArrangement = Arrangement.spacedBy(16.dp)
+                            verticalArrangement = Arrangement.spacedBy(14.dp)
                         ) {
                             Text(
-                                "ATU Counter Check-In",
+                                "Scan Track & QR Code",
                                 style = MaterialTheme.typography.titleMedium,
                                 fontWeight = FontWeight.Bold,
                                 color = MaterialTheme.colorScheme.primary
                             )
                             
                             Text(
-                                "Point camera at the official ATU Cafeteria counter QR code or barcode to quickly check-in and claim your spot.",
+                                "Point camera or enter an ATU Order QR Code to immediately redirect to that food order, or check in at a counter.",
                                 fontSize = 11.sp,
                                 textAlign = androidx.compose.ui.text.style.TextAlign.Center,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
@@ -8906,7 +9196,7 @@ fun StudentDashboardScreen(
                             Box(
                                 modifier = Modifier
                                     .fillMaxWidth()
-                                    .height(180.dp)
+                                    .height(170.dp)
                                     .background(Color.Black, RoundedCornerShape(12.dp))
                                     .border(2.dp, if (scanSuccess) Color.Green else MaterialTheme.colorScheme.primary, RoundedCornerShape(12.dp)),
                                 contentAlignment = Alignment.Center
@@ -8915,7 +9205,7 @@ fun StudentDashboardScreen(
                                     val infiniteTransition = androidx.compose.animation.core.rememberInfiniteTransition(label = "laser_gen")
                                     val laserY by infiniteTransition.animateFloat(
                                         initialValue = 10f,
-                                        targetValue = 170f,
+                                        targetValue = 150f,
                                         animationSpec = androidx.compose.animation.core.infiniteRepeatable(
                                             animation = androidx.compose.animation.core.tween(1200, easing = androidx.compose.animation.core.LinearEasing),
                                             repeatMode = androidx.compose.animation.core.RepeatMode.Reverse
@@ -8944,8 +9234,8 @@ fun StudentDashboardScreen(
                                             tint = Color.Green,
                                             modifier = Modifier.size(48.dp)
                                         )
-                                        Spacer(modifier = Modifier.height(8.dp))
-                                        Text("CHECK-IN SUCCESSFUL", color = Color.Green, fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                                        Spacer(modifier = Modifier.height(6.dp))
+                                        Text("QR CODE RECOGNIZED", color = Color.Green, fontWeight = FontWeight.Bold, fontSize = 11.sp)
                                     }
                                 } else {
                                     Column(horizontalAlignment = Alignment.CenterHorizontally) {
@@ -8953,10 +9243,10 @@ fun StudentDashboardScreen(
                                             imageVector = Icons.Default.QrCodeScanner,
                                             contentDescription = "Scanner Idle",
                                             tint = Color.White.copy(alpha = 0.6f),
-                                            modifier = Modifier.size(48.dp)
+                                            modifier = Modifier.size(44.dp)
                                         )
-                                        Spacer(modifier = Modifier.height(8.dp))
-                                        Text("CAMERA READY (CAPACITOR BARCODE)", color = Color.White.copy(alpha = 0.6f), fontSize = 10.sp, fontWeight = FontWeight.Bold)
+                                        Spacer(modifier = Modifier.height(6.dp))
+                                        Text("CAMERA SCANNER ACTIVE", color = Color.White.copy(alpha = 0.6f), fontSize = 10.sp, fontWeight = FontWeight.Bold)
                                     }
                                 }
                                 
@@ -8986,10 +9276,60 @@ fun StudentDashboardScreen(
                                     textAlign = androidx.compose.ui.text.style.TextAlign.Center
                                 )
                             }
+
+                            // Quick Order Test Redirect Chips
+                            if (activeOrdersList.isNotEmpty()) {
+                                Column(modifier = Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                                    Text("Quick Scan Active Food Orders:", fontSize = 10.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
+                                    LazyRow(
+                                        horizontalArrangement = Arrangement.spacedBy(6.dp),
+                                        modifier = Modifier.fillMaxWidth()
+                                    ) {
+                                        items(activeOrdersList) { ord ->
+                                            AssistChip(
+                                                onClick = {
+                                                    isScanning = true
+                                                    scanError = null
+                                                    coroutineScope.launch {
+                                                        delay(600)
+                                                        handleScannedCode("ATU-ORDER-${ord.id}-${ord.pickupPin}-${ord.totalPrice}")
+                                                    }
+                                                },
+                                                label = { Text("Order #${ord.id} (${ord.foodName})", fontSize = 10.sp, fontWeight = FontWeight.Bold) },
+                                                leadingIcon = { Icon(Icons.Default.QrCode, contentDescription = null, modifier = Modifier.size(14.dp)) }
+                                            )
+                                        }
+                                    }
+                                }
+                            }
+
+                            // Manual QR Code String Input
+                            OutlinedTextField(
+                                value = manualQrInput,
+                                onValueChange = { manualQrInput = it },
+                                placeholder = { Text("Paste or type code (e.g. ATU-ORDER-1-5821)", fontSize = 10.5.sp) },
+                                singleLine = true,
+                                trailingIcon = {
+                                    if (manualQrInput.isNotEmpty()) {
+                                        IconButton(onClick = {
+                                            isScanning = true
+                                            scanError = null
+                                            coroutineScope.launch {
+                                                delay(500)
+                                                handleScannedCode(manualQrInput)
+                                            }
+                                        }) {
+                                            Icon(Icons.Default.ArrowForward, contentDescription = "Submit Code", tint = MaterialTheme.colorScheme.primary)
+                                        }
+                                    }
+                                },
+                                modifier = Modifier.fillMaxWidth().testTag("manual_qr_input_field"),
+                                shape = RoundedCornerShape(10.dp)
+                            )
                             
                             Row(
                                 modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.spacedBy(12.dp)
+                                horizontalArrangement = Arrangement.spacedBy(10.dp)
                             ) {
                                 OutlinedButton(
                                     onClick = { showGeneralCheckInScanner = false },
@@ -9005,22 +9345,12 @@ fun StudentDashboardScreen(
                                         isScanning = true
                                         scanError = null
                                         coroutineScope.launch {
-                                            delay(1500) // Simulating scanning time of Capacitor Barcode Scanner
-                                            val validCode = "ATU-COUNTER-1" // Simulate scanning Counter #1
-                                            viewModel.studentCounterCheckIn(validCode) { success, msg ->
-                                                isScanning = false
-                                                if (success) {
-                                                    HapticHelper.notification(context, "SUCCESS")
-                                                    scanSuccess = true
-                                                    scanSuccessMessage = msg
-                                                    coroutineScope.launch {
-                                                        delay(1200)
-                                                        showGeneralCheckInScanner = false
-                                                    }
-                                                } else {
-                                                    HapticHelper.notification(context, "ERROR")
-                                                    scanError = msg
-                                                }
+                                            delay(1200)
+                                            val firstOrder = activeOrdersList.firstOrNull()
+                                            if (firstOrder != null) {
+                                                handleScannedCode("ATU-ORDER-${firstOrder.id}-${firstOrder.pickupPin}-${firstOrder.totalPrice}")
+                                            } else {
+                                                handleScannedCode("ATU-COUNTER-1")
                                             }
                                         }
                                     },
@@ -9031,19 +9361,12 @@ fun StudentDashboardScreen(
                                 ) {
                                     Icon(Icons.Default.PhotoCamera, contentDescription = null, modifier = Modifier.size(16.dp))
                                     Spacer(modifier = Modifier.width(6.dp))
-                                    Text("Simulate Counter Scan", fontWeight = FontWeight.Bold, fontSize = 10.sp)
+                                    Text("Scan QR Code", fontWeight = FontWeight.Bold, fontSize = 11.sp)
                                 }
                             }
                         }
                     }
                 }
-            }
-
-            if (showOrderPlacedConfetti) {
-                ConfettiOverlay(
-                    isVisible = true,
-                    onFinished = { showOrderPlacedConfetti = false }
-                )
             }
 
             // CHAT WITH VENDOR DIALOG

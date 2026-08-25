@@ -10,6 +10,63 @@ import com.example.BuildConfig
 // ==========================================
 class GeminiAnalyticsRepository {
 
+    /**
+     * Executes a prompt against the Gemini API with automatic fallback and retry.
+     * Tries primary fast model (gemini-2.5-flash), and retries with fallback model (gemini-3.5-flash)
+     * on transient 5xx/503/429 errors.
+     */
+    private suspend fun executeGeminiPrompt(
+        apiKey: String,
+        prompt: String,
+        primaryModel: String = "gemini-2.5-flash",
+        fallbackModel: String = "gemini-3.5-flash"
+    ): String? {
+        if (apiKey.isBlank() || apiKey == "MY_GEMINI_API_KEY") {
+            return null
+        }
+
+        val request = GeminiGenerateRequest(
+            contents = listOf(
+                GeminiContent(
+                    parts = listOf(
+                        GeminiPart(text = prompt)
+                    )
+                )
+            )
+        )
+
+        // Attempt 1: primary fast model
+        try {
+            val response = RetrofitClient.geminiService.generateContentWithModel(primaryModel, apiKey, request)
+            val result = response.candidates?.firstOrNull()?.content?.parts?.firstOrNull()?.text
+            if (!result.isNullOrBlank()) {
+                return result
+            }
+        } catch (e: retrofit2.HttpException) {
+            Log.w("GeminiAnalytics", "Primary model $primaryModel returned HTTP ${e.code()}. Trying fallback model $fallbackModel...")
+        } catch (e: Exception) {
+            Log.w("GeminiAnalytics", "Primary model $primaryModel request failed: ${e.message}. Trying fallback model $fallbackModel...")
+        }
+
+        // Attempt 2: fallback model with short backoff
+        try {
+            kotlinx.coroutines.delay(400)
+            val response = RetrofitClient.geminiService.generateContentWithModel(fallbackModel, apiKey, request)
+            val result = response.candidates?.firstOrNull()?.content?.parts?.firstOrNull()?.text
+            if (!result.isNullOrBlank()) {
+                return result
+            }
+        } catch (e: retrofit2.HttpException) {
+            Log.w("GeminiAnalytics", "Fallback model $fallbackModel returned HTTP ${e.code()}: ${e.message()}")
+        } catch (e: Exception) {
+            Log.w("GeminiAnalytics", "Fallback model $fallbackModel request failed: ${e.message}")
+        }
+
+        return null
+    }
+
+
+
     suspend fun generateVendorPerformanceReview(
         vendorName: String,
         feedbacks: List<Feedback>,
@@ -57,22 +114,12 @@ class GeminiAnalyticsRepository {
             3. **💡 Strategic University Directives**: Deliver exactly 3 highly specific, localized action items (e.g. food prep instructions, waste control, digitised queuing) that the vendor must implement to comply with ATU hygiene and efficiency standards. Keep the tone insightful, academic, encouraging, and highly professional.
         """.trimIndent()
 
-        val request = GeminiGenerateRequest(
-            contents = listOf(
-                GeminiContent(
-                    parts = listOf(
-                        GeminiPart(text = prompt)
-                    )
-                )
-            )
-        )
+        val geminiResult = executeGeminiPrompt(apiKey, prompt)
+        if (!geminiResult.isNullOrBlank()) {
+            return@withContext geminiResult
+        }
 
-        try {
-            val response = RetrofitClient.geminiService.generateContent(apiKey, request)
-            response.candidates?.firstOrNull()?.content?.parts?.firstOrNull()?.text ?: "No insight received from ATU Analytics, try again later."
-        } catch (e: Exception) {
-            Log.e("GeminiAnalytics", "Error communicating with Gemini", e)
-            "Offline Simulation Mode (Network/API Limit reached): \n\n" +
+        "Offline Simulation Mode (Network/API Limit reached): \n\n" +
                     "### 🏆 Performance Diagnostics Scorecard\n" +
                     "• **Strengths**: Excelling on Price-to-Value ratios for ATU student budgets, keeping food local and appetizing.\n" +
                     "• **Bottlenecks**: Pounded food preparation and Jollof peak crowding delays service speed during lunch hour transitions.\n\n" +
@@ -82,7 +129,6 @@ class GeminiAnalyticsRepository {
                     "1. **Pre-portion Waakye Shito Sides**: Pre-packaging standard student packages before 11:30 AM will cut serving times by 40%.\n" +
                     "2. **Implement Dual-Line Service**: Have separate channels for cash/PIN-verification pickups and queue orders.\n" +
                     "3. **Campus Hygiene Protocol**: Arrange structured cleaning sweeps at 11:00 AM and 2:00 PM."
-        }
     }
 
     suspend fun generateVendorSentimentAnalysis(
@@ -130,22 +176,12 @@ class GeminiAnalyticsRepository {
             Keep the content highly structured, engaging, and professional for a mobile dashboard. Use bold markdown headers and formatting.
         """.trimIndent()
 
-        val request = GeminiGenerateRequest(
-            contents = listOf(
-                GeminiContent(
-                    parts = listOf(
-                        GeminiPart(text = prompt)
-                    )
-                )
-            )
-        )
+        val geminiResult = executeGeminiPrompt(apiKey, prompt)
+        if (!geminiResult.isNullOrBlank()) {
+            return@withContext geminiResult
+        }
 
-        try {
-            val response = RetrofitClient.geminiService.generateContent(apiKey, request)
-            response.candidates?.firstOrNull()?.content?.parts?.firstOrNull()?.text ?: "No sentiment insight received, try again later."
-        } catch (e: Exception) {
-            Log.e("GeminiSentiment", "Error communicating with Gemini", e)
-            "Offline Simulation Mode (Network/API Limit reached): \n\n" +
+        "Offline Simulation Mode (Network/API Limit reached): \n\n" +
                     "### 📊 Overall Sentiment Balance\n" +
                     "🟢 **Positive**: 78% | 🟡 **Neutral**: 14% | 🔴 **Negative**: 8%\n\n" +
                     "### 🏆 Key Praise & Strengths\n" +
@@ -154,7 +190,6 @@ class GeminiAnalyticsRepository {
                     "### ⚠️ Key Friction Points & Complaints\n" +
                     "• **Queue Waiting Bottlenecks**: Peak lunch transit congestion at 12:15 PM remains student friction point.\n" +
                     "• **Order status signaling**: Students noted that sometimes orders are marked 'Ready' but are still being boxed."
-        }
     }
 
     suspend fun generateVendorAutoReplies(
@@ -192,29 +227,18 @@ class GeminiAnalyticsRepository {
             - The actual ready-to-copy placeholder response text enclosed in professional quotes.
         """.trimIndent()
 
-        val request = GeminiGenerateRequest(
-            contents = listOf(
-                GeminiContent(
-                    parts = listOf(
-                        GeminiPart(text = prompt)
-                    )
-                )
-            )
-        )
+        val geminiResult = executeGeminiPrompt(apiKey, prompt)
+        if (!geminiResult.isNullOrBlank()) {
+            return@withContext geminiResult
+        }
 
-        try {
-            val response = RetrofitClient.geminiService.generateContent(apiKey, request)
-            response.candidates?.firstOrNull()?.content?.parts?.firstOrNull()?.text ?: "No template suggestions received, please try again."
-        } catch (e: Exception) {
-            Log.e("GeminiAutoReply", "Error communicating with Gemini", e)
-            "Offline Simulation Mode:\n\n" +
+        "Offline Simulation Mode:\n\n" +
                     "### 📝 Template 1: For Service Speed/Waiting Complaints\n" +
                     "\"Dear Student, thank you for your valuable feedback. We are sincerely sorry you experienced a delay during peak hours. ATU Cafeteria values your time, and we are implementing pre-packaging and dual lines next week to speed up order collection. We hope to serve you better next time! - $vendorName\"\n\n" +
                     "### 📝 Template 2: For Food Quality/Portion Complaints\n" +
                     "\"Hello! Thank you for sharing your experience. We take food quality seriously. We want to ensure you get the best value for your money. Please show this message to our manager on your next visit so we can make this right. - $vendorName\"\n\n" +
                     "### 📝 Template 3: For Booth Hygiene/Cleanliness Complaints\n" +
                     "\"Thank you for bringing this to our attention. We are committed to strict hygienic protocols on campus. We have augmented our clean-up sweeps to address this immediately. Thank you for helping us keep ATU clean! - $vendorName\""
-        }
     }
 
     suspend fun generateMenuPricingSuggestions(
@@ -303,22 +327,12 @@ class GeminiAnalyticsRepository {
             Keep the report beautifully styled with bullet points, bold percentages, and bold pricing figures (GH₵) so vendors can read them instantly on their phone dashboard.
         """.trimIndent())
 
-        val request = GeminiGenerateRequest(
-            contents = listOf(
-                GeminiContent(
-                    parts = listOf(
-                        GeminiPart(text = prompt)
-                    )
-                )
-            )
-        )
+        val geminiResult = executeGeminiPrompt(apiKey, prompt)
+        if (!geminiResult.isNullOrBlank()) {
+            return@withContext geminiResult
+        }
 
-        try {
-            val response = RetrofitClient.geminiService.generateContent(apiKey, request)
-            response.candidates?.firstOrNull()?.content?.parts?.firstOrNull()?.text ?: "No price recommendations generated by ATU Intelligence at this time."
-        } catch (e: Exception) {
-            Log.e("GeminiPricing", "Error communicating with Gemini", e)
-            "Offline Simulation Mode:\n\n" +
+        "Offline Simulation Mode:\n\n" +
                     "### ☀️ Breakfast Peak Hour Suggestions (8:00 AM - 10:30 AM)\n" +
                     "• **Special**: 'Rise & Shine Porridge Combo' (Koko + Egg + Bread) reduced from GH₵ 18.00 to **GH₵ 15.00**.\n" +
                     "• **Pricing Strategy**: Maintain current prices for single pastries as they are highly price-elastic for students first thing in the morning.\n\n" +
@@ -327,7 +341,6 @@ class GeminiAnalyticsRepository {
                     "• **Special Combo**: 'ATU Lunch Champion' (Waakye + Sobolo) bundled for GH₵ 35.00 (saves 12% compared to separate purchases).\n\n" +
                     "### 🍹 Afternoon Slack Hour Suggestions (2:30 PM - 5:00 PM)\n" +
                     "• **Specials**: 'Happy Hour Drinks': Discount Sobolo and fresh juices by **20%** to generate traffic during lecture intervals."
-        }
     }
 
     suspend fun generateTodayInsights(
@@ -432,29 +445,18 @@ class GeminiAnalyticsRepository {
             Keep the report beautifully styled with concise bullets, bold keys, and clear pricing symbols (GH₵) so vendors can read and digest them in seconds. Keep it compact!
         """.trimIndent())
 
-        val request = GeminiGenerateRequest(
-            contents = listOf(
-                GeminiContent(
-                    parts = listOf(
-                        GeminiPart(text = prompt)
-                    )
-                )
-            )
-        )
+        val geminiResult = executeGeminiPrompt(apiKey, prompt)
+        if (!geminiResult.isNullOrBlank()) {
+            return@withContext geminiResult
+        }
 
-        try {
-            val response = RetrofitClient.geminiService.generateContent(apiKey, request)
-            response.candidates?.firstOrNull()?.content?.parts?.firstOrNull()?.text ?: "No today's insights generated by ATU Intelligence at this time."
-        } catch (e: Exception) {
-            Log.e("GeminiTodayInsights", "Error communicating with Gemini", e)
-            "Offline Simulation Mode:\n\n" +
+        "Offline Simulation Mode:\n\n" +
                     "### 📊 Today's Live Sales Analytics\n" +
                     "• **Busiest Hour**: **$busiestHourStr**\n" +
                     "• **Most Ordered Item**: **$topItemStr**\n" +
                     "• **Total Revenue**: **GH₵ ${"%.2f".format(totalRev)}** across **$totalQty** items ordered.\n\n" +
                     "### 💡 Smart Recommendations for $vendorName\n" +
                     "1. **Peak Demand Action**: Your busiest window was around **$busiestHourStr**. Consider preparing pre-packaged portions 15 minutes before this peak to serve students instantaneously!"
-        }
     }
 
     suspend fun generateHistoricalOrderInsights(
@@ -558,28 +560,17 @@ class GeminiAnalyticsRepository {
             Keep the report beautifully styled, concise, encouraging, and highly professional. Limit to 350-400 words.
         """.trimIndent())
 
-        val request = GeminiGenerateRequest(
-            contents = listOf(
-                GeminiContent(
-                    parts = listOf(
-                        GeminiPart(text = prompt)
-                    )
-                )
-            )
-        )
+        val geminiResult = executeGeminiPrompt(apiKey, prompt)
+        if (!geminiResult.isNullOrBlank()) {
+            return@withContext geminiResult
+        }
 
-        try {
-            val response = RetrofitClient.geminiService.generateContent(apiKey, request)
-            response.candidates?.firstOrNull()?.content?.parts?.firstOrNull()?.text ?: "No historical order insights generated by ATU Intelligence at this time."
-        } catch (e: Exception) {
-            Log.e("GeminiHistoricalOrderInsights", "Error communicating with Gemini", e)
-            "### 📈 ATU Intelligence: Historical Order Analytics Summary for **$vendorName**\n" +
+        "### 📈 ATU Intelligence: Historical Order Analytics Summary for **$vendorName**\n" +
                     "*(Local Smart Fallback Report — Active Data Aggregation Running Live)*\n\n" +
                     "• **Busiest Hour**: $busiestHourStr\n" +
                     "• **Top Food Performance**:\n" +
                     popularItemsStr + "\n" +
                     "• **Operational Tip**: Prep portion lines 20 minutes before peak sessions."
-        }
     }
 
     suspend fun generateNutritionCoaching(
@@ -633,28 +624,17 @@ class GeminiAnalyticsRepository {
             Make sure your response has a bright, encouraging, supportive tone. Limit the response to 400 words.
         """.trimIndent()
 
-        val request = GeminiGenerateRequest(
-            contents = listOf(
-                GeminiContent(
-                    parts = listOf(
-                        GeminiPart(text = prompt)
-                    )
-                )
-            )
-        )
+        val geminiResult = executeGeminiPrompt(apiKey, prompt)
+        if (!geminiResult.isNullOrBlank()) {
+            return@withContext geminiResult
+        }
 
-        try {
-            val response = RetrofitClient.geminiService.generateContent(apiKey, request)
-            response.candidates?.firstOrNull()?.content?.parts?.firstOrNull()?.text ?: "No nutrition insight generated."
-        } catch (e: Exception) {
-            Log.e("GeminiNutrition", "Error communicating with Gemini", e)
-            "Offline Simulation Mode:\n\n" +
+        "Offline Simulation Mode:\n\n" +
                     "### 🛡️ Daily Macro Analysis\n" +
                     "• **Calories**: ${currentKcal.toInt()} / ${dailyTargetKcal.toInt()} kcal\n" +
                     "• **Protein**: ${protein.toInt()}g logged vs 130g goal\n\n" +
                     "### 🍏 Smart Meal Recommendations\n" +
                     "• **High Protein**: Select double eggs with Waakye from the local stands to lift your macro density!"
-        }
     }
 
     suspend fun generateDailyDemandForecast(
@@ -707,22 +687,12 @@ class GeminiAnalyticsRepository {
             Keep the report beautifully styled, concise, encouraging, and highly professional. Limit to 350-400 words.
         """.trimIndent())
 
-        val request = GeminiGenerateRequest(
-            contents = listOf(
-                GeminiContent(
-                    parts = listOf(
-                        GeminiPart(text = prompt)
-                    )
-                )
-            )
-        )
+        val geminiResult = executeGeminiPrompt(apiKey, prompt)
+        if (!geminiResult.isNullOrBlank()) {
+            return@withContext geminiResult
+        }
 
-        try {
-            val response = RetrofitClient.geminiService.generateContent(apiKey, request)
-            response.candidates?.firstOrNull()?.content?.parts?.firstOrNull()?.text ?: "No daily demand forecast generated by ATU Intelligence at this time."
-        } catch (e: Exception) {
-            Log.e("GeminiDemandForecast", "Error communicating with Gemini", e)
-            "Offline Simulation Mode:\n\n" +
+        "Offline Simulation Mode:\n\n" +
                     "### 🔮 Tomorrow's Demand Forecast (Units Required)\n" +
                     "• **Waakye Premium**: Forecasted demand of **35 - 45 units**\n" +
                     "• **Jollof Rice**: Forecasted demand of **25 - 35 units**\n" +
@@ -732,7 +702,6 @@ class GeminiAnalyticsRepository {
                     "### 💡 Operational Directives\n" +
                     "1. Pre-package at least 20 portions of Waakye by 11:30 AM.\n" +
                     "2. Chill Sobolo bottles overnight to meet peak hydration demand during afternoon heat."
-        }
     }
 
     suspend fun generateStudentMenuRecommendations(
@@ -783,24 +752,13 @@ class GeminiAnalyticsRepository {
             Make the output visually compelling with bold headers and lists, suited for a mobile screen card. Limit to 350 words.
         """.trimIndent()
 
-        val request = GeminiGenerateRequest(
-            contents = listOf(
-                GeminiContent(
-                    parts = listOf(
-                        GeminiPart(text = prompt)
-                    )
-                )
-            )
-        )
-
-        try {
-            val response = RetrofitClient.geminiService.generateContent(apiKey, request)
-            response.candidates?.firstOrNull()?.content?.parts?.firstOrNull()?.text ?: "No recommendations generated at this time."
-        } catch (e: Exception) {
-            Log.e("GeminiMenuRecs", "Error communicating with Gemini", e)
-            "### 🧠 Gemini AI Student Menu Recommendations\n" +
-                    "• **Recommended dish**: Waakye with extra fish and Sobolo drink. High in fiber and perfect for a student with local tastes."
+        val geminiResult = executeGeminiPrompt(apiKey, prompt)
+        if (!geminiResult.isNullOrBlank()) {
+            return@withContext geminiResult
         }
+
+        "### 🧠 Gemini AI Student Menu Recommendations\n" +
+                    "• **Recommended dish**: Waakye with extra fish and Sobolo drink. High in fiber and perfect for a student with local tastes."
     }
 
     suspend fun predictLowStockItems(
@@ -854,23 +812,12 @@ class GeminiAnalyticsRepository {
             Keep the predictions actionable and precise for a vendor's mobile notification alert system. Limit your response to 300 words.
         """.trimIndent())
 
-        val request = GeminiGenerateRequest(
-            contents = listOf(
-                GeminiContent(
-                    parts = listOf(
-                        GeminiPart(text = prompt)
-                    )
-                )
-            )
-        )
-
-        try {
-            val response = RetrofitClient.geminiService.generateContent(apiKey, request)
-            response.candidates?.firstOrNull()?.content?.parts?.firstOrNull()?.text ?: "All stock levels appear stable."
-        } catch (e: Exception) {
-            Log.e("GeminiLowStockPredict", "Error communicating with Gemini", e)
-            "Prediction: High demand predicted for Waakye. Remaining stock of ${foodItems.firstOrNull()?.currentStock ?: 10} will fall below threshold soon. Suggest restocking 20 units."
+        val geminiResult = executeGeminiPrompt(apiKey, prompt)
+        if (!geminiResult.isNullOrBlank()) {
+            return@withContext geminiResult
         }
+
+        "Prediction: High demand predicted for Waakye. Remaining stock of ${foodItems.firstOrNull()?.currentStock ?: 10} will fall below threshold soon. Suggest restocking 20 units."
     }
 
     suspend fun generatePopularTodaySuggestions(
@@ -924,26 +871,15 @@ class GeminiAnalyticsRepository {
             Make the tone extremely engaging, energetic, encouraging, and local to ATU campus life. Keep it short (max 250 words) so it fits in a mobile home screen section.
         """.trimIndent()
 
-        val request = GeminiGenerateRequest(
-            contents = listOf(
-                GeminiContent(
-                    parts = listOf(
-                        GeminiPart(text = prompt)
-                    )
-                )
-            )
-        )
+        val geminiResult = executeGeminiPrompt(apiKey, prompt)
+        if (!geminiResult.isNullOrBlank()) {
+            return@withContext geminiResult
+        }
 
-        try {
-            val response = RetrofitClient.geminiService.generateContent(apiKey, request)
-            response.candidates?.firstOrNull()?.content?.parts?.firstOrNull()?.text ?: "No trending insights available right now."
-        } catch (e: Exception) {
-            Log.e("GeminiPopularToday", "Error communicating with Gemini", e)
-            "### 🔥 Popular Today on Campus\n\n" +
+        "### 🔥 Popular Today on Campus\n\n" +
                     "• **Waakye Premium Combo**: 28 portions sold today!\n" +
                     "• **Zesty Ginger Sobolo**: 19 portions sold today!\n\n" +
                     "High midday temperatures have driven a 30% surge in Sobolo orders, while Waakye remains the ultimate student budget fuel."
-        }
     }
 
     suspend fun analyzeMenuItemNutrition(
@@ -976,27 +912,16 @@ class GeminiAnalyticsRepository {
             Keep the output concise, clean, and optimized for display in a compact mobile card.
         """.trimIndent()
 
-        val request = GeminiGenerateRequest(
-            contents = listOf(
-                GeminiContent(
-                    parts = listOf(
-                        GeminiPart(text = prompt)
-                    )
-                )
-            )
-        )
+        val geminiResult = executeGeminiPrompt(apiKey, prompt)
+        if (!geminiResult.isNullOrBlank()) {
+            return@withContext geminiResult
+        }
 
-        try {
-            val response = RetrofitClient.geminiService.generateContent(apiKey, request)
-            response.candidates?.firstOrNull()?.content?.parts?.firstOrNull()?.text ?: "Unable to parse nutritional structure."
-        } catch (e: Exception) {
-            Log.e("GeminiNutrition", "Error parsing nutrition", e)
-            "### 🥗 Dynamic Nutritional Breakdown\n" +
+        "### 🥗 Dynamic Nutritional Breakdown\n" +
                     "• **Calories**: 480 kcal\n" +
                     "• **Macros**: Carbs: 65g | Protein: 18g | Fat: 14g\n" +
                     "• **Key Allergens**: None detected\n" +
                     "• **AI Health Rating**: Balanced & Energy-Boosting"
-        }
     }
 
     suspend fun analyzeCartNutritionalContent(
@@ -1025,27 +950,16 @@ class GeminiAnalyticsRepository {
             - **Dietitian Recommendation**: A 1-2 sentence tailored recommendation to optimize energy, focus, or nutritional balance for campus activities.
         """.trimIndent()
 
-        val request = GeminiGenerateRequest(
-            contents = listOf(
-                GeminiContent(
-                    parts = listOf(
-                        GeminiPart(text = prompt)
-                    )
-                )
-            )
-        )
+        val geminiResult = executeGeminiPrompt(apiKey, prompt)
+        if (!geminiResult.isNullOrBlank()) {
+            return@withContext geminiResult
+        }
 
-        try {
-            val response = RetrofitClient.geminiService.generateContent(apiKey, request)
-            response.candidates?.firstOrNull()?.content?.parts?.firstOrNull()?.text ?: "Unable to complete cart health analysis."
-        } catch (e: Exception) {
-            Log.e("GeminiCartNutrition", "Error analyzing cart nutrition", e)
-            "### 🥗 ATU Cart Health Advisor\n" +
+        "### 🥗 ATU Cart Health Advisor\n" +
                     "• **Estimated Total Calories**: ~650 kcal\n" +
                     "• **Macro Breakdown**: Carbs: 78g | Protein: 28g | Fat: 18g\n" +
                     "• **Health Rating**: Energy-Rich Student Meal\n" +
                     "• **💡 Dietary Recommendation**: Solid meal choice to power through campus lectures!"
-        }
     }
 
     private fun xmlDocClean(input: String): String {
