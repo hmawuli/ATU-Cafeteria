@@ -182,9 +182,20 @@ class CafeteriaViewModel @Inject constructor(
     private val _isSessionTimedOut = MutableStateFlow(false)
     val isSessionTimedOut: StateFlow<Boolean> = _isSessionTimedOut.asStateFlow()
 
+    // Rate-limiting and authentication lockout state flows
+    private val _failedLoginAttempts = MutableStateFlow(userSessionRepo.getFailedAttemptsCount())
+    val failedLoginAttempts: StateFlow<Int> = _failedLoginAttempts.asStateFlow()
+
+    private val _lockoutRemainingSeconds = MutableStateFlow(userSessionRepo.getRemainingLockoutSeconds())
+    val lockoutRemainingSeconds: StateFlow<Int> = _lockoutRemainingSeconds.asStateFlow()
+
+    val isRateLimited: StateFlow<Boolean> = _lockoutRemainingSeconds.map { it > 0 }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), userSessionRepo.isLockedOut())
+
     fun updateActivity() {
         if (_currentUser.value != null) {
             _lastActivityTime.value = System.currentTimeMillis()
+            userSessionRepo.recordUserActivity()
         }
     }
 
@@ -709,6 +720,24 @@ class CafeteriaViewModel @Inject constructor(
             // Guarantee Seeding occurs on first start
             repository.seedDatabaseIfEmpty()
             loadOfflineOrders()
+
+            // Session persistence auto-restore
+            if (userSessionRepo.isLoggedIn()) {
+                val uid = userSessionRepo.getUserId()
+                val uname = userSessionRepo.getUserName()
+                val restored: com.example.data.User? = if (uid > 0) {
+                    repository.userDao.getUserSync(uid)
+                } else if (uname.isNotBlank()) {
+                    repository.userDao.getUserByUsername(uname)
+                } else null
+
+                if (restored != null) {
+                    _currentUser.value = restored
+                    _lastActivityTime.value = userSessionRepo.getLastActivityTime()
+                    Log.i("CafeteriaViewModel", "Session restored successfully for: ${restored.fullName} (${restored.role})")
+                }
+            }
+
             if (LaravelClientManager.isLaravelEnabled) {
                 val success = repository.syncAllFromLaravel()
                 if (success) {
@@ -719,16 +748,36 @@ class CafeteriaViewModel @Inject constructor(
                 }
             }
         }
+
+        // Rate-limiting lockout countdown updater (1s interval)
         viewModelScope.launch {
             while (true) {
-                delay(10000) // check every 10 seconds
+                delay(1000)
+                val remaining = userSessionRepo.getRemainingLockoutSeconds()
+                if (_lockoutRemainingSeconds.value != remaining) {
+                    _lockoutRemainingSeconds.value = remaining
+                }
+            }
+        }
+
+        // Automatic 24-Hour Inactivity Session Token Invalidation Loop
+        viewModelScope.launch {
+            while (true) {
+                delay(15000) // check every 15 seconds
                 val user = _currentUser.value
                 if (user != null) {
-                    val inactiveTime = System.currentTimeMillis() - _lastActivityTime.value
-                    if (inactiveTime > 30 * 60 * 1000) { // 30 minutes
+                    val now = System.currentTimeMillis()
+                    val inactiveTime = now - _lastActivityTime.value
+                    // Invalidate session if inactive for >= 24 hours (86,400,000 ms)
+                    if (inactiveTime >= (24L * 3600L * 1000L)) {
                         _isSessionTimedOut.value = true
-                        repository.insertAuditLog(user.id, "AUTO_LOGOUT_INACTIVITY", "Auto-logged out user due to 30 minutes of inactivity.")
-                        logOut()
+                        repository.insertAuditLog(
+                            user.id, 
+                            "SESSION_TOKEN_INVALIDATED_24H", 
+                            "[SECURITY_POLICY] Session token automatically invalidated after 24 hours of inactivity to ensure compliance with OAuth 2.0 and Ghana Data Protection Act."
+                        )
+                        userSessionRepo.notifySessionExpired("OAuth 2.0 session token expired after 24 hours of inactivity.")
+                        logout()
                     }
                 }
             }
@@ -1426,6 +1475,16 @@ class CafeteriaViewModel @Inject constructor(
             _isLoading.value = true
             _loginError.value = null
 
+            // Rate-limiting Lockout Pre-check
+            if (userSessionRepo.isLockedOut()) {
+                val remainingSeconds = userSessionRepo.getRemainingLockoutSeconds()
+                val errMsg = "Security Lockout: 5 failed attempts reached. Please wait $remainingSeconds seconds."
+                _loginError.value = errMsg
+                _isLoading.value = false
+                onComplete(false)
+                return@launch
+            }
+
             val formattedEmail = if (username.contains("@")) username.trim() else "${username.trim()}@atu.edu.gh"
             val pinHash = repository.sha256(pinCode)
             // CONSOLE LOGGING MECHANISM FOR PAYLOAD INSPECTION
@@ -1455,6 +1514,10 @@ class CafeteriaViewModel @Inject constructor(
                 com.example.ui.util.CrashlyticsHelper.log("Network operation: Authenticating user '$username'")
                 val authenticated = repository.authenticateUser(username, pinCode)
                 if (authenticated != null) {
+                    userSessionRepo.resetFailedAttempts()
+                    _failedLoginAttempts.value = 0
+                    _lockoutRemainingSeconds.value = 0
+
                     _currentUser.value = authenticated
                     userSessionRepo.saveSession(
                         token = "TOKEN_${System.currentTimeMillis()}_${authenticated.id}",
@@ -1478,8 +1541,22 @@ class CafeteriaViewModel @Inject constructor(
                     _isLoading.value = false
                     onComplete(true)
                 } else {
-                    val errMsg = "Invalid Username or Pass-PIN."
-                    com.example.ui.util.CrashlyticsHelper.log("Authentication state: Invalid credentials provided for '$username'")
+                    val (attempts, isNowLocked) = userSessionRepo.recordFailedLoginAttempt()
+                    _failedLoginAttempts.value = attempts
+                    _lockoutRemainingSeconds.value = userSessionRepo.getRemainingLockoutSeconds()
+
+                    val errMsg = if (isNowLocked) {
+                        repository.insertAuditLog(
+                            0,
+                            "RATE_LIMIT_LOCKOUT",
+                            "[SECURITY_ALERT] 5 consecutive failed login attempts detected for '$username'. Temporary 60s authentication lockout triggered."
+                        )
+                        "Temporary Security Lockout: 5 consecutive failed login attempts reached. Please wait 60 seconds."
+                    } else {
+                        "Invalid Username or Pass-PIN. (Failed attempt $attempts of 5)"
+                    }
+
+                    com.example.ui.util.CrashlyticsHelper.log("Authentication state: Invalid credentials provided for '$username' (Attempt $attempts)")
                     com.example.ui.util.FirebaseAnalyticsHelper.logLoginFailure("CREDENTIALS", "INVALID_CREDENTIALS", errMsg)
                     _loginError.value = errMsg
                     _isLoading.value = false
@@ -1577,19 +1654,29 @@ class CafeteriaViewModel @Inject constructor(
                     logoUrl = null
                 )
 
+                userSessionRepo.resetFailedAttempts()
+                _failedLoginAttempts.value = 0
+                _lockoutRemainingSeconds.value = 0
+
                 _currentUser.value = authenticated
                 val sessionToken = "OAUTH2_JWT_${System.currentTimeMillis()}_${nonce.take(8)}_${authenticated.id}"
-                userSessionRepo.saveSession(
+                userSessionRepo.persistUserSession(
                     token = sessionToken,
                     userId = authenticated.id,
                     userName = authenticated.username,
                     role = authenticated.role
                 )
-                repository.insertAuditLog(
-                    authenticated.id, 
-                    "OAUTH2_GOOGLE_LOGIN", 
-                    "[SECURITY_VERIFIED] Google OAuth 2.0 Auth handshake verified. Nonce: $nonce | Scopes: openid,email,profile | User: ${authenticated.fullName} ($cleanEmail, ID: $resolvedId)."
+
+                // Log OAuth 2.0 Security Handshake with granted scopes and exact ISO-8601 timestamp
+                logSecurityHandshake(
+                    userId = authenticated.id,
+                    fullName = authenticated.fullName,
+                    email = cleanEmail,
+                    identifierOrPass = resolvedId,
+                    nonce = nonce,
+                    scopes = "openid, https://www.googleapis.com/auth/userinfo.email, https://www.googleapis.com/auth/userinfo.profile"
                 )
+
                 userSessionRepo.notifyAuthenticated(authenticated)
                 _isLoading.value = false
                 onComplete(true)
@@ -1599,6 +1686,37 @@ class CafeteriaViewModel @Inject constructor(
                 onComplete(false)
             }
         }
+    }
+
+    /**
+     * Documents Google OAuth 2.0 scopes granted and exact timestamp in audit log.
+     * Stored in Room database audit log repository and rendered under Admin Audit Logs.
+     */
+    fun logSecurityHandshake(
+        userId: Int,
+        fullName: String,
+        email: String,
+        identifierOrPass: String,
+        nonce: String,
+        scopes: String = "openid, https://www.googleapis.com/auth/userinfo.email, https://www.googleapis.com/auth/userinfo.profile"
+    ) {
+        val handshakeTimestamp = java.time.format.DateTimeFormatter.ISO_INSTANT.format(java.time.Instant.now())
+        val detailedAuditEntry = "[SECURITY_HANDSHAKE_VERIFIED] Timestamp: $handshakeTimestamp | Handshake ID: HS-${nonce.take(8).uppercase()} | Provider: Google Identity Services (OAuth 2.0) | Granted Scopes: [$scopes] | Anti-CSRF Nonce: Verified ($nonce) | Identity: $fullName ($email, ID: $identifierOrPass) | Policy: Invalidation Window: 24h Inactivity | Compliance: Ghana Data Protection Act (Act 843) | Status: AUTHORIZED_200_OK"
+
+        viewModelScope.launch {
+            repository.insertAuditLog(
+                userId, 
+                "OAUTH2_GOOGLE_HANDSHAKE", 
+                detailedAuditEntry
+            )
+        }
+    }
+
+    /**
+     * Rate limit checker helper for login flow.
+     */
+    fun checkRateLimit(identifier: String = ""): Boolean {
+        return userSessionRepo.checkRateLimit(identifier)
     }
 
     fun loginAsGuest(onComplete: (Boolean) -> Unit) {

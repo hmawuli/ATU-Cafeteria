@@ -94,6 +94,11 @@ fun LoginScreen(
     var googleNonce by remember { mutableStateOf("0x8f72a9b4c1") }
     var isPerformingGoogleHandshake by remember { mutableStateOf(false) }
 
+    // Rate Limiting and Inactivity Lockout Collection
+    val isRateLimited by viewModel.isRateLimited.collectAsStateWithLifecycle()
+    val lockoutRemainingSeconds by viewModel.lockoutRemainingSeconds.collectAsStateWithLifecycle()
+    val failedLoginAttempts by viewModel.failedLoginAttempts.collectAsStateWithLifecycle()
+
     // Real-time input validation states
     val isEmailFormat = remember(username) { username.contains("@") }
     val usernameValidationError = remember(username) {
@@ -108,8 +113,8 @@ fun LoginScreen(
         } else null
     }
 
-    val isFormSubmissionAllowed = remember(username, pinCode, usernameValidationError, pinValidationError) {
-        username.isNotBlank() && pinCode.isNotBlank() && usernameValidationError == null && pinValidationError == null
+    val isFormSubmissionAllowed = remember(username, pinCode, usernameValidationError, pinValidationError, isRateLimited, lockoutRemainingSeconds) {
+        username.isNotBlank() && pinCode.isNotBlank() && usernameValidationError == null && pinValidationError == null && !isRateLimited && lockoutRemainingSeconds <= 0
     }
 
     val context = androidx.compose.ui.platform.LocalContext.current
@@ -379,6 +384,43 @@ fun LoginScreen(
                                     )
                                     Text(
                                         text = "For security, your session was automatically cleared after inactivity.",
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.onErrorContainer
+                                    )
+                                }
+                            }
+                        }
+                    }
+
+                    if (isRateLimited || lockoutRemainingSeconds > 0) {
+                        Card(
+                            colors = CardDefaults.cardColors(
+                                containerColor = MaterialTheme.colorScheme.errorContainer
+                            ),
+                            border = BorderStroke(1.dp, MaterialTheme.colorScheme.error),
+                            modifier = Modifier.fillMaxWidth().padding(bottom = 12.dp),
+                            shape = RoundedCornerShape(12.dp)
+                        ) {
+                            Row(
+                                modifier = Modifier.padding(12.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.Lock,
+                                    contentDescription = "Security Lockout",
+                                    tint = MaterialTheme.colorScheme.error,
+                                    modifier = Modifier.size(24.dp)
+                                )
+                                Spacer(modifier = Modifier.width(12.dp))
+                                Column {
+                                    Text(
+                                        text = "Authentication Lockout Active",
+                                        style = MaterialTheme.typography.titleSmall,
+                                        fontWeight = FontWeight.Bold,
+                                        color = MaterialTheme.colorScheme.onErrorContainer
+                                    )
+                                    Text(
+                                        text = "5 consecutive failed login attempts detected. Lockout expires in ${lockoutRemainingSeconds}s.",
                                         style = MaterialTheme.typography.bodySmall,
                                         color = MaterialTheme.colorScheme.onErrorContainer
                                     )

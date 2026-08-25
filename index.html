@@ -199,6 +199,24 @@
               <span class="text-[10px] font-bold text-slate-500 bg-slate-100 px-2.5 py-1 rounded-full border border-slate-200">Secure Access</span>
             </div>
 
+            <!-- Lockout Rate-Limiting Warning Banner -->
+            <div id="auth-rate-limit-banner" class="hidden p-3 rounded-2xl border border-rose-300 bg-rose-50 text-rose-900 text-xs space-y-1">
+              <div class="flex items-center gap-2 font-black text-rose-700">
+                <i data-lucide="shield-alert" class="w-4 h-4 text-rose-600 shrink-0"></i>
+                <span>Authentication Lockout Active</span>
+              </div>
+              <p class="text-[11px] text-rose-800">5 consecutive failed attempts detected. Retries locked for <strong id="auth-lockout-timer">60</strong> seconds.</p>
+            </div>
+
+            <!-- Inactivity Session Invalidation Notification -->
+            <div id="auth-inactivity-banner" class="hidden p-3 rounded-2xl border border-amber-300 bg-amber-50 text-amber-900 text-xs space-y-1">
+              <div class="flex items-center gap-2 font-black text-amber-800">
+                <i data-lucide="clock" class="w-4 h-4 text-amber-600 shrink-0"></i>
+                <span>Session Invalidated (24h Inactivity)</span>
+              </div>
+              <p class="text-[11px] text-amber-800">Your OAuth 2.0 session token expired after 24 hours of inactivity to ensure security compliance.</p>
+            </div>
+
             <!-- Social Login: Google / Gmail Button -->
             <button onclick="loginWithGoogle()" class="w-full py-2.5 px-4 bg-white hover:bg-slate-50 border-2 border-slate-200 hover:border-slate-300 rounded-2xl text-xs font-black text-slate-700 shadow-2xs flex items-center justify-center gap-2.5 transition-all active:scale-98">
               <svg class="w-4 h-4" viewBox="0 0 24 24">
@@ -222,7 +240,7 @@
               <label class="block text-xs font-bold text-slate-700 mb-1">Username or Email</label>
               <div class="relative">
                 <i data-lucide="user" class="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2"></i>
-                <input type="text" id="login-identifier" value="" placeholder="e.g. student@atu.edu.gh or kofi" class="w-full pl-10 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-800 outline-none focus:ring-2 focus:ring-brand-500" />
+                <input type="text" id="login-identifier" oninput="checkRateLimit(this.value)" value="" placeholder="e.g. student@atu.edu.gh or kofi" class="w-full pl-10 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-800 outline-none focus:ring-2 focus:ring-brand-500" />
               </div>
             </div>
 
@@ -247,7 +265,7 @@
             </div>
 
             <!-- Secure Login Action Button -->
-            <button onclick="handleUnifiedLogin()" class="w-full py-3 bg-[#0d1e38] hover:bg-[#162d50] text-white rounded-xl text-xs font-black shadow-md flex items-center justify-center gap-2 transition-transform active:scale-95">
+            <button id="unified-login-submit-btn" onclick="handleUnifiedLogin()" class="w-full py-3 bg-[#0d1e38] hover:bg-[#162d50] text-white rounded-xl text-xs font-black shadow-md flex items-center justify-center gap-2 transition-transform active:scale-95">
               <i data-lucide="lock" class="w-4 h-4 text-amber-400"></i>
               <span>Secure Login</span>
             </button>
@@ -1668,10 +1686,13 @@
         email: guestUser.email,
         balance: guestUser.balance,
         authProvider: 'Campus Visitor Pass',
+        sessionToken: 'GUEST_SES_' + Date.now(),
         isGuest: true
       };
 
       studentBalance = guestUser.balance;
+      resetLoginRateLimit();
+      saveUserSessionToStorage(currentLoggedInUser);
       applyUserSession();
       switchRole('STUDENT');
       auditLogs.unshift(`Campus visitor entered system with Pass #${guestId} and GH₵ 150.00 trial balance.`);
@@ -1725,16 +1746,276 @@
         email: newStudent.email,
         balance: newStudent.balance,
         authProvider: selectedType === 'GUEST' ? 'Visitor Registration' : 'Student Registration',
+        sessionToken: 'REG_SES_' + Date.now(),
         isGuest: (selectedType === 'GUEST')
       };
 
       studentBalance = newStudent.balance;
+      resetLoginRateLimit();
+      saveUserSessionToStorage(currentLoggedInUser);
       applyUserSession();
       switchRole('STUDENT');
       const userLabel = selectedType === 'GUEST' ? `Campus Guest (${fullName})` : `Student (${fullName})`;
       auditLogs.unshift(`${userLabel} registered with ID ${indexNo} & GH₵ 150.00 wallet.`);
       showToast(`Account Created Successfully! Welcome to ATU Cafeteria, ${fullName}.`, 'success');
       playChime(659.25);
+    }
+
+    // ==========================================
+    // SECURITY, SESSION PERSISTENCE & RATE LIMITING
+    // ==========================================
+    const STORAGE_SESSION_KEY = 'atu_cafeteria_user_session';
+    const STORAGE_RATE_LIMIT_KEY = 'atu_cafeteria_login_rate_limit';
+    const OAUTH_INACTIVITY_LIMIT_MS = 24 * 60 * 60 * 1000; // 24 Hours (86,400,000 ms)
+    const MAX_FAILED_LOGIN_ATTEMPTS = 5;
+    const LOCKOUT_DURATION_MS = 60 * 1000; // 60 Seconds temporary lockout
+
+    /**
+     * Wraps localStorage.setItem for session data.
+     * Ensures user object, OAuth token, and lastActiveTimestamp are saved.
+     */
+    function persistUserSession(sessionData) {
+      if (!sessionData) return null;
+      try {
+        const userObj = sessionData.user || sessionData;
+        const sessionPayload = {
+          user: userObj,
+          sessionToken: sessionData.sessionToken || userObj.sessionToken || ('OAUTH2_JWT_' + Date.now()),
+          lastActiveTimestamp: sessionData.lastActiveTimestamp || Date.now(),
+          loginTimestamp: sessionData.loginTimestamp || Date.now(),
+          authProvider: sessionData.authProvider || userObj.authProvider || 'Verified Credentials'
+        };
+        localStorage.setItem(STORAGE_SESSION_KEY, JSON.stringify(sessionPayload));
+        return sessionPayload;
+      } catch (e) {
+        console.warn('persistUserSession error:', e);
+        return null;
+      }
+    }
+
+    function saveUserSessionToStorage(user) {
+      return persistUserSession({
+        user: user,
+        lastActiveTimestamp: Date.now(),
+        loginTimestamp: Date.now(),
+        sessionToken: user.sessionToken || ('JWT_ATU_' + Date.now())
+      });
+    }
+
+    function recordUserActivity() {
+      try {
+        const raw = localStorage.getItem(STORAGE_SESSION_KEY);
+        if (raw) {
+          const sessionData = JSON.parse(raw);
+          sessionData.lastActiveTimestamp = Date.now();
+          localStorage.setItem(STORAGE_SESSION_KEY, JSON.stringify(sessionData));
+        }
+      } catch (e) {
+        console.warn('Error recording user activity:', e);
+      }
+    }
+
+    function loadUserSessionFromStorage() {
+      try {
+        const raw = localStorage.getItem(STORAGE_SESSION_KEY);
+        if (!raw) return false;
+        const sessionData = JSON.parse(raw);
+        if (!sessionData || !sessionData.user) return false;
+
+        const now = Date.now();
+        const lastActive = sessionData.lastActiveTimestamp || sessionData.loginTimestamp || 0;
+        
+        // 24 Hours Inactivity Policy Verification
+        if (now - lastActive > OAUTH_INACTIVITY_LIMIT_MS) {
+          localStorage.removeItem(STORAGE_SESSION_KEY);
+          currentLoggedInUser = null;
+          auditLogs.unshift(`[SECURITY_POLICY] Session token automatically invalidated after 24 hours of inactivity to ensure compliance with OAuth 2.0 and Ghana Data Protection Act (Act 843). User: ${sessionData.user.name}.`);
+          showInactivityBanner();
+          return false;
+        }
+
+        // Valid session - restore user state
+        currentLoggedInUser = sessionData.user;
+        if (currentLoggedInUser.role === 'STUDENT') {
+          studentBalance = currentLoggedInUser.balance || 150.00;
+        } else if (currentLoggedInUser.role === 'VENDOR') {
+          activeVendorId = currentLoggedInUser.vendorId || 201;
+        }
+        applyUserSession();
+        switchRole(currentLoggedInUser.role);
+        return true;
+      } catch (e) {
+        console.error('Error loading session from localStorage:', e);
+        return false;
+      }
+    }
+
+    function showInactivityBanner() {
+      const banner = document.getElementById('auth-inactivity-banner');
+      if (banner) {
+        banner.classList.remove('hidden');
+        setTimeout(() => banner.classList.add('hidden'), 8000);
+      }
+    }
+
+    function getRateLimitState() {
+      try {
+        const raw = localStorage.getItem(STORAGE_RATE_LIMIT_KEY);
+        if (!raw) return { failedAttempts: 0, lockoutUntil: 0, attemptsByIdentifier: {} };
+        return JSON.parse(raw);
+      } catch (e) {
+        return { failedAttempts: 0, lockoutUntil: 0, attemptsByIdentifier: {} };
+      }
+    }
+
+    /**
+     * Helper to verify rate limiting in the login flow.
+     * If failed attempt count for an identifier exceeds 5, sets lockoutUntil in localStorage for 60 seconds.
+     * Disables the login button for this identifier until the timestamp expires.
+     */
+    function checkRateLimit(identifier) {
+      const cleanId = (identifier || (document.getElementById('login-identifier') ? document.getElementById('login-identifier').value.trim() : '')).toLowerCase();
+      const state = getRateLimitState();
+      const now = Date.now();
+      
+      const idLockout = (state.attemptsByIdentifier && cleanId && state.attemptsByIdentifier[cleanId]?.lockoutUntil) || 0;
+      const globalLockout = state.lockoutUntil || 0;
+      const activeLockoutUntil = Math.max(idLockout, globalLockout);
+      const isLocked = activeLockoutUntil > now;
+      const remainingSeconds = isLocked ? Math.ceil((activeLockoutUntil - now) / 1000) : 0;
+
+      const loginBtn = document.getElementById('unified-login-submit-btn');
+      const banner = document.getElementById('auth-rate-limit-banner');
+      const timer = document.getElementById('auth-lockout-timer');
+
+      if (isLocked) {
+        if (loginBtn) {
+          loginBtn.disabled = true;
+          loginBtn.classList.add('opacity-50', 'cursor-not-allowed', 'pointer-events-none');
+          const span = loginBtn.querySelector('span');
+          if (span) span.innerText = `Login Locked (${remainingSeconds}s)`;
+        }
+        if (banner) banner.classList.remove('hidden');
+        if (timer) timer.innerText = remainingSeconds;
+        return { isLocked: true, remainingSeconds: remainingSeconds, lockoutUntil: activeLockoutUntil };
+      } else {
+        if (loginBtn) {
+          loginBtn.disabled = false;
+          loginBtn.classList.remove('opacity-50', 'cursor-not-allowed', 'pointer-events-none');
+          const span = loginBtn.querySelector('span');
+          if (span) span.innerText = 'Secure Login';
+        }
+        if (banner) banner.classList.add('hidden');
+        return { isLocked: false, remainingSeconds: 0, lockoutUntil: 0 };
+      }
+    }
+
+    function isLoginRateLimited() {
+      return checkRateLimit().isLocked;
+    }
+
+    function getLockoutRemainingSeconds() {
+      return checkRateLimit().remainingSeconds;
+    }
+
+    function recordFailedLoginAttempt(identifier) {
+      const cleanId = (identifier || 'unknown_user').toLowerCase();
+      const state = getRateLimitState();
+      if (!state.attemptsByIdentifier) state.attemptsByIdentifier = {};
+      
+      const currentIdAttempts = (state.attemptsByIdentifier[cleanId]?.failedAttempts || 0) + 1;
+      state.failedAttempts = (state.failedAttempts || 0) + 1;
+      
+      const isLocked = currentIdAttempts >= MAX_FAILED_LOGIN_ATTEMPTS || state.failedAttempts >= MAX_FAILED_LOGIN_ATTEMPTS;
+      const now = Date.now();
+      const lockoutUntil = isLocked ? (now + LOCKOUT_DURATION_MS) : 0;
+
+      state.attemptsByIdentifier[cleanId] = {
+        failedAttempts: currentIdAttempts,
+        lockoutUntil: lockoutUntil
+      };
+
+      if (isLocked) {
+        state.lockoutUntil = lockoutUntil;
+        auditLogs.unshift(`[SECURITY_ALERT] 5 consecutive failed login attempts detected for identifier '${cleanId}'. Set lockoutUntil for 60 seconds.`);
+      }
+
+      localStorage.setItem(STORAGE_RATE_LIMIT_KEY, JSON.stringify(state));
+      checkRateLimit(cleanId);
+      return { attempts: currentIdAttempts, isLocked: isLocked };
+    }
+
+    function resetLoginRateLimit(identifier) {
+      const state = getRateLimitState();
+      if (identifier && state.attemptsByIdentifier) {
+        delete state.attemptsByIdentifier[identifier.toLowerCase()];
+      }
+      localStorage.removeItem(STORAGE_RATE_LIMIT_KEY);
+      checkRateLimit();
+    }
+
+    function updateLockoutUI() {
+      checkRateLimit();
+    }
+
+    // Attach activity listeners to refresh inactivity timestamp on interactions
+    ['click', 'keydown', 'scroll', 'touchstart'].forEach(evt => {
+      window.addEventListener(evt, () => recordUserActivity(), { passive: true });
+    });
+
+    // Rate-limiting countdown ticker (every 1 second)
+    setInterval(() => {
+      checkRateLimit();
+    }, 1000);
+
+    /**
+     * Background timer using setInterval that tracks lastActiveTimestamp in session storage.
+     * If the time difference exceeds 24 hours (86,400,000ms), automatically calls logoutUser(),
+     * clears the session from localStorage, and displays a 'Session Expired' alert.
+     */
+    setInterval(() => {
+      try {
+        const raw = localStorage.getItem(STORAGE_SESSION_KEY);
+        if (!raw) return;
+        const sessionData = JSON.parse(raw);
+        if (!sessionData || !sessionData.lastActiveTimestamp) return;
+
+        const now = Date.now();
+        const elapsed = now - sessionData.lastActiveTimestamp;
+
+        if (elapsed > OAUTH_INACTIVITY_LIMIT_MS) { // 24 hours (86,400,000 ms)
+          const expiredUserName = sessionData.user ? (sessionData.user.name || sessionData.user.fullName || 'User') : 'User';
+          logoutUser();
+          localStorage.removeItem(STORAGE_SESSION_KEY);
+          auditLogs.unshift(`[SESSION_EXPIRED] 24-hour inactivity limit exceeded (${elapsed}ms). Session token invalidated for ${expiredUserName}.`);
+          showInactivityBanner();
+          alert('Session Expired: You have been automatically signed out after 24 hours of inactivity to secure your account.');
+        }
+      } catch (e) {
+        console.error('Background inactivity timer error:', e);
+      }
+    }, 5000);
+
+    /**
+     * Documents Google OAuth 2.0 scopes granted and the exact server timestamp in audit log.
+     * Stores this metadata in the auditLogs array and renders it under Admin Audit Logs.
+     */
+    function logSecurityHandshake(user, scopes = ["openid", "https://www.googleapis.com/auth/userinfo.email", "https://www.googleapis.com/auth/userinfo.profile"], nonce = null) {
+      const serverTimestamp = new Date().toISOString();
+      const scopesList = Array.isArray(scopes) ? scopes.join(', ') : scopes;
+      const handshakeId = "HS-" + (nonce ? nonce.substring(0, 8).toUpperCase() : Date.now().toString(36).toUpperCase());
+      const userName = user.name || user.fullName || 'ATU Member';
+      const userEmail = user.email || 'user@atu.edu.gh';
+      const userIdentifier = user.indexNo || user.id || 'N/A';
+      const nonceDisplay = nonce ? ` | Anti-CSRF Nonce: Verified (0x${nonce.substring(0, 8)})` : '';
+
+      const handshakeEntry = `[SECURITY_HANDSHAKE_VERIFIED] Timestamp: ${serverTimestamp} | Handshake ID: ${handshakeId} | Provider: Google Identity Services (OAuth 2.0) | Granted Scopes: [${scopesList}]${nonceDisplay} | Identity: ${userName} (${userEmail}, ID: ${userIdentifier}) | Policy: Invalidation Window: 24h Inactivity | Compliance: Ghana Data Protection Act (Act 843) | Status: AUTHORIZED_200_OK`;
+
+      auditLogs.unshift(handshakeEntry);
+      if (typeof renderAdminDashboard === 'function') {
+        renderAdminDashboard();
+      }
+      return handshakeEntry;
     }
 
     function togglePasswordVisibility(inputId, iconId) {
@@ -1891,11 +2172,27 @@
         };
 
         studentBalance = student.balance;
+        
+        // Reset failed login attempts and persist session in localStorage via persistUserSession
+        resetLoginRateLimit();
+        persistUserSession({
+          user: currentLoggedInUser,
+          sessionToken: sessionToken,
+          lastActiveTimestamp: Date.now(),
+          loginTimestamp: Date.now(),
+          authProvider: 'Google OAuth 2.0 (Verified)'
+        });
+
         applyUserSession();
         switchRole('STUDENT');
 
-        // Audit Trail Security Record
-        auditLogs.unshift(`[OAUTH2_SECURITY] Google Identity Handshake validated. Nonce matched. Scope: openid,email,profile. User: ${name} (${email}, ID: ${finalIndex}). Session Token issued.`);
+        // Document Google OAuth 2.0 scopes granted and exact timestamp in audit logs
+        logSecurityHandshake(
+          student, 
+          ["openid", "https://www.googleapis.com/auth/userinfo.email", "https://www.googleapis.com/auth/userinfo.profile"], 
+          currentOAuthNonce
+        );
+
         closeGoogleOAuthModal();
         
         showToast(`Google Authentication Verified! Welcome, ${student.name}.`, 'success');
@@ -1904,6 +2201,14 @@
     }
 
     function handleUnifiedLogin() {
+      // Rate-limiting Lockout Pre-check
+      if (isLoginRateLimited()) {
+        const remainingSeconds = getLockoutRemainingSeconds();
+        showToast(`Security Lockout: 5 consecutive failed attempts reached. Please wait ${remainingSeconds} seconds.`, 'error');
+        updateLockoutUI();
+        return;
+      }
+
       const idInput = (document.getElementById('login-identifier') ? document.getElementById('login-identifier').value.trim() : '').toLowerCase();
       const passInput = document.getElementById('login-credential-pass') ? document.getElementById('login-credential-pass').value.trim() : '';
 
@@ -1912,13 +2217,27 @@
         return;
       }
 
+      // Check PIN / Password length
+      if (passInput && passInput.length < 4) {
+        const res = recordFailedLoginAttempt(idInput);
+        if (res.isLocked) {
+          showToast('Security Alert: 5 failed attempts reached. Temporary 60s lockout initiated.', 'error');
+        } else {
+          showToast(`Invalid credential PIN. Attempt ${res.attempts} of 5.`, 'error');
+        }
+        return;
+      }
+
       // 1. ADMIN CHECK (e.g. admin@atu.edu.gh or dean)
       if (idInput.includes('admin') || idInput.includes('dean') || idInput === 'director') {
         currentLoggedInUser = {
           role: 'ADMIN',
           name: 'Dean of Student Affairs',
-          email: idInput.includes('@') ? idInput : 'admin@atu.edu.gh'
+          email: idInput.includes('@') ? idInput : 'admin@atu.edu.gh',
+          sessionToken: 'ADMIN_SES_' + Date.now()
         };
+        resetLoginRateLimit();
+        saveUserSessionToStorage(currentLoggedInUser);
         applyUserSession();
         switchRole('ADMIN');
         auditLogs.unshift(`Administrator (${currentLoggedInUser.name}) authenticated into Central Directorate Hub.`);
@@ -1939,8 +2258,11 @@
           vendorId: vendor.id,
           name: vendor.name,
           location: vendor.location,
-          email: idInput
+          email: idInput,
+          sessionToken: 'VENDOR_SES_' + Date.now()
         };
+        resetLoginRateLimit();
+        saveUserSessionToStorage(currentLoggedInUser);
         applyUserSession();
         switchRole('VENDOR');
         auditLogs.unshift(`Vendor (${vendor.name}) opened Kitchen Station terminal.`);
@@ -1975,10 +2297,13 @@
         indexNo: student.indexNo,
         email: student.email,
         balance: student.balance,
-        authProvider: 'Email'
+        authProvider: 'Email',
+        sessionToken: 'STUDENT_SES_' + Date.now()
       };
 
       studentBalance = student.balance;
+      resetLoginRateLimit();
+      saveUserSessionToStorage(currentLoggedInUser);
       applyUserSession();
       switchRole('STUDENT');
       auditLogs.unshift(`Student ${student.name} (${student.email}) authenticated into ATU Cafeteria.`);
@@ -2066,6 +2391,7 @@
       clearCart();
       const prevUser = currentLoggedInUser ? currentLoggedInUser.name : 'User';
       currentLoggedInUser = null;
+      localStorage.removeItem(STORAGE_SESSION_KEY);
       applyUserSession();
       auditLogs.unshift(`${prevUser} signed out of campus terminal session.`);
       showToast('Signed out successfully. Portal locked.', 'info');
@@ -3791,6 +4117,15 @@
         setTimeout(() => toast.remove(), 300);
       }, 3500);
     }
+
+    // Auto-restore session from localStorage if active & initialize lockout UI
+    document.addEventListener('DOMContentLoaded', () => {
+      loadUserSessionFromStorage();
+      updateLockoutUI();
+    });
+    // Fallback immediate check
+    loadUserSessionFromStorage();
+    updateLockoutUI();
   </script>
 </body>
 </html>

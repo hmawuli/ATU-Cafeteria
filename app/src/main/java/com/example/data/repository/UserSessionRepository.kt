@@ -36,13 +36,20 @@ class UserSessionRepository(private val context: Context) {
         private const val KEY_USER_ROLE = "key_user_role"
         private const val KEY_IS_LOGGED_IN = "key_is_logged_in"
         private const val KEY_LAST_LOGIN_TIMESTAMP = "key_last_login_timestamp"
+        private const val KEY_LAST_ACTIVITY_TIMESTAMP = "key_last_activity_timestamp"
+        private const val KEY_FAILED_ATTEMPTS = "key_failed_attempts"
+        private const val KEY_LOCKOUT_UNTIL = "key_lockout_until"
         private const val KEY_BIOMETRIC_ENABLED = "key_biometric_enabled"
         private const val KEY_SAVED_USERNAME = "key_saved_username"
         private const val KEY_SAVED_PIN = "key_saved_pin"
         private const val KEY_FORCE_OFFLINE_MODE = "key_force_offline_mode"
         private const val KEY_BIOMETRIC_PAYMENT_PROFILE_REQUIRED = "key_biometric_payment_profile_required"
         private const val KEY_ONBOARDING_COMPLETED = "key_onboarding_completed"
-        private const val SESSION_TIMEOUT_MS = 30L * 24L * 3600L * 1000L // 30 days session validity
+        
+        // 24 Hours of Inactivity Policy for OAuth 2.0 / Security Tokens
+        const val OAUTH_INACTIVITY_TIMEOUT_MS = 24L * 3600L * 1000L // 24 Hours (86,400,000 ms)
+        const val MAX_FAILED_ATTEMPTS = 5
+        const val LOCKOUT_DURATION_MS = 60_000L // 60 seconds temporary lockout
     }
 
     fun addAuthStateListener(listener: AuthStateListener) {
@@ -78,7 +85,32 @@ class UserSessionRepository(private val context: Context) {
     }
 
     /**
-     * Store active session credentials on successful login.
+     * Persists user session object, auth token, and lastActiveTimestamp.
+     */
+    fun persistUserSession(
+        token: String,
+        userId: Int,
+        userName: String,
+        role: String
+    ) {
+        val now = System.currentTimeMillis()
+        prefs.edit().apply {
+            putString(KEY_AUTH_TOKEN, token)
+            putInt(KEY_USER_ID, userId)
+            putString(KEY_USER_NAME, userName)
+            putString(KEY_USER_ROLE, role)
+            putBoolean(KEY_IS_LOGGED_IN, true)
+            putLong(KEY_LAST_LOGIN_TIMESTAMP, now)
+            putLong(KEY_LAST_ACTIVITY_TIMESTAMP, now)
+            putInt(KEY_FAILED_ATTEMPTS, 0)
+            putLong(KEY_LOCKOUT_UNTIL, 0L)
+            apply()
+        }
+        Log.i(TAG, "User session persisted securely for user: $userName ($role)")
+    }
+
+    /**
+     * Store active session credentials on successful login and reset rate limit counters.
      */
     fun saveSession(
         token: String,
@@ -86,16 +118,16 @@ class UserSessionRepository(private val context: Context) {
         userName: String,
         role: String
     ) {
-        prefs.edit().apply {
-            putString(KEY_AUTH_TOKEN, token)
-            putInt(KEY_USER_ID, userId)
-            putString(KEY_USER_NAME, userName)
-            putString(KEY_USER_ROLE, role)
-            putBoolean(KEY_IS_LOGGED_IN, true)
-            putLong(KEY_LAST_LOGIN_TIMESTAMP, System.currentTimeMillis())
-            apply()
+        persistUserSession(token, userId, userName, role)
+    }
+
+    /**
+     * Update the last activity timestamp whenever the user performs actions in the app.
+     */
+    fun recordUserActivity() {
+        if (prefs.getBoolean(KEY_IS_LOGGED_IN, false)) {
+            prefs.edit().putLong(KEY_LAST_ACTIVITY_TIMESTAMP, System.currentTimeMillis()).apply()
         }
-        Log.i(TAG, "User session stored securely for user: $userName ($role)")
     }
 
     /**
@@ -106,18 +138,110 @@ class UserSessionRepository(private val context: Context) {
     }
 
     /**
-     * Check if valid active user session exists and has not expired.
+     * Check if valid active user session exists and automatically invalidate if inactive for >24 hours.
      */
     fun isLoggedIn(): Boolean {
         val isLoggedIn = prefs.getBoolean(KEY_IS_LOGGED_IN, false)
         val token = getAuthToken()
-        val lastLogin = getLastLoginTime()
-        val isExpired = lastLogin > 0L && (System.currentTimeMillis() - lastLogin) > SESSION_TIMEOUT_MS
-        if (isLoggedIn && isExpired) {
-            notifySessionExpired("Token expired after maximum session duration.")
+        if (!isLoggedIn || token.isNullOrBlank()) {
             return false
         }
-        return isLoggedIn && !token.isNullOrBlank()
+        
+        val lastActivity = prefs.getLong(KEY_LAST_ACTIVITY_TIMESTAMP, prefs.getLong(KEY_LAST_LOGIN_TIMESTAMP, 0L))
+        val now = System.currentTimeMillis()
+        val isInactiveFor24Hours = lastActivity > 0L && (now - lastActivity) > OAUTH_INACTIVITY_TIMEOUT_MS
+
+        if (isInactiveFor24Hours) {
+            Log.w(TAG, "Session token automatically invalidated after 24 hours of inactivity.")
+            notifySessionExpired("Session token automatically invalidated after 24 hours of inactivity.")
+            return false
+        }
+
+        return true
+    }
+
+    /**
+     * Explicit verification and invalidation of inactive session tokens.
+     */
+    fun checkAndInvalidateInactiveToken(): Boolean {
+        if (prefs.getBoolean(KEY_IS_LOGGED_IN, false)) {
+            val lastActivity = prefs.getLong(KEY_LAST_ACTIVITY_TIMESTAMP, prefs.getLong(KEY_LAST_LOGIN_TIMESTAMP, 0L))
+            val now = System.currentTimeMillis()
+            if (lastActivity > 0L && (now - lastActivity) > OAUTH_INACTIVITY_TIMEOUT_MS) {
+                notifySessionExpired("OAuth 2.0 session token expired after 24 hours of inactivity.")
+                return true
+            }
+        }
+        return false
+    }
+
+    /**
+     * Helper to verify rate limiting in the login flow.
+     * If failed attempt count exceeds 5, lockoutUntil timestamp is set for 60 seconds.
+     * Returns true if locked out, false otherwise.
+     */
+    fun checkRateLimit(identifier: String = ""): Boolean {
+        return isLockedOut()
+    }
+
+    /**
+     * Rate Limiting: Check if authentication is currently locked out after 5 failed attempts.
+     */
+    fun isLockedOut(): Boolean {
+        val lockoutUntil = prefs.getLong(KEY_LOCKOUT_UNTIL, 0L)
+        val now = System.currentTimeMillis()
+        if (lockoutUntil > now) {
+            return true
+        }
+        return false
+    }
+
+    /**
+     * Returns remaining lockout time in seconds.
+     */
+    fun getRemainingLockoutSeconds(): Int {
+        val lockoutUntil = prefs.getLong(KEY_LOCKOUT_UNTIL, 0L)
+        val now = System.currentTimeMillis()
+        return if (lockoutUntil > now) {
+            (((lockoutUntil - now) / 1000) + 1).toInt()
+        } else {
+            0
+        }
+    }
+
+    /**
+     * Record a failed login attempt. If failed attempts reach 5, trigger 60-second lockout.
+     */
+    fun recordFailedLoginAttempt(): Pair<Int, Boolean> {
+        val currentAttempts = prefs.getInt(KEY_FAILED_ATTEMPTS, 0) + 1
+        val now = System.currentTimeMillis()
+        val isNowLockedOut = currentAttempts >= MAX_FAILED_ATTEMPTS
+        val lockoutUntil = if (isNowLockedOut) now + LOCKOUT_DURATION_MS else 0L
+
+        prefs.edit().apply {
+            putInt(KEY_FAILED_ATTEMPTS, currentAttempts)
+            if (isNowLockedOut) {
+                putLong(KEY_LOCKOUT_UNTIL, lockoutUntil)
+            }
+            apply()
+        }
+        Log.w(TAG, "Failed login attempt #$currentAttempts. Locked out: $isNowLockedOut")
+        return Pair(currentAttempts, isNowLockedOut)
+    }
+
+    /**
+     * Reset rate-limiting failed attempts on successful login.
+     */
+    fun resetFailedAttempts() {
+        prefs.edit().apply {
+            putInt(KEY_FAILED_ATTEMPTS, 0)
+            putLong(KEY_LOCKOUT_UNTIL, 0L)
+            apply()
+        }
+    }
+
+    fun getFailedAttemptsCount(): Int {
+        return prefs.getInt(KEY_FAILED_ATTEMPTS, 0)
     }
 
     fun getUserId(): Int {
@@ -134,6 +258,10 @@ class UserSessionRepository(private val context: Context) {
 
     fun getLastLoginTime(): Long {
         return prefs.getLong(KEY_LAST_LOGIN_TIMESTAMP, 0L)
+    }
+
+    fun getLastActivityTime(): Long {
+        return prefs.getLong(KEY_LAST_ACTIVITY_TIMESTAMP, 0L)
     }
 
     /**
