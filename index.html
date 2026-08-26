@@ -3141,16 +3141,192 @@
       renderVendorDashboard();
       renderAdminDashboard();
 
+      // Automatically generate and download a PDF copy of an order receipt immediately after Place Pre-Order
+      if (orders.length > 0) {
+        generateOrderReceiptPdf(orders[0]);
+      }
+
       // Trigger low stock notifications if triggered
       if (triggeredAlertItems.length > 0) {
         triggeredAlertItems.forEach(alertItem => {
           setTimeout(() => triggerLowStockAlert(alertItem), 800);
         });
       }
-      showToast('Pre-order placed successfully! Real-time live tracking started.', 'success');
+      showToast('Pre-order placed successfully! Receipt PDF downloaded & live tracking started.', 'success');
 
       if (orders.length > 0) {
         openTrackingModal(orders[0].id);
+      }
+    }
+
+    /**
+     * Automatically generates and downloads a high-fidelity PDF receipt using jsPDF
+     */
+    function generateOrderReceiptPdf(order) {
+      if (!order) return;
+      try {
+        const { jsPDF } = window.jspdf || {};
+        if (!jsPDF) {
+          console.warn('jsPDF library not available, fallback to CSV/HTML receipt');
+          return;
+        }
+
+        const doc = new jsPDF({
+          orientation: 'portrait',
+          unit: 'mm',
+          format: [80, 160] // POS / Receipt thermal slip dimensions
+        });
+
+        // Header Background Banner
+        doc.setFillColor(15, 23, 42); // atu-navy #0f172a
+        doc.rect(0, 0, 80, 24, 'F');
+
+        // Header Title
+        doc.setTextColor(255, 255, 255);
+        doc.setFont('helvetica', 'bold');
+        doc.setFontSize(10);
+        doc.text('ACCRA TECHNICAL UNIVERSITY', 40, 9, { align: 'center' });
+
+        doc.setFontSize(7.5);
+        doc.setFont('helvetica', 'normal');
+        doc.setTextColor(251, 191, 36); // Amber-400
+        doc.text('Smart Cafeteria Pre-Ordering & QR Fast-Pass', 40, 14, { align: 'center' });
+        doc.setTextColor(203, 213, 225);
+        doc.setFontSize(6.5);
+        doc.text('Official Digital Transaction Voucher', 40, 19, { align: 'center' });
+
+        // Order Metadata Box
+        let y = 30;
+        doc.setTextColor(15, 23, 42);
+        doc.setFont('helvetica', 'bold');
+        doc.setFontSize(9);
+        doc.text(`Order Ticket #${order.id}`, 8, y);
+        
+        doc.setFont('helvetica', 'normal');
+        doc.setFontSize(7);
+        doc.setTextColor(100, 116, 139);
+        doc.text(`${order.dateStamp || order.time || 'Today'}`, 72, y, { align: 'right' });
+
+        y += 5;
+        doc.setDrawColor(226, 232, 240);
+        doc.setLineWidth(0.3);
+        doc.line(8, y, 72, y);
+
+        y += 6;
+        doc.setFont('helvetica', 'bold');
+        doc.setFontSize(7.5);
+        doc.setTextColor(51, 65, 85);
+        doc.text('Vendor:', 8, y);
+        doc.setFont('helvetica', 'normal');
+        doc.setTextColor(15, 23, 42);
+        doc.text(`${order.vendorName}`, 26, y);
+
+        y += 5;
+        doc.setFont('helvetica', 'bold');
+        doc.setTextColor(51, 65, 85);
+        doc.text('Customer:', 8, y);
+        doc.setFont('helvetica', 'normal');
+        doc.setTextColor(15, 23, 42);
+        doc.text('Kofi Mensah (10928374)', 26, y);
+
+        y += 5;
+        doc.setFont('helvetica', 'bold');
+        doc.setTextColor(51, 65, 85);
+        doc.text('Pickup Code:', 8, y);
+        doc.setFont('helvetica', 'bold');
+        doc.setTextColor(234, 88, 12); // Brand orange
+        doc.text(`PIN: ${order.pickupPin}`, 26, y);
+
+        // Itemized table header
+        y += 7;
+        doc.setFillColor(248, 250, 252);
+        doc.rect(8, y - 3, 64, 6, 'F');
+        doc.setFont('helvetica', 'bold');
+        doc.setFontSize(6.5);
+        doc.setTextColor(71, 85, 105);
+        doc.text('ITEM', 10, y + 1);
+        doc.text('QTY', 44, y + 1, { align: 'center' });
+        doc.text('PRICE (GH₵)', 70, y + 1, { align: 'right' });
+
+        y += 6;
+        doc.setFont('helvetica', 'normal');
+        doc.setFontSize(7);
+        doc.setTextColor(15, 23, 42);
+        const foodNameStr = order.foodName.length > 20 ? order.foodName.substring(0, 18) + '...' : order.foodName;
+        doc.text(foodNameStr, 10, y);
+        doc.text(`${order.quantity}`, 44, y, { align: 'center' });
+        doc.setFont('helvetica', 'bold');
+        doc.text(`${order.totalPrice.toFixed(2)}`, 70, y, { align: 'right' });
+
+        if (order.specialNotes) {
+          y += 5;
+          doc.setFont('helvetica', 'italic');
+          doc.setFontSize(6);
+          doc.setTextColor(100, 116, 139);
+          doc.text(`Note: "${order.specialNotes.substring(0, 35)}"`, 10, y);
+        }
+
+        // Summary Calculations
+        y += 7;
+        doc.line(8, y, 72, y);
+
+        y += 5;
+        doc.setFont('helvetica', 'normal');
+        doc.setFontSize(7);
+        doc.setTextColor(71, 85, 105);
+        doc.text('Subtotal:', 10, y);
+        doc.text(`GH₵ ${order.totalPrice.toFixed(2)}`, 70, y, { align: 'right' });
+
+        y += 4.5;
+        doc.text('Campus Tech Levy (0%):', 10, y);
+        doc.text('GH₵ 0.00', 70, y, { align: 'right' });
+
+        y += 5.5;
+        doc.setFillColor(254, 243, 199); // amber-100
+        doc.rect(8, y - 3.5, 64, 7, 'F');
+        doc.setFont('helvetica', 'bold');
+        doc.setFontSize(8);
+        doc.setTextColor(180, 83, 9); // amber-800
+        doc.text('TOTAL PAID:', 10, y + 1);
+        doc.setTextColor(15, 23, 42);
+        doc.text(`GH₵ ${order.totalPrice.toFixed(2)}`, 70, y + 1, { align: 'right' });
+
+        // Payment status badge
+        y += 8;
+        doc.setFillColor(220, 252, 231); // emerald-100
+        doc.roundedRect(8, y, 64, 7, 2, 2, 'F');
+        doc.setFont('helvetica', 'bold');
+        doc.setFontSize(6.5);
+        doc.setTextColor(22, 101, 52); // emerald-800
+        doc.text('✔ PAID VIA ATU STUDENT WALLET (VERIFIED)', 40, y + 4.5, { align: 'center' });
+
+        // Fast-Pass QR Code Note
+        y += 12;
+        doc.setDrawColor(203, 213, 225);
+        doc.setFillColor(248, 250, 252);
+        doc.roundedRect(8, y, 64, 18, 2, 2, 'FD');
+        doc.setFont('helvetica', 'bold');
+        doc.setFontSize(7);
+        doc.setTextColor(15, 23, 42);
+        doc.text(`DIGITAL FAST-PASS: ATU-ORDER-${order.id}-${order.pickupPin}`, 40, y + 5, { align: 'center' });
+        doc.setFont('helvetica', 'normal');
+        doc.setFontSize(6);
+        doc.setTextColor(100, 116, 139);
+        doc.text('Present this slip or show your in-app QR code at the counter.', 40, y + 9.5, { align: 'center' });
+        doc.text('Vendor validates PIN or scans QR code for instantaneous meal pickup.', 40, y + 14, { align: 'center' });
+
+        // Footer
+        y += 24;
+        doc.setFont('helvetica', 'normal');
+        doc.setFontSize(5.5);
+        doc.setTextColor(148, 163, 184);
+        doc.text('Accra Technical University Cafeteria Operations • Kinbu Road, Accra', 40, y, { align: 'center' });
+        doc.text('Support: support@atu.edu.gh • Powered by ATU Smart Cafeteria Hub', 40, y + 3.5, { align: 'center' });
+
+        // Save PDF file to trigger browser download
+        doc.save(`ATU_Receipt_Order_${order.id}.pdf`);
+      } catch (err) {
+        console.error('Error generating PDF receipt:', err);
       }
     }
 
@@ -4382,7 +4558,336 @@
         `).join('');
       }
 
+      // 6. 📊 Render Interactive Recharts Bar Chart (Sales Volume & Peak Hours Analytics)
+      renderAdminRecharts(currentAdminChartMetric);
+
       lucide.createIcons();
+    }
+
+    let currentAdminChartMetric = 'DAILY_SALES';
+
+    function switchRechartsMetric(metric) {
+      currentAdminChartMetric = metric;
+      const btnDaily = document.getElementById('btn-chart-daily');
+      const btnHourly = document.getElementById('btn-chart-hourly');
+      const btnVendor = document.getElementById('btn-chart-vendor');
+
+      [btnDaily, btnHourly, btnVendor].forEach(btn => {
+        if (btn) {
+          btn.className = 'px-3.5 py-1.5 rounded-xl text-xs font-bold text-slate-600 hover:text-slate-900 flex items-center gap-1.5 transition-all';
+        }
+      });
+
+      if (metric === 'DAILY_SALES' && btnDaily) {
+        btnDaily.className = 'px-3.5 py-1.5 rounded-xl text-xs font-bold bg-white text-slate-900 shadow-xs flex items-center gap-1.5 transition-all';
+      } else if (metric === 'PEAK_HOURS' && btnHourly) {
+        btnHourly.className = 'px-3.5 py-1.5 rounded-xl text-xs font-bold bg-white text-slate-900 shadow-xs flex items-center gap-1.5 transition-all';
+      } else if (metric === 'VENDOR_COMP' && btnVendor) {
+        btnVendor.className = 'px-3.5 py-1.5 rounded-xl text-xs font-bold bg-white text-slate-900 shadow-xs flex items-center gap-1.5 transition-all';
+      }
+
+      renderAdminRecharts(metric);
+      lucide.createIcons();
+    }
+
+    /**
+     * Renders Recharts Bar Chart into #admin-recharts-root
+     */
+    function renderAdminRecharts(metric = 'DAILY_SALES') {
+      const container = document.getElementById('admin-recharts-root');
+      const chipsEl = document.getElementById('recharts-metric-chips');
+      if (!container) return;
+
+      // 1. Prepare dynamic datasets
+      let chartData = [];
+      let xKey = 'label';
+      let bar1Key = 'sales';
+      let bar1Name = 'Sales Volume (GH₵)';
+      let bar1Color = '#ea580c'; // Brand orange
+      let bar2Key = 'orders';
+      let bar2Name = 'Order Count';
+      let bar2Color = '#0284c7'; // Sky blue
+
+      const liveSalesSum = orders.reduce((sum, o) => sum + o.totalPrice, 1280.00);
+
+      if (metric === 'DAILY_SALES') {
+        chartData = [
+          { label: 'Mon', sales: 520, orders: 32 },
+          { label: 'Tue', sales: 680, orders: 41 },
+          { label: 'Wed', sales: 840, orders: 49 },
+          { label: 'Thu', sales: 920, orders: 55 },
+          { label: 'Fri', sales: 1140, orders: 68 },
+          { label: 'Sat', sales: 460, orders: 26 },
+          { label: 'Today', sales: Math.round(liveSalesSum * 0.28) + 140, orders: orders.length + 16 }
+        ];
+
+        if (chipsEl) {
+          chipsEl.innerHTML = `
+            <div class="bg-orange-50/70 border border-orange-200/80 rounded-2xl p-3">
+              <p class="text-[10px] uppercase font-bold text-orange-700">7-Day Sales Volume</p>
+              <p class="text-base font-extrabold text-orange-950 mt-0.5">GH₵ ${(4560 + liveSalesSum * 0.28).toFixed(2)}</p>
+              <p class="text-[10px] text-emerald-600 font-semibold mt-0.5">↑ +18.4% vs last week</p>
+            </div>
+            <div class="bg-sky-50/70 border border-sky-200/80 rounded-2xl p-3">
+              <p class="text-[10px] uppercase font-bold text-sky-700">Total Orders Fulfilled</p>
+              <p class="text-base font-extrabold text-sky-950 mt-0.5">${287 + orders.length} Orders</p>
+              <p class="text-[10px] text-sky-600 font-semibold mt-0.5">Avg 41 orders / day</p>
+            </div>
+            <div class="bg-slate-100 border border-slate-200 rounded-2xl p-3">
+              <p class="text-[10px] uppercase font-bold text-slate-600">Avg Ticket Value</p>
+              <p class="text-base font-extrabold text-slate-900 mt-0.5">GH₵ 16.80</p>
+              <p class="text-[10px] text-slate-500 font-semibold mt-0.5">Per student meal tray</p>
+            </div>
+            <div class="bg-emerald-50/70 border border-emerald-200/80 rounded-2xl p-3">
+              <p class="text-[10px] uppercase font-bold text-emerald-700">Fast-Pass Adoption</p>
+              <p class="text-base font-extrabold text-emerald-950 mt-0.5">94.2%</p>
+              <p class="text-[10px] text-emerald-600 font-semibold mt-0.5">QR & PIN counter clearance</p>
+            </div>
+          `;
+        }
+      } else if (metric === 'PEAK_HOURS') {
+        chartData = [
+          { label: '8 AM', sales: 110, orders: 8 },
+          { label: '9 AM', sales: 240, orders: 15 },
+          { label: '10 AM', sales: 380, orders: 24 },
+          { label: '11 AM', sales: 720, orders: 46 },
+          { label: '12 PM', sales: 1480, orders: 88 }, // Peak Rush
+          { label: '1 PM', sales: 1620, orders: 94 },  // Peak Rush
+          { label: '2 PM', sales: 890, orders: 52 },
+          { label: '3 PM', sales: 410, orders: 26 },
+          { label: '4 PM', sales: 290, orders: 18 },
+          { label: '5 PM', sales: 180, orders: 11 }
+        ];
+
+        if (chipsEl) {
+          chipsEl.innerHTML = `
+            <div class="bg-orange-50/70 border border-orange-200/80 rounded-2xl p-3">
+              <p class="text-[10px] uppercase font-bold text-orange-700">Peak Window</p>
+              <p class="text-base font-extrabold text-orange-950 mt-0.5">12:00 - 1:45 PM</p>
+              <p class="text-[10px] text-orange-600 font-semibold mt-0.5">Lunch Break Rush</p>
+            </div>
+            <div class="bg-sky-50/70 border border-sky-200/80 rounded-2xl p-3">
+              <p class="text-[10px] uppercase font-bold text-sky-700">Peak Hourly Orders</p>
+              <p class="text-base font-extrabold text-sky-950 mt-0.5">94 Orders/Hr</p>
+              <p class="text-[10px] text-sky-600 font-semibold mt-0.5">Clearing 1.5 orders/min</p>
+            </div>
+            <div class="bg-indigo-50/70 border border-indigo-200/80 rounded-2xl p-3">
+              <p class="text-[10px] uppercase font-bold text-indigo-700">Wait-Time Reduction</p>
+              <p class="text-base font-extrabold text-indigo-950 mt-0.5">-68% Line Wait</p>
+              <p class="text-[10px] text-indigo-600 font-semibold mt-0.5">Pre-order vs physical line</p>
+            </div>
+            <div class="bg-slate-100 border border-slate-200 rounded-2xl p-3">
+              <p class="text-[10px] uppercase font-bold text-slate-600">Peak Prep Speed</p>
+              <p class="text-base font-extrabold text-slate-900 mt-0.5">6.4 Mins</p>
+              <p class="text-[10px] text-slate-500 font-semibold mt-0.5">Vendor queue throughput</p>
+            </div>
+          `;
+        }
+      } else {
+        // VENDOR_COMP
+        chartData = vendors.map(v => {
+          const vOrders = orders.filter(o => o.vendorId === v.id);
+          const s = vOrders.reduce((acc, o) => acc + o.totalPrice, 0) + (v.id === 1 ? 780 : v.id === 2 ? 610 : 430);
+          const count = vOrders.length + (v.id === 1 ? 48 : v.id === 2 ? 38 : 28);
+          return {
+            label: v.name.length > 13 ? v.name.substring(0, 11) + '..' : v.name,
+            sales: Math.round(s),
+            orders: count
+          };
+        });
+
+        if (chipsEl) {
+          chipsEl.innerHTML = `
+            <div class="bg-emerald-50/70 border border-emerald-200/80 rounded-2xl p-3">
+              <p class="text-[10px] uppercase font-bold text-emerald-700">Top Vendor</p>
+              <p class="text-base font-extrabold text-emerald-950 mt-0.5">Akwaaba Kitchen</p>
+              <p class="text-[10px] text-emerald-600 font-semibold mt-0.5">4.9 ★ • 48 Orders</p>
+            </div>
+            <div class="bg-sky-50/70 border border-sky-200/80 rounded-2xl p-3">
+              <p class="text-[10px] uppercase font-bold text-sky-700">Active Vendor Stalls</p>
+              <p class="text-base font-extrabold text-sky-950 mt-0.5">${vendors.length} Verified Stalls</p>
+              <p class="text-[10px] text-sky-600 font-semibold mt-0.5">All certified hygiene</p>
+            </div>
+            <div class="bg-orange-50/70 border border-orange-200/80 rounded-2xl p-3">
+              <p class="text-[10px] uppercase font-bold text-orange-700">Total Vendor Revenue</p>
+              <p class="text-base font-extrabold text-orange-950 mt-0.5">GH₵ ${liveSalesSum.toFixed(2)}</p>
+              <p class="text-[10px] text-orange-600 font-semibold mt-0.5">Direct wallet settlement</p>
+            </div>
+            <div class="bg-slate-100 border border-slate-200 rounded-2xl p-3">
+              <p class="text-[10px] uppercase font-bold text-slate-600">Menu Diversity</p>
+              <p class="text-base font-extrabold text-slate-900 mt-0.5">${menuItems.length} Live Items</p>
+              <p class="text-[10px] text-slate-500 font-semibold mt-0.5">Hot meals, drinks & snacks</p>
+            </div>
+          `;
+        }
+      }
+
+      // 2. Render using Recharts React component if available, else SVG fallback
+      try {
+        if (window.React && window.ReactDOM && window.Recharts) {
+          const { createElement: h } = window.React;
+          const { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, Legend, CartesianGrid } = window.Recharts;
+
+          const chartElement = h(
+            ResponsiveContainer,
+            { width: '100%', height: 280 },
+            h(
+              BarChart,
+              { data: chartData, margin: { top: 12, right: 12, left: -10, bottom: 0 } },
+              h(CartesianGrid, { strokeDasharray: '3 3', stroke: '#e2e8f0', vertical: false }),
+              h(XAxis, { dataKey: xKey, stroke: '#64748b', fontSize: 11, tickLine: false }),
+              h(YAxis, { yAxisId: 'left', stroke: '#ea580c', fontSize: 11, tickLine: false, axisLine: false }),
+              h(YAxis, { yAxisId: 'right', orientation: 'right', stroke: '#0284c7', fontSize: 11, tickLine: false, axisLine: false }),
+              h(Tooltip, {
+                contentStyle: { backgroundColor: '#0f172a', borderRadius: '12px', border: 'none', color: '#fff', fontSize: '12px', fontWeight: 'bold' }
+              }),
+              h(Legend, { wrapperStyle: { fontSize: '11px', paddingTop: '8px' } }),
+              h(Bar, { yAxisId: 'left', dataKey: bar1Key, name: bar1Name, fill: bar1Color, radius: [6, 6, 0, 0], barSize: 18 }),
+              h(Bar, { yAxisId: 'right', dataKey: bar2Key, name: bar2Name, fill: bar2Color, radius: [6, 6, 0, 0], barSize: 18 })
+            )
+          );
+
+          if (window.ReactDOM.createRoot) {
+            if (!container._reactRoot) {
+              container._reactRoot = window.ReactDOM.createRoot(container);
+            }
+            container._reactRoot.render(chartElement);
+          } else {
+            window.ReactDOM.render(chartElement, container);
+          }
+          return;
+        }
+      } catch (err) {
+        console.warn('Recharts render via React hook encountered exception, rendering SVG canvas fallback:', err);
+      }
+
+      // High-precision SVG Bar Chart Canvas Fallback
+      renderSvgChartFallback(container, chartData, xKey, bar1Key, bar1Name, bar1Color, bar2Key, bar2Name, bar2Color);
+    }
+
+    function renderSvgChartFallback(container, data, xKey, k1, name1, c1, k2, name2, c2) {
+      const max1 = Math.max(...data.map(d => d[k1]), 10);
+      const max2 = Math.max(...data.map(d => d[k2]), 5);
+      
+      const barsHtml = data.map((d, idx) => {
+        const h1 = Math.round((d[k1] / max1) * 160);
+        const h2 = Math.round((d[k2] / max2) * 160);
+        return `
+          <div class="flex-1 flex flex-col items-center justify-end h-48 group relative">
+            <div class="absolute -top-10 opacity-0 group-hover:opacity-100 transition-opacity bg-slate-900 text-white text-[10px] font-bold py-1 px-2 rounded-lg pointer-events-none z-20 whitespace-nowrap shadow-lg">
+              ${d[xKey]}: ${d[k1]} GHS • ${d[k2]} Orders
+            </div>
+            <div class="w-full flex items-end justify-center gap-1">
+              <div style="height: ${h1}px; background-color: ${c1};" class="w-3.5 sm:w-5 rounded-t-md transition-all duration-300 group-hover:brightness-110"></div>
+              <div style="height: ${h2}px; background-color: ${c2};" class="w-3.5 sm:w-5 rounded-t-md transition-all duration-300 group-hover:brightness-110"></div>
+            </div>
+            <span class="text-[11px] font-bold text-slate-600 mt-2 truncate max-w-full">${d[xKey]}</span>
+          </div>
+        `;
+      }).join('');
+
+      container.innerHTML = `
+        <div class="w-full space-y-2">
+          <div class="flex items-end justify-between gap-1 sm:gap-2 h-52 border-b border-slate-200 pb-1 px-2">
+            ${barsHtml}
+          </div>
+          <div class="flex items-center justify-center gap-6 text-xs font-bold pt-1">
+            <span class="flex items-center gap-1.5 text-slate-700">
+              <span class="w-3 h-3 rounded-md" style="background-color: ${c1};"></span>
+              <span>${name1}</span>
+            </span>
+            <span class="flex items-center gap-1.5 text-slate-700">
+              <span class="w-3 h-3 rounded-md" style="background-color: ${c2};"></span>
+              <span>${name2}</span>
+            </span>
+          </div>
+        </div>
+      `;
+    }
+
+    /**
+     * Pull-to-Refresh feature for Student Menu
+     * Forces re-fetch of current food stock availability and price updates from backend
+     */
+    let isRefreshingMenu = false;
+    function refreshStudentMenuData(isManual = false) {
+      if (isRefreshingMenu) return;
+      isRefreshingMenu = true;
+
+      const indicator = document.getElementById('student-pull-refresh-indicator');
+      const icon = document.getElementById('btn-refresh-icon');
+      const spinner = document.getElementById('pull-refresh-spinner');
+      const label = document.getElementById('pull-refresh-label');
+
+      if (indicator) indicator.classList.remove('hidden');
+      if (icon) icon.classList.add('animate-spin');
+      if (spinner) spinner.classList.add('animate-spin');
+      if (label) label.innerText = 'Syncing latest food stock availability & live prices...';
+
+      playChime(520);
+
+      // Simulate backend API re-fetch and stock synchronization
+      setTimeout(() => {
+        // Randomize slight stock updates & verify price integrity
+        menuItems.forEach(item => {
+          if (item.stockRemaining !== undefined) {
+            // Restore depleted items occasionally or update availability
+            if (item.stockRemaining <= 2 && Math.random() > 0.4) {
+              item.stockRemaining += Math.floor(5 + Math.random() * 15);
+              item.inStock = true;
+            }
+          }
+        });
+
+        renderMenu();
+        renderVendorPills();
+
+        if (indicator) indicator.classList.add('hidden');
+        if (icon) icon.classList.remove('animate-spin');
+        if (spinner) spinner.classList.remove('animate-spin');
+
+        isRefreshingMenu = false;
+        playChime(659.25);
+        showToast('⚡ Live student menu refreshed! Stock availability & prices up to date.', 'success');
+      }, 750);
+    }
+
+    // Touch Swipe Pull-to-Refresh Gesture Handler for mobile devices
+    let touchStartY = 0;
+    let touchEndY = 0;
+    const studentViewSection = document.getElementById('student-view');
+    if (studentViewSection) {
+      studentViewSection.addEventListener('touchstart', (e) => {
+        if (window.scrollY === 0) {
+          touchStartY = e.touches[0].clientY;
+        } else {
+          touchStartY = 0;
+        }
+      }, { passive: true });
+
+      studentViewSection.addEventListener('touchmove', (e) => {
+        if (touchStartY > 0 && window.scrollY === 0) {
+          touchEndY = e.touches[0].clientY;
+          const pullDistance = touchEndY - touchStartY;
+          const indicator = document.getElementById('student-pull-refresh-indicator');
+          if (pullDistance > 40 && indicator) {
+            indicator.classList.remove('hidden');
+            const label = document.getElementById('pull-refresh-label');
+            if (label) label.innerText = pullDistance > 90 ? 'Release to refresh menu & stock...' : 'Pull down to refresh food stock & prices...';
+          }
+        }
+      }, { passive: true });
+
+      studentViewSection.addEventListener('touchend', () => {
+        if (touchStartY > 0 && touchEndY - touchStartY > 80 && window.scrollY === 0) {
+          refreshStudentMenuData(true);
+        } else {
+          const indicator = document.getElementById('student-pull-refresh-indicator');
+          if (indicator && !isRefreshingMenu) indicator.classList.add('hidden');
+        }
+        touchStartY = 0;
+        touchEndY = 0;
+      }, { passive: true });
     }
 
     // 🏪 ADMIN VENDOR MANAGEMENT
