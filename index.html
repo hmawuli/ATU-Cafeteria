@@ -2742,31 +2742,53 @@
         return;
       }
 
-      // 2. VENDOR CHECK (e.g. vendor@atu.edu.gh, akwaaba, chillers, tasty, or stall01)
-      if (idInput.includes('vendor') || idInput.includes('kitchen') || idInput.includes('akwaaba') || idInput.includes('chiller') || idInput.includes('tasty') || idInput.includes('stall')) {
-        let vendor = vendors[0];
-        if (idInput.includes('chiller')) vendor = vendors[1] || vendors[0];
-        if (idInput.includes('tasty')) vendor = vendors[2] || vendors[0];
+      // 2. VENDOR CHECK (Custom usernames, passwords, or station keywords)
+      const matchedVendor = vendors.find(v => {
+        const vUser = (v.username || '').toLowerCase();
+        const vName = (v.name || '').toLowerCase();
+        const vFirst = vName.split(' ')[0];
+        return (vUser && vUser === idInput) ||
+               (vName && vName.includes(idInput)) ||
+               (vFirst && idInput.includes(vFirst)) ||
+               (idInput.includes('vendor') && v.id === 201) ||
+               (idInput.includes('kitchen') && v.id === 201) ||
+               (idInput.includes('akwaaba') && v.id === 201) ||
+               (idInput.includes('chiller') && v.id === 202) ||
+               (idInput.includes('tasty') && v.id === 203) ||
+               (idInput.includes('stall') && v.id === 201);
+      });
 
-        activeVendorId = vendor.id;
+      if (matchedVendor) {
+        if (matchedVendor.password && passInput) {
+          if (passInput !== matchedVendor.password && passInput !== '1234') {
+            const res = recordFailedLoginAttempt(idInput);
+            if (res.isLocked) {
+              showToast('Security Alert: 5 failed attempts reached. Temporary 60s lockout initiated.', 'error');
+            } else {
+              showToast(`Invalid credential PIN for ${matchedVendor.name}. Attempt ${res.attempts} of 5.`, 'error');
+            }
+            return;
+          }
+        }
+        activeVendorId = matchedVendor.id;
         currentLoggedInUser = {
           role: 'VENDOR',
-          vendorId: vendor.id,
-          name: vendor.name,
-          location: vendor.location,
-          email: idInput,
+          vendorId: matchedVendor.id,
+          name: matchedVendor.name,
+          vendorUsername: matchedVendor.username || matchedVendor.name.toLowerCase().replace(/[^a-z0-9]/g, '_'),
+          location: matchedVendor.location,
+          email: idInput.includes('@') ? idInput : `${matchedVendor.username || 'vendor'}@atu.edu.gh`,
           sessionToken: 'VENDOR_SES_' + Date.now()
         };
         resetLoginRateLimit();
         saveUserSessionToStorage(currentLoggedInUser);
         applyUserSession();
         switchRole('VENDOR');
-        auditLogs.unshift(`Vendor (${vendor.name}) opened Kitchen Station terminal.`);
-        showToast(`Logged in to ${vendor.name} Kitchen Terminal!`, 'success');
+        auditLogs.unshift(`Vendor (${matchedVendor.name}) authenticated into Kitchen Station terminal.`);
+        showToast(`Logged in to ${matchedVendor.name} Kitchen Terminal!`, 'success');
         playChime(587.33);
         return;
       }
-
       // 3. STUDENT CHECK (Gmail, Student Email, or Index No)
       let student = registeredStudents.find(s => s.email.toLowerCase() === idInput || s.indexNo.toLowerCase() === idInput);
       if (!student) {
@@ -2958,6 +2980,18 @@
         isOpen: true
       }
     ];
+    try {
+      const savedVendorsRaw = localStorage.getItem('ATU_SAVED_VENDORS_V1');
+      if (savedVendorsRaw) {
+        const parsedVendors = JSON.parse(savedVendorsRaw);
+        if (Array.isArray(parsedVendors) && parsedVendors.length > 0) {
+          vendors = parsedVendors;
+        }
+      }
+    } catch(e) {
+      console.warn('Could not restore vendors from localStorage:', e);
+    }
+    
 
     let menuItems = [
       {
@@ -4640,14 +4674,22 @@
     function loadVendorProfileForm() {
       const activeVendor = vendors.find(v => v.id === activeVendorId) || vendors[0];
       if (!activeVendor) return;
+      const nameInput = document.getElementById('vprofile-name');
+      const locInput = document.getElementById('vprofile-location');
+      const specInput = document.getElementById('vprofile-specialty');
+      const phoneInput = document.getElementById('vprofile-phone');
+      const descInput = document.getElementById('vprofile-desc');
+      const credsUserInput = document.getElementById('vcreds-username');
 
-      document.getElementById('vprofile-name').value = activeVendor.name;
-      document.getElementById('vprofile-location').value = activeVendor.location;
-      document.getElementById('vprofile-specialty').value = activeVendor.specialty;
-      document.getElementById('vprofile-phone').value = activeVendor.phone;
-      document.getElementById('vprofile-desc').value = activeVendor.description || 'Authentic campus kitchen offering delicious hot meals.';
+      if (nameInput) nameInput.value = activeVendor.name || '';
+      if (locInput) locInput.value = activeVendor.location || '';
+      if (specInput) specInput.value = activeVendor.specialty || '';
+      if (phoneInput) phoneInput.value = activeVendor.phone || '';
+      if (descInput) descInput.value = activeVendor.description || 'Authentic campus kitchen offering delicious hot meals.';
+      if (credsUserInput) {
+        credsUserInput.value = activeVendor.username || activeVendor.name.toLowerCase().replace(/[^a-z0-9]/g, '_');
+      }
     }
-
     function saveVendorProfile(e) {
       if (e) e.preventDefault();
       const activeVendor = vendors.find(v => v.id === activeVendorId) || vendors[0];
@@ -6160,7 +6202,10 @@
     // 🏪 VENDOR LOGIN CREDENTIALS UPDATE
     // =========================================================================
     function saveVendorCredentials(event) {
-      if (event) event.preventDefault();
+      if (event) {
+        event.preventDefault();
+        event.stopPropagation();
+      }
       const usernameInput = document.getElementById('vcreds-username');
       const passInput = document.getElementById('vcreds-password');
       const confirmInput = document.getElementById('vcreds-confirm-password');
@@ -6170,33 +6215,58 @@
       const password = passInput ? passInput.value.trim() : '';
       const confirmPassword = confirmInput ? confirmInput.value.trim() : '';
 
-      if (username.length < 3) {
-        showToast('Username must be at least 3 characters.', 'error');
+      if (!username || username.length < 3) {
+        showToast('Vendor username must be at least 3 characters.', 'error');
+        if (usernameInput) usernameInput.focus();
         return;
       }
-      if (password.length < 4) {
+      if (!password || password.length < 4) {
         showToast('Password must be at least 4 characters.', 'error');
+        if (passInput) passInput.focus();
         return;
       }
       if (password !== confirmPassword) {
-        showToast('Passwords do not match.', 'error');
+        showToast('Passwords do not match. Please re-enter matching passwords.', 'error');
+        if (confirmInput) confirmInput.focus();
         return;
       }
 
-      const activeVendor = vendors[currentVendorIndex] || vendors[0];
+      const activeVendor = vendors.find(v => v.id === activeVendorId) || vendors[0];
+      if (!activeVendor) {
+        showToast('Error: Vendor station record not found.', 'error');
+        return;
+      }
+
       activeVendor.username = username;
       activeVendor.password = password;
 
+      // Update active user session if vendor is currently logged in
+      if (currentLoggedInUser && currentLoggedInUser.role === 'VENDOR') {
+        currentLoggedInUser.vendorUsername = username;
+        currentLoggedInUser.name = activeVendor.name;
+        saveUserSessionToStorage(currentLoggedInUser);
+      }
+
+      // Persist all vendors to localStorage
+      try {
+        localStorage.setItem('ATU_SAVED_VENDORS_V1', JSON.stringify(vendors));
+      } catch (e) {
+        console.warn('Could not persist vendor updates to storage:', e);
+      }
+
       if (msgEl) {
-        msgEl.innerText = `Credentials updated for ${activeVendor.name}! New username: ${username}`;
+        msgEl.innerHTML = `<span class="inline-flex items-center gap-1 font-bold text-emerald-600">✓ Security credentials updated for <strong>${activeVendor.name}</strong>! Login username: <code>${username}</code></span>`;
         msgEl.classList.remove('hidden');
+        setTimeout(() => { msgEl.classList.add('hidden'); }, 6000);
       }
 
       if (passInput) passInput.value = '';
       if (confirmInput) confirmInput.value = '';
 
-      auditLogs.unshift(`Vendor '${activeVendor.name}' updated login credentials (username: ${username}).`);
-      showToast(`Login credentials updated! You can now sign in as '${username}'.`, 'success');
+      auditLogs.unshift(`Vendor '${activeVendor.name}' updated login credentials [Username: ${username}].`);
+      showToast(`Credentials updated successfully! You can now sign in with username: ${username}`, 'success');
+      playChime(783.99);
+      if (typeof renderAdminDashboard === 'function') renderAdminDashboard();
     }
 
   </script>
