@@ -90,6 +90,7 @@ fun AdminDashboardScreen(
 
     // Local Dialog States
     var showAddVendorDialog by remember { mutableStateOf(false) }
+    var newlyCreatedVendorCreds by remember { mutableStateOf<Pair<String, String>?>(null) } // Pair(Username, PIN)
     var vendorToEdit by remember { mutableStateOf<User?>(null) }
     var vendorToDelete by remember { mutableStateOf<User?>(null) }
 
@@ -182,10 +183,12 @@ fun AdminDashboardScreen(
                 if (activeSubTab == 0 && listSelection == 0) {
                     ExtendedFloatingActionButton(
                         onClick = {
-                            addUsername = ""
-                            addPinCode = ""
                             addFullName = ""
+                            addUsername = ""
+                            addPinCode = "1234"
                             addInfo = ""
+                            addLogoUrl = ""
+                            addPictureUrl = ""
                             addError = null
                             showAddVendorDialog = true
                         },
@@ -1342,50 +1345,141 @@ fun AdminDashboardScreen(
         if (showAddVendorDialog) {
             Dialog(onDismissRequest = { showAddVendorDialog = false }) {
                 Card(
-                    shape = RoundedCornerShape(16.dp),
+                    shape = RoundedCornerShape(20.dp),
                     colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-                    modifier = Modifier.fillMaxWidth().padding(8.dp)
+                    modifier = Modifier.fillMaxWidth().padding(8.dp),
+                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
                 ) {
                     Column(
-                        modifier = Modifier.padding(20.dp),
+                        modifier = Modifier
+                            .padding(20.dp)
+                            .verticalScroll(rememberScrollState()),
                         verticalArrangement = Arrangement.spacedBy(12.dp)
                     ) {
-                        Text("Add New Campus Vendor", fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.primary)
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Icon(
+                                Icons.Default.Storefront,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.size(24.dp)
+                            )
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Column {
+                                Text(
+                                    "Register New Campus Vendor",
+                                    fontWeight = FontWeight.Bold,
+                                    style = MaterialTheme.typography.titleMedium,
+                                    color = MaterialTheme.colorScheme.primary
+                                )
+                                Text(
+                                    "Creates vendor stall & generates default login credentials",
+                                    fontSize = 11.sp,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                        }
 
-                        OutlinedTextField(
-                            value = addUsername,
-                            onValueChange = { addUsername = it.lowercase().trim() },
-                            label = { Text("Vendor Login Username") },
-                            modifier = Modifier.fillMaxWidth(),
-                            singleLine = true
-                        )
-
+                        // Vendor Details Section
                         OutlinedTextField(
                             value = addFullName,
-                            onValueChange = { addFullName = it },
-                            label = { Text("Vendor Full Brand name") },
-                            modifier = Modifier.fillMaxWidth(),
-                            singleLine = true
+                            onValueChange = { name ->
+                                addFullName = name
+                                // Automatically generate default login username from vendor name if not manually modified
+                                val clean = name.trim().lowercase().replace(Regex("[^a-z0-9]"), "_").take(18)
+                                if (clean.isNotEmpty()) {
+                                    addUsername = if (clean.startsWith("vendor_")) clean else "vendor_$clean"
+                                }
+                            },
+                            label = { Text("Vendor / Stall Name *") },
+                            placeholder = { Text("e.g. Kiki Grills & Chills") },
+                            modifier = Modifier.fillMaxWidth().testTag("add_vendor_name_input"),
+                            singleLine = true,
+                            leadingIcon = { Icon(Icons.Default.Store, contentDescription = null, modifier = Modifier.size(18.dp)) }
                         )
 
                         OutlinedTextField(
                             value = addInfo,
                             onValueChange = { addInfo = it },
-                            label = { Text("Booth Location / Kitchen Desc.") },
-                            placeholder = { Text("e.g. Sobolo Palace / Booth 5") },
-                            modifier = Modifier.fillMaxWidth(),
-                            singleLine = true
+                            label = { Text("Booth Location / Kitchen Specialty") },
+                            placeholder = { Text("e.g. Stall #04, Block B • Fast Food") },
+                            modifier = Modifier.fillMaxWidth().testTag("add_vendor_info_input"),
+                            singleLine = true,
+                            leadingIcon = { Icon(Icons.Default.Place, contentDescription = null, modifier = Modifier.size(18.dp)) }
                         )
 
-                        OutlinedTextField(
-                            value = addPinCode,
-                            onValueChange = { addPinCode = it },
-                            label = { Text("Access Pin Code (4+ characters)") },
-                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.NumberPassword),
-                            modifier = Modifier.fillMaxWidth(),
-                            singleLine = true
-                        )
+                        // 🔑 DEFAULT LOGIN CREDENTIALS HIGHLIGHT CARD
+                        Card(
+                            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.4f)),
+                            shape = RoundedCornerShape(12.dp),
+                            border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.3f))
+                        ) {
+                            Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Row(verticalAlignment = Alignment.CenterVertically) {
+                                        Icon(
+                                            Icons.Default.Key,
+                                            contentDescription = null,
+                                            tint = MaterialTheme.colorScheme.primary,
+                                            modifier = Modifier.size(16.dp)
+                                        )
+                                        Spacer(modifier = Modifier.width(6.dp))
+                                        Text(
+                                            "Default Vendor Login Credentials",
+                                            fontWeight = FontWeight.Bold,
+                                            fontSize = 12.sp,
+                                            color = MaterialTheme.colorScheme.primary
+                                        )
+                                    }
+                                    TextButton(
+                                        onClick = {
+                                            if (addFullName.isNotBlank()) {
+                                                val clean = addFullName.trim().lowercase().replace(Regex("[^a-z0-9]"), "_").take(18)
+                                                addUsername = "vendor_$clean"
+                                            } else {
+                                                addUsername = "vendor_${System.currentTimeMillis() % 10000}"
+                                            }
+                                            addPinCode = "1234"
+                                        },
+                                        contentPadding = PaddingValues(horizontal = 8.dp, vertical = 2.dp)
+                                    ) {
+                                        Text("Reset Defaults", fontSize = 10.sp, fontWeight = FontWeight.Bold)
+                                    }
+                                }
 
+                                Text(
+                                    "Admin sets default access credentials. The vendor will use these to log in and can update them at any time from their profile.",
+                                    fontSize = 10.sp,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+
+                                OutlinedTextField(
+                                    value = addUsername,
+                                    onValueChange = { addUsername = it.lowercase().trim() },
+                                    label = { Text("Default Login Username *") },
+                                    placeholder = { Text("e.g. vendor_kiki_grills") },
+                                    modifier = Modifier.fillMaxWidth().testTag("add_vendor_username_input"),
+                                    singleLine = true,
+                                    leadingIcon = { Icon(Icons.Default.Person, contentDescription = null, modifier = Modifier.size(18.dp)) }
+                                )
+
+                                OutlinedTextField(
+                                    value = addPinCode,
+                                    onValueChange = { addPinCode = it },
+                                    label = { Text("Default Password / PIN * (4+ chars)") },
+                                    placeholder = { Text("1234") },
+                                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
+                                    modifier = Modifier.fillMaxWidth().testTag("add_vendor_pin_input"),
+                                    singleLine = true,
+                                    leadingIcon = { Icon(Icons.Default.Lock, contentDescription = null, modifier = Modifier.size(18.dp)) }
+                                )
+                            }
+                        }
+
+                        // Logo & Cover Setup
                         Text("Logo Setup", fontWeight = FontWeight.SemiBold, fontSize = 11.sp, color = MaterialTheme.colorScheme.primary)
                         OutlinedTextField(
                             value = addLogoUrl,
@@ -1453,34 +1547,44 @@ fun AdminDashboardScreen(
                             Spacer(modifier = Modifier.width(8.dp))
                             Button(
                                 onClick = {
-                                    if (addUsername.isBlank() || addFullName.isBlank() || addPinCode.length < 4) {
-                                        addError = "Username, Full Name, and a 4+ digit PIN are mandatory."
+                                    val finalUsername = if (addUsername.isNotBlank()) addUsername else {
+                                        val clean = addFullName.trim().lowercase().replace(Regex("[^a-z0-9]"), "_").take(18)
+                                        if (clean.isNotEmpty()) "vendor_$clean" else "vendor_${System.currentTimeMillis() % 10000}"
+                                    }
+                                    val finalPin = if (addPinCode.isNotBlank()) addPinCode else "1234"
+
+                                    if (addFullName.isBlank() || finalUsername.isBlank() || finalPin.length < 4) {
+                                        addError = "Vendor Name, Username, and 4+ character PIN/Password are mandatory."
                                     } else {
                                         viewModel.addVendor(
-                                            username = addUsername,
-                                            pinCode = addPinCode,
+                                            username = finalUsername,
+                                            pinCode = finalPin,
                                             fullName = addFullName,
                                             info = addInfo,
                                             logoUrl = addLogoUrl.ifBlank { null },
                                             pictureUrl = addPictureUrl.ifBlank { null }
                                         ) { success ->
                                             if (success) {
+                                                newlyCreatedVendorCreds = Pair(finalUsername, finalPin)
                                                 showAddVendorDialog = false
                                                 addUsername = ""
                                                 addFullName = ""
                                                 addInfo = ""
-                                                addPinCode = ""
+                                                addPinCode = "1234"
                                                 addLogoUrl = ""
                                                 addPictureUrl = ""
                                                 addError = null
                                             } else {
-                                                addError = "Username already exists."
+                                                addError = "Username '$finalUsername' already exists. Please choose a different username."
                                             }
                                         }
                                     }
-                                }
+                                },
+                                modifier = Modifier.testTag("submit_add_vendor_btn")
                             ) {
-                                Text("Add Profile")
+                                Icon(Icons.Default.Check, contentDescription = null, modifier = Modifier.size(16.dp))
+                                Spacer(modifier = Modifier.width(4.dp))
+                                Text("Register & Create Credentials")
                             }
                         }
                     }
@@ -1488,6 +1592,66 @@ fun AdminDashboardScreen(
             }
         }
 
+        // Dialog showing the newly created vendor login credentials to Admin
+        newlyCreatedVendorCreds?.let { creds ->
+            AlertDialog(
+                onDismissRequest = { newlyCreatedVendorCreds = null },
+                icon = {
+                    Icon(
+                        Icons.Default.VerifiedUser,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.size(32.dp)
+                    )
+                },
+                title = {
+                    Text("Vendor Registered Successfully!", fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleMedium)
+                },
+                text = {
+                    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                        Text(
+                            "The new vendor stall has been created with the following default login credentials. Please hand these over to the vendor:",
+                            fontSize = 12.sp,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                        Card(
+                            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
+                            shape = RoundedCornerShape(10.dp),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.SpaceBetween
+                                ) {
+                                    Text("Default Username:", fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                    Text(creds.first, fontSize = 12.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
+                                }
+                                HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.SpaceBetween
+                                ) {
+                                    Text("Default Password / PIN:", fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                    Text(creds.second, fontSize = 12.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
+                                }
+                            }
+                        }
+                        Text(
+                            "💡 The vendor can log in immediately and customize their credentials anytime from their Vendor Profile.",
+                            fontSize = 11.sp,
+                            color = MaterialTheme.colorScheme.primary,
+                            fontWeight = FontWeight.Medium
+                        )
+                    }
+                },
+                confirmButton = {
+                    Button(onClick = { newlyCreatedVendorCreds = null }) {
+                        Text("Done")
+                    }
+                }
+            )
+        }
         // 2. EDIT VENDOR DIALOG
         vendorToEdit?.let { vendor ->
             Dialog(onDismissRequest = { vendorToEdit = null }) {

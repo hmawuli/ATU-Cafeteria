@@ -1349,7 +1349,18 @@
         </div>
 
         <div>
-                  <div class="grid grid-cols-2 gap-3 bg-amber-50/70 p-3 rounded-2xl border border-amber-200/80">
+                  <div class="bg-amber-50/80 p-3.5 rounded-2xl border border-amber-200 space-y-2">
+          <div class="flex items-center justify-between">
+            <div class="flex items-center gap-1.5 text-amber-900 font-bold text-xs">
+              <i data-lucide="key-round" class="w-3.5 h-3.5"></i>
+              <span>Default Login Credentials (Auto-Generated)</span>
+            </div>
+            <button type="button" onclick="resetVendorDefaultCredentials()" class="text-[10px] text-amber-700 bg-amber-200/60 hover:bg-amber-200 px-2 py-0.5 rounded-lg font-bold">
+              Reset PIN 1234
+            </button>
+          </div>
+          <p class="text-[10.5px] text-amber-800 leading-tight">Admin sets initial login credentials. The vendor will use these to log in and can update their password anytime.</p>
+          <div class="grid grid-cols-2 gap-3 pt-1">
           <div>
             <label class="block mb-1 text-amber-950 font-bold">Vendor Username</label>
             <input type="text" id="new-vendor-username" placeholder="e.g. kiki_grills" class="w-full px-3 py-2 bg-white border border-amber-200 rounded-xl outline-none focus:ring-2 focus:ring-brand-500 font-mono text-xs" />
@@ -5335,8 +5346,54 @@
 
     // 🏪 ADMIN VENDOR MANAGEMENT
     function openAddVendorModal() {
-      document.getElementById('add-vendor-modal').classList.remove('hidden');
+      const modal = document.getElementById('add-vendor-modal');
+      const nameInput = document.getElementById('new-vendor-name');
+      const locInput = document.getElementById('new-vendor-location');
+      const specInput = document.getElementById('new-vendor-specialty');
+      const phoneInput = document.getElementById('new-vendor-phone');
+      const userInput = document.getElementById('new-vendor-username');
+      const passInput = document.getElementById('new-vendor-password');
+
+      if (nameInput) nameInput.value = '';
+      if (locInput) locInput.value = '';
+      if (specInput) specInput.value = '';
+      if (phoneInput) phoneInput.value = '';
+      if (userInput) userInput.value = '';
+      if (passInput) passInput.value = '1234';
+
+      if (nameInput && !nameInput._boundCredsListener) {
+        nameInput._boundCredsListener = true;
+        nameInput.addEventListener('input', () => {
+          const uInput = document.getElementById('new-vendor-username');
+          if (uInput && (!uInput.value || uInput.dataset.autogen === 'true' || uInput.value.startsWith('vendor_'))) {
+            const clean = nameInput.value.trim().toLowerCase().replace(/[^a-z0-9]/g, '_').substring(0, 18);
+            uInput.value = clean ? `vendor_${clean}` : '';
+            uInput.dataset.autogen = 'true';
+          }
+        });
+      }
+
+      if (userInput) {
+        userInput.addEventListener('input', () => {
+          userInput.dataset.autogen = 'false';
+        });
+      }
+
+      modal.classList.remove('hidden');
       lucide.createIcons();
+    }
+
+    function resetVendorDefaultCredentials() {
+      const nameInput = document.getElementById('new-vendor-name');
+      const userInput = document.getElementById('new-vendor-username');
+      const passInput = document.getElementById('new-vendor-password');
+      if (userInput) {
+        const name = nameInput ? nameInput.value.trim() : '';
+        const clean = name.toLowerCase().replace(/[^a-z0-9]/g, '_').substring(0, 18);
+        userInput.value = clean ? `vendor_${clean}` : `vendor_${Math.floor(1000 + Math.random()*9000)}`;
+      }
+      if (passInput) passInput.value = '1234';
+      showToast('Default login credentials applied: PIN 1234', 'info');
     }
 
     function closeAddVendorModal() {
@@ -5351,13 +5408,16 @@
       const usernameField = document.getElementById('new-vendor-username');
       const passwordField = document.getElementById('new-vendor-password');
 
-      const username = (usernameField && usernameField.value.trim()) ? usernameField.value.trim().toLowerCase() : name.toLowerCase().replace(/[^a-z0-9]/g, '_');
-      const password = (passwordField && passwordField.value.trim()) ? passwordField.value.trim() : 'Vendor@123';
-
       if (!name || !location) {
         showToast('Please enter vendor name and location stall.', 'error');
         return;
       }
+
+      const cleanSlug = name.toLowerCase().replace(/[^a-z0-9]/g, '_').substring(0, 18);
+      const defaultUsername = `vendor_${cleanSlug || Math.floor(1000 + Math.random()*9000)}`;
+      const username = (usernameField && usernameField.value.trim()) ? usernameField.value.trim().toLowerCase() : defaultUsername;
+      const password = (passwordField && passwordField.value.trim()) ? passwordField.value.trim() : '1234';
+
       const newVendor = {
         id: Date.now(),
         name,
@@ -5370,11 +5430,16 @@
         isOpen: true
       };
       vendors.push(newVendor);
-      auditLogs.unshift(`Admin registered vendor '${name}' with username '${username}'. Vendor can update credentials upon login.`);
+      auditLogs.unshift(`Admin registered vendor '${name}' with default credentials [Username: ${username}, PIN: ${password}].`);
+      
       renderVendorPills();
       renderAdminDashboard();
       closeAddVendorModal();
-      showToast(`Vendor '${name}' registered! Initial username: ${username}`, 'success');
+      
+      showToast(`Vendor '${name}' registered! Default Login: ${username} | PIN: ${password}`, 'success');
+    }
+
+    ' registered! Initial username: ${username}`, 'success');
       return;
     }
     function old_saveNewVendor_unused() {
