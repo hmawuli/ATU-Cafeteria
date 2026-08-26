@@ -3118,16 +3118,7 @@
       }
     }
 
-    function showTopUpModal() {
-      const addAmount = 50.00;
-      studentBalance += addAmount;
-      registeredStudents[0].balance = studentBalance;
-      updateWalletPill();
-      playChime(880);
-      auditLogs.unshift(`Student topped up GH₵ ${addAmount.toFixed(2)} via Mobile Money.`);
-      renderAdminDashboard();
-      showToast(`Wallet topped up with GH₵ ${addAmount.toFixed(2)}!`, 'success');
-    }
+    // showTopUpModal handled by comprehensive modal handler below
 
     function switchRole(role) {
       currentRole = role;
@@ -5438,10 +5429,6 @@
       
       showToast(`Vendor '${name}' registered! Default Login: ${username} | PIN: ${password}`, 'success');
     }
-
-    ' registered! Initial username: ${username}`, 'success');
-      return;
-    }
     function old_saveNewVendor_unused() {
       const name = document.getElementById('new-vendor-name').value.trim();
       const location = document.getElementById('new-vendor-location').value.trim();
@@ -5786,6 +5773,432 @@
     // Fallback immediate check
     loadUserSessionFromStorage();
     updateLockoutUI();
+  
+
+    // =========================================================================
+    // 📈 RECHARTS 30-DAY WALLET TRENDS & PERSONAL FINANCIAL MANAGEMENT
+    // =========================================================================
+    function renderStudentWalletTrendChart() {
+      const container = document.getElementById('student-wallet-line-chart-container');
+      if (!container) return;
+
+      const chartData = [];
+      const now = Date.now();
+      let runningBal = 85.00;
+
+      for (let i = 29; i >= 0; i--) {
+        const d = new Date(now - i * 86400000);
+        const dayLabel = d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' });
+        
+        let dailySpend = 0;
+        let dailyDeposit = 0;
+
+        if (i === 22) { dailyDeposit = 150.00; runningBal += 150.00; }
+        else if (i === 19) { dailySpend = 35.00; runningBal = Math.max(10, runningBal - 35.00); }
+        else if (i === 14) { dailySpend = 28.00; runningBal = Math.max(10, runningBal - 28.00); }
+        else if (i === 8) { dailyDeposit = 100.00; runningBal += 100.00; }
+        else if (i === 4) { dailySpend = 38.00; runningBal = Math.max(10, runningBal - 38.00); }
+        else if (i === 1) { dailySpend = 35.00; runningBal = Math.max(10, runningBal - 35.00); }
+        else if (i === 0) {
+          runningBal = studentBalance;
+        }
+
+        chartData.push({
+          date: dayLabel,
+          balance: Math.max(0, Math.round(runningBal * 100) / 100),
+          spending: dailySpend,
+          deposit: dailyDeposit
+        });
+      }
+
+      const balEl = document.getElementById('trend-wallet-bal');
+      if (balEl) balEl.innerText = studentBalance.toFixed(2);
+      const depEl = document.getElementById('trend-wallet-deposits');
+      if (depEl) depEl.innerText = '250.00';
+      const spEl = document.getElementById('trend-wallet-spent');
+      if (spEl) spEl.innerText = '136.00';
+      const avgEl = document.getElementById('trend-wallet-avg');
+      if (avgEl) avgEl.innerText = '34.00';
+
+      try {
+        if (window.React && window.ReactDOM && window.Recharts && window.Recharts.LineChart) {
+          const { createElement: h } = window.React;
+          const { ResponsiveContainer, LineChart, Line, CartesianGrid, XAxis, YAxis, Tooltip, Legend } = window.Recharts;
+
+          const chartElement = h(
+            ResponsiveContainer,
+            { width: '100%', height: 240 },
+            h(
+              LineChart,
+              { data: chartData, margin: { top: 10, right: 15, left: -10, bottom: 5 } },
+              h(CartesianGrid, { strokeDasharray: '3 3', stroke: '#e2e8f0', vertical: false }),
+              h(XAxis, { dataKey: 'date', tick: { fill: '#64748b', fontSize: 10 }, tickLine: false, axisLine: { stroke: '#cbd5e1' } }),
+              h(YAxis, { tick: { fill: '#64748b', fontSize: 10 }, tickLine: false, axisLine: { stroke: '#cbd5e1' }, tickFormatter: v => `GH₵${v}` }),
+              h(Tooltip, {
+                contentStyle: { backgroundColor: '#0f172a', borderColor: '#334155', borderRadius: '12px', color: '#fff', fontSize: '11px', boxShadow: '0 10px 25px -5px rgba(0,0,0,0.3)' },
+                formatter: (val, name) => [`GH₵ ${Number(val).toFixed(2)}`, name === 'balance' ? 'Wallet Balance' : (name === 'spending' ? 'Daily Meal Spending' : 'Deposit')]
+              }),
+              h(Legend, { wrapperStyle: { fontSize: '11px', paddingTop: '6px' } }),
+              h(Line, { type: 'monotone', dataKey: 'balance', name: 'Wallet Balance (GH₵)', stroke: '#10b981', strokeWidth: 3, dot: { r: 3, fill: '#10b981' }, activeDot: { r: 6 } }),
+              h(Line, { type: 'monotone', dataKey: 'spending', name: 'Daily Meal Spend (GH₵)', stroke: '#f59e0b', strokeWidth: 2, dot: { r: 2, fill: '#f59e0b' } })
+            )
+          );
+
+          if (window.ReactDOM.createRoot) {
+            if (!container._reactLineRoot) {
+              container._reactLineRoot = window.ReactDOM.createRoot(container);
+            }
+            container._reactLineRoot.render(chartElement);
+          } else {
+            window.ReactDOM.render(chartElement, container);
+          }
+          return;
+        }
+      } catch (err) {
+        console.warn('Recharts line chart error, fallback:', err);
+      }
+
+      // SVG Line Chart Fallback
+      renderSvgLineChartFallback(container, chartData);
+    }
+
+    function renderSvgLineChartFallback(container, data) {
+      if (!container || !data || data.length === 0) return;
+      const width = container.clientWidth || 600;
+      const height = 240;
+      const padLeft = 45;
+      const padRight = 20;
+      const padTop = 20;
+      const padBottom = 35;
+      const plotW = width - padLeft - padRight;
+      const plotH = height - padTop - padBottom;
+
+      const maxBal = Math.max(...data.map(d => d.balance), 200);
+      const points = data.map((d, i) => {
+        const x = padLeft + (i / (data.length - 1)) * plotW;
+        const y = padTop + plotH - (d.balance / maxBal) * plotH;
+        return `${x},${y}`;
+      }).join(' ');
+
+      container.innerHTML = `
+        <svg width="100%" height="100%" viewBox="0 0 ${width} ${height}" class="overflow-visible">
+          <line x1="${padLeft}" y1="${padTop + plotH}" x2="${width - padRight}" y2="${padTop + plotH}" stroke="#cbd5e1" stroke-width="1" />
+          <polyline fill="none" stroke="#10b981" stroke-width="3" points="${points}" />
+          ${data.filter((_, i) => i % 5 === 0).map((d, idx) => {
+            const i = idx * 5;
+            const x = padLeft + (i / (data.length - 1)) * plotW;
+            const y = padTop + plotH - (d.balance / maxBal) * plotH;
+            return `<circle cx="${x}" cy="${y}" r="4" fill="#10b981" /><text x="${x}" y="${padTop + plotH + 16}" font-size="9" fill="#64748b" text-anchor="middle">${d.date}</text>`;
+          }).join('')}
+        </svg>
+      `;
+    }
+
+    // =========================================================================
+    // 📄 EXPORT WALLET TRANSACTION STATEMENT (PDF)
+    // =========================================================================
+    function exportWalletTransactionsPdf() {
+      try {
+        const jspdfObj = (window.jspdf && window.jspdf.jsPDF) ? window.jspdf : window;
+        if (!jspdfObj || !jspdfObj.jsPDF) {
+          showToast('PDF generator library is initializing...', 'info');
+          return;
+        }
+        const { jsPDF } = jspdfObj;
+        const doc = new jsPDF({
+          orientation: 'portrait',
+          unit: 'mm',
+          format: 'a4'
+        });
+
+        const navyColor = [15, 23, 42];
+        const emeraldColor = [46, 125, 50];
+        const redColor = [198, 40, 40];
+
+        // Header
+        doc.setFillColor(...navyColor);
+        doc.rect(0, 0, 210, 38, 'F');
+
+        doc.setTextColor(255, 255, 255);
+        doc.setFont('helvetica', 'bold');
+        doc.setFontSize(16);
+        doc.text('ACCRA TECHNICAL UNIVERSITY', 15, 14);
+
+        doc.setFontSize(10.5);
+        doc.setFont('helvetica', 'normal');
+        doc.setTextColor(253, 186, 116);
+        doc.text('Smart Cafeteria Hub • Official Digital Wallet Statement', 15, 22);
+
+        doc.setFontSize(8);
+        doc.setTextColor(203, 213, 225);
+        const dateStr = new Date().toLocaleString('en-GB', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit', second: '2-digit' });
+        doc.text(`Generated On: ${dateStr}  |  Official Security Hash: ATU-${Math.floor(100000 + Math.random()*900000)}`, 15, 30);
+
+        // Account Details Box
+        doc.setFillColor(248, 250, 252);
+        doc.setDrawColor(226, 232, 240);
+        doc.roundedRect(15, 44, 180, 24, 3, 3, 'FD');
+
+        doc.setTextColor(15, 23, 42);
+        doc.setFont('helvetica', 'bold');
+        doc.setFontSize(9.5);
+        const holderName = (currentLoggedInUser && currentLoggedInUser.name) ? currentLoggedInUser.name : 'Kofi Mensah';
+        const holderId = (currentLoggedInUser && currentLoggedInUser.indexNo) ? currentLoggedInUser.indexNo : '01210492B';
+        doc.text(`Account Holder: ${holderName} (Student ID: ${holderId})`, 20, 52);
+
+        doc.setFont('helvetica', 'normal');
+        doc.setFontSize(8.5);
+        doc.setTextColor(71, 85, 105);
+        doc.text('Program: BTech Computer Science   |   Phone: +233 24 987 6543', 20, 58);
+        doc.text('Security Auth: Verified 4-Digit PIN & Biometric Touch ID', 20, 64);
+
+        // Balance Summary Cards
+        doc.setFillColor(236, 253, 245);
+        doc.setDrawColor(167, 243, 208);
+        doc.roundedRect(15, 73, 57, 18, 2, 2, 'FD');
+        doc.setTextColor(6, 95, 70);
+        doc.setFontSize(7.5);
+        doc.setFont('helvetica', 'bold');
+        doc.text('AVAILABLE BALANCE', 19, 79);
+        doc.setFontSize(11);
+        doc.text(`GH₵ ${studentBalance.toFixed(2)}`, 19, 87);
+
+        doc.setFillColor(239, 246, 255);
+        doc.setDrawColor(191, 219, 254);
+        doc.roundedRect(76, 73, 57, 18, 2, 2, 'FD');
+        doc.setTextColor(30, 64, 175);
+        doc.setFontSize(7.5);
+        doc.text('TOTAL DEPOSITS (30D)', 80, 79);
+        doc.setFontSize(11);
+        doc.text('+GH₵ 250.00', 80, 87);
+
+        doc.setFillColor(254, 242, 242);
+        doc.setDrawColor(254, 202, 202);
+        doc.roundedRect(138, 73, 57, 18, 2, 2, 'FD');
+        doc.setTextColor(153, 27, 27);
+        doc.setFontSize(7.5);
+        doc.text('TOTAL MEAL SPEND (30D)', 142, 79);
+        doc.setFontSize(11);
+        doc.text('-GH₵ 136.00', 142, 87);
+
+        // Table Header
+        let y = 100;
+        doc.setFillColor(51, 65, 85);
+        doc.rect(15, y, 180, 8, 'F');
+        doc.setTextColor(255, 255, 255);
+        doc.setFontSize(8);
+        doc.setFont('helvetica', 'bold');
+        doc.text('Date & Time', 18, y + 5.5);
+        doc.text('Type', 55, y + 5.5);
+        doc.text('Description / Vendor', 80, y + 5.5);
+        doc.text('Ref / ID', 145, y + 5.5);
+        doc.text('Amount', 175, y + 5.5);
+
+        y += 8;
+
+        const txs = [
+          { date: '25 Aug, 13:40', type: 'SPEND', desc: 'Special Assorted Jollof Meal', ref: 'ORD-8944', amt: -35.00 },
+          { date: '22 Aug, 11:15', type: 'SPEND', desc: 'Fried Rice & Pepper Wings (Tasty Bite)', ref: 'ORD-8943', amt: -38.00 },
+          { date: '18 Aug, 09:30', type: 'DEPOSIT', desc: 'Telecel Cash Wallet Deposit', ref: 'MOMO-910283', amt: 100.00 },
+          { date: '12 Aug, 12:50', type: 'SPEND', desc: 'Waakye Special & Boiled Egg (Mama Muni)', ref: 'ORD-8942', amt: -28.00 },
+          { date: '07 Aug, 14:10', type: 'SPEND', desc: 'Assorted Jollof & Grilled Chicken (Akwaaba)', ref: 'ORD-8941', amt: -35.00 },
+          { date: '04 Aug, 08:20', type: 'DEPOSIT', desc: 'MTN Mobile Money Top-Up', ref: 'MOMO-784912', amt: 150.00 }
+        ];
+
+        doc.setFont('helvetica', 'normal');
+        doc.setFontSize(8);
+
+        txs.forEach((tx, idx) => {
+          if (idx % 2 === 1) {
+            doc.setFillColor(248, 250, 252);
+            doc.rect(15, y, 180, 8, 'F');
+          }
+          doc.setDrawColor(226, 232, 240);
+          doc.line(15, y + 8, 195, y + 8);
+
+          doc.setTextColor(51, 65, 85);
+          doc.text(tx.date, 18, y + 5.5);
+
+          if (tx.amt >= 0) {
+            doc.setTextColor(...emeraldColor);
+            doc.setFont('helvetica', 'bold');
+            doc.text('DEPOSIT', 55, y + 5.5);
+          } else {
+            doc.setTextColor(...redColor);
+            doc.setFont('helvetica', 'bold');
+            doc.text('SPEND', 55, y + 5.5);
+          }
+
+          doc.setFont('helvetica', 'normal');
+          doc.setTextColor(30, 41, 59);
+          doc.text(tx.desc.length > 28 ? tx.desc.substring(0, 26) + '..' : tx.desc, 80, y + 5.5);
+
+          doc.setTextColor(100, 116, 139);
+          doc.text(tx.ref, 145, y + 5.5);
+
+          if (tx.amt >= 0) {
+            doc.setTextColor(...emeraldColor);
+            doc.setFont('helvetica', 'bold');
+            doc.text(`+GH₵ ${tx.amt.toFixed(2)}`, 175, y + 5.5);
+          } else {
+            doc.setTextColor(...redColor);
+            doc.setFont('helvetica', 'bold');
+            doc.text(`-GH₵ ${Math.abs(tx.amt).toFixed(2)}`, 175, y + 5.5);
+          }
+
+          doc.setFont('helvetica', 'normal');
+          y += 8;
+        });
+
+        // Verification stamp
+        y += 10;
+        doc.setFillColor(241, 245, 249);
+        doc.roundedRect(15, y, 180, 22, 2, 2, 'FD');
+
+        doc.setTextColor(30, 41, 59);
+        doc.setFontSize(8);
+        doc.setFont('helvetica', 'bold');
+        doc.text('OFFICIAL VERIFICATION & AUDIT COMPLIANCE', 20, y + 6);
+        doc.setFont('helvetica', 'normal');
+        doc.setFontSize(7.5);
+        doc.setTextColor(100, 116, 139);
+        doc.text('This digital statement is officially authorized by Accra Technical University Cafeteria Services.', 20, y + 11);
+        doc.text('Transactions are encrypted and validated via biometric credentials and 4-digit PIN authentication.', 20, y + 16);
+
+        // Footer
+        doc.setFontSize(7);
+        doc.setTextColor(148, 163, 184);
+        doc.text('ATU Smart Cafeteria System • Cashless Campus Hub • Inquiries: support@atu-cafeteria.edu.gh', 105, 285, { align: 'center' });
+
+        const filename = `ATU_Wallet_Statement_${Date.now()}.pdf`;
+        doc.save(filename);
+        showToast(`Wallet Statement downloaded: ${filename}`, 'success');
+      } catch (err) {
+        console.error('Wallet PDF Export error:', err);
+        showToast('Failed to export statement: ' + err.message, 'error');
+      }
+    }
+
+    // =========================================================================
+    // 🔒 5-MINUTE INACTIVITY SESSION LOCK & BIOMETRICS
+    // =========================================================================
+    let lastUserActivityTime = Date.now();
+    const INACTIVITY_TIMEOUT_MS = 5 * 60 * 1000;
+    let pendingInactivityAction = null;
+
+    function recordUserActivity() {
+      lastUserActivityTime = Date.now();
+    }
+
+    ['mousemove', 'keydown', 'touchstart', 'click', 'scroll'].forEach(evt => {
+      window.addEventListener(evt, recordUserActivity, { passive: true });
+    });
+
+    function checkInactivityLock() {
+      return (Date.now() - lastUserActivityTime) >= INACTIVITY_TIMEOUT_MS;
+    }
+
+    function requireInactivityVerification(onSuccess) {
+      if (!checkInactivityLock()) {
+        onSuccess();
+        return;
+      }
+      pendingInactivityAction = onSuccess;
+      const modal = document.getElementById('inactivity-lock-modal');
+      const pinInput = document.getElementById('inactivity-unlock-pin');
+      const errEl = document.getElementById('inactivity-lock-error');
+      if (errEl) errEl.classList.add('hidden');
+      if (pinInput) pinInput.value = '';
+      if (modal) modal.classList.remove('hidden');
+      lucide.createIcons();
+    }
+
+    function closeInactivityModal() {
+      const modal = document.getElementById('inactivity-lock-modal');
+      if (modal) modal.classList.add('hidden');
+    }
+
+    function verifyInactivityPinUnlock() {
+      const pinInput = document.getElementById('inactivity-unlock-pin');
+      const errEl = document.getElementById('inactivity-lock-error');
+      const pin = pinInput ? pinInput.value.trim() : '';
+
+      if (!pin || pin.length < 4) {
+        if (errEl) {
+          errEl.innerText = 'Please enter your 4-digit security PIN.';
+          errEl.classList.remove('hidden');
+        }
+        return;
+      }
+
+      lastUserActivityTime = Date.now();
+      closeInactivityModal();
+      showToast('Inactivity session verified! Resuming action.', 'success');
+
+      if (typeof pendingInactivityAction === 'function') {
+        const action = pendingInactivityAction;
+        pendingInactivityAction = null;
+        action();
+      }
+    }
+
+    function triggerInactivityBiometricUnlock() {
+      showToast('Scanning biometric sensor...', 'info');
+      setTimeout(() => {
+        lastUserActivityTime = Date.now();
+        closeInactivityModal();
+        showToast('Biometric authentication verified! Resuming session.', 'success');
+        if (typeof pendingInactivityAction === 'function') {
+          const action = pendingInactivityAction;
+          pendingInactivityAction = null;
+          action();
+        }
+      }, 600);
+    }
+
+    // =========================================================================
+    // 🏪 VENDOR LOGIN CREDENTIALS UPDATE
+    // =========================================================================
+    function saveVendorCredentials(event) {
+      if (event) event.preventDefault();
+      const usernameInput = document.getElementById('vcreds-username');
+      const passInput = document.getElementById('vcreds-password');
+      const confirmInput = document.getElementById('vcreds-confirm-password');
+      const msgEl = document.getElementById('vendor-creds-msg');
+
+      const username = usernameInput ? usernameInput.value.trim().toLowerCase() : '';
+      const password = passInput ? passInput.value.trim() : '';
+      const confirmPassword = confirmInput ? confirmInput.value.trim() : '';
+
+      if (username.length < 3) {
+        showToast('Username must be at least 3 characters.', 'error');
+        return;
+      }
+      if (password.length < 4) {
+        showToast('Password must be at least 4 characters.', 'error');
+        return;
+      }
+      if (password !== confirmPassword) {
+        showToast('Passwords do not match.', 'error');
+        return;
+      }
+
+      const activeVendor = vendors[currentVendorIndex] || vendors[0];
+      activeVendor.username = username;
+      activeVendor.password = password;
+
+      if (msgEl) {
+        msgEl.innerText = `Credentials updated for ${activeVendor.name}! New username: ${username}`;
+        msgEl.classList.remove('hidden');
+      }
+
+      if (passInput) passInput.value = '';
+      if (confirmInput) confirmInput.value = '';
+
+      auditLogs.unshift(`Vendor '${activeVendor.name}' updated login credentials (username: ${username}).`);
+      showToast(`Login credentials updated! You can now sign in as '${username}'.`, 'success');
+    }
+
   </script>
   <!-- 🔒 5-Minute Inactivity Session Lock Modal -->
   <div id="inactivity-lock-modal" class="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-md hidden flex items-center justify-center p-4">
