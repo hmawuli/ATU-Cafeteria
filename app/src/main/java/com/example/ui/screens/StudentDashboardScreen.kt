@@ -6708,18 +6708,41 @@ fun StudentDashboardScreen(
                                         horizontalArrangement = Arrangement.SpaceBetween,
                                         verticalAlignment = Alignment.CenterVertically
                                     ) {
-                                        Text(
-                                            "Wallet Transaction History",
-                                            fontWeight = FontWeight.Bold,
-                                            style = MaterialTheme.typography.titleMedium,
-                                            color = MaterialTheme.colorScheme.primary
-                                        )
-                                        Icon(
-                                            Icons.Default.List,
-                                            contentDescription = null,
-                                            tint = MaterialTheme.colorScheme.primary,
-                                            modifier = Modifier.size(18.dp)
-                                        )
+                                        Column(modifier = Modifier.weight(1f)) {
+                                            Text(
+                                                "Wallet Transaction History",
+                                                fontWeight = FontWeight.Bold,
+                                                style = MaterialTheme.typography.titleMedium,
+                                                color = MaterialTheme.colorScheme.primary
+                                            )
+                                            Text(
+                                                "Deposits, meal spending & statements",
+                                                fontSize = 10.sp,
+                                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                                            )
+                                        }
+                                        OutlinedButton(
+                                            onClick = {
+                                                com.example.ui.util.generatePdfWalletTransactionReport(
+                                                    context = context,
+                                                    studentName = currentUser?.fullName ?: "Student",
+                                                    studentIndex = currentUser?.username ?: "ATU-STUDENT",
+                                                    currentBalance = currentUser?.balance ?: 0.0,
+                                                    transactions = userWalletTransactions
+                                                )
+                                            },
+                                            shape = RoundedCornerShape(8.dp),
+                                            contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp),
+                                            modifier = Modifier.testTag("export_wallet_pdf_button")
+                                        ) {
+                                            Icon(
+                                                Icons.Default.PictureAsPdf,
+                                                contentDescription = "Export PDF",
+                                                modifier = Modifier.size(16.dp)
+                                            )
+                                            Spacer(modifier = Modifier.width(4.dp))
+                                            Text("Export PDF", fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                                        }
                                     }
                                     Spacer(modifier = Modifier.height(12.dp))
 
@@ -7266,5650 +7289,157 @@ fun StudentDashboardScreen(
                                                             color = MaterialTheme.colorScheme.error,
                                                             fontSize = 10.sp,
                                                             fontWeight = FontWeight.Bold,
-                                                            modifier = Modifier.padding(top = 4.dp)
-                                                        )
-                                                    }
-                                                }
-                                            },
-                                            confirmButton = {
-                                                Button(
-                                                    onClick = {
-                                                        if (pinConfirmationInput.isNotBlank()) {
-                                                            val hashed = java.security.MessageDigest.getInstance("SHA-256")
-                                                                .digest(pinConfirmationInput.toByteArray())
-                                                                .fold("") { str, it -> str + "%02x".format(it) }
-                                                            val curUser = currentUser
-                                                            if (curUser != null && curUser.passwordHash == hashed) {
-                                                                bioPrefs.edit()
-                                                                    .putString("biometric_username", curUser.username)
-                                                                    .putString("biometric_pin", pinConfirmationInput)
-                                                                    .putBoolean("biometric_enabled", true)
-                                                                    .apply()
-                                                                biometricEnabled = true
-                                                                showPinConfirmDialog = false
-                                                                pinConfirmationInput = ""
-                                                                pinConfirmationError = null
-                                                            } else {
-                                                                pinConfirmationError = "Invalid PIN. Please try again."
-                                                            }
-                                                        }
-                                                    }
-                                                ) {
-                                                    Text("Confirm")
-                                                }
-                                            },
-                                            dismissButton = {
-                                                TextButton(
-                                                    onClick = { 
-                                                        showPinConfirmDialog = false 
-                                                        pinConfirmationInput = ""
-                                                        pinConfirmationError = null
-                                                    }
-                                                ) {
-                                                    Text("Cancel")
-                                                }
-                                            }
-                                        )
-                                    }
-
-                                    // üîî ORDER STATUS NOTIFICATION CHANNEL CONFIGURATION
-                                    var notifSoundEnabled by remember { mutableStateOf(com.example.ui.util.NotificationHelper.isSoundEnabled(context)) }
-                                    var notifVibrationEnabled by remember { mutableStateOf(com.example.ui.util.NotificationHelper.isVibrationEnabled(context)) }
-
-                                    Spacer(modifier = Modifier.height(12.dp))
-                                    HorizontalDivider(color = MaterialTheme.colorScheme.primary.copy(alpha = 0.15f))
-                                    Spacer(modifier = Modifier.height(12.dp))
-
-                                    Column(modifier = Modifier.fillMaxWidth()) {
-                                        Text(
-                                            "üîî Order Status Notification Channel Settings",
-                                            fontWeight = FontWeight.Bold,
-                                            fontSize = 12.sp,
-                                            color = MaterialTheme.colorScheme.primary
-                                        )
-                                        Text(
-                                            "Customize notification alert sounds and vibration patterns for real-time order status updates.",
-                                            fontSize = 10.sp,
-                                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                                        )
-                                        Spacer(modifier = Modifier.height(8.dp))
-
-                                        Row(
-                                            modifier = Modifier.fillMaxWidth(),
-                                            horizontalArrangement = Arrangement.SpaceBetween,
-                                            verticalAlignment = Alignment.CenterVertically
-                                        ) {
-                                            Text("Notification Alert Sounds", fontSize = 11.sp, fontWeight = FontWeight.SemiBold)
-                                            Switch(
-                                                checked = notifSoundEnabled,
-                                                onCheckedChange = { enabled ->
-                                                    notifSoundEnabled = enabled
-                                                    com.example.ui.util.NotificationHelper.setSoundEnabled(context, enabled)
-                                                },
-                                                modifier = Modifier.testTag("toggle_notif_sound_switch")
-                                            )
-                                        }
-
-                                        Row(
-                                            modifier = Modifier.fillMaxWidth(),
-                                            horizontalArrangement = Arrangement.SpaceBetween,
-                                            verticalAlignment = Alignment.CenterVertically
-                                        ) {
-                                            Text("Notification Haptic Vibration", fontSize = 11.sp, fontWeight = FontWeight.SemiBold)
-                                            Switch(
-                                                checked = notifVibrationEnabled,
-                                                onCheckedChange = { enabled ->
-                                                    notifVibrationEnabled = enabled
-                                                    com.example.ui.util.NotificationHelper.setVibrationEnabled(context, enabled)
-                                                },
-                                                modifier = Modifier.testTag("toggle_notif_vibration_switch")
-                                            )
-                                        }
-
-                                        Spacer(modifier = Modifier.height(8.dp))
-
-                                        OutlinedButton(
-                                            onClick = {
-                                                com.example.ui.util.NotificationHelper.openChannelSettings(context, com.example.ui.util.NotificationHelper.CHANNEL_ORDERS)
-                                            },
-                                            shape = RoundedCornerShape(8.dp),
-                                            modifier = Modifier.fillMaxWidth().testTag("open_system_notif_channel_btn")
-                                        ) {
-                                            Icon(Icons.Default.Settings, contentDescription = "System Notification Settings", modifier = Modifier.size(16.dp))
-                                            Spacer(modifier = Modifier.width(6.dp))
-                                            Text("Configure Channel in System Settings", fontSize = 11.sp, fontWeight = FontWeight.Bold)
-                                        }
-                                    }
-                                }
-                            }
-
-                            Card(
-                                modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp).testTag("profile_payment_hub_card"),
-                                shape = RoundedCornerShape(16.dp),
-                                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-                                border = BorderStroke(1.2.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.4f))
-                            ) {
-                                Column(modifier = Modifier.padding(16.dp)) {
-                                    Row(
-                                        modifier = Modifier.fillMaxWidth(),
-                                        horizontalArrangement = Arrangement.SpaceBetween,
-                                        verticalAlignment = Alignment.CenterVertically
-                                    ) {
-                                        Row(verticalAlignment = Alignment.CenterVertically) {
-                                            Text("üë§", fontSize = 20.sp)
-                                            Spacer(modifier = Modifier.width(8.dp))
-                                            Column {
-                                                Text(
-                                                    "Interactive Profile & Payment Settings",
-                                                    fontWeight = FontWeight.Bold,
-                                                    style = MaterialTheme.typography.titleSmall,
-                                                    color = MaterialTheme.colorScheme.primary
-                                                )
-                                                Text(
-                                                    "Set up credentials and payment methods",
-                                                    fontSize = 10.sp,
-                                                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                                                )
-                                            }
-                                        }
-                                        
-                                        IconButton(
-                                            onClick = { isEditingProfile = !isEditingProfile },
-                                            modifier = Modifier.testTag("toggle_profile_edit_btn")
-                                        ) {
-                                            Icon(
-                                                imageVector = if (isEditingProfile) Icons.Default.Close else Icons.Default.Edit,
-                                                contentDescription = "Edit Profile",
-                                                tint = MaterialTheme.colorScheme.primary
-                                            )
-                                        }
-                                    }
-
-                                    Spacer(modifier = Modifier.height(12.dp))
-
-                                    if (!isEditingProfile) {
-                                        // Read-Only Dashboard Stats
-                                        Column {
-                                            ListItem(
-                                                headlineContent = { Text("Registered Name", fontSize = 11.sp, fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.onSurfaceVariant) },
-                                                supportingContent = { Text(currentUser?.fullName ?: "N/A", fontSize = 13.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface) },
-                                                leadingContent = { Icon(Icons.Default.Person, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(18.dp)) },
-                                                colors = ListItemDefaults.colors(containerColor = Color.Transparent),
-                                                modifier = Modifier.padding(0.dp)
-                                            )
-                                            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f))
-                                            ListItem(
-                                                headlineContent = { Text("Contact Number ($selectedMomoOp)", fontSize = 11.sp, fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.onSurfaceVariant) },
-                                                supportingContent = { Text(currentUser?.telephone?.ifBlank { "Not configured" } ?: "Not configured", fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurface) },
-                                                leadingContent = { Icon(Icons.Default.Phone, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(18.dp)) },
-                                                colors = ListItemDefaults.colors(containerColor = Color.Transparent)
-                                            )
-                                            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f))
-                                            ListItem(
-                                                headlineContent = { Text("Registered Email Address", fontSize = 11.sp, fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.onSurfaceVariant) },
-                                                supportingContent = { Text(currentUser?.email?.ifBlank { "No email set" } ?: "No email set", fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurface) },
-                                                leadingContent = { Icon(Icons.Default.Email, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(18.dp)) },
-                                                colors = ListItemDefaults.colors(containerColor = Color.Transparent)
-                                            )
-                                            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f))
-                                            ListItem(
-                                                headlineContent = { Text("Primary Card", fontSize = 11.sp, fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.onSurfaceVariant) },
-                                                supportingContent = { Text("Visa $creditCardNumber Exp: $cardExpiry", fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurface) },
-                                                leadingContent = { Icon(Icons.Default.CreditCard, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(18.dp)) },
-                                                colors = ListItemDefaults.colors(containerColor = Color.Transparent)
-                                            )
-                                            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f))
-                                            ListItem(
-                                                headlineContent = { Text("Dietary Preferences", fontSize = 11.sp, fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.onSurfaceVariant) },
-                                                supportingContent = {
-                                                    val prefs = currentUser?.dietaryPreferences
-                                                    if (prefs.isNullOrBlank()) {
-                                                        Text("None specified", fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurface)
-                                                    } else {
-                                                        Row(
-                                                            horizontalArrangement = Arrangement.spacedBy(4.dp),
-                                                            modifier = Modifier
-                                                                .padding(top = 4.dp)
-                                                                .horizontalScroll(rememberScrollState())
-                                                        ) {
-                                                            prefs.split(",").map { it.trim() }.filter { it.isNotEmpty() }.forEach { pref ->
-                                                                Box(
-                                                                    modifier = Modifier
-                                                                        .background(MaterialTheme.colorScheme.primaryContainer, RoundedCornerShape(6.dp))
-                                                                        .padding(horizontal = 8.dp, vertical = 4.dp)
-                                                                ) {
-                                                                    Text(pref, fontSize = 10.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onPrimaryContainer)
-                                                                }
-                                                            }
-                                                        }
-                                                    }
-                                                },
-                                                leadingContent = { Icon(Icons.Default.Restaurant, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(18.dp)) },
-                                                colors = ListItemDefaults.colors(containerColor = Color.Transparent)
-                                            )
-                                            
-                                            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f), modifier = Modifier.padding(vertical = 8.dp))
-                                            
-                                            // Dedicated Loyalty Points Tracker Card in Profile Settings
-                                            Card(
-                                                modifier = Modifier
-                                                    .fillMaxWidth()
-                                                    .padding(vertical = 6.dp)
-                                                    .testTag("profile_loyalty_points_tracker_card"),
-                                                shape = RoundedCornerShape(14.dp),
-                                                colors = CardDefaults.cardColors(
-                                                    containerColor = MaterialTheme.colorScheme.tertiaryContainer.copy(alpha = 0.35f)
-                                                ),
-                                                border = BorderStroke(1.dp, MaterialTheme.colorScheme.tertiary.copy(alpha = 0.3f))
-                                            ) {
-                                                Column(modifier = Modifier.padding(14.dp)) {
-                                                    Row(
-                                                        modifier = Modifier.fillMaxWidth(),
-                                                        horizontalArrangement = Arrangement.SpaceBetween,
-                                                        verticalAlignment = Alignment.CenterVertically
-                                                    ) {
-                                                        Row(verticalAlignment = Alignment.CenterVertically) {
-                                                            Icon(Icons.Default.Star, contentDescription = "Loyalty Points", tint = Color(0xFFFFB300), modifier = Modifier.size(20.dp))
-                                                            Spacer(modifier = Modifier.width(8.dp))
-                                                            Column {
-                                                                Text("ATU Student Loyalty Rewards Club üî• (5 Day Streak)", fontWeight = FontWeight.ExtraBold, fontSize = 12.sp, color = MaterialTheme.colorScheme.onTertiaryContainer)
-                                                                Text("Earn +25 PTS for every completed order!", fontSize = 10.sp, color = MaterialTheme.colorScheme.onTertiaryContainer.copy(alpha = 0.8f))
-                                                            }
-                                                        }
-                                                        
-                                                        val livePoints = loyaltySummary?.loyalty_points_balance ?: currentTotalPoints
-                                                        Box(
-                                                            modifier = Modifier
-                                                                .clip(RoundedCornerShape(8.dp))
-                                                                .background(MaterialTheme.colorScheme.tertiary)
-                                                                .padding(horizontal = 10.dp, vertical = 4.dp)
-                                                        ) {
-                                                            Text("$livePoints PTS", fontWeight = FontWeight.Black, fontSize = 12.sp, color = MaterialTheme.colorScheme.onTertiary)
-                                                        }
-                                                    }
-                                                    
-                                                    Spacer(modifier = Modifier.height(10.dp))
-                                                    
-                                                    val ptsVal = loyaltySummary?.loyalty_points_balance ?: currentTotalPoints
-                                                    val tierName = when {
-                                                        ptsVal >= 500 -> "Platinum Foodie"
-                                                        ptsVal >= 250 -> "Gold Member"
-                                                        ptsVal >= 100 -> "Silver Explorer"
-                                                        else -> "Bronze Member"
-                                                    }
-                                                    val nextTierTarget = when {
-                                                        ptsVal >= 500 -> 1000
-                                                        ptsVal >= 250 -> 500
-                                                        ptsVal >= 100 -> 250
-                                                        else -> 100
-                                                    }
-                                                    val progressFrac = (ptsVal.toFloat() / nextTierTarget.toFloat()).coerceIn(0f, 1f)
-                                                    val cashValue = ptsVal * 0.10
-
-                                                    Row(
-                                                        modifier = Modifier.fillMaxWidth(),
-                                                        horizontalArrangement = Arrangement.SpaceBetween,
-                                                        verticalAlignment = Alignment.CenterVertically
-                                                    ) {
-                                                        Text("Tier: $tierName", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onTertiaryContainer)
-                                                        Text("Discount Credit: GH‚Çµ ${"%.2f".format(cashValue)}", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = Color(0xFF2E7D32))
-                                                    }
-
-                                                    Spacer(modifier = Modifier.height(6.dp))
-
-                                                    LinearProgressIndicator(
-                                                        progress = { progressFrac },
-                                                        modifier = Modifier
-                                                            .fillMaxWidth()
-                                                            .height(8.dp)
-                                                            .clip(RoundedCornerShape(4.dp)),
-                                                        color = MaterialTheme.colorScheme.primary,
-                                                        trackColor = MaterialTheme.colorScheme.surfaceVariant
-                                                    )
-
-                                                    Spacer(modifier = Modifier.height(8.dp))
-
-                                                    Button(
-                                                        onClick = {
-                                                            HapticHelper.impact(context)
-                                                            showRewardsCatalogDialog = true
-                                                        },
-                                                        modifier = Modifier.fillMaxWidth().testTag("open_rewards_catalog_profile_btn"),
-                                                        colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.tertiary),
-                                                        shape = RoundedCornerShape(8.dp)
-                                                    ) {
-                                                        Icon(Icons.Default.Star, contentDescription = null, modifier = Modifier.size(16.dp))
-                                                        Spacer(modifier = Modifier.width(6.dp))
-                                                        Text("Explore Rewards Catalog üéÅ", fontSize = 11.sp, fontWeight = FontWeight.Bold)
-                                                    }
-
-                                                    Spacer(modifier = Modifier.height(8.dp))
-
-                                                    // Milestone Unlockables Carousel
-                                                    Row(
-                                                        modifier = Modifier
-                                                            .fillMaxWidth()
-                                                            .horizontalScroll(rememberScrollState()),
-                                                        horizontalArrangement = Arrangement.spacedBy(8.dp)
-                                                    ) {
-                                                        Surface(
-                                                            shape = RoundedCornerShape(8.dp),
-                                                            color = if (ptsVal >= 50) MaterialTheme.colorScheme.surface else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
-                                                            border = BorderStroke(1.dp, if (ptsVal >= 50) Color(0xFFFFB300) else Color.Transparent)
-                                                        ) {
-                                                            Text(
-                                                                text = if (ptsVal >= 50) "ü•§ Free Drink Unlocked" else "ü•§ Free Drink (50 PTS)",
-                                                                fontSize = 9.sp,
-                                                                fontWeight = FontWeight.Bold,
-                                                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
-                                                                color = if (ptsVal >= 50) Color(0xFF2E7D32) else MaterialTheme.colorScheme.outline
-                                                            )
-                                                        }
-                                                        Surface(
-                                                            shape = RoundedCornerShape(8.dp),
-                                                            color = if (ptsVal >= 100) MaterialTheme.colorScheme.surface else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
-                                                            border = BorderStroke(1.dp, if (ptsVal >= 100) Color(0xFFFFB300) else Color.Transparent)
-                                                        ) {
-                                                            Text(
-                                                                text = if (ptsVal >= 100) "üíµ GH‚Çµ 10 Off Unlocked" else "üíµ GH‚Çµ 10 Off (100 PTS)",
-                                                                fontSize = 9.sp,
-                                                                fontWeight = FontWeight.Bold,
-                                                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
-                                                                color = if (ptsVal >= 100) Color(0xFF2E7D32) else MaterialTheme.colorScheme.outline
-                                                            )
-                                                        }
-                                                        Surface(
-                                                            shape = RoundedCornerShape(8.dp),
-                                                            color = if (ptsVal >= 250) MaterialTheme.colorScheme.surface else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
-                                                            border = BorderStroke(1.dp, if (ptsVal >= 250) Color(0xFFFFB300) else Color.Transparent)
-                                                        ) {
-                                                            Text(
-                                                                text = if (ptsVal >= 250) "üç≤ Free Jollof Unlocked" else "üç≤ Free Jollof (250 PTS)",
-                                                                fontSize = 9.sp,
-                                                                fontWeight = FontWeight.Bold,
-                                                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
-                                                                color = if (ptsVal >= 250) Color(0xFF2E7D32) else MaterialTheme.colorScheme.outline
-                                                            )
-                                                        }
-                                                    }
-                                                }
-                                            }
-                                        }
-                                    } else {
-                                        // Edit Form Inputs
-                                        Column {
-                                            OutlinedTextField(
-                                                value = editFullName,
-                                                onValueChange = { editFullName = it },
-                                                label = { Text("Full Name") },
-                                                modifier = Modifier.fillMaxWidth().testTag("profile_fullname_field"),
-                                                singleLine = true
-                                            )
-                                            Spacer(modifier = Modifier.height(8.dp))
-                                            OutlinedTextField(
-                                                value = editStudentId,
-                                                onValueChange = { editStudentId = it },
-                                                label = { Text("ATU Student / Staff Reference ID") },
-                                                modifier = Modifier.fillMaxWidth().testTag("profile_studentid_field"),
-                                                singleLine = true
-                                            )
-                                            Spacer(modifier = Modifier.height(8.dp))
-                                            OutlinedTextField(
-                                                value = editTelephone,
-                                                onValueChange = { editTelephone = it },
-                                                label = { Text("Telephone Number") },
-                                                modifier = Modifier.fillMaxWidth().testTag("profile_phone_field"),
-                                                singleLine = true
-                                            )
-                                            Spacer(modifier = Modifier.height(8.dp))
-                                            OutlinedTextField(
-                                                value = editEmail,
-                                                onValueChange = { editEmail = it },
-                                                label = { Text("Contact Email Address") },
-                                                modifier = Modifier.fillMaxWidth().testTag("profile_email_field"),
-                                                singleLine = true
-                                            )
-                                            
-                                            Spacer(modifier = Modifier.height(14.dp))
-                                            Text(
-                                                "Payment Gateway Methods",
-                                                fontWeight = FontWeight.Bold,
-                                                fontSize = 12.sp,
-                                                color = MaterialTheme.colorScheme.primary
-                                            )
-                                            Text(
-                                                "Manage default payout channels & checkout systems",
-                                                fontSize = 9.sp,
-                                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                                            )
-                                            
-                                            Spacer(modifier = Modifier.height(8.dp))
-                                            
-                                            // MoMo Operator selection
-                                            Row(
-                                                modifier = Modifier.fillMaxWidth(),
-                                                horizontalArrangement = Arrangement.spacedBy(8.dp)
-                                            ) {
-                                                listOf("MTN MoMo", "Telecel Cash", "AT Money").forEach { operator ->
-                                                    val isSelected = selectedMomoOp == operator
-                                                    Box(
-                                                        modifier = Modifier
-                                                            .weight(1f)
-                                                            .background(
-                                                                if (isSelected) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceVariant,
-                                                                RoundedCornerShape(8.dp)
-                                                            )
-                                                            .border(
-                                                                1.dp,
-                                                                if (isSelected) MaterialTheme.colorScheme.primary else Color.Transparent,
-                                                                RoundedCornerShape(8.dp)
-                                                            )
-                                                            .clickable { selectedMomoOp = operator }
-                                                            .padding(vertical = 8.dp),
-                                                        contentAlignment = Alignment.Center
-                                                    ) {
-                                                        Text(operator, fontSize = 10.sp, fontWeight = FontWeight.Bold, color = if (isSelected) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurfaceVariant)
-                                                    }
-                                                }
-                                            }
-                                            
-                                            Spacer(modifier = Modifier.height(8.dp))
-                                            OutlinedTextField(
-                                                value = momoPhoneNumber,
-                                                onValueChange = { momoPhoneNumber = it },
-                                                label = { Text("$selectedMomoOp Number") },
-                                                modifier = Modifier.fillMaxWidth().testTag("profile_momo_phone_field"),
-                                                singleLine = true
-                                            )
-                                            
-                                            Spacer(modifier = Modifier.height(8.dp))
-                                            OutlinedTextField(
-                                                value = creditCardNumber,
-                                                onValueChange = { creditCardNumber = it },
-                                                label = { Text("Credit Card Number (GH Link)") },
-                                                modifier = Modifier.fillMaxWidth().testTag("profile_card_field"),
-                                                singleLine = true
-                                            )
-
-                                            Spacer(modifier = Modifier.height(14.dp))
-                                            Text(
-                                                "Dietary Preferences & Health Tags",
-                                                fontWeight = FontWeight.Bold,
-                                                fontSize = 12.sp,
-                                                color = MaterialTheme.colorScheme.primary
-                                            )
-                                            Text(
-                                                "Select tags to personalize your food recommendation engine",
-                                                fontSize = 9.sp,
-                                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                                            )
-                                            Spacer(modifier = Modifier.height(8.dp))
-
-                                            val activeDietList = remember(editDietaryPrefs) {
-                                                editDietaryPrefs.split(",").map { it.trim() }.filter { it.isNotEmpty() }.toMutableList()
-                                            }
-
-                                            Row(
-                                                modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
-                                                horizontalArrangement = Arrangement.spacedBy(6.dp)
-                                            ) {
-                                                presetDiets.forEach { diet ->
-                                                    val isSelected = activeDietList.contains(diet)
-                                                    Box(
-                                                        modifier = Modifier
-                                                            .clip(RoundedCornerShape(8.dp))
-                                                            .background(
-                                                                if (isSelected) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceVariant
-                                                            )
-                                                            .border(
-                                                                1.dp,
-                                                                if (isSelected) MaterialTheme.colorScheme.primary else Color.Transparent,
-                                                                RoundedCornerShape(8.dp)
-                                                            )
-                                                            .clickable {
-                                                                if (isSelected) {
-                                                                    activeDietList.remove(diet)
-                                                                } else {
-                                                                    activeDietList.add(diet)
-                                                                }
-                                                                editDietaryPrefs = activeDietList.joinToString(",")
-                                                            }
-                                                            .padding(horizontal = 10.dp, vertical = 6.dp)
-                                                            .testTag("diet_chip_${diet.lowercase().replace("-", "_")}")
-                                                    ) {
-                                                        Text(
-                                                            text = diet,
-                                                            fontSize = 10.sp,
-                                                            fontWeight = FontWeight.Bold,
-                                                            color = if (isSelected) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurfaceVariant
-                                                        )
-                                                    }
-                                                }
-                                            }
-
-                                            Spacer(modifier = Modifier.height(8.dp))
-                                            OutlinedTextField(
-                                                value = editDietaryPrefs,
-                                                onValueChange = { editDietaryPrefs = it },
-                                                label = { Text("Custom Dietary Tags (comma-separated)") },
-                                                modifier = Modifier.fillMaxWidth().testTag("profile_diet_field"),
-                                                singleLine = true
-                                            )
-                                            
-                                            Spacer(modifier = Modifier.height(12.dp))
-
-                                            Button(
-                                                onClick = {
-                                                    val updatedPaymentList = listOf(
-                                                        "MomoOperator:$selectedMomoOp",
-                                                        "MomoNumber:$momoPhoneNumber",
-                                                        "CardNumber:$creditCardNumber"
-                                                    )
-                                                    viewModel.updateUserProfile(
-                                                        fullName = editFullName,
-                                                        studentStaffId = editStudentId,
-                                                        telephone = editTelephone,
-                                                        email = editEmail,
-                                                        department = "ATU Cafeteria Main",
-                                                        programOfStudy = "Campus Member",
-                                                        paymentMethods = updatedPaymentList,
-                                                        info = editStudentId,
-                                                        dietaryPreferences = editDietaryPrefs,
-                                                        onResult = { success ->
-                                                            if (success) {
-                                                                profileSaveSuccess = "Profile and payment credentials synchronized successfully!"
-                                                                profileSaveError = null
-                                                                isEditingProfile = false
-                                                            } else {
-                                                                profileSaveError = "Synced profile successfully to secure local storage."
-                                                                profileSaveSuccess = null
-                                                                isEditingProfile = false
-                                                            }
-                                                        }
-                                                    )
-                                                },
-                                                modifier = Modifier.fillMaxWidth().testTag("save_profile_btn"),
-                                                shape = RoundedCornerShape(8.dp)
-                                            ) {
-                                                Text("Save Changes", fontSize = 12.sp, fontWeight = FontWeight.Bold)
-                                            }
-                                        }
-                                    }
-
-                                    profileSaveSuccess?.let { msg ->
-                                        Spacer(modifier = Modifier.height(10.dp))
-                                        Text(msg, color = androidx.compose.ui.graphics.Color(0xFF2E7D32), fontSize = 10.sp, fontWeight = FontWeight.Bold)
-                                    }
-
-                                    profileSaveError?.let { err ->
-                                        Spacer(modifier = Modifier.height(10.dp))
-                                        Text(err, color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 10.sp, fontWeight = FontWeight.Bold)
-                                    }
-                                }
-                            }
-                        }
-
-                        // 3. Security logs / helpdesk inquiry ticket
-                        item {
-                            Card(
-                                modifier = Modifier.fillMaxWidth(),
-                                shape = RoundedCornerShape(12.dp),
-                                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
-                            ) {
-                                Column(modifier = Modifier.padding(16.dp)) {
-                                    Text("Direct Help Request Ticket", fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleSmall, color = MaterialTheme.colorScheme.primary)
-                                    Text("File secure complaints directly to campus administration. Replies go to registered email.", fontSize = 10.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
-
-                                    Spacer(modifier = Modifier.height(12.dp))
-
-                                    if (helpSubmitted) {
-                                        Box(
-                                            modifier = Modifier
-                                                .fillMaxWidth()
-                                                .background(
-                                                    MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.5f),
-                                                    RoundedCornerShape(8.dp)
-                                                )
-                                                .padding(12.dp),
-                                            contentAlignment = Alignment.Center
-                                        ) {
-                                            Text("Ticket compiled safely. Verification ID: ATU-${(100000..999999).random()} logged.", fontSize = 11.sp, color = MaterialTheme.colorScheme.onSecondaryContainer, fontWeight = FontWeight.Bold)
-                                        }
-                                        Spacer(modifier = Modifier.height(8.dp))
-                                        TextButton(onClick = { helpSubmitted = false }) {
-                                            Text("Open another ticket", fontSize = 11.sp)
-                                        }
-                                    } else {
-                                        OutlinedTextField(
-                                            value = helpSubject,
-                                            onValueChange = { helpSubject = it },
-                                            label = { Text("Subject (e.g. Broken line, payment error)") },
-                                            modifier = Modifier.fillMaxWidth(),
-                                            singleLine = true
-                                        )
-
-                                        Spacer(modifier = Modifier.height(8.dp))
-
-                                        OutlinedTextField(
-                                            value = helpMessage,
-                                            onValueChange = { helpMessage = it },
-                                            label = { Text("Describe details of complaint...") },
-                                            modifier = Modifier.fillMaxWidth(),
-                                            maxLines = 4
-                                        )
-
-                                        Spacer(modifier = Modifier.height(12.dp))
-
-                                        Button(
-                                            onClick = {
-                                                if (helpSubject.isNotBlank() && helpMessage.isNotBlank()) {
-                                                    helpSubmitted = true
-                                                    helpSubject = ""
-                                                    helpMessage = ""
-                                                }
-                                            },
-                                            modifier = Modifier.align(Alignment.End),
-                                            shape = RoundedCornerShape(8.dp)
-                                        ) {
-                                            Text("Dispatch Ticket", fontSize = 12.sp)
-                                         }
-                                     }
-                                 }
-                             }
-                         }
-
-                         // 4. Client Hardware Display & Screen Resolution Metrics Panel
-                         item {
-                             val configuration = LocalConfiguration.current
-                             val density = LocalDensity.current
-                             
-                             val screenWidthDp = configuration.screenWidthDp
-                             val screenHeightDp = configuration.screenHeightDp
-                             
-                             val screenWidthPx = (screenWidthDp.toFloat() * density.density).toInt()
-                             val screenHeightPx = (screenHeightDp.toFloat() * density.density).toInt()
-                             
-                             val densityScale = density.density
-                             val fontScale = density.fontScale
-                             
-                             val isLandscape = configuration.orientation == android.content.res.Configuration.ORIENTATION_LANDSCAPE
-                             
-                             val windowWidthClass = when {
-                                 screenWidthDp < 600 -> "Compact (Mobile View)"
-                                 screenWidthDp < 840 -> "Medium (Foldable/Small Tablet)"
-                                 else -> "Expanded (Landscape/Tablet View)"
-                             }
-
-                             Card(
-                                 modifier = Modifier.fillMaxWidth().testTag("screen_resolution_card"),
-                                 shape = RoundedCornerShape(12.dp),
-                                 colors = CardDefaults.cardColors(
-                                     containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f)
-                                 ),
-                                 border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
-                             ) {
-                                 Column(modifier = Modifier.padding(16.dp)) {
-                                     Row(
-                                         modifier = Modifier.fillMaxWidth(),
-                                         horizontalArrangement = Arrangement.SpaceBetween,
-                                         verticalAlignment = Alignment.CenterVertically
-                                     ) {
-                                         Text(
-                                             text = "üñ•Ô∏è Screen Resolution Audit",
-                                             fontWeight = FontWeight.Bold,
-                                             style = MaterialTheme.typography.titleSmall,
-                                             color = MaterialTheme.colorScheme.primary
-                                         )
-                                         Box(
-                                             modifier = Modifier
-                                                 .background(
-                                                     MaterialTheme.colorScheme.primary.copy(alpha = 0.15f),
-                                                     RoundedCornerShape(6.dp)
-                                                 )
-                                                 .padding(horizontal = 8.dp, vertical = 2.dp)
-                                         ) {
-                                             Text(
-                                                 text = if (isLandscape) "LANDSCAPE" else "PORTRAIT",
-                                                 fontSize = 9.sp,
-                                                 fontWeight = FontWeight.Bold,
-                                                 color = MaterialTheme.colorScheme.primary
-                                             )
-                                         }
-                                     }
-                                     Spacer(modifier = Modifier.height(4.dp))
-                                     Text(
-                                         text = "Real-time hardware screen dimensions & layout density metrics computed dynamically.",
-                                         fontSize = 10.sp,
-                                         color = MaterialTheme.colorScheme.onSurfaceVariant
-                                     )
-
-                                     Spacer(modifier = Modifier.height(14.dp))
-
-                                     Row(
-                                         modifier = Modifier.fillMaxWidth(),
-                                         horizontalArrangement = Arrangement.spacedBy(12.dp)
-                                     ) {
-                                         Column(
-                                             modifier = Modifier
-                                                 .weight(1f)
-                                                 .background(MaterialTheme.colorScheme.surface, RoundedCornerShape(8.dp))
-                                                 .padding(10.dp),
-                                             horizontalAlignment = Alignment.CenterHorizontally
-                                         ) {
-                                             Text("PIXEL RESOLUTION", fontSize = 8.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.secondary)
-                                             Spacer(modifier = Modifier.height(4.dp))
-                                             Text("$screenWidthPx x $screenHeightPx", fontSize = 14.sp, fontWeight = FontWeight.ExtraBold)
-                                             Text("pixels", fontSize = 8.sp, color = Color.Gray)
-                                         }
-
-                                         Column(
-                                             modifier = Modifier
-                                                 .weight(1f)
-                                                 .background(MaterialTheme.colorScheme.surface, RoundedCornerShape(8.dp))
-                                                 .padding(10.dp),
-                                             horizontalAlignment = Alignment.CenterHorizontally
-                                         ) {
-                                             Text("VIEWPORT METRICS", fontSize = 8.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.secondary)
-                                             Spacer(modifier = Modifier.height(4.dp))
-                                             Text("$screenWidthDp x $screenHeightDp", fontSize = 14.sp, fontWeight = FontWeight.ExtraBold, color = MaterialTheme.colorScheme.primary)
-                                             Text("dp", fontSize = 8.sp, color = Color.Gray)
-                                         }
-                                     }
-
-                                     Spacer(modifier = Modifier.height(12.dp))
-
-                                     Column(
-                                         verticalArrangement = Arrangement.spacedBy(8.dp)
-                                     ) {
-                                         Row(
-                                             modifier = Modifier.fillMaxWidth(),
-                                             horizontalArrangement = Arrangement.SpaceBetween
-                                         ) {
-                                             Text("Window Width Class:", fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                                             Text(windowWidthClass, fontSize = 11.sp, fontWeight = FontWeight.Bold)
-                                         }
-
-                                         Row(
-                                             modifier = Modifier.fillMaxWidth(),
-                                             horizontalArrangement = Arrangement.SpaceBetween
-                                         ) {
-                                             Text("Screen Density Scale:", fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                                             Text("${densityScale}f (dpi ratio)", fontSize = 11.sp, fontWeight = FontWeight.Bold)
-                                         }
-
-                                         Row(
-                                             modifier = Modifier.fillMaxWidth(),
-                                             horizontalArrangement = Arrangement.SpaceBetween
-                                         ) {
-                                             Text("System Font Scaling Index:", fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                                             Text("${fontScale}x scaling", fontSize = 11.sp, fontWeight = FontWeight.Bold)
-                                         }
-                                     }
-
-                                     Spacer(modifier = Modifier.height(14.dp))
-
-                                     Box(
-                                         modifier = Modifier
-                                             .fillMaxWidth()
-                                             .height(84.dp)
-                                             .background(
-                                                 color = MaterialTheme.colorScheme.surface,
-                                                 shape = RoundedCornerShape(8.dp)
-                                             )
-                                             .padding(6.dp),
-                                         contentAlignment = Alignment.Center
-                                     ) {
-                                         val primaryColor = MaterialTheme.colorScheme.primary
-                                         androidx.compose.foundation.Canvas(modifier = Modifier.fillMaxSize()) {
-                                             val maxWidth = size.width
-                                             val maxHeight = size.height
-                                             
-                                             val screenRatio = screenWidthDp.toFloat() / screenHeightDp.toFloat()
-                                             val canvasRatio = maxWidth / maxHeight
-                                             
-                                             val boxW: Float
-                                             val boxH: Float
-                                             
-                                             if (screenRatio > canvasRatio) {
-                                                 boxW = maxWidth * 0.70f
-                                                 boxH = boxW / screenRatio
-                                             } else {
-                                                 boxH = maxHeight * 0.70f
-                                                 boxW = boxH * screenRatio
-                                             }
-                                             
-                                             val left = (maxWidth - boxW) / 2f
-                                             val top = (maxHeight - boxH) / 2f
-                                             val rectSize = androidx.compose.ui.geometry.Size(boxW, boxH)
-                                             
-                                             drawRect(
-                                                 color = Color(0xFFEADDFF),
-                                                 topLeft = androidx.compose.ui.geometry.Offset(left, top),
-                                                 size = rectSize
-                                             )
-                                             
-                                             drawRect(
-                                                 color = primaryColor,
-                                                 topLeft = androidx.compose.ui.geometry.Offset(left, top),
-                                                 size = rectSize,
-                                                 style = androidx.compose.ui.graphics.drawscope.Stroke(width = 2.dp.toPx())
-                                             )
-                                             
-                                             drawLine(
-                                                 color = primaryColor.copy(alpha = 0.35f),
-                                                 start = androidx.compose.ui.geometry.Offset(left + boxW/2f, top),
-                                                 end = androidx.compose.ui.geometry.Offset(left + boxW/2f, top + boxH),
-                                                 strokeWidth = 1.5.dp.toPx()
-                                             )
-                                             drawLine(
-                                                 color = primaryColor.copy(alpha = 0.35f),
-                                                 start = androidx.compose.ui.geometry.Offset(left, top + boxH/2f),
-                                                 end = androidx.compose.ui.geometry.Offset(left + boxW, top + boxH/2f),
-                                                 strokeWidth = 1.5.dp.toPx()
-                                             )
-                                         }
-                                     }
-                                 }
-                             }
-                         }
-
-                         item {
-                             Card(modifier = Modifier.size(0.dp)) {
-                                 Column {
-                                     val dummySubmitted = false
-                                     if (dummySubmitted) {
-                                         Text("")
-                                     } else {
-                                         Button(onClick = {}) {
-                                             Text(text = "Dummy Text")
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                    }
-
-                    // TOP UP DIALOG
-                    if (showTopUpDialog) {
-                        Dialog(onDismissRequest = { if (!isTopUpProcessing) showTopUpDialog = false }) {
-                            Card(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .padding(vertical = 16.dp),
-                                shape = RoundedCornerShape(16.dp)
-                            ) {
-                                Column(
-                                    modifier = Modifier
-                                        .padding(24.dp)
-                                        .verticalScroll(rememberScrollState())
-                                ) {
-                                    Text(
-                                        "Secure Settlement Gateway",
-                                        fontWeight = FontWeight.Bold,
-                                        style = MaterialTheme.typography.titleMedium,
-                                        color = MaterialTheme.colorScheme.primary
-                                    )
-                                    Text(
-                                        "ATU Unified Payment & Billing Infrastructure",
-                                        fontSize = 11.sp,
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                                    )
-                                    Spacer(modifier = Modifier.height(16.dp))
-
-                                    if (topUpSuccess) {
-                                        Box(
-                                            modifier = Modifier
-                                                .fillMaxWidth()
-                                                .background(
-                                                    MaterialTheme.colorScheme.secondaryContainer,
-                                                    RoundedCornerShape(8.dp)
-                                                )
-                                                .padding(16.dp),
-                                            contentAlignment = Alignment.Center
-                                        ) {
-                                            Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                                                Icon(
-                                                    Icons.Default.Check,
-                                                    contentDescription = null,
-                                                    tint = MaterialTheme.colorScheme.secondary,
-                                                    modifier = Modifier.size(48.dp)
-                                                )
-                                                Spacer(modifier = Modifier.height(8.dp))
-                                                Text("Deposit Cleared!", fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSecondaryContainer)
-                                                Text("GH‚Çµ ${"%.2f".format(topUpAmount.toDoubleOrNull() ?: 0.0)} loaded successfully via ${selectedGatewayPayMethod}.", fontSize = 11.sp, color = MaterialTheme.colorScheme.onSecondaryContainer.copy(alpha = 0.8f))
-                                                Spacer(modifier = Modifier.height(4.dp))
-                                                Text("Balance updated instantly.", fontSize = 11.sp)
-                                            }
-                                        }
-                                        Spacer(modifier = Modifier.height(16.dp))
-                                        TextButton(
-                                            onClick = { showTopUpDialog = false },
-                                            modifier = Modifier.align(Alignment.End)
-                                        ) {
-                                            Text("Done")
-                                        }
-                                    } else {
-                                        // Amount Input
-                                        OutlinedTextField(
-                                            value = topUpAmount,
-                                            onValueChange = { 
-                                                topUpAmount = it 
-                                                gatewayErrorMessage = null
-                                            },
-                                            label = { Text("Enter Deposit Sum (GH‚Çµ)") },
-                                            leadingIcon = { Icon(Icons.Default.Payments, contentDescription = null, tint = MaterialTheme.colorScheme.primary) },
-                                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                                            modifier = Modifier.fillMaxWidth(),
-                                            singleLine = true
-                                        )
-
-                                        Spacer(modifier = Modifier.height(16.dp))
-
-                                        // Payment Gateway Method Selector
-                                        Text("Select Funding Channel:", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
-                                        Spacer(modifier = Modifier.height(8.dp))
-                                        
-                                        // 4 Options selectors (momo, card, bank, paypal)
-                                        Row(
-                                            modifier = Modifier.fillMaxWidth(),
-                                            horizontalArrangement = Arrangement.spacedBy(4.dp)
-                                        ) {
-                                            listOf(
-                                                "MOMO" to "MoMo",
-                                                "CARD" to "Card",
-                                                "BANK" to "Bank",
-                                                "PAYPAL" to "PayPal"
-                                            ).forEach { (code, label) ->
-                                                val isSelected = selectedGatewayPayMethod == code
-                                                val containerColor = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
-                                                val textColor = if (isSelected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant
-                                                
-                                                Box(
-                                                    modifier = Modifier
-                                                        .weight(1f)
-                                                        .background(containerColor, RoundedCornerShape(8.dp))
-                                                        .clickable { 
-                                                            selectedGatewayPayMethod = code 
-                                                            gatewayErrorMessage = null
-                                                        }
-                                                        .padding(vertical = 8.dp),
-                                                    contentAlignment = Alignment.Center
-                                                ) {
-                                                    Text(label, fontSize = 10.sp, fontWeight = FontWeight.Bold, color = textColor)
-                                                }
-                                            }
-                                        }
-
-                                        Spacer(modifier = Modifier.height(16.dp))
-
-                                        // Render targeted method input
-                                        Card(
-                                            modifier = Modifier.fillMaxWidth(),
-                                            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f)),
-                                            shape = RoundedCornerShape(8.dp),
-                                            border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
-                                        ) {
-                                            Column(modifier = Modifier.padding(12.dp)) {
-                                                when (selectedGatewayPayMethod) {
-                                                    "MOMO" -> {
-                                                        Text("Mobile Money Routing Gateway", fontSize = 11.sp, fontWeight = FontWeight.Bold)
-                                                        Spacer(modifier = Modifier.height(8.dp))
-                                                        
-                                                        // Operator ChoiceChips
-                                                        Row(
-                                                            modifier = Modifier.fillMaxWidth(),
-                                                            horizontalArrangement = Arrangement.spacedBy(6.dp)
-                                                        ) {
-                                                            listOf("MTN MoMo", "Telecel Cash", "ATG Money").forEach { operator ->
-                                                                val isOpSelected = selectedMomoOperator == operator
-                                                                val borderColor = if (isOpSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outlineVariant
-                                                                Box(
-                                                                    modifier = Modifier
-                                                                        .weight(1f)
-                                                                        .background(Color.White, RoundedCornerShape(6.dp))
-                                                                        .border(1.dp, borderColor, RoundedCornerShape(6.dp))
-                                                                        .clickable { selectedMomoOperator = operator }
-                                                                        .padding(vertical = 6.dp),
-                                                                    contentAlignment = Alignment.Center
-                                                                ) {
-                                                                    Text(operator, fontSize = 9.sp, fontWeight = FontWeight.Bold, color = if (isOpSelected) MaterialTheme.colorScheme.primary else Color.Gray)
-                                                                }
-                                                            }
-                                                        }
-
-                                                        Spacer(modifier = Modifier.height(12.dp))
-
-                                                        OutlinedTextField(
-                                                            value = topUpPhone,
-                                                            onValueChange = { topUpPhone = it },
-                                                            label = { Text("MoMo Number") },
-                                                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone),
-                                                            modifier = Modifier.fillMaxWidth(),
-                                                            singleLine = true
-                                                        )
-
-                                                        Spacer(modifier = Modifier.height(8.dp))
-
-                                                        OutlinedTextField(
-                                                            value = gatewayMomoPin,
-                                                            onValueChange = { gatewayMomoPin = it },
-                                                            label = { Text("4-Digit Wallet Security PIN") },
-                                                            visualTransformation = androidx.compose.ui.text.input.PasswordVisualTransformation(),
-                                                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                                                            modifier = Modifier.fillMaxWidth(),
-                                                            singleLine = true
-                                                        )
-                                                    }
-                                                    "CARD" -> {
-                                                        Text("Standard Visa / MasterCard Gateway", fontSize = 11.sp, fontWeight = FontWeight.Bold)
-                                                        Spacer(modifier = Modifier.height(8.dp))
-
-                                                        OutlinedTextField(
-                                                            value = gatewayCardName,
-                                                            onValueChange = { gatewayCardName = it },
-                                                            label = { Text("Cardholder Name") },
-                                                            modifier = Modifier.fillMaxWidth(),
-                                                            singleLine = true
-                                                        )
-
-                                                        Spacer(modifier = Modifier.height(8.dp))
-
-                                                        OutlinedTextField(
-                                                            value = gatewayCardNumber,
-                                                            onValueChange = { gatewayCardNumber = it },
-                                                            label = { Text("16-Digit Card Number") },
-                                                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                                                            modifier = Modifier.fillMaxWidth(),
-                                                            singleLine = true
-                                                        )
-
-                                                        Spacer(modifier = Modifier.height(8.dp))
-
-                                                        Row(
-                                                            modifier = Modifier.fillMaxWidth(),
-                                                            horizontalArrangement = Arrangement.spacedBy(8.dp)
-                                                        ) {
-                                                            OutlinedTextField(
-                                                                value = gatewayCardExpiry,
-                                                                onValueChange = { gatewayCardExpiry = it },
-                                                                label = { Text("Expiry (MM/YY)") },
-                                                                modifier = Modifier.weight(1f),
-                                                                singleLine = true
-                                                            )
-
-                                                            OutlinedTextField(
-                                                                value = gatewayCardCvv,
-                                                                onValueChange = { gatewayCardCvv = it },
-                                                                label = { Text("CVV") },
-                                                                visualTransformation = androidx.compose.ui.text.input.PasswordVisualTransformation(),
-                                                                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                                                                modifier = Modifier.weight(1f),
-                                                                singleLine = true
-                                                            )
-                                                        }
-                                                    }
-                                                    "BANK" -> {
-                                                        Text("Direct Bank Account Settlement", fontSize = 11.sp, fontWeight = FontWeight.Bold)
-                                                        Spacer(modifier = Modifier.height(8.dp))
-
-                                                        Row(
-                                                            modifier = Modifier.fillMaxWidth(),
-                                                            horizontalArrangement = Arrangement.spacedBy(6.dp)
-                                                        ) {
-                                                            listOf("Ecobank Ghana", "GCB Bank", "ABSA").forEach { bk ->
-                                                                val isBkSelected = selectedBankName == bk
-                                                                val borderColor = if (isBkSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outlineVariant
-                                                                Box(
-                                                                    modifier = Modifier
-                                                                        .weight(1f)
-                                                                        .background(Color.White, RoundedCornerShape(6.dp))
-                                                                        .border(1.dp, borderColor, RoundedCornerShape(6.dp))
-                                                                        .clickable { selectedBankName = bk }
-                                                                        .padding(vertical = 6.dp),
-                                                                    contentAlignment = Alignment.Center
-                                                                ) {
-                                                                    Text(bk, fontSize = 9.sp, fontWeight = FontWeight.Bold, color = if (isBkSelected) MaterialTheme.colorScheme.primary else Color.Gray)
-                                                                }
-                                                            }
-                                                        }
-
-                                                        Spacer(modifier = Modifier.height(12.dp))
-
-                                                        OutlinedTextField(
-                                                            value = gatewayBankAccount,
-                                                            onValueChange = { gatewayBankAccount = it },
-                                                            label = { Text("Bank Account Number") },
-                                                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                                                            modifier = Modifier.fillMaxWidth(),
-                                                            singleLine = true
-                                                        )
-
-                                                        Spacer(modifier = Modifier.height(8.dp))
-
-                                                        OutlinedTextField(
-                                                            value = gatewayBankPin,
-                                                            onValueChange = { gatewayBankPin = it },
-                                                            label = { Text("Bank Routing Verification PIN") },
-                                                            visualTransformation = androidx.compose.ui.text.input.PasswordVisualTransformation(),
-                                                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                                                            modifier = Modifier.fillMaxWidth(),
-                                                            singleLine = true
-                                                        )
-                                                    }
-                                                    "PAYPAL" -> {
-                                                        Text("PayPal Account Gateway", fontSize = 11.sp, fontWeight = FontWeight.Bold)
-                                                        Spacer(modifier = Modifier.height(8.dp))
-
-                                                        OutlinedTextField(
-                                                            value = gatewayPaypalEmail,
-                                                            onValueChange = { gatewayPaypalEmail = it },
-                                                            label = { Text("PayPal Registered Email") },
-                                                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email),
-                                                            modifier = Modifier.fillMaxWidth(),
-                                                            singleLine = true
-                                                        )
-
-                                                        Spacer(modifier = Modifier.height(8.dp))
-
-                                                        OutlinedTextField(
-                                                            value = gatewayPaypalPassword,
-                                                            onValueChange = { gatewayPaypalPassword = it },
-                                                            label = { Text("Secured PayPal Password") },
-                                                            visualTransformation = androidx.compose.ui.text.input.PasswordVisualTransformation(),
-                                                            modifier = Modifier.fillMaxWidth(),
-                                                            singleLine = true
-                                                        )
-                                                    }
-                                                }
-                                            }
-                                        }
-
-                                        gatewayErrorMessage?.let { err ->
-                                            Spacer(modifier = Modifier.height(12.dp))
-                                            Text(err, color = MaterialTheme.colorScheme.error, fontSize = 11.sp, fontWeight = FontWeight.Bold)
-                                        }
-
-                                        Spacer(modifier = Modifier.height(20.dp))
-
-                                        if (isTopUpProcessing) {
-                                            Column(
-                                                modifier = Modifier.fillMaxWidth(),
-                                                horizontalAlignment = Alignment.CenterHorizontally
-                                            ) {
-                                                CircularProgressIndicator(modifier = Modifier.size(36.dp), color = MaterialTheme.colorScheme.primary)
-                                                Spacer(modifier = Modifier.height(12.dp))
-                                                Text(
-                                                    text = gatewayTransactionStep,
-                                                    fontSize = 11.sp,
-                                                    fontWeight = FontWeight.SemiBold,
-                                                    color = MaterialTheme.colorScheme.primary,
-                                                    textAlign = androidx.compose.ui.text.style.TextAlign.Center
-                                                )
-                                                Spacer(modifier = Modifier.height(4.dp))
-                                                Text("DO NOT CLOSE THIS INTERFACE", fontSize = 9.sp, fontWeight = FontWeight.Bold, color = Color.Gray)
-                                            }
-                                        } else {
-                                            Row(
-                                                modifier = Modifier.fillMaxWidth(),
-                                                horizontalArrangement = Arrangement.End
-                                            ) {
-                                                TextButton(onClick = { showTopUpDialog = false }) {
-                                                    Text("Abort")
-                                                }
-                                                Spacer(modifier = Modifier.width(12.dp))
-                                                Button(
-                                                    onClick = {
-                                                        val amt = topUpAmount.toDoubleOrNull()
-                                                        if (amt == null || amt <= 0) {
-                                                            gatewayErrorMessage = "Please input a valid transfer amount."
-                                                            return@Button
-                                                        }
-                                                        
-                                                        // Secure Gateway Validations
-                                                        when (selectedGatewayPayMethod) {
-                                                            "MOMO" -> {
-                                                                if (topUpPhone.length < 9) {
-                                                                    gatewayErrorMessage = "Enter a valid 9-10 digit Mobile Money Number."
-                                                                    return@Button
-                                                                }
-                                                                if (gatewayMomoPin.length < 4) {
-                                                                    gatewayErrorMessage = "Enter your 4-digit Mobile Money Security PIN."
-                                                                    return@Button
-                                                                }
-                                                            }
-                                                            "CARD" -> {
-                                                                if (gatewayCardName.isBlank()) {
-                                                                    gatewayErrorMessage = "Please state Cardholder Name."
-                                                                    return@Button
-                                                                }
-                                                                if (gatewayCardNumber.length < 16) {
-                                                                    gatewayErrorMessage = "Credit Card Number must be exactly 16 digits."
-                                                                    return@Button
-                                                                }
-                                                                if (gatewayCardExpiry.length < 4) {
-                                                                    gatewayErrorMessage = "Expiry Date must be in MM/YY format."
-                                                                    return@Button
-                                                                }
-                                                                if (gatewayCardCvv.length < 3) {
-                                                                    gatewayErrorMessage = "Enter a valid 3-4 digit Credit card CVV code."
-                                                                    return@Button
-                                                                }
-                                                            }
-                                                            "BANK" -> {
-                                                                if (gatewayBankAccount.length < 8) {
-                                                                    gatewayErrorMessage = "Provide your valid bank account number."
-                                                                    return@Button
-                                                                }
-                                                                if (gatewayBankPin.length < 4) {
-                                                                    gatewayErrorMessage = "Routing Validation PIN is required."
-                                                                    return@Button
-                                                                }
-                                                            }
-                                                            "PAYPAL" -> {
-                                                                if (!gatewayPaypalEmail.contains("@")) {
-                                                                    gatewayErrorMessage = "A valid PayPal account email is required."
-                                                                    return@Button
-                                                                }
-                                                                if (gatewayPaypalPassword.length < 4) {
-                                                                    gatewayErrorMessage = "Enter your PayPal secure authorization password."
-                                                                    return@Button
-                                                                }
-                                                            }
-                                                        }
-
-                                                        gatewayErrorMessage = null
-                                                        scope.launch {
-                                                            isTopUpProcessing = true
-                                                            gatewayTransactionStep = "Securing channel with AES-256 SSL handshake..."
-                                                            delay(800)
-                                                            gatewayTransactionStep = "Connecting to ATU Cafeteria billing server..."
-                                                            delay(800)
-                                                            gatewayTransactionStep = "Authenticating user via 3D Secure Multi-Factor authorization..."
-                                                            delay(800)
-                                                            gatewayTransactionStep = "Verifying transaction OTP on payment gateway core..."
-                                                            delay(800)
-                                                            gatewayTransactionStep = "Clearing secure funds settlement with Bank of Ghana..."
-                                                            delay(600)
-                                                            if (com.example.data.LaravelClientManager.isLaravelEnabled) {
-                                                                 val userEmail = currentUser?.username ?: "student@atu.edu.gh"
-                                                                 val emailToUse = if (userEmail.contains("@")) userEmail else "${userEmail}@atu.edu.gh"
-                                                                 
-                                                                 var initDetails: com.example.data.LaravelPaystackInitDetails? = null
-                                                                 viewModel.initPaystackPayment(emailToUse, amt, "WALLET_TOPUP") { details ->
-                                                                     initDetails = details
-                                                                 }
-                                                                 var waitCount = 0
-                                                                 while (initDetails == null && waitCount < 30) {
-                                                                     delay(100)
-                                                                     waitCount++
-                                                                 }
-                                                                 
-                                                                 val details = initDetails
-                                                                 if (details != null) {
-                                                                     var verificationSuccess: Boolean? = null
-                                                                     viewModel.verifyPaystackPayment(details.reference, amt, "WALLET_TOPUP") { success ->
-                                                                         verificationSuccess = success
-                                                                     }
-                                                                     
-                                                                     waitCount = 0
-                                                                     while (verificationSuccess == null && waitCount < 50) {
-                                                                      delay(100)
-                                                                      waitCount++
-                                                                  }
-                                                                  if (verificationSuccess != true) {
-                                                                      gatewayErrorMessage = "Secure gateway verification failed or timed out. Please try again."
-                                                                      isTopUpProcessing = false
-                                                                      return@launch
-                                                                  }
-                                                                  // Dummy statement to absorb old delay blocks
-                                                                  if (false) {
-                                                                         delay(100)
-                                                                         waitCount++
-                                                                     }
-                                                                 }
-                                                             } else {
-                                                                 viewModel.rechargeWallet(amt)
-                                                             }
-                                                            isTopUpProcessing = false
-                                                            topUpSuccess = true
-                                                        }
-                                                    }
-                                                ) {
-                                                    Text("Authorize Payment")
-                                                }
-                                            }
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-
-                                    // STUDENT QR CLAIM CODE & ORDER DETAILS DIALOG (LIVE FOOD TRACKING)
-            showQrForOrder?.let { order ->
-                val vendor = allVendors.find { it.id == order.vendorId }
-                val context = androidx.compose.ui.platform.LocalContext.current
-                Dialog(onDismissRequest = { showQrForOrder = null }) {
-                    Card(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(horizontal = 12.dp, vertical = 16.dp)
-                            .testTag("student_qr_claim_dialog"),
-                        shape = RoundedCornerShape(24.dp),
-                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-                        elevation = CardDefaults.cardElevation(defaultElevation = 8.dp)
-                    ) {
-                        Column(
-                            modifier = Modifier
-                                .padding(20.dp)
-                                .fillMaxWidth()
-                                .verticalScroll(rememberScrollState()),
-                            horizontalAlignment = Alignment.CenterHorizontally,
-                            verticalArrangement = Arrangement.spacedBy(14.dp)
-                        ) {
-                            // Header
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.SpaceBetween,
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Column(modifier = Modifier.weight(1f)) {
-                                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                                        Icon(Icons.Default.Restaurant, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(18.dp))
-                                        Text(
-                                            text = "Order #${order.id} Tracking",
-                                            style = MaterialTheme.typography.titleMedium,
-                                            fontWeight = FontWeight.ExtraBold,
-                                            color = MaterialTheme.colorScheme.primary
-                                        )
-                                    }
-                                    Text(
-                                        text = vendor?.fullName ?: "Campus Food Booth",
-                                        fontSize = 11.sp,
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                        fontWeight = FontWeight.Medium
-                                    )
-                                }
-
-                                val statusBgColor = when (order.status.uppercase()) {
-                                    "COMPLETED", "DELIVERED" -> Color(0xFFE8F5E9)
-                                    "READY" -> Color(0xFFE3F2FD)
-                                    "PREPARING" -> Color(0xFFFFF8E1)
-                                    "CANCELLED", "DECLINED" -> Color(0xFFFFEBEE)
-                                    else -> Color(0xFFF3E5F5)
-                                }
-                                val statusTextColor = when (order.status.uppercase()) {
-                                    "COMPLETED", "DELIVERED" -> Color(0xFF2E7D32)
-                                    "READY" -> Color(0xFF1565C0)
-                                    "PREPARING" -> Color(0xFFF57F17)
-                                    "CANCELLED", "DECLINED" -> Color(0xFFC62828)
-                                    else -> Color(0xFF7B1FA2)
-                                }
-
-                                Box(
-                                    modifier = Modifier
-                                        .clip(RoundedCornerShape(8.dp))
-                                        .background(statusBgColor)
-                                        .padding(horizontal = 8.dp, vertical = 4.dp)
-                                ) {
-                                    Text(
-                                        text = order.status.uppercase(),
-                                        fontSize = 10.sp,
-                                        fontWeight = FontWeight.Bold,
-                                        color = statusTextColor
-                                    )
-                                }
-                            }
-
-                            // Food Info Card
-                            Card(
-                                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.3f)),
-                                shape = RoundedCornerShape(14.dp),
-                                modifier = Modifier.fillMaxWidth()
-                            ) {
-                                Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                                    Text(
-                                        text = order.foodName,
-                                        fontSize = 15.sp,
-                                        fontWeight = FontWeight.ExtraBold,
-                                        color = MaterialTheme.colorScheme.onSurface
-                                    )
-                                    Row(
-                                        modifier = Modifier.fillMaxWidth(),
-                                        horizontalArrangement = Arrangement.SpaceBetween,
-                                        verticalAlignment = Alignment.CenterVertically
-                                    ) {
-                                        Text(
-                                            text = "Quantity: ${order.quantity} plate(s)",
-                                            fontSize = 11.sp,
-                                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                                        )
-                                        Text(
-                                            text = "GH‚Çµ ${String.format(java.util.Locale.US, "%.2f", order.totalPrice)}",
-                                            fontSize = 13.sp,
-                                            fontWeight = FontWeight.Black,
-                                            color = MaterialTheme.colorScheme.primary
-                                        )
-                                    }
-                                    if (order.estimatedPickupTime.isNotEmpty()) {
-                                        Text(
-                                            text = "Estimated Time: ${order.estimatedPickupTime}",
-                                            fontSize = 10.sp,
-                                            fontStyle = androidx.compose.ui.text.font.FontStyle.Italic,
-                                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                                        )
-                                    }
-                                }
-                            }
-
-                            // Live Tracking Stepper
-                            Column(modifier = Modifier.fillMaxWidth().padding(horizontal = 4.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                                val stages = listOf("PENDING" to "1. Received", "PREPARING" to "2. Kitchen Prep", "READY" to "3. Ready for Claim", "COMPLETED" to "4. Handed Off")
-                                val currentStepIndex = when (order.status.uppercase()) {
-                                    "PREPARING" -> 1
-                                    "READY" -> 2
-                                    "COMPLETED", "DELIVERED" -> 3
-                                    else -> 0
-                                }
-
-                                Row(
-                                    modifier = Modifier.fillMaxWidth(),
-                                    horizontalArrangement = Arrangement.SpaceBetween,
-                                    verticalAlignment = Alignment.CenterVertically
-                                ) {
-                                    stages.forEachIndexed { idx, stage ->
-                                        val isDone = idx <= currentStepIndex
-                                        val isCurrent = idx == currentStepIndex
-                                        Column(
-                                            horizontalAlignment = Alignment.CenterHorizontally,
-                                            modifier = Modifier.weight(1f)
-                                        ) {
-                                            Box(
-                                                modifier = Modifier
-                                                    .size(22.dp)
-                                                    .clip(CircleShape)
-                                                    .background(if (isDone) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceVariant),
-                                                contentAlignment = Alignment.Center
-                                            ) {
-                                                if (isDone) {
-                                                    Icon(Icons.Default.Check, contentDescription = null, tint = Color.White, modifier = Modifier.size(13.dp))
-                                                } else {
-                                                    Text("${idx + 1}", fontSize = 9.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                                                }
-                                            }
-                                            Spacer(modifier = Modifier.height(2.dp))
-                                            Text(
-                                                text = stage.second,
-                                                fontSize = 8.sp,
-                                                fontWeight = if (isCurrent) FontWeight.Bold else FontWeight.Normal,
-                                                color = if (isCurrent) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
-                                                textAlign = androidx.compose.ui.text.style.TextAlign.Center,
-                                                maxLines = 1
-                                            )
-                                        }
-                                    }
-                                }
-                            }
-
-                            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
-
-                            // QR Code Ticket Box
-                            Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                                Text(
-                                    "Official Custody QR Claim Pass",
-                                    fontSize = 11.sp,
-                                    fontWeight = FontWeight.Bold,
-                                    color = MaterialTheme.colorScheme.onSurface
-                                )
-                                Text(
-                                    "Show or scan this barcode at the counter to verify pickup",
-                                    fontSize = 9.5.sp,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                    textAlign = androidx.compose.ui.text.style.TextAlign.Center
-                                )
-
-                                Box(
-                                    modifier = Modifier
-                                        .size(170.dp)
-                                        .clip(RoundedCornerShape(12.dp))
-                                        .background(Color.White)
-                                        .border(1.5.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f), RoundedCornerShape(12.dp))
-                                        .padding(8.dp),
-                                    contentAlignment = Alignment.Center
-                                ) {
-                                    val qrBitmap = remember(order.id, order.pickupPin, order.totalPrice) {
-                                        com.example.ui.util.QrCodeGeneratorUtil.generateQrImageBitmap(
-                                            content = "ATU-ORDER-${order.id}-${order.pickupPin}-${order.totalPrice}",
-                                            sizePx = 512
-                                        )
-                                    }
-                                    if (qrBitmap != null) {
-                                        androidx.compose.foundation.Image(
-                                            bitmap = qrBitmap,
-                                            contentDescription = "Transaction QR Code for Order #${order.id}",
-                                            modifier = Modifier.fillMaxSize().testTag("student_transaction_qr_image_${order.id}")
-                                        )
-                                    } else {
-                                        Icon(Icons.Default.QrCode, contentDescription = null, modifier = Modifier.size(100.dp), tint = Color.Black)
-                                    }
-                                }
-                            }
-
-                            // Order Identifiers
-                            Card(
-                                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)),
-                                shape = RoundedCornerShape(12.dp),
-                                modifier = Modifier.fillMaxWidth()
-                            ) {
-                                Row(
-                                    modifier = Modifier
-                                        .padding(12.dp)
-                                        .fillMaxWidth(),
-                                    horizontalArrangement = Arrangement.SpaceBetween,
-                                    verticalAlignment = Alignment.CenterVertically
-                                ) {
-                                    Column {
-                                        Text("TRACKING CODE", fontSize = 8.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                                        Text("ATU-ORDER-${order.id}", fontSize = 12.sp, fontWeight = FontWeight.Black, color = MaterialTheme.colorScheme.onSurface)
-                                    }
-                                    Column(horizontalAlignment = Alignment.End) {
-                                        Text("SECRET PICKUP PIN", fontSize = 8.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                                        Text(order.pickupPin, fontSize = 14.sp, fontWeight = FontWeight.Black, color = MaterialTheme.colorScheme.primary)
-                                    }
-                                }
-                            }
-
-                            // Quick Action Buttons
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.spacedBy(8.dp)
-                            ) {
-                                OutlinedButton(
-                                    onClick = {
-                                        HapticHelper.impact(context)
-                                        activeChatOrder = order
-                                    },
-                                    modifier = Modifier.weight(1f).height(36.dp),
-                                    shape = RoundedCornerShape(10.dp),
-                                    contentPadding = PaddingValues(horizontal = 4.dp, vertical = 0.dp)
-                                ) {
-                                    Icon(Icons.Default.Chat, contentDescription = null, modifier = Modifier.size(13.dp))
-                                    Spacer(modifier = Modifier.width(4.dp))
-                                    Text("Chat Vendor", fontSize = 10.sp, fontWeight = FontWeight.Bold)
-                                }
-
-                                OutlinedButton(
-                                    onClick = {
-                                        HapticHelper.impact(context)
-                                        generatePdfReceipt(context, order)
-                                    },
-                                    modifier = Modifier.weight(1f).height(36.dp),
-                                    shape = RoundedCornerShape(10.dp),
-                                    contentPadding = PaddingValues(horizontal = 4.dp, vertical = 0.dp)
-                                ) {
-                                    Icon(Icons.Default.Print, contentDescription = null, modifier = Modifier.size(13.dp))
-                                    Spacer(modifier = Modifier.width(4.dp))
-                                    Text("PDF Receipt", fontSize = 10.sp, fontWeight = FontWeight.Bold)
-                                }
-                            }
-
-                            if (order.status.uppercase() == "READY") {
-                                Button(
-                                    onClick = {
-                                        showScannerForOrder = order
-                                    },
-                                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF2E7D32)),
-                                    modifier = Modifier.fillMaxWidth().height(40.dp),
-                                    shape = RoundedCornerShape(12.dp)
-                                ) {
-                                    Icon(Icons.Default.QrCodeScanner, contentDescription = null, modifier = Modifier.size(16.dp))
-                                    Spacer(modifier = Modifier.width(6.dp))
-                                    Text("Scan Counter QR to Confirm Pickup", fontSize = 11.sp, fontWeight = FontWeight.Bold)
-                                }
-                            }
-
-                            Button(
-                                onClick = { showQrForOrder = null },
-                                shape = RoundedCornerShape(12.dp),
-                                modifier = Modifier.fillMaxWidth().height(40.dp).testTag("student_qr_dismiss_btn")
-                            ) {
-                                Text("Close Order Tracking", fontWeight = FontWeight.Bold, fontSize = 11.sp)
-                            }
-                        }
-                    }
-                }
-            }
-
-            // STUDENT QR SCANNER SIMULATOR DIALOG
-            showScannerForOrder?.let { order ->
-                var isScanning by remember { mutableStateOf(false) }
-                var scanError by remember { mutableStateOf<String?>(null) }
-                var scanSuccess by remember { mutableStateOf(false) }
-                var manualQrInput by remember { mutableStateOf("") }
-                val coroutineScope = rememberCoroutineScope()
-                val context = androidx.compose.ui.platform.LocalContext.current
-                
-                Dialog(onDismissRequest = { 
-                    if (!isScanning) {
-                        showScannerForOrder = null 
-                    }
-                }) {
-                    Card(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(16.dp)
-                            .testTag("student_qr_scanner_dialog"),
-                        shape = RoundedCornerShape(24.dp),
-                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-                        border = BorderStroke(1.5.dp, MaterialTheme.colorScheme.primary)
-                    ) {
-                        Column(
-                            modifier = Modifier
-                                .padding(20.dp)
-                                .fillMaxWidth()
-                                .verticalScroll(rememberScrollState()),
-                            horizontalAlignment = Alignment.CenterHorizontally,
-                            verticalArrangement = Arrangement.spacedBy(14.dp)
-                        ) {
-                            Text(
-                                "ATU Counter & Pickup Scanner",
-                                style = MaterialTheme.typography.titleMedium,
-                                fontWeight = FontWeight.Bold,
-                                color = MaterialTheme.colorScheme.primary
-                            )
-                            
-                            Text(
-                                "Point camera at the vendor counter QR code or enter an ATU Order Tracking Code to instantly view/claim this dish.",
-                                fontSize = 11.sp,
-                                textAlign = androidx.compose.ui.text.style.TextAlign.Center,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                            
-                            // Visual Camera Viewport / Scanning Overlay
-                            Box(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .height(170.dp)
-                                    .background(Color.Black, RoundedCornerShape(12.dp))
-                                    .border(2.dp, if (scanSuccess) Color.Green else MaterialTheme.colorScheme.primary, RoundedCornerShape(12.dp)),
-                                contentAlignment = Alignment.Center
-                            ) {
-                                if (isScanning) {
-                                    val infiniteTransition = androidx.compose.animation.core.rememberInfiniteTransition(label = "laser")
-                                    val laserY by infiniteTransition.animateFloat(
-                                        initialValue = 10f,
-                                        targetValue = 150f,
-                                        animationSpec = androidx.compose.animation.core.infiniteRepeatable(
-                                            animation = androidx.compose.animation.core.tween(1200, easing = androidx.compose.animation.core.LinearEasing),
-                                            repeatMode = androidx.compose.animation.core.RepeatMode.Reverse
-                                        ),
-                                        label = "laserY"
-                                    )
-                                    
-                                    Box(
-                                        modifier = Modifier
-                                            .fillMaxWidth()
-                                            .height(2.dp)
-                                            .align(Alignment.TopCenter)
-                                            .offset(y = laserY.dp)
-                                            .background(Color.Red)
-                                    )
-                                    
-                                    CircularProgressIndicator(
-                                        color = Color.White,
-                                        modifier = Modifier.size(36.dp)
-                                    )
-                                } else if (scanSuccess) {
-                                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                                        Icon(
-                                            imageVector = Icons.Default.CheckCircle,
-                                            contentDescription = "Scan Success",
-                                            tint = Color.Green,
-                                            modifier = Modifier.size(48.dp)
-                                        )
-                                        Spacer(modifier = Modifier.height(8.dp))
-                                        Text("PICKUP VERIFIED", color = Color.Green, fontWeight = FontWeight.Bold, fontSize = 12.sp)
-                                    }
-                                } else {
-                                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                                        Icon(
-                                            imageVector = Icons.Default.QrCodeScanner,
-                                            contentDescription = "Scanner Idle",
-                                            tint = Color.White.copy(alpha = 0.6f),
-                                            modifier = Modifier.size(44.dp)
-                                        )
-                                        Spacer(modifier = Modifier.height(6.dp))
-                                        Text("CAMERA ACTIVE", color = Color.White.copy(alpha = 0.6f), fontSize = 10.sp, fontWeight = FontWeight.Bold)
-                                    }
-                                }
-                                
-                                // Decorative corners
-                                Box(modifier = Modifier.size(16.dp).align(Alignment.TopStart).border(2.dp, Color.Green, RoundedCornerShape(topStart = 4.dp)))
-                                Box(modifier = Modifier.size(16.dp).align(Alignment.TopEnd).border(2.dp, Color.Green, RoundedCornerShape(topEnd = 4.dp)))
-                                Box(modifier = Modifier.size(16.dp).align(Alignment.BottomStart).border(2.dp, Color.Green, RoundedCornerShape(bottomStart = 4.dp)))
-                                Box(modifier = Modifier.size(16.dp).align(Alignment.BottomEnd).border(2.dp, Color.Green, RoundedCornerShape(bottomEnd = 4.dp)))
-                            }
-                            
-                            scanError?.let { err ->
-                                Text(
-                                    text = err,
-                                    color = MaterialTheme.colorScheme.error,
-                                    fontSize = 11.sp,
-                                    fontWeight = FontWeight.Bold,
-                                    textAlign = androidx.compose.ui.text.style.TextAlign.Center
-                                )
-                            }
-                            
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.spacedBy(10.dp)
-                            ) {
-                                OutlinedButton(
-                                    onClick = { showScannerForOrder = null },
-                                    modifier = Modifier.weight(1f).testTag("scanner_cancel_btn"),
-                                    shape = RoundedCornerShape(12.dp),
-                                    enabled = !isScanning
-                                ) {
-                                    Text("Cancel", fontWeight = FontWeight.Bold)
-                                }
-                                
-                                Button(
-                                    onClick = {
-                                        isScanning = true
-                                        scanError = null
-                                        coroutineScope.launch {
-                                            delay(1500)
-                                            val validCode = "ATU-COUNTER-${order.vendorId}"
-                                            viewModel.studentVerifyPickupViaQr(order.id, validCode) { success ->
-                                                isScanning = false
-                                                if (success) {
-                                                    HapticHelper.notification(context, "SUCCESS")
-                                                    scanSuccess = true
-                                                    val scannedOrder = order
-                                                    coroutineScope.launch {
-                                                        delay(1000)
-                                                        showScannerForOrder = null
-                                                        feedbackTargetOrder = scannedOrder
-                                                    }
-                                                } else {
-                                                    HapticHelper.notification(context, "ERROR")
-                                                    scanError = "Verification failed. Check the vendor QR code."
-                                                }
-                                            }
-                                        }
-                                    },
-                                    modifier = Modifier.weight(1.5f).testTag("simulate_counter_scan_btn"),
-                                    shape = RoundedCornerShape(12.dp),
-                                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary),
-                                    enabled = !isScanning && !scanSuccess
-                                ) {
-                                    Icon(Icons.Default.PhotoCamera, contentDescription = null, modifier = Modifier.size(16.dp))
-                                    Spacer(modifier = Modifier.width(6.dp))
-                                    Text("Scan Counter QR", fontWeight = FontWeight.Bold, fontSize = 11.sp)
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-
-            // GENERAL TRACKING & COUNTER CHECK-IN SCANNER DIALOG
-            if (showGeneralCheckInScanner) {
-                var isScanning by remember { mutableStateOf(false) }
-                var scanError by remember { mutableStateOf<String?>(null) }
-                var scanSuccess by remember { mutableStateOf(false) }
-                var scanSuccessMessage by remember { mutableStateOf("") }
-                var manualQrInput by remember { mutableStateOf("") }
-                val coroutineScope = rememberCoroutineScope()
-                val context = androidx.compose.ui.platform.LocalContext.current
-
-                fun handleScannedCode(rawCode: String) {
-                    val code = rawCode.trim()
-                    if (code.isEmpty()) return
-
-                    // Check if it represents an Order QR code
-                    val orderIdFromCode = when {
-                        code.startsWith("ATU-ORDER-", ignoreCase = true) -> {
-                            val parts = code.split("-")
-                            if (parts.size >= 3) parts[2].toIntOrNull() else null
-                        }
-                        code.startsWith("ATU-TKT-", ignoreCase = true) -> {
-                            code.substringAfter("ATU-TKT-").substringBefore("-").trim().toIntOrNull()
-                        }
-                        code.contains("orderId=", ignoreCase = true) -> {
-                            code.substringAfter("orderId=").substringBefore("&").toIntOrNull()
-                        }
-                        code.contains("track=", ignoreCase = true) -> {
-                            code.substringAfter("track=").substringBefore("&").toIntOrNull()
-                        }
-                        code.toIntOrNull() != null -> code.toIntOrNull()
-                        else -> null
-                    }
-
-                    if (orderIdFromCode != null) {
-                        val foundOrder = studentOrders.find { it.id == orderIdFromCode }
-
-                        if (foundOrder != null) {
-                            HapticHelper.notification(context, "SUCCESS")
-                            scanSuccess = true
-                            scanSuccessMessage = "Found Order #${foundOrder.id}: ${foundOrder.foodName}! Redirecting..."
-                            // Immediately close scanner modal upon successful recognition
-                            showGeneralCheckInScanner = false
-                            activeTab = 1
-                            ordersSubTab = 0
-                            showQrForOrder = foundOrder
-                            return
-                        } else {
-                            // If order not yet in list, create quick view with the ID
-                            val dummyOrder = Order(
-                                id = orderIdFromCode,
-                                customerId = currentUser?.id ?: 1,
-                                vendorId = 1,
-                                foodItemId = 1,
-                                foodName = "Tracked Campus Meal #${orderIdFromCode}",
-                                quantity = 1,
-                                unitPrice = 25.0,
-                                totalPrice = 25.0,
-                                status = "PREPARING",
-                                pickupPin = "5821",
-                                orderTimestamp = System.currentTimeMillis()
-                            )
-                            HapticHelper.notification(context, "SUCCESS")
-                            scanSuccess = true
-                            scanSuccessMessage = "Order #${orderIdFromCode} located! Redirecting to food order tracking..."
-                            // Immediately close scanner modal upon successful recognition
-                            showGeneralCheckInScanner = false
-                            activeTab = 1
-                            ordersSubTab = 0
-                            showQrForOrder = dummyOrder
-                            return
-                        }
-                    }
-
-                    // Otherwise check for Counter Check-In
-                    if (code.startsWith("ATU-COUNTER-", ignoreCase = true)) {
-                        viewModel.studentCounterCheckIn(code) { success, msg ->
-                            isScanning = false
-                            if (success) {
-                                HapticHelper.notification(context, "SUCCESS")
-                                scanSuccess = true
-                                scanSuccessMessage = msg
-                                coroutineScope.launch {
-                                    delay(1200)
-                                    showGeneralCheckInScanner = false
-                                }
-                            } else {
-                                HapticHelper.notification(context, "ERROR")
-                                scanError = msg
-                            }
-                        }
-                    } else {
-                        isScanning = false
-                        HapticHelper.notification(context, "ERROR")
-                        scanError = "Unrecognized QR Code. Please scan an ATU Order or Counter QR Code."
-                    }
-                }
-                
-                Dialog(onDismissRequest = { 
-                    if (!isScanning) {
-                        showGeneralCheckInScanner = false 
-                    }
-                }) {
-                    Card(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(16.dp)
-                            .testTag("general_counter_scanner_dialog"),
-                        shape = RoundedCornerShape(24.dp),
-                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-                        border = BorderStroke(1.5.dp, MaterialTheme.colorScheme.primary)
-                    ) {
-                        Column(
-                            modifier = Modifier
-                                .padding(20.dp)
-                                .fillMaxWidth()
-                                .verticalScroll(rememberScrollState()),
-                            horizontalAlignment = Alignment.CenterHorizontally,
-                            verticalArrangement = Arrangement.spacedBy(14.dp)
-                        ) {
-                            Text(
-                                "Scan Track & QR Code",
-                                style = MaterialTheme.typography.titleMedium,
-                                fontWeight = FontWeight.Bold,
-                                color = MaterialTheme.colorScheme.primary
-                            )
-                            
-                            Text(
-                                "Point camera or enter an ATU Order QR Code to immediately redirect to that food order, or check in at a counter.",
-                                fontSize = 11.sp,
-                                textAlign = androidx.compose.ui.text.style.TextAlign.Center,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                            
-                            // Camera Frame Overlay
-                            Box(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .height(170.dp)
-                                    .background(Color.Black, RoundedCornerShape(12.dp))
-                                    .border(2.dp, if (scanSuccess) Color.Green else MaterialTheme.colorScheme.primary, RoundedCornerShape(12.dp)),
-                                contentAlignment = Alignment.Center
-                            ) {
-                                if (isScanning) {
-                                    val infiniteTransition = androidx.compose.animation.core.rememberInfiniteTransition(label = "laser_gen")
-                                    val laserY by infiniteTransition.animateFloat(
-                                        initialValue = 10f,
-                                        targetValue = 150f,
-                                        animationSpec = androidx.compose.animation.core.infiniteRepeatable(
-                                            animation = androidx.compose.animation.core.tween(1200, easing = androidx.compose.animation.core.LinearEasing),
-                                            repeatMode = androidx.compose.animation.core.RepeatMode.Reverse
-                                        ),
-                                        label = "laserY_gen"
-                                    )
-                                    
-                                    Box(
-                                        modifier = Modifier
-                                            .fillMaxWidth()
-                                            .height(2.dp)
-                                            .align(Alignment.TopCenter)
-                                            .offset(y = laserY.dp)
-                                            .background(Color.Red)
-                                    )
-                                    
-                                    CircularProgressIndicator(
-                                        color = Color.White,
-                                        modifier = Modifier.size(36.dp)
-                                    )
-                                } else if (scanSuccess) {
-                                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                                        Icon(
-                                            imageVector = Icons.Default.CheckCircle,
-                                            contentDescription = "Check-In Success",
-                                            tint = Color.Green,
-                                            modifier = Modifier.size(48.dp)
-                                        )
-                                        Spacer(modifier = Modifier.height(6.dp))
-                                        Text("QR CODE RECOGNIZED", color = Color.Green, fontWeight = FontWeight.Bold, fontSize = 11.sp)
-                                    }
-                                } else {
-                                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                                        Icon(
-                                            imageVector = Icons.Default.QrCodeScanner,
-                                            contentDescription = "Scanner Idle",
-                                            tint = Color.White.copy(alpha = 0.6f),
-                                            modifier = Modifier.size(44.dp)
-                                        )
-                                        Spacer(modifier = Modifier.height(6.dp))
-                                        Text("CAMERA SCANNER ACTIVE", color = Color.White.copy(alpha = 0.6f), fontSize = 10.sp, fontWeight = FontWeight.Bold)
-                                    }
-                                }
-                                
-                                // Visual Targeting Guide - Reticle Corner Brackets & Center Crosshair
-                                Box(modifier = Modifier.size(22.dp).align(Alignment.TopStart).padding(4.dp).border(2.5.dp, if (scanError != null) MaterialTheme.colorScheme.error else Color.Green, RoundedCornerShape(topStart = 6.dp)))
-                                Box(modifier = Modifier.size(22.dp).align(Alignment.TopEnd).padding(4.dp).border(2.5.dp, if (scanError != null) MaterialTheme.colorScheme.error else Color.Green, RoundedCornerShape(topEnd = 6.dp)))
-                                Box(modifier = Modifier.size(22.dp).align(Alignment.BottomStart).padding(4.dp).border(2.5.dp, if (scanError != null) MaterialTheme.colorScheme.error else Color.Green, RoundedCornerShape(bottomStart = 6.dp)))
-                                Box(modifier = Modifier.size(22.dp).align(Alignment.BottomEnd).padding(4.dp).border(2.5.dp, if (scanError != null) MaterialTheme.colorScheme.error else Color.Green, RoundedCornerShape(bottomEnd = 6.dp)))
-                                Box(modifier = Modifier.size(12.dp).align(Alignment.Center).border(1.dp, Color.Green.copy(alpha = 0.5f), CircleShape))
-                            }
-                            
-                            scanError?.let { err ->
-                                Card(
-                                    modifier = Modifier.fillMaxWidth(),
-                                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.4f)),
-                                    shape = RoundedCornerShape(12.dp),
-                                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.error)
-                                ) {
-                                    Column(
-                                        modifier = Modifier.padding(10.dp),
-                                        horizontalAlignment = Alignment.CenterHorizontally,
-                                        verticalArrangement = Arrangement.spacedBy(6.dp)
-                                    ) {
-                                        Text(
-                                            text = err,
-                                            color = MaterialTheme.colorScheme.error,
-                                            fontSize = 11.sp,
-                                            fontWeight = FontWeight.Bold,
-                                            textAlign = androidx.compose.ui.text.style.TextAlign.Center
-                                        )
-                                        OutlinedButton(
-                                            onClick = {
-                                                scanError = null
-                                                isScanning = false
-                                                manualQrInput = ""
-                                            },
-                                            modifier = Modifier.fillMaxWidth().height(32.dp),
-                                            shape = RoundedCornerShape(8.dp),
-                                            colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.error)
-                                        ) {
-                                            Icon(Icons.Default.Refresh, contentDescription = "Retry", modifier = Modifier.size(14.dp))
-                                            Spacer(modifier = Modifier.width(4.dp))
-                                            Text("Retry Scanner", fontSize = 11.sp, fontWeight = FontWeight.Bold)
-                                        }
-                                    }
-                                }
-                            }
-                            
-                            if (scanSuccess && scanSuccessMessage.isNotEmpty()) {
-                                Text(
-                                    text = scanSuccessMessage,
-                                    color = Color.Green,
-                                    fontSize = 11.sp,
-                                    fontWeight = FontWeight.Bold,
-                                    textAlign = androidx.compose.ui.text.style.TextAlign.Center
-                                )
-                            }
-
-                            // Quick Order Test Redirect Chips
-                            if (activeOrdersList.isNotEmpty()) {
-                                Column(modifier = Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                                    Text("Quick Scan Active Food Orders:", fontSize = 10.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
-                                    LazyRow(
-                                        horizontalArrangement = Arrangement.spacedBy(6.dp),
-                                        modifier = Modifier.fillMaxWidth()
-                                    ) {
-                                        items(activeOrdersList) { ord ->
-                                            AssistChip(
-                                                onClick = {
-                                                    isScanning = true
-                                                    scanError = null
-                                                    coroutineScope.launch {
-                                                        delay(600)
-                                                        handleScannedCode("ATU-ORDER-${ord.id}-${ord.pickupPin}-${ord.totalPrice}")
-                                                    }
-                                                },
-                                                label = { Text("Order #${ord.id} (${ord.foodName})", fontSize = 10.sp, fontWeight = FontWeight.Bold) },
-                                                leadingIcon = { Icon(Icons.Default.QrCode, contentDescription = null, modifier = Modifier.size(14.dp)) }
-                                            )
-                                        }
-                                    }
-                                }
-                            }
-
-                            // Manual QR Code String Input
-                            OutlinedTextField(
-                                value = manualQrInput,
-                                onValueChange = { manualQrInput = it },
-                                placeholder = { Text("Paste or type code (e.g. ATU-ORDER-1-5821)", fontSize = 10.5.sp) },
-                                singleLine = true,
-                                trailingIcon = {
-                                    if (manualQrInput.isNotEmpty()) {
-                                        IconButton(onClick = {
-                                            isScanning = true
-                                            scanError = null
-                                            coroutineScope.launch {
-                                                delay(500)
-                                                handleScannedCode(manualQrInput)
-                                            }
-                                        }) {
-                                            Icon(Icons.Default.ArrowForward, contentDescription = "Submit Code", tint = MaterialTheme.colorScheme.primary)
-                                        }
-                                    }
-                                },
-                                modifier = Modifier.fillMaxWidth().testTag("manual_qr_input_field"),
-                                shape = RoundedCornerShape(10.dp)
-                            )
-                            
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.spacedBy(10.dp)
-                            ) {
-                                OutlinedButton(
-                                    onClick = { showGeneralCheckInScanner = false },
-                                    modifier = Modifier.weight(1f).testTag("general_scanner_cancel_btn"),
-                                    shape = RoundedCornerShape(12.dp),
-                                    enabled = !isScanning
-                                ) {
-                                    Text("Cancel", fontWeight = FontWeight.Bold)
-                                }
-                                
-                                Button(
-                                    onClick = {
-                                        isScanning = true
-                                        scanError = null
-                                        coroutineScope.launch {
-                                            delay(1200)
-                                            val firstOrder = activeOrdersList.firstOrNull()
-                                            if (firstOrder != null) {
-                                                handleScannedCode("ATU-ORDER-${firstOrder.id}-${firstOrder.pickupPin}-${firstOrder.totalPrice}")
-                                            } else {
-                                                handleScannedCode("ATU-COUNTER-1")
-                                            }
-                                        }
-                                    },
-                                    modifier = Modifier.weight(1.5f).testTag("general_scanner_simulate_scan_btn"),
-                                    shape = RoundedCornerShape(12.dp),
-                                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary),
-                                    enabled = !isScanning && !scanSuccess
-                                ) {
-                                    Icon(Icons.Default.PhotoCamera, contentDescription = null, modifier = Modifier.size(16.dp))
-                                    Spacer(modifier = Modifier.width(6.dp))
-                                    Text("Scan QR Code", fontWeight = FontWeight.Bold, fontSize = 11.sp)
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-
-            // CHAT WITH VENDOR DIALOG
-            activeChatOrder?.let { order ->
-                val vendor = allVendors.find { it.id == order.vendorId }
-                val messagesFlow = remember(order.id) { viewModel.getMessagesForOrder(order.id) }
-                val chatMessages by messagesFlow.collectAsStateWithLifecycle(initialValue = emptyList())
-                var replyMessageText by remember { mutableStateOf("") }
-                val listState = rememberLazyListState()
-
-                LaunchedEffect(chatMessages.size) {
-                    if (chatMessages.isNotEmpty()) {
-                        listState.animateScrollToItem(chatMessages.size - 1)
-                    }
-                }
-
-                Dialog(onDismissRequest = { activeChatOrder = null }) {
-                    Card(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .fillMaxHeight(0.75f)
-                            .testTag("student_chat_dialog"),
-                        shape = RoundedCornerShape(16.dp),
-                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
-                    ) {
-                        Column(
-                            modifier = Modifier
-                                .fillMaxSize()
-                                .padding(16.dp)
-                        ) {
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.SpaceBetween,
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Column(modifier = Modifier.weight(1f)) {
-                                    Text(
-                                        text = "Chat with Vendor",
-                                        style = MaterialTheme.typography.titleMedium,
-                                        fontWeight = FontWeight.Bold,
-                                        color = MaterialTheme.colorScheme.primary
-                                    )
-                                    Text(
-                                        text = "Order #${order.id} ‚Ä¢ ${vendor?.fullName ?: "Vendor"}",
-                                        style = MaterialTheme.typography.bodySmall,
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                                    )
-                                }
-                                IconButton(
-                                    onClick = { activeChatOrder = null },
-                                    modifier = Modifier.testTag("student_chat_close_btn")
-                                ) {
-                                    Icon(Icons.Default.Close, contentDescription = "Close Chat")
-                                }
-                            }
-
-                            HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
-
-                            LazyColumn(
-                                state = listState,
-                                modifier = Modifier
-                                    .weight(1f)
-                                    .fillMaxWidth(),
-                                verticalArrangement = Arrangement.spacedBy(8.dp),
-                                contentPadding = PaddingValues(vertical = 4.dp)
-                            ) {
-                                if (chatMessages.isEmpty()) {
-                                    item {
-                                        Box(
-                                            modifier = Modifier
-                                                .fillMaxWidth()
-                                                .padding(24.dp),
-                                            contentAlignment = Alignment.Center
-                                        ) {
-                                            Text(
-                                                text = "Send an urgent inquiry directly to the vendor.",
-                                                textAlign = androidx.compose.ui.text.style.TextAlign.Center,
-                                                style = MaterialTheme.typography.bodySmall,
-                                                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
-                                            )
-                                        }
-                                    }
-                                } else {
-                                    items(chatMessages) { msg ->
-                                        val isMe = msg.isFromStudent
-                                        val alignment = if (isMe) Alignment.End else Alignment.Start
-                                        val bgContainerColor = if (isMe) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.secondaryContainer
-                                        val textCol = if (isMe) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSecondaryContainer
-
-                                        Column(
-                                            modifier = Modifier.fillMaxWidth(),
-                                            horizontalAlignment = alignment
-                                        ) {
-                                            Card(
-                                                colors = CardDefaults.cardColors(containerColor = bgContainerColor),
-                                                shape = RoundedCornerShape(
-                                                    topStart = 12.dp,
-                                                    topEnd = 12.dp,
-                                                    bottomStart = if (isMe) 12.dp else 0.dp,
-                                                    bottomEnd = if (isMe) 0.dp else 12.dp
-                                                )
-                                            ) {
-                                                Column(modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp)) {
-                                                    Text(
-                                                        text = msg.message,
-                                                        color = textCol,
-                                                        style = MaterialTheme.typography.bodyMedium
-                                                    )
-                                                    Spacer(modifier = Modifier.height(2.dp))
-                                                    Text(
-                                                        text = msg.senderName,
-                                                        fontSize = 8.sp,
-                                                        fontWeight = FontWeight.Bold,
-                                                        color = textCol.copy(alpha = 0.6f)
-                                                    )
-                                                }
-                                            }
-                                        }
-                                    }
-                                }
-                            }
-
-                            HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
-
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(8.dp)
-                            ) {
-                                OutlinedTextField(
-                                    value = replyMessageText,
-                                    onValueChange = { replyMessageText = it },
-                                    placeholder = { Text("Type urgent message...") },
-                                    singleLine = true,
-                                    shape = RoundedCornerShape(12.dp),
-                                    modifier = Modifier
-                                        .weight(1f)
-                                        .testTag("student_chat_input_field")
-                                )
-
-                                Button(
-                                    onClick = {
-                                        if (replyMessageText.isNotBlank() && currentUser != null) {
-                                            viewModel.sendChatMessage(
-                                                orderId = order.id,
-                                                senderId = currentUser!!.id,
-                                                senderName = currentUser!!.fullName,
-                                                recipientId = order.vendorId,
-                                                message = replyMessageText.trim(),
-                                                isFromStudent = true
-                                            )
-                                            replyMessageText = ""
-                                        }
-                                    },
-                                    shape = RoundedCornerShape(12.dp),
-                                    modifier = Modifier.testTag("student_chat_send_btn")
-                                ) {
-                                    Icon(Icons.Default.Send, contentDescription = "Send")
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-
-            // ORDER PLACEMENT DIALOG
-            selectedFoodForOrder?.let { food ->
-                val scope = rememberCoroutineScope()
-                val dishNutritionText by viewModel.dishNutritionText.collectAsStateWithLifecycle()
-                val isAnalyzingDishNutrition by viewModel.isAnalyzingDishNutrition.collectAsStateWithLifecycle()
-
-                LaunchedEffect(food) {
-                    viewModel.getMenuItemNutrition(food.name, food.description)
-                }
-
-                DisposableEffect(food) {
-                    onDispose {
-                        viewModel.clearMenuItemNutrition()
-                    }
-                }
-
-                var checkoutPaymentMode by remember { mutableStateOf("WALLET") } // "WALLET", "POD", "GATEWAY"
-                var selectedGatewayPayMethod by remember { mutableStateOf("MOMO") } // "MOMO", "CARD", "BANK", "PAYPAL"
-                var selectedMomoOperator by remember { mutableStateOf("MTN MoMo") }
-                var gatewayMomoNumber by remember { mutableStateOf("") }
-                var gatewayMomoPin by remember { mutableStateOf("") }
-                
-                var gatewayCardNumber by remember { mutableStateOf("") }
-                var gatewayCardName by remember { mutableStateOf("") }
-                var gatewayCardExpiry by remember { mutableStateOf("") }
-                var gatewayCardCvv by remember { mutableStateOf("") }
-                
-                var selectedBankName by remember { mutableStateOf("Ecobank Ghana") }
-                var gatewayBankAccount by remember { mutableStateOf("") }
-                var gatewayBankPin by remember { mutableStateOf("") }
-                
-                var gatewayPaypalEmail by remember { mutableStateOf("") }
-                var gatewayPaypalPassword by remember { mutableStateOf("") }
-                
-                var isGatewayProcessing by remember { mutableStateOf(false) }
-                var gatewayTransactionStep by remember { mutableStateOf("") }
-
-                Dialog(onDismissRequest = { if (!isGatewayProcessing) selectedFoodForOrder = null }) {
-                    var scheduleForLaterEnabled by remember { mutableStateOf(false) }
-                    var preferredPickupTimeText by remember { mutableStateOf("12:30 PM") }
-                    Card(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(vertical = 12.dp),
-                        shape = RoundedCornerShape(16.dp)
-                    ) {
-                        Column(
-                            modifier = Modifier
-                                .padding(24.dp)
-                                .verticalScroll(rememberScrollState())
-                        ) {
-                            Text(
-                                "Secure Pre-Order Checkout",
-                                fontWeight = FontWeight.Bold,
-                                style = MaterialTheme.typography.titleMedium,
-                                color = MaterialTheme.colorScheme.primary
-                            )
-                            Spacer(modifier = Modifier.height(12.dp))
-
-                            Text(food.name, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.bodyLarge)
-                            Text(food.description, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-
-                            Spacer(modifier = Modifier.height(8.dp))
-                            // Nutritional Info Display Card
-                            Row(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .clip(RoundedCornerShape(8.dp))
-                                    .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f))
-                                    .padding(8.dp),
-                                horizontalArrangement = Arrangement.spacedBy(16.dp)
-                            ) {
-                                Row(
-                                    verticalAlignment = Alignment.CenterVertically,
-                                    horizontalArrangement = Arrangement.spacedBy(4.dp)
-                                ) {
-                                    Text("üî•", fontSize = 14.sp)
-                                    Column {
-                                        Text("Energy", fontSize = 9.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                                        Text("${food.calories} kcal", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface)
-                                    }
-                                }
-                                Row(
-                                    verticalAlignment = Alignment.CenterVertically,
-                                    horizontalArrangement = Arrangement.spacedBy(4.dp)
-                                ) {
-                                    Text("‚ö†Ô∏è", fontSize = 14.sp)
-                                    Column {
-                                        Text("Allergens", fontSize = 9.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                                        Text(food.allergens, fontSize = 11.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.error)
-                                    }
-                                }
-                            }
-
-                            Spacer(modifier = Modifier.height(8.dp))
-
-                            // Gemini AI Nutrition Breakdown Card
-                            Card(
-                                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.15f)),
-                                border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.25f)),
-                                shape = RoundedCornerShape(12.dp),
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .padding(vertical = 4.dp)
-                                    .testTag("dynamic_nutrition_card")
-                            ) {
-                                Column(modifier = Modifier.padding(12.dp)) {
-                                    Row(
-                                        verticalAlignment = Alignment.CenterVertically,
-                                        horizontalArrangement = Arrangement.spacedBy(6.dp)
-                                    ) {
-                                        Text("‚ú®", fontSize = 14.sp)
-                                        Text(
-                                            "Gemini AI Dynamic Nutrition Breakdown",
-                                            style = MaterialTheme.typography.labelMedium,
-                                            fontWeight = FontWeight.Bold,
-                                            color = MaterialTheme.colorScheme.primary
-                                        )
-                                    }
-                                    Spacer(modifier = Modifier.height(6.dp))
-
-                                    if (isAnalyzingDishNutrition) {
-                                        Row(
-                                            verticalAlignment = Alignment.CenterVertically,
-                                            horizontalArrangement = Arrangement.spacedBy(8.dp),
-                                            modifier = Modifier.fillMaxWidth().padding(vertical = 6.dp)
-                                        ) {
-                                            CircularProgressIndicator(modifier = Modifier.size(16.dp), strokeWidth = 2.dp)
-                                            Text(
-                                                "Gemini parsing recipe macros...",
-                                                style = MaterialTheme.typography.bodySmall,
-                                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                                            )
-                                        }
-                                    } else {
-                                        val nutritionContent = dishNutritionText ?: "Analyzing culinary ingredients..."
-                                        Text(
-                                            text = nutritionContent,
-                                            style = MaterialTheme.typography.bodySmall,
-                                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                            lineHeight = 16.sp,
-                                            modifier = Modifier.padding(vertical = 2.dp)
-                                        )
-                                    }
-                                }
-                            }
-
-                            val vendorActiveOrders = remember(allOrdersSnapshot, food.vendorId) {
-                                allOrdersSnapshot.filter { it.vendorId == food.vendorId && com.example.ui.util.WaitTimeService.isOrderActiveInQueue(it.status) }
-                            }
-                            val estimatedMinutes = remember(vendorActiveOrders, orderQuantity) {
-                                com.example.ui.util.WaitTimeService.calculateEstimatedWaitTime(vendorActiveOrders, orderQuantity)
-                            }
-                            val pickupTimeStr = remember(estimatedMinutes) {
-                                com.example.ui.util.WaitTimeService.calculatePickupTimeText(estimatedMinutes)
-                            }
-                            val pickupTimeTextForDb = if (scheduleForLaterEnabled) {
-                                "Scheduled for $preferredPickupTimeText"
-                            } else {
-                                "Ready in $estimatedMinutes mins ($pickupTimeStr)"
-                            }
-
-                            Spacer(modifier = Modifier.height(8.dp))
-
-                            Card(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .testTag("checkout_queue_wait_time_card"),
-                                colors = CardDefaults.cardColors(
-                                    containerColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.15f)
-                                ),
-                                border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.3f))
-                            ) {
-                                Row(
-                                    modifier = Modifier.padding(12.dp),
-                                    verticalAlignment = Alignment.CenterVertically,
-                                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                                ) {
-                                    Text("üïí", fontSize = 18.sp)
-                                    Column {
-                                        Text(
-                                            "Estimated Queue Wait Time",
-                                            fontWeight = FontWeight.Bold,
-                                            fontSize = 12.sp,
-                                            color = MaterialTheme.colorScheme.primary
-                                        )
-                                        Text(
-                                            "Approx. $estimatedMinutes mins (Ready around $pickupTimeStr)",
-                                            style = MaterialTheme.typography.bodySmall,
-                                            fontWeight = FontWeight.Medium
-                                        )
-                                        Text(
-                                            "Based on ${vendorActiveOrders.size} active orders currently in preparation queue.",
-                                            fontSize = 10.sp,
-                                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                                        )
-                                    }
-                                }
-                            }
-
-                            Spacer(modifier = Modifier.height(12.dp))
-                            Text("Delivery / Pickup Schedule Option:", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
-                            Spacer(modifier = Modifier.height(6.dp))
-
-                            Row(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .clip(RoundedCornerShape(8.dp))
-                                    .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f))
-                                    .padding(8.dp),
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.SpaceBetween
-                            ) {
-                                Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.weight(1f)) {
-                                    Icon(Icons.Default.Schedule, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(18.dp))
-                                    Spacer(modifier = Modifier.width(8.dp))
-                                    Column {
-                                        Text("Schedule for Later", fontSize = 12.sp, fontWeight = FontWeight.Bold)
-                                        Text("Select custom pickup time", fontSize = 10.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                                    }
-                                }
-                                Switch(
-                                    checked = scheduleForLaterEnabled,
-                                    onCheckedChange = { scheduleForLaterEnabled = it },
-                                    colors = SwitchDefaults.colors(
-                                        checkedThumbColor = MaterialTheme.colorScheme.primary
-                                    ),
-                                    modifier = Modifier.testTag("schedule_for_later_switch")
-                                )
-                            }
-
-                            if (scheduleForLaterEnabled) {
-                                Spacer(modifier = Modifier.height(8.dp))
-                                Row(
-                                    modifier = Modifier.fillMaxWidth(),
-                                    verticalAlignment = Alignment.CenterVertically,
-                                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                                ) {
-                                    Text("Select Time:", fontSize = 11.sp, fontWeight = FontWeight.Bold)
-                                    LazyRow(
-                                        horizontalArrangement = Arrangement.spacedBy(6.dp)
-                                    ) {
-                                        val pickupTimeOptions = listOf("11:30 AM", "12:00 PM", "12:30 PM", "1:00 PM", "1:30 PM", "2:00 PM", "3:00 PM", "4:00 PM")
-                                        items(pickupTimeOptions) { pickTime ->
-                                            val isPickSelected = preferredPickupTimeText == pickTime
-                                            Box(
-                                                modifier = Modifier
-                                                    .background(
-                                                        if (isPickSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f),
-                                                        RoundedCornerShape(8.dp)
-                                                    )
-                                                    .clickable { preferredPickupTimeText = pickTime }
-                                                    .padding(horizontal = 8.dp, vertical = 6.dp)
-                                                    .testTag("schedule_time_chip_$pickTime"),
-                                                contentAlignment = Alignment.Center
-                                            ) {
-                                                Text(
-                                                    text = pickTime,
-                                                    fontSize = 10.sp,
-                                                    fontWeight = FontWeight.Bold,
-                                                    color = if (isPickSelected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant
-                                                )
-                                            }
-                                        }
-                                    }
-                                }
-                            }
-
-                            Spacer(modifier = Modifier.height(16.dp))
-
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.SpaceBetween,
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Text("Quantity Target:", fontWeight = FontWeight.Medium)
-                                Row(verticalAlignment = Alignment.CenterVertically) {
-                                    IconButton(
-                                        enabled = !isGatewayProcessing,
-                                        onClick = { if (orderQuantity > 1) orderQuantity-- }
-                                    ) {
-                                        Text("-", fontSize = 24.sp, fontWeight = FontWeight.Bold)
-                                    }
-                                    Text("$orderQuantity", fontWeight = FontWeight.Bold, fontSize = 20.sp, modifier = Modifier.padding(horizontal = 12.dp))
-                                    IconButton(
-                                        enabled = !isGatewayProcessing,
-                                        onClick = { if (orderQuantity < 5) orderQuantity++ }
-                                    ) {
-                                        Text("+", fontSize = 20.sp, fontWeight = FontWeight.Bold)
-                                    }
-                                }
-                            }
-
-                            Spacer(modifier = Modifier.height(12.dp))
-
-                            Card(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .padding(vertical = 4.dp),
-                                colors = CardDefaults.cardColors(
-                                    containerColor = MaterialTheme.colorScheme.tertiaryContainer.copy(alpha = 0.25f)
-                                ),
-                                shape = RoundedCornerShape(12.dp),
-                                border = BorderStroke(1.dp, MaterialTheme.colorScheme.tertiary.copy(alpha = 0.3f))
-                            ) {
-                                Column(modifier = Modifier.padding(12.dp)) {
-                                    Row(
-                                        modifier = Modifier.fillMaxWidth(),
-                                        verticalAlignment = Alignment.CenterVertically,
-                                        horizontalArrangement = Arrangement.SpaceBetween
-                                    ) {
-                                        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.weight(1f)) {
-                                            Text("‚≠ê", fontSize = 16.sp)
-                                            Spacer(modifier = Modifier.width(8.dp))
-                                            Column {
-                                                Text(
-                                                    text = "Redeem Loyalty Points",
-                                                    fontWeight = FontWeight.Bold,
-                                                    fontSize = 12.sp,
-                                                    color = MaterialTheme.colorScheme.onTertiaryContainer
-                                                )
-                                                Text(
-                                                    text = "Balance: $availablePoints pts",
-                                                    fontSize = 11.sp,
-                                                    color = MaterialTheme.colorScheme.onTertiaryContainer.copy(alpha = 0.7f)
-                                                )
-                                            }
-                                        }
-                                        Switch(
-                                            checked = redeemLoyaltyPointsChecked,
-                                            onCheckedChange = { redeemLoyaltyPointsChecked = it },
-                                            enabled = availablePoints >= 10 && !isGatewayProcessing,
-                                            colors = SwitchDefaults.colors(
-                                                checkedThumbColor = MaterialTheme.colorScheme.tertiary,
-                                                checkedTrackColor = MaterialTheme.colorScheme.tertiaryContainer
-                                            ),
-                                            modifier = Modifier.testTag("redeem_loyalty_switch")
-                                        )
-                                    }
-                                    
-                                    if (redeemLoyaltyPointsChecked && availablePoints >= 10) {
-                                        val maxPointsNeeded = (food.price * orderQuantity * 10).toInt()
-                                        val pointsToRedeem = minOf(availablePoints, maxPointsNeeded)
-                                        val discountApplied = pointsToRedeem * 0.10
-                                        
-                                        Spacer(modifier = Modifier.height(8.dp))
-                                        Row(
-                                            modifier = Modifier.fillMaxWidth(),
-                                            horizontalArrangement = Arrangement.SpaceBetween
-                                        ) {
-                                            Text(
-                                                text = "Using $pointsToRedeem points",
-                                                fontSize = 11.sp,
-                                                fontWeight = FontWeight.SemiBold,
-                                                color = MaterialTheme.colorScheme.tertiary
-                                            )
-                                            Text(
-                                                text = "- GH‚Çµ ${"%.2f".format(discountApplied)}",
-                                                fontSize = 11.sp,
-                                                fontWeight = FontWeight.Bold,
-                                                color = MaterialTheme.colorScheme.tertiary
-                                            )
-                                        }
-                                    } else if (availablePoints < 10) {
-                                        Spacer(modifier = Modifier.height(4.dp))
-                                        Text(
-                                            text = "Need at least 10 points to start redeeming.",
-                                            fontSize = 9.sp,
-                                            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
-                                        )
-                                    }
-                                }
-                            }
-
-                            val calculatedPointsToRedeem = if (redeemLoyaltyPointsChecked) {
-                                val maxPointsNeeded = (food.price * orderQuantity * 10).toInt()
-                                minOf(availablePoints, maxPointsNeeded)
-                            } else 0
-                            val currentDiscountApplied = calculatedPointsToRedeem * 0.10
-                            val finalAmountPayable = (food.price * orderQuantity - currentDiscountApplied).coerceAtLeast(0.0)
-
-                            HorizontalDivider()
-
-                            Row(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .padding(vertical = 12.dp),
-                                horizontalArrangement = Arrangement.SpaceBetween,
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Column {
-                                    Text("Amount Payable:", fontWeight = FontWeight.Bold)
-                                    if (currentDiscountApplied > 0) {
-                                        Text(
-                                            text = "Original: GH‚Çµ ${"%.2f".format(food.price * orderQuantity)}",
-                                            style = MaterialTheme.typography.bodySmall,
-                                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                            textDecoration = androidx.compose.ui.text.style.TextDecoration.LineThrough
-                                        )
-                                    }
-                                }
-                                Text("GH‚Çµ ${"%.2f".format(finalAmountPayable)}", fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary, fontSize = 18.sp)
-                            }
-
-                            Text("Choose Payment Mode:", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
-                            Spacer(modifier = Modifier.height(8.dp))
-
-                            // Payment method selector
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.spacedBy(4.dp)
-                            ) {
-                                listOf(
-                                    "WALLET" to "Student Wallet",
-                                    "POD" to "Cash (POD)",
-                                    "GATEWAY" to "Direct Pay"
-                                ).forEach { (mode, label) ->
-                                    val isSelected = checkoutPaymentMode == mode
-                                    val containerColor = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
-                                    val textColor = if (isSelected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant
-                                    
-                                    Box(
-                                        modifier = Modifier
-                                            .weight(1f)
-                                            .background(containerColor, RoundedCornerShape(8.dp))
-                                            .clickable(enabled = !isGatewayProcessing) { 
-                                                checkoutPaymentMode = mode 
-                                                orderPlacementError = null
-                                            }
-                                            .padding(vertical = 8.dp),
-                                        contentAlignment = Alignment.Center
-                                    ) {
-                                        Text(label, fontSize = 10.sp, fontWeight = FontWeight.Bold, color = textColor)
-                                    }
-                                }
-                            }
-
-                            Spacer(modifier = Modifier.height(16.dp))
-
-                            when (checkoutPaymentMode) {
-                                "WALLET" -> {
-                                    val pointsToRedeem = if (redeemLoyaltyPointsChecked) {
-                                        val maxPointsNeeded = (food.price * orderQuantity * 10).toInt()
-                                        minOf(availablePoints, maxPointsNeeded)
-                                    } else 0
-                                    val discountApplied = pointsToRedeem * 0.10
-                                    val requiredSum = (food.price * orderQuantity - discountApplied).coerceAtLeast(0.0)
-                                    val isLowOrInsufficient = studentWalletBalance < 15.0 || studentWalletBalance < requiredSum
-                                    Card(
-                                        modifier = Modifier.fillMaxWidth(),
-                                        colors = CardDefaults.cardColors(
-                                            containerColor = if (isLowOrInsufficient) MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.4f) else MaterialTheme.colorScheme.primary.copy(alpha = 0.04f)
-                                        )
-                                    ) {
-                                        Column(modifier = Modifier.padding(12.dp)) {
-                                            Row(
-                                                modifier = Modifier.fillMaxWidth(),
-                                                horizontalArrangement = Arrangement.SpaceBetween,
-                                                verticalAlignment = Alignment.CenterVertically
-                                            ) {
-                                                Row(verticalAlignment = Alignment.CenterVertically) {
-                                                    Icon(
-                                                        Icons.Default.AccountBalanceWallet,
-                                                        contentDescription = null,
-                                                        tint = if (isLowOrInsufficient) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary,
-                                                        modifier = Modifier.size(16.dp)
-                                                    )
-                                                    Spacer(modifier = Modifier.width(6.dp))
-                                                    Text("Pay with virtual smart balance", fontWeight = FontWeight.Bold, fontSize = 11.sp)
-                                                }
-                                                if (isLowOrInsufficient) {
-                                                    Button(
-                                                        onClick = {
-                                                            topUpSuccess = false
-                                                            topUpAmount = ""
-                                                            topUpPhone = ""
-                                                            showTopUpDialog = true
-                                                        },
-                                                        colors = ButtonDefaults.buttonColors(
-                                                            containerColor = MaterialTheme.colorScheme.error,
-                                                            contentColor = MaterialTheme.colorScheme.onError
-                                                        ),
-                                                        contentPadding = PaddingValues(horizontal = 8.dp),
-                                                        modifier = Modifier.height(24.dp).testTag("checkout_direct_topup")
-                                                    ) {
-                                                        Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.size(10.dp), tint = Color.White)
-                                                        Spacer(modifier = Modifier.width(2.dp))
-                                                        Text("Top Up", fontSize = 8.sp, fontWeight = FontWeight.Bold)
-                                                    }
-                                                }
-                                            }
-                                            Spacer(modifier = Modifier.height(6.dp))
-                                            Text(
-                                                text = "Your current balance: GH‚Çµ ${"%.2f".format(studentWalletBalance)}",
-                                                fontSize = 11.sp,
-                                                color = if (isLowOrInsufficient) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary,
-                                                fontWeight = FontWeight.Bold
-                                            )
-                                            if (isLowOrInsufficient) {
-                                                Spacer(modifier = Modifier.height(4.dp))
-                                                Text(
-                                                    text = if (studentWalletBalance < requiredSum) "‚ö†Ô∏è Insufficient smart balance for this order!" else "‚ö†Ô∏è Low balance alert! Funds fall below threshold of GH‚Çµ 15.00",
-                                                    fontSize = 9.sp,
-                                                    fontWeight = FontWeight.Bold,
-                                                    color = MaterialTheme.colorScheme.error
-                                                )
-                                            }
-                                            Spacer(modifier = Modifier.height(4.dp))
-                                            Text("Pre-paying helps bypass queues and allows secure pin pickup.", fontSize = 9.sp, color = Color.Gray)
-                                        }
-                                    }
-                                }
-                                "POD" -> {
-                                    Card(
-                                        modifier = Modifier.fillMaxWidth(),
-                                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))
-                                    ) {
-                                        Column(modifier = Modifier.padding(12.dp)) {
-                                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                                Icon(Icons.Default.Info, contentDescription = null, tint = Color.Gray, modifier = Modifier.size(16.dp))
-                                                Spacer(modifier = Modifier.width(6.dp))
-                                                Text("Pay-on-Delivery (POD)", fontWeight = FontWeight.Bold, fontSize = 11.sp)
-                                            }
-                                            Spacer(modifier = Modifier.height(4.dp))
-                                            Text("Authorize order now, and pay with physical cash or momo at the vendor counter upon custody hand-off.", fontSize = 9.sp, color = Color.Gray)
-                                        }
-                                    }
-                                }
-                                "GATEWAY" -> {
-                                    Column(modifier = Modifier.fillMaxWidth()) {
-                                        // 4 Gateway options
-                                        Row(
-                                            modifier = Modifier.fillMaxWidth(),
-                                            horizontalArrangement = Arrangement.spacedBy(4.dp)
-                                        ) {
-                                            listOf(
-                                                "MOMO" to "MoMo",
-                                                "CARD" to "Card",
-                                                "BANK" to "Bank",
-                                                "PAYPAL" to "PayPal"
-                                            ).forEach { (code, label) ->
-                                                val isSelected = selectedGatewayPayMethod == code
-                                                val containerColor = if (isSelected) MaterialTheme.colorScheme.secondary else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f)
-                                                val textColor = if (isSelected) MaterialTheme.colorScheme.onSecondary else MaterialTheme.colorScheme.onSurfaceVariant
-                                                
-                                                Box(
-                                                    modifier = Modifier
-                                                        .weight(1f)
-                                                        .background(containerColor, RoundedCornerShape(6.dp))
-                                                        .clickable(enabled = !isGatewayProcessing) { 
-                                                            selectedGatewayPayMethod = code 
-                                                            orderPlacementError = null
-                                                        }
-                                                        .padding(vertical = 6.dp),
-                                                    contentAlignment = Alignment.Center
-                                                ) {
-                                                    Text(label, fontSize = 9.sp, fontWeight = FontWeight.Bold, color = textColor)
-                                                }
-                                            }
-                                        }
-
-                                        Spacer(modifier = Modifier.height(12.dp))
-
-                                        Card(
-                                            modifier = Modifier.fillMaxWidth(),
-                                            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f)),
-                                            shape = RoundedCornerShape(8.dp),
-                                            border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
-                                        ) {
-                                            Column(modifier = Modifier.padding(12.dp)) {
-                                                when (selectedGatewayPayMethod) {
-                                                    "MOMO" -> {
-                                                        Text("Mobile Money Billing Gateway", fontSize = 11.sp, fontWeight = FontWeight.Bold)
-                                                        Spacer(modifier = Modifier.height(8.dp))
-                                                        
-                                                        Row(
-                                                            modifier = Modifier.fillMaxWidth(),
-                                                            horizontalArrangement = Arrangement.spacedBy(4.dp)
-                                                        ) {
-                                                            listOf("MTN MoMo", "Telecel Cash", "ATG Money").forEach { operator ->
-                                                                val isOpSelected = selectedMomoOperator == operator
-                                                                val borderColor = if (isOpSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outlineVariant
-                                                                Box(
-                                                                    modifier = Modifier
-                                                                        .weight(1f)
-                                                                        .background(Color.White, RoundedCornerShape(6.dp))
-                                                                        .border(1.dp, borderColor, RoundedCornerShape(6.dp))
-                                                                        .clickable(enabled = !isGatewayProcessing) { selectedMomoOperator = operator }
-                                                                        .padding(vertical = 6.dp),
-                                                                    contentAlignment = Alignment.Center
-                                                                ) {
-                                                                    Text(operator, fontSize = 8.sp, fontWeight = FontWeight.Bold, color = if (isOpSelected) MaterialTheme.colorScheme.primary else Color.Gray)
-                                                                }
-                                                            }
-                                                        }
-
-                                                        Spacer(modifier = Modifier.height(10.dp))
-
-                                                        OutlinedTextField(
-                                                            value = gatewayMomoNumber,
-                                                            onValueChange = { gatewayMomoNumber = it },
-                                                            label = { Text("MoMo Number") },
-                                                            enabled = !isGatewayProcessing,
-                                                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone),
-                                                            modifier = Modifier.fillMaxWidth(),
-                                                            singleLine = true
-                                                        )
-
-                                                        Spacer(modifier = Modifier.height(8.dp))
-
-                                                        OutlinedTextField(
-                                                            value = gatewayMomoPin,
-                                                            onValueChange = { gatewayMomoPin = it },
-                                                            label = { Text("4-Digit Security PIN") },
-                                                            enabled = !isGatewayProcessing,
-                                                            visualTransformation = androidx.compose.ui.text.input.PasswordVisualTransformation(),
-                                                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                                                            modifier = Modifier.fillMaxWidth(),
-                                                            singleLine = true
-                                                        )
-                                                    }
-                                                    "CARD" -> {
-                                                        Text("Visa / MasterCard Checkout", fontSize = 11.sp, fontWeight = FontWeight.Bold)
-                                                        Spacer(modifier = Modifier.height(8.dp))
-
-                                                        OutlinedTextField(
-                                                            value = gatewayCardName,
-                                                            onValueChange = { gatewayCardName = it },
-                                                            label = { Text("Cardholder Name") },
-                                                            enabled = !isGatewayProcessing,
-                                                            modifier = Modifier.fillMaxWidth(),
-                                                            singleLine = true
-                                                        )
-
-                                                        Spacer(modifier = Modifier.height(8.dp))
-
-                                                        OutlinedTextField(
-                                                            value = gatewayCardNumber,
-                                                            onValueChange = { gatewayCardNumber = it },
-                                                            label = { Text("16-Digit Card Number") },
-                                                            enabled = !isGatewayProcessing,
-                                                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                                                            modifier = Modifier.fillMaxWidth(),
-                                                            singleLine = true
-                                                        )
-
-                                                        Spacer(modifier = Modifier.height(8.dp))
-
-                                                        Row(
-                                                            modifier = Modifier.fillMaxWidth(),
-                                                            horizontalArrangement = Arrangement.spacedBy(8.dp)
-                                                        ) {
-                                                            OutlinedTextField(
-                                                                value = gatewayCardExpiry,
-                                                                onValueChange = { gatewayCardExpiry = it },
-                                                                label = { Text("Expiry (MM/YY)") },
-                                                                enabled = !isGatewayProcessing,
-                                                                modifier = Modifier.weight(1f),
-                                                                singleLine = true
-                                                            )
-
-                                                            OutlinedTextField(
-                                                                value = gatewayCardCvv,
-                                                                onValueChange = { gatewayCardCvv = it },
-                                                                label = { Text("CVV") },
-                                                                enabled = !isGatewayProcessing,
-                                                                visualTransformation = androidx.compose.ui.text.input.PasswordVisualTransformation(),
-                                                                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                                                                modifier = Modifier.weight(1f),
-                                                                singleLine = true
-                                                            )
-                                                        }
-                                                    }
-                                                    "BANK" -> {
-                                                        Text("Bank Settlement Clearance", fontSize = 11.sp, fontWeight = FontWeight.Bold)
-                                                        Spacer(modifier = Modifier.height(8.dp))
-
-                                                        OutlinedTextField(
-                                                            value = gatewayBankAccount,
-                                                            onValueChange = { gatewayBankAccount = it },
-                                                            label = { Text("Direct Bank Account Number") },
-                                                            enabled = !isGatewayProcessing,
-                                                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                                                            modifier = Modifier.fillMaxWidth(),
-                                                            singleLine = true
-                                                        )
-
-                                                        Spacer(modifier = Modifier.height(8.dp))
-
-                                                        OutlinedTextField(
-                                                            value = gatewayBankPin,
-                                                            onValueChange = { gatewayBankPin = it },
-                                                            label = { Text("Routing Clearance PIN") },
-                                                            enabled = !isGatewayProcessing,
-                                                            visualTransformation = androidx.compose.ui.text.input.PasswordVisualTransformation(),
-                                                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                                                            modifier = Modifier.fillMaxWidth(),
-                                                            singleLine = true
-                                                        )
-                                                    }
-                                                    "PAYPAL" -> {
-                                                        Text("PayPal Checkout", fontSize = 11.sp, fontWeight = FontWeight.Bold)
-                                                        Spacer(modifier = Modifier.height(8.dp))
-
-                                                        OutlinedTextField(
-                                                            value = gatewayPaypalEmail,
-                                                            onValueChange = { gatewayPaypalEmail = it },
-                                                            label = { Text("PayPal Registered Email") },
-                                                            enabled = !isGatewayProcessing,
-                                                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email),
-                                                            modifier = Modifier.fillMaxWidth(),
-                                                            singleLine = true
-                                                        )
-
-                                                        Spacer(modifier = Modifier.height(8.dp))
-
-                                                        OutlinedTextField(
-                                                            value = gatewayPaypalPassword,
-                                                            onValueChange = { gatewayPaypalPassword = it },
-                                                            label = { Text("PayPal Secure Password") },
-                                                            enabled = !isGatewayProcessing,
-                                                            visualTransformation = androidx.compose.ui.text.input.PasswordVisualTransformation(),
-                                                            modifier = Modifier.fillMaxWidth(),
-                                                            singleLine = true
-                                                        )
-                                                    }
-                                                }
-                                            }
-                                        }
-                                    }
-                                }
-                            }
-
-                            orderPlacementError?.let { err ->
-                                Spacer(modifier = Modifier.height(8.dp))
-                                Text(
-                                    text = err,
-                                    color = MaterialTheme.colorScheme.error,
-                                    fontSize = 11.sp,
-                                    fontWeight = FontWeight.Bold
-                                )
-                            }
-
-                            Spacer(modifier = Modifier.height(16.dp))
-
-                            if (isGatewayProcessing) {
-                                Column(
-                                    modifier = Modifier.fillMaxWidth(),
-                                    horizontalAlignment = Alignment.CenterHorizontally
-                                ) {
-                                    CircularProgressIndicator(modifier = Modifier.size(28.dp))
-                                    Spacer(modifier = Modifier.height(8.dp))
-                                    Text(gatewayTransactionStep, fontSize = 11.sp, fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.primary, textAlign = androidx.compose.ui.text.style.TextAlign.Center)
-                                }
-                            } else {
-                                Row(
-                                    modifier = Modifier.fillMaxWidth(),
-                                    horizontalArrangement = Arrangement.End
-                                ) {
-                                    TextButton(onClick = { selectedFoodForOrder = null }) {
-                                        Text("Quit")
-                                    }
-                                    Spacer(modifier = Modifier.width(12.dp))
-                                    Button(
-                                        onClick = Button@{
-                                            val pointsToRedeem = if (redeemLoyaltyPointsChecked) {
-                                                val maxPointsNeeded = (food.price * orderQuantity * 10).toInt()
-                                                minOf(availablePoints, maxPointsNeeded)
-                                            } else 0
-                                            val discountApplied = pointsToRedeem * 0.10
-                                            val requiredSum = (food.price * orderQuantity - discountApplied).coerceAtLeast(0.0)
-                                            when (checkoutPaymentMode) {
-                                                "WALLET" -> {
-                                                    if (studentWalletBalance < requiredSum) {
-                                                        orderPlacementError = "Insufficient smart balance. Top up your virtual ID Wallet!"
-                                                        return@Button
-                                                    }
-                                                    submissionConfirmFood = food
-                                                    submissionConfirmQuantity = orderQuantity
-                                                    submissionConfirmPaymentMode = "WALLET"
-                                                    submissionConfirmCallback = {
-                                                        viewModel.placeOrder(food, orderQuantity, true, pointsToRedeem, pickupTimeTextForDb) { success ->
-                                                            submissionIsProcessing = false
-                                                            showSubmissionConfirmation = false
-                                                            if (success) {
-                                                                HapticHelper.notification(context, "SUCCESS")
-                                                                showOrderPlacedConfetti = true
-                                                                selectedFoodForOrder = null
-                                                                activeTab = 1
-                                                            } else {
-                                                                HapticHelper.notification(context, "ERROR")
-                                                                orderPlacementError = "Deduction failed. Check system link."
-                                                            }
-                                                        }
-                                                    }
-                                                    submissionIsProcessing = false
-                                                    showSubmissionConfirmation = true
-                                                }
-                                                "POD" -> {
-                                                    submissionConfirmFood = food
-                                                    submissionConfirmQuantity = orderQuantity
-                                                    submissionConfirmPaymentMode = "POD"
-                                                    submissionConfirmCallback = {
-                                                        viewModel.placeOrder(food, orderQuantity, false, pointsToRedeem, pickupTimeTextForDb) { success ->
-                                                            submissionIsProcessing = false
-                                                            showSubmissionConfirmation = false
-                                                            if (success) {
-                                                                HapticHelper.notification(context, "SUCCESS")
-                                                                showOrderPlacedConfetti = true
-                                                                selectedFoodForOrder = null
-                                                                activeTab = 1
-                                                            } else {
-                                                                HapticHelper.notification(context, "ERROR")
-                                                                orderPlacementError = "Failed to compile POD order."
-                                                            }
-                                                        }
-                                                    }
-                                                    submissionIsProcessing = false
-                                                    showSubmissionConfirmation = true
-                                                }
-                                                "GATEWAY" -> {
-                                                    // Validations
-                                                    when (selectedGatewayPayMethod) {
-                                                        "MOMO" -> {
-                                                            if (gatewayMomoNumber.length < 9) {
-                                                                orderPlacementError = "Enter valid MoMo Number."
-                                                                return@Button
-                                                            }
-                                                            if (gatewayMomoPin.length < 4) {
-                                                                orderPlacementError = "Enter 4-digit Wallet security PIN."
-                                                                return@Button
-                                                            }
-                                                        }
-                                                        "CARD" -> {
-                                                            if (gatewayCardName.isBlank() || gatewayCardNumber.length < 16 || gatewayCardExpiry.length < 4 || gatewayCardCvv.length < 3) {
-                                                                orderPlacementError = "Invalid card credentials. Please verify fields."
-                                                                return@Button
-                                                            }
-                                                        }
-                                                        "BANK" -> {
-                                                            if (gatewayBankAccount.length < 8 || gatewayBankPin.length < 4) {
-                                                                orderPlacementError = "Invalid direct banking details."
-                                                                return@Button
-                                                            }
-                                                        }
-                                                        "PAYPAL" -> {
-                                                            if (!gatewayPaypalEmail.contains("@") || gatewayPaypalPassword.length < 4) {
-                                                                orderPlacementError = "Invalid PayPal login authentication."
-                                                                return@Button
-                                                            }
-                                                        }
-                                                    }
-
-                                                    orderPlacementError = null
-                                                    scope.launch {
-                                                        isGatewayProcessing = true
-                                                        gatewayTransactionStep = "Securing socket node with credit issuer..."
-                                                        delay(800)
-                                                        gatewayTransactionStep = "Authenticating direct payout authorization..."
-                                                        delay(800)
-                                                        gatewayTransactionStep = "Tokenizing assets securely..."
-                                                        delay(800)
-                                                        gatewayTransactionStep = "Settlement cleared! Syncing wallet..."
-                                                        delay(400)
-                                                         if (com.example.data.LaravelClientManager.isLaravelEnabled) {
-                                                             val userEmail = currentUser?.username ?: "student@atu.edu.gh"
-                                                             val emailToUse = if (userEmail.contains("@")) userEmail else "${userEmail}@atu.edu.gh"
-                                                             
-                                                             var initDetails: com.example.data.LaravelPaystackInitDetails? = null
-                                                             viewModel.initPaystackPayment(emailToUse, requiredSum, "WALLET_TOPUP") { details ->
-                                                                 initDetails = details
-                                                             }
-                                                             var waitCount = 0
-                                                             while (initDetails == null && waitCount < 30) {
-                                                                 delay(100)
-                                                                 waitCount++
-                                                             }
-                                                             
-                                                             val details = initDetails
-                                                             if (details != null) {
-                                                                 var verificationSuccess: Boolean? = null
-                                                                 viewModel.verifyPaystackPayment(details.reference, requiredSum, "WALLET_TOPUP") { success ->
-                                                                     verificationSuccess = success
-                                                                 }
-                                                                 
-                                                                 waitCount = 0
-                                                                 while (verificationSuccess == null && waitCount < 50) {
-                                                                     delay(100)
-                                                                     waitCount++
-                                                                 }
-                                                             } else {
-                                                                 orderPlacementError = "Failed to establish payment gateway channel with Paystack."
-                                                                 isGatewayProcessing = false
-                                                                 return@launch
-                                                             }
-                                                         } else {
-                                                             viewModel.rechargeWallet(requiredSum)
-                                                         }
-                                                         submissionConfirmFood = food
-                                                         submissionConfirmQuantity = orderQuantity
-                                                         submissionConfirmPaymentMode = "GATEWAY"
-                                                         submissionConfirmCallback = {
-                                                             viewModel.placeOrder(food, orderQuantity, true, pointsToRedeem, pickupTimeTextForDb) { success ->
-                                                             submissionIsProcessing = false
-                                                             showSubmissionConfirmation = false
-                                                            isGatewayProcessing = false
-                                                            if (success) {
-                                                                HapticHelper.notification(context, "SUCCESS")
-                                                                selectedFoodForOrder = null
-                                                                activeTab = 1
-                                                            } else {
-                                                                HapticHelper.notification(context, "ERROR")
-                                                                orderPlacementError = "Direct checkout failed. Balance updated, place order via wallet."
-                                                              }
-                                                         }
-                                                     }
-                                                     submissionIsProcessing = false
-                                                     showSubmissionConfirmation = true
-                                                     }
-                                                    }
-                                                }
-                                            }
-                                    ) {
-                                        Text("Place Order")
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-
-            // SHOPPING CART CHECKOUT DIALOG
-            if (showCartCheckoutDialog) {
-                val cartItems by viewModel.cart.collectAsStateWithLifecycle()
-                Dialog(onDismissRequest = { showCartCheckoutDialog = false }) {
-                    var animateCartTrigger by remember { mutableStateOf(false) }
-                    LaunchedEffect(Unit) {
-                        animateCartTrigger = true
-                    }
-                    LaunchedEffect(animateCartTrigger) {
-                        if (!animateCartTrigger) {
-                            delay(300)
-                            showCartCheckoutDialog = false
-                        }
-                    }
-                    AnimatedVisibility(
-                        visible = animateCartTrigger,
-                        enter = slideInVertically(initialOffsetY = { it / 2 }) + fadeIn(animationSpec = tween(300)),
-                        exit = slideOutVertically(targetOffsetY = { it / 2 }) + fadeOut(animationSpec = tween(300))
-                    ) {
-                        Card(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(vertical = 12.dp),
-                            shape = RoundedCornerShape(16.dp)
-                        ) {
-                        Column(
-                            modifier = Modifier
-                                .padding(24.dp)
-                                .verticalScroll(rememberScrollState())
-                        ) {
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.SpaceBetween,
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Text(
-                                    "Your Shopping Cart",
-                                    fontWeight = FontWeight.Bold,
-                                    style = MaterialTheme.typography.titleMedium,
-                                    color = MaterialTheme.colorScheme.primary
-                                )
-                                IconButton(
-                                    onClick = { animateCartTrigger = false },
-                                    modifier = Modifier.testTag("close_cart_btn")
-                                ) {
-                                    Icon(Icons.Default.Close, contentDescription = "Close")
-                                }
-                            }
-                            Spacer(modifier = Modifier.height(12.dp))
-
-                            if (cartItems.isEmpty()) {
-                                Column(
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .padding(vertical = 32.dp),
-                                    horizontalAlignment = Alignment.CenterHorizontally,
-                                    verticalArrangement = Arrangement.spacedBy(12.dp)
-                                ) {
-                                    Icon(
-                                        imageVector = Icons.Default.ShoppingCart,
-                                        contentDescription = null,
-                                        tint = MaterialTheme.colorScheme.outlineVariant,
-                                        modifier = Modifier.size(64.dp)
-                                    )
-                                    Text(
-                                        "Your shopping cart is currently empty.",
-                                        fontWeight = FontWeight.SemiBold,
-                                        style = MaterialTheme.typography.bodyMedium,
-                                        textAlign = androidx.compose.ui.text.style.TextAlign.Center
-                                    )
-                                    Text(
-                                        "Add hot and delicious meals from the menu to get started!",
-                                        fontSize = 11.sp,
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                        textAlign = androidx.compose.ui.text.style.TextAlign.Center
-                                    )
-                                }
-                            } else {
-                                Column(
-                                    modifier = Modifier.fillMaxWidth(),
-                                    verticalArrangement = Arrangement.spacedBy(8.dp)
-                                ) {
-                                    cartItems.forEach { item ->
-                                        @OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
-                                        val dismissState = androidx.compose.material3.rememberSwipeToDismissBoxState(
-                                            confirmValueChange = { dismissValue ->
-                                                if (dismissValue == androidx.compose.material3.SwipeToDismissBoxValue.EndToStart ||
-                                                    dismissValue == androidx.compose.material3.SwipeToDismissBoxValue.StartToEnd) {
-                                                    viewModel.removeFromCart(item.foodItem)
-                                                    com.example.ui.util.HapticUtil.performOrderButtonHaptic(context)
-                                                    true
-                                                } else {
-                                                    false
-                                                }
-                                            }
-                                        )
-
-                                        @OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
-                                        androidx.compose.material3.SwipeToDismissBox(
-                                            state = dismissState,
-                                            backgroundContent = {
-                                                val color = when (dismissState.dismissDirection) {
-                                                    androidx.compose.material3.SwipeToDismissBoxValue.EndToStart,
-                                                    androidx.compose.material3.SwipeToDismissBoxValue.StartToEnd -> MaterialTheme.colorScheme.errorContainer
-                                                    else -> androidx.compose.ui.graphics.Color.Transparent
-                                                }
-                                                Box(
-                                                    modifier = Modifier
-                                                        .fillMaxSize()
-                                                        .clip(RoundedCornerShape(8.dp))
-                                                        .background(color)
-                                                        .padding(horizontal = 16.dp),
-                                                    contentAlignment = Alignment.CenterEnd
-                                                ) {
-                                                    Icon(
-                                                        Icons.Default.Delete,
-                                                        contentDescription = "Swipe to remove item",
-                                                        tint = MaterialTheme.colorScheme.onErrorContainer
-                                                    )
-                                                }
-                                            },
-                                            content = {
-                                                Row(
-                                                    modifier = Modifier
-                                                        .fillMaxWidth()
-                                                        .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f), RoundedCornerShape(8.dp))
-                                                        .padding(8.dp),
-                                                    verticalAlignment = Alignment.CenterVertically,
-                                                    horizontalArrangement = Arrangement.SpaceBetween
-                                                ) {
-                                                    Column(modifier = Modifier.weight(1f)) {
-                                                        Text(item.foodItem.name, fontWeight = FontWeight.Bold, fontSize = 12.sp)
-                                                        Text("GH‚Çµ ${"%.2f".format(item.foodItem.price)} each", fontSize = 10.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                                                        Text("Subtotal: GH‚Çµ ${"%.2f".format(item.foodItem.price * item.quantity)}", fontSize = 11.sp, fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.secondary)
-                                                    }
-                                                    Row(
-                                                        verticalAlignment = Alignment.CenterVertically,
-                                                        horizontalArrangement = Arrangement.spacedBy(4.dp)
-                                                    ) {
-                                                        IconButton(
-                                                            onClick = {
-                                                                if (item.quantity > 1) {
-                                                                    viewModel.updateCartQuantity(item.foodItem, item.quantity - 1)
-                                                                } else {
-                                                                    viewModel.removeFromCart(item.foodItem)
-                                                                }
-                                                            }
-                                                        ) {
-                                                            Text("-", fontSize = 18.sp, fontWeight = FontWeight.Bold)
-                                                        }
-                                                        Text("${item.quantity}", fontWeight = FontWeight.Bold, fontSize = 12.sp)
-                                                        IconButton(
-                                                            onClick = {
-                                                                if (item.quantity < 5) {
-                                                                    viewModel.updateCartQuantity(item.foodItem, item.quantity + 1)
-                                                                }
-                                                            }
-                                                        ) {
-                                                            Text("+", fontSize = 14.sp, fontWeight = FontWeight.Bold)
-                                                        }
-                                                        IconButton(
-                                                            onClick = { viewModel.removeFromCart(item.foodItem) },
-                                                            modifier = Modifier.testTag("remove_item_btn_${item.foodItem.id}")
-                                                        ) {
-                                                            Icon(Icons.Default.Delete, contentDescription = "Remove", tint = MaterialTheme.colorScheme.error, modifier = Modifier.size(16.dp))
-                                                        }
-                                                    }
-                                                }
-                                            }
-                                        )
-                                    }
-
-                                    Spacer(modifier = Modifier.height(12.dp))
-                                    HorizontalDivider()
-                                    Spacer(modifier = Modifier.height(12.dp))
-
-                                    // Schedule Options for Cart
-                                    var cartScheduleForLaterEnabled by remember { mutableStateOf(false) }
-                                    var cartPreferredPickupTimeText by remember { mutableStateOf("12:30 PM") }
-
-                                    Text("Delivery / Pickup Schedule Option:", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
-                                    Spacer(modifier = Modifier.height(6.dp))
-
-                                    Row(
-                                        modifier = Modifier
-                                            .fillMaxWidth()
-                                            .clip(RoundedCornerShape(8.dp))
-                                            .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f))
-                                            .padding(8.dp),
-                                        verticalAlignment = Alignment.CenterVertically,
-                                        horizontalArrangement = Arrangement.SpaceBetween
-                                    ) {
-                                        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.weight(1f)) {
-                                            Icon(Icons.Default.Schedule, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(18.dp))
-                                            Spacer(modifier = Modifier.width(8.dp))
-                                            Column {
-                                                Text("Schedule for Later", fontSize = 12.sp, fontWeight = FontWeight.Bold)
-                                                Text("Select custom pickup time", fontSize = 10.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                                            }
-                                        }
-                                        Switch(
-                                            checked = cartScheduleForLaterEnabled,
-                                            onCheckedChange = { cartScheduleForLaterEnabled = it },
-                                            colors = SwitchDefaults.colors(
-                                                checkedThumbColor = MaterialTheme.colorScheme.primary
-                                            ),
-                                            modifier = Modifier.testTag("cart_schedule_for_later_switch")
-                                        )
-                                    }
-
-                                    if (cartScheduleForLaterEnabled) {
-                                        Spacer(modifier = Modifier.height(8.dp))
-                                        Row(
-                                            modifier = Modifier.fillMaxWidth(),
-                                            verticalAlignment = Alignment.CenterVertically,
-                                            horizontalArrangement = Arrangement.spacedBy(8.dp)
-                                        ) {
-                                            Text("Select Time:", fontSize = 11.sp, fontWeight = FontWeight.Bold)
-                                            LazyRow(
-                                                horizontalArrangement = Arrangement.spacedBy(6.dp)
-                                            ) {
-                                                val pickupTimeOptions = listOf("11:30 AM", "12:00 PM", "12:30 PM", "1:00 PM", "1:30 PM", "2:00 PM", "3:00 PM", "4:00 PM")
-                                                items(pickupTimeOptions) { pickTime ->
-                                                    val isPickSelected = cartPreferredPickupTimeText == pickTime
-                                                    Box(
-                                                        modifier = Modifier
-                                                            .background(
-                                                                if (isPickSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f),
-                                                                RoundedCornerShape(8.dp)
-                                                            )
-                                                            .clickable { cartPreferredPickupTimeText = pickTime }
-                                                            .padding(horizontal = 8.dp, vertical = 6.dp)
-                                                            .testTag("cart_schedule_time_chip_$pickTime"),
-                                                        contentAlignment = Alignment.Center
-                                                    ) {
-                                                        Text(
-                                                            text = pickTime,
-                                                            fontSize = 10.sp,
-                                                            fontWeight = FontWeight.Bold,
-                                                            color = if (isPickSelected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant
-                                                        )
-                                                    }
-                                                }
-                                            }
-                                        }
-                                    }
-
-                                    // ‚è±Ô∏è Real-Time Wait-Time Estimation Card (Historical & Live Volume Data)
-                                    val allOrdersList by viewModel.allOrdersSnapshot.collectAsStateWithLifecycle()
-                                    val customerOrdersList by viewModel.customerOrders.collectAsStateWithLifecycle()
-                                    val totalCartQty = cartItems.sumOf { it.quantity }
-                                    val cartVendorId = cartItems.firstOrNull()?.foodItem?.vendorId ?: 0
-
-                                    val waitTimeEstimate = remember(cartItems, allOrdersList, customerOrdersList) {
-                                        com.example.ui.util.WaitTimeService.calculateDetailedWaitTime(
-                                            activeOrders = allOrdersList,
-                                            historicalOrders = customerOrdersList,
-                                            vendorId = cartVendorId,
-                                            newItemQuantity = totalCartQty
-                                        )
-                                    }
-
-                                    Card(
-                                        modifier = Modifier.fillMaxWidth(),
-                                        colors = CardDefaults.cardColors(
-                                            containerColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.25f)
-                                        ),
-                                        shape = RoundedCornerShape(10.dp)
-                                    ) {
-                                        Row(
-                                            modifier = Modifier.padding(10.dp),
-                                            verticalAlignment = Alignment.CenterVertically,
-                                            horizontalArrangement = Arrangement.spacedBy(10.dp)
-                                        ) {
-                                            Icon(
-                                                imageVector = Icons.Default.Timer,
-                                                contentDescription = "Wait Time",
-                                                tint = MaterialTheme.colorScheme.primary,
-                                                modifier = Modifier.size(24.dp)
-                                            )
-                                            Column {
-                                                Text(
-                                                    "‚è±Ô∏è Est. Kitchen Preparation Wait Time",
-                                                    fontSize = 11.sp,
-                                                    fontWeight = FontWeight.Bold,
-                                                    color = MaterialTheme.colorScheme.primary
-                                                )
-                                                Text(
-                                                    waitTimeEstimate.summaryText,
-                                                    fontSize = 12.sp,
-                                                    fontWeight = FontWeight.ExtraBold,
-                                                    color = MaterialTheme.colorScheme.onSurface
-                                                )
-                                                Text(
-                                                    "Calculated from ${waitTimeEstimate.queueSize} queue orders & historical average prep speed",
-                                                    fontSize = 9.sp,
-                                                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                                                )
-                                            }
-                                        }
-                                    }
-
-                                    Spacer(modifier = Modifier.height(10.dp))
-
-                                    // ü•ó Gemini Real-time Cart Nutritional Analysis & Health Warning/Recommendation Card
-                                    val cartNutritionAnalysisText by viewModel.cartNutritionAnalysis.collectAsStateWithLifecycle()
-                                    val isAnalyzingCartNutrition by viewModel.isAnalyzingCartNutrition.collectAsStateWithLifecycle()
-
-                                    LaunchedEffect(cartItems) {
-                                        if (cartItems.isNotEmpty()) {
-                                            viewModel.analyzeCartNutritionWithGemini(cartItems)
-                                        }
-                                    }
-
-                                    Card(
-                                        modifier = Modifier.fillMaxWidth(),
-                                        colors = CardDefaults.cardColors(
-                                            containerColor = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.25f)
-                                        ),
-                                        shape = RoundedCornerShape(10.dp)
-                                    ) {
-                                        Column(modifier = Modifier.padding(10.dp)) {
-                                            Row(
-                                                modifier = Modifier.fillMaxWidth(),
-                                                verticalAlignment = Alignment.CenterVertically,
-                                                horizontalArrangement = Arrangement.SpaceBetween
-                                            ) {
-                                                Row(
-                                                    verticalAlignment = Alignment.CenterVertically,
-                                                    horizontalArrangement = Arrangement.spacedBy(6.dp)
-                                                ) {
-                                                    Icon(
-                                                        imageVector = Icons.Default.AutoAwesome,
-                                                        contentDescription = "Gemini AI",
-                                                        tint = MaterialTheme.colorScheme.secondary,
-                                                        modifier = Modifier.size(18.dp)
-                                                    )
-                                                    Text(
-                                                        "Gemini Real-time Cart Health & Nutrition Advisor",
-                                                        fontSize = 11.sp,
-                                                        fontWeight = FontWeight.Bold,
-                                                        color = MaterialTheme.colorScheme.secondary
-                                                    )
-                                                }
-                                                if (isAnalyzingCartNutrition) {
-                                                    CircularProgressIndicator(
-                                                        modifier = Modifier.size(14.dp),
-                                                        strokeWidth = 2.dp,
-                                                        color = MaterialTheme.colorScheme.secondary
-                                                    )
-                                                }
-                                            }
-
-                                            Spacer(modifier = Modifier.height(6.dp))
-
-                                            if (cartNutritionAnalysisText != null) {
-                                                Text(
-                                                    text = cartNutritionAnalysisText ?: "",
-                                                    fontSize = 10.sp,
-                                                    color = MaterialTheme.colorScheme.onSurface,
-                                                    lineHeight = 14.sp
-                                                )
-                                            } else {
-                                                Text(
-                                                    "Analyzing meal calories, macronutrients, and health recommendations...",
-                                                    fontSize = 10.sp,
-                                                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                                                )
-                                            }
-                                        }
-                                    }
-
-                                    Spacer(modifier = Modifier.height(10.dp))
-
-                                    val cartTotalSum = viewModel.getCartTotal()
-                                    val finalCartPickupTimeText = if (cartScheduleForLaterEnabled) {
-                                        "Scheduled for $cartPreferredPickupTimeText"
-                                    } else {
-                                        "As soon as possible"
-                                    }
-
-                                    Spacer(modifier = Modifier.height(12.dp))
-                                    HorizontalDivider()
-                                    Spacer(modifier = Modifier.height(12.dp))
-
-                                    Row(
-                                        modifier = Modifier.fillMaxWidth(),
-                                        horizontalArrangement = Arrangement.SpaceBetween,
-                                        verticalAlignment = Alignment.CenterVertically
-                                    ) {
-                                        Text("Total Amount:", fontWeight = FontWeight.Bold)
-                                        Text("GH‚Çµ ${"%.2f".format(cartTotalSum)}", fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary, fontSize = 18.sp)
-                                    }
-
-                                    Spacer(modifier = Modifier.height(12.dp))
-                                    Text("Choose Payment Mode:", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
-                                    Spacer(modifier = Modifier.height(6.dp))
-
-                                    var cartPaymentMode by remember { mutableStateOf("WALLET") }
-                                    Row(
-                                        modifier = Modifier.fillMaxWidth(),
-                                        horizontalArrangement = Arrangement.spacedBy(4.dp)
-                                    ) {
-                                        listOf(
-                                            "WALLET" to "Student Wallet",
-                                            "POD" to "Cash (POD)"
-                                        ).forEach { (mode, label) ->
-                                            val isSelected = cartPaymentMode == mode
-                                            val containerColor = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
-                                            val textColor = if (isSelected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant
-                                            Box(
-                                                modifier = Modifier
-                                                    .weight(1f)
-                                                    .background(containerColor, RoundedCornerShape(8.dp))
-                                                    .clickable { cartPaymentMode = mode }
-                                                    .padding(vertical = 8.dp),
-                                                contentAlignment = Alignment.Center
-                                            ) {
-                                                Text(label, fontSize = 10.sp, fontWeight = FontWeight.Bold, color = textColor)
-                                            }
-                                        }
-                                    }
-
-                                    Spacer(modifier = Modifier.height(12.dp))
-
-                                    var cartCheckoutError by remember { mutableStateOf<String?>(null) }
-                                    var cartCheckoutProcessing by remember { mutableStateOf(false) }
-
-                                    if (cartPaymentMode == "WALLET") {
-                                        val isLowOrInsufficient = studentWalletBalance < cartTotalSum
-                                        Card(
-                                            modifier = Modifier.fillMaxWidth(),
-                                            colors = CardDefaults.cardColors(
-                                                containerColor = if (isLowOrInsufficient) MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.4f) else MaterialTheme.colorScheme.primary.copy(alpha = 0.04f)
-                                            )
-                                        ) {
-                                            Column(modifier = Modifier.padding(12.dp)) {
-                                                Text(
-                                                    text = "Your current balance: GH‚Çµ ${"%.2f".format(studentWalletBalance)}",
-                                                    fontSize = 11.sp,
-                                                    color = if (isLowOrInsufficient) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary,
-                                                    fontWeight = FontWeight.Bold
-                                                )
-                                                if (isLowOrInsufficient) {
-                                                    Text(
-                                                        text = "‚ö†Ô∏è Insufficient smart balance for this order!",
-                                                        fontSize = 9.sp,
-                                                        fontWeight = FontWeight.Bold,
-                                                        color = MaterialTheme.colorScheme.error
-                                                    )
-                                                }
-                                            }
-                                        }
-                                    }
-
-                                    val conflicts = remember(currentUser?.dietaryPreferences, cartItems) {
-                                        checkDietaryConflicts(currentUser?.dietaryPreferences ?: "", cartItems)
-                                    }
-
-                                    if (conflicts.isNotEmpty()) {
-                                        Card(
-                                            colors = CardDefaults.cardColors(
-                                                containerColor = MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.95f)
-                                            ),
-                                            shape = RoundedCornerShape(10.dp),
-                                            modifier = Modifier
-                                                .fillMaxWidth()
-                                                .padding(vertical = 4.dp)
-                                                .testTag("dietary_conflict_warning_card")
-                                        ) {
-                                            Row(
-                                                modifier = Modifier.padding(12.dp),
-                                                verticalAlignment = Alignment.CenterVertically,
-                                                horizontalArrangement = Arrangement.spacedBy(8.dp)
-                                            ) {
-                                                Icon(
-                                                    imageVector = Icons.Default.Warning,
-                                                    contentDescription = "Dietary Warning",
-                                                    tint = MaterialTheme.colorScheme.onErrorContainer,
-                                                    modifier = Modifier.size(20.dp)
-                                                )
-                                                Column {
-                                                    Text(
-                                                        text = "Dietary Preference Warning!",
-                                                        fontWeight = FontWeight.Bold,
-                                                        fontSize = 11.sp,
-                                                        color = MaterialTheme.colorScheme.onErrorContainer
-                                                    )
-                                                    for (conflict in conflicts) {
-                                                        Text(
-                                                            text = "‚Ä¢ $conflict",
-                                                            fontSize = 9.5.sp,
-                                                            color = MaterialTheme.colorScheme.onErrorContainer,
-                                                            lineHeight = 12.sp
-                                                        )
-                                                    }
-                                                }
-                                            }
-                                        }
-                                        Spacer(modifier = Modifier.height(8.dp))
-                                    }
-
-                                    cartCheckoutError?.let { err ->
-                                        Text(err, color = MaterialTheme.colorScheme.error, fontSize = 11.sp, fontWeight = FontWeight.Bold)
-                                        Spacer(modifier = Modifier.height(8.dp))
-                                    }
-
-                                    if (cartCheckoutProcessing) {
-                                        CircularProgressIndicator(modifier = Modifier.size(24.dp).align(Alignment.CenterHorizontally))
-                                    } else {
-                                        val context = androidx.compose.ui.platform.LocalContext.current
-                                        Button(
-                                            onClick = {
-                                                if (cartPaymentMode == "WALLET" && studentWalletBalance < cartTotalSum) {
-                                                    cartCheckoutError = "Insufficient smart balance. Top up your virtual ID Wallet!"
-                                                } else {
-                                                    if (conflicts.isNotEmpty()) {
-                                                        android.widget.Toast.makeText(
-                                                            context,
-                                                            "‚ö†Ô∏è Dietary Warning: ${conflicts.first()}",
-                                                            android.widget.Toast.LENGTH_LONG
-                                                        ).show()
-                                                    }
-                                                    cartCheckoutError = null
-                                                    showCartOrderConfirmationDialog = true
-                                                }
-                                            },
-                                            modifier = Modifier.fillMaxWidth().testTag("cart_checkout_submit_btn"),
-                                            shape = RoundedCornerShape(8.dp)
-                                        ) {
-                                            Text("Place Multi-Order (${cartItems.size} items)")
-                                        }
-
-                                        // MULTI-ITEM CART ORDER CONFIRMATION DIALOG (PREVENTS ACCIDENTAL PURCHASES)
-                                        if (showCartOrderConfirmationDialog) {
-                                            val confirmTotalSum = cartItems.sumOf { it.foodItem.price * it.quantity }
-
-                                            Dialog(onDismissRequest = { if (!cartCheckoutProcessing) showCartOrderConfirmationDialog = false }) {
-                                                Card(
-                                                    modifier = Modifier
-                                                        .fillMaxWidth()
-                                                        .padding(16.dp)
-                                                        .testTag("multi_cart_confirmation_dialog"),
-                                                    shape = RoundedCornerShape(24.dp),
-                                                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-                                                    elevation = CardDefaults.cardElevation(defaultElevation = 8.dp)
-                                                ) {
-                                                    Column(
-                                                        modifier = Modifier
-                                                            .padding(24.dp)
-                                                            .fillMaxWidth(),
-                                                        horizontalAlignment = Alignment.CenterHorizontally,
-                                                        verticalArrangement = Arrangement.spacedBy(16.dp)
-                                                    ) {
-                                                        Box(
-                                                            modifier = Modifier
-                                                                .size(56.dp)
-                                                                .background(MaterialTheme.colorScheme.primaryContainer, shape = CircleShape),
-                                                            contentAlignment = Alignment.Center
-                                                        ) {
-                                                            Icon(
-                                                                imageVector = Icons.Default.ShoppingCart,
-                                                                contentDescription = null,
-                                                                tint = MaterialTheme.colorScheme.onPrimaryContainer,
-                                                                modifier = Modifier.size(28.dp)
-                                                            )
-                                                        }
-
-                                                        Text(
-                                                            "Confirm Multi-Item Order",
-                                                            style = MaterialTheme.typography.titleLarge,
-                                                            fontWeight = FontWeight.Bold,
-                                                            color = MaterialTheme.colorScheme.onSurface
-                                                        )
-
-                                                        Surface(
-                                                            color = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.5f),
-                                                            shape = RoundedCornerShape(8.dp)
-                                                        ) {
-                                                            Row(
-                                                                modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
-                                                                verticalAlignment = Alignment.CenterVertically
-                                                            ) {
-                                                                Icon(
-                                                                    Icons.Default.VerifiedUser,
-                                                                    contentDescription = null,
-                                                                    tint = MaterialTheme.colorScheme.onSecondaryContainer,
-                                                                    modifier = Modifier.size(16.dp)
-                                                                )
-                                                                Spacer(modifier = Modifier.width(6.dp))
-                                                                Text(
-                                                                    "Accidental Purchase Protection Active",
-                                                                    fontSize = 11.sp,
-                                                                    fontWeight = FontWeight.SemiBold,
-                                                                    color = MaterialTheme.colorScheme.onSecondaryContainer
-                                                                )
-                                                            }
-                                                        }
-
-                                                        Text(
-                                                            "Review your order summary and final payable total before sending order directly to cafeteria kitchen staff.",
-                                                            style = MaterialTheme.typography.bodySmall,
-                                                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                                            textAlign = androidx.compose.ui.text.style.TextAlign.Center
-                                                        )
-
-                                                        HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
-
-                                                        // Items breakdown list
-                                                        Column(
-                                                            modifier = Modifier
-                                                                .fillMaxWidth()
-                                                                .heightIn(max = 180.dp)
-                                                                .verticalScroll(rememberScrollState()),
-                                                            verticalArrangement = Arrangement.spacedBy(8.dp)
-                                                        ) {
-                                                            cartItems.forEach { cartItem ->
-                                                                Row(
-                                                                    modifier = Modifier.fillMaxWidth(),
-                                                                    horizontalArrangement = Arrangement.SpaceBetween,
-                                                                    verticalAlignment = Alignment.CenterVertically
-                                                                ) {
-                                                                    Column(modifier = Modifier.weight(1f)) {
-                                                                        Text(
-                                                                            cartItem.foodItem.name,
-                                                                            fontWeight = FontWeight.Bold,
-                                                                            style = MaterialTheme.typography.bodyMedium
-                                                                        )
-                                                                        Text(
-                                                                            "Qty: ${cartItem.quantity} x GH‚Çµ ${"%.2f".format(cartItem.foodItem.price)}",
-                                                                            fontSize = 11.sp,
-                                                                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                                                                        )
-                                                                    }
-                                                                    Text(
-                                                                        "GH‚Çµ ${"%.2f".format(cartItem.foodItem.price * cartItem.quantity)}",
-                                                                        fontWeight = FontWeight.Bold,
-                                                                        style = MaterialTheme.typography.bodyMedium,
-                                                                        color = MaterialTheme.colorScheme.primary
-                                                                    )
-                                                                }
-                                                            }
-                                                        }
-
-                                                        HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
-
-                                                        // Payment mode & Pickup summary
-                                                        Row(
-                                                            modifier = Modifier.fillMaxWidth(),
-                                                            horizontalArrangement = Arrangement.SpaceBetween
-                                                        ) {
-                                                            Text("Payment Method:", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                                                            Text(
-                                                                if (cartPaymentMode == "WALLET") "Virtual ID Wallet" else cartPaymentMode,
-                                                                fontSize = 12.sp,
-                                                                fontWeight = FontWeight.Bold,
-                                                                color = MaterialTheme.colorScheme.onSurface
-                                                            )
-                                                        }
-
-                                                        Row(
-                                                            modifier = Modifier.fillMaxWidth(),
-                                                            horizontalArrangement = Arrangement.SpaceBetween
-                                                        ) {
-                                                            Text("Total Payable:", fontSize = 14.sp, fontWeight = FontWeight.Bold)
-                                                            Text(
-                                                                "GH‚Çµ ${"%.2f".format(confirmTotalSum)}",
-                                                                fontSize = 18.sp,
-                                                                fontWeight = FontWeight.ExtraBold,
-                                                                color = MaterialTheme.colorScheme.primary
-                                                            )
-                                                        }
-
-                                                        if (cartCheckoutProcessing) {
-                                                            CircularProgressIndicator(modifier = Modifier.size(28.dp).align(Alignment.CenterHorizontally))
-                                                        } else {
-                                                            Row(
-                                                                modifier = Modifier.fillMaxWidth(),
-                                                                horizontalArrangement = Arrangement.spacedBy(12.dp)
-                                                            ) {
-                                                                OutlinedButton(
-                                                                    onClick = { showCartOrderConfirmationDialog = false },
-                                                                    modifier = Modifier.weight(1f).testTag("cancel_multi_cart_confirm_btn")
-                                                                ) {
-                                                                    Text("Modify Cart")
-                                                                }
-                                                                Button(
-                                                                    onClick = {
-                                                                        cartCheckoutProcessing = true
-                                                                        viewModel.checkoutCart(
-                                                                            useWallet = (cartPaymentMode == "WALLET"),
-                                                                            estimatedPickupTime = finalCartPickupTimeText
-                                                                        ) { success ->
-                                                                            cartCheckoutProcessing = false
-                                                                            showCartOrderConfirmationDialog = false
-                                                                            if (success) {
-                                                                                HapticHelper.notification(context, "SUCCESS")
-                                                                                showOrderPlacedConfetti = true
-                                                                                showCartCheckoutDialog = false
-                                                                            } else {
-                                                                                HapticHelper.notification(context, "ERROR")
-                                                                                cartCheckoutError = "Checkout transaction failed. Try again."
-                                                                            }
-                                                                        }
-                                                                    },
-                                                                    modifier = Modifier.weight(1.4f).testTag("confirm_multi_cart_submit_btn")
-                                                                ) {
-                                                                    Text("Confirm & Pay GH‚Çµ ${"%.2f".format(confirmTotalSum)}", fontSize = 11.sp, fontWeight = FontWeight.Bold)
-                                                                }
-                                                            }
-                                                        }
-                                                    }
-                                                }
-                                            }
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-
-            // ORDER SUBMISSION CONFIRMATION DIALOG (PREVENTS ACCIDENTAL DUPLICATIONS)
-            if (showSubmissionConfirmation) {
-                submissionConfirmFood?.let { food ->
-                    val totalSum = food.price * submissionConfirmQuantity
-                    Dialog(onDismissRequest = { if (!submissionIsProcessing) showSubmissionConfirmation = false }) {
-                        Card(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(16.dp)
-                                .testTag("order_submission_confirmation_dialog"),
-                            shape = RoundedCornerShape(24.dp),
-                            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-                            elevation = CardDefaults.cardElevation(defaultElevation = 8.dp)
-                        ) {
-                            Column(
-                                modifier = Modifier
-                                    .padding(24.dp)
-                                    .fillMaxWidth(),
-                                horizontalAlignment = Alignment.CenterHorizontally,
-                                verticalArrangement = Arrangement.spacedBy(16.dp)
-                            ) {
-                                // Header icon and title
-                                Box(
-                                    modifier = Modifier
-                                        .size(56.dp)
-                                        .background(MaterialTheme.colorScheme.primaryContainer, shape = CircleShape),
-                                    contentAlignment = Alignment.Center
-                                ) {
-                                    Icon(
-                                        imageVector = Icons.Default.ShoppingCart,
-                                        contentDescription = null,
-                                        tint = MaterialTheme.colorScheme.onPrimaryContainer,
-                                        modifier = Modifier.size(28.dp)
-                                    )
-                                }
-
-                                Text(
-                                    "Confirm Your Order",
-                                    style = MaterialTheme.typography.titleLarge,
-                                    fontWeight = FontWeight.Bold,
-                                    color = MaterialTheme.colorScheme.onSurface
-                                )
-
-                                Text(
-                                    "Please review details below before routing this order directly to the kitchen.",
-                                    style = MaterialTheme.typography.bodyMedium,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                    textAlign = androidx.compose.ui.text.style.TextAlign.Center
-                                )
-
-                                HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
-
-                                // Order summary block
-                                Row(
-                                    modifier = Modifier.fillMaxWidth(),
-                                    horizontalArrangement = Arrangement.SpaceBetween,
-                                    verticalAlignment = Alignment.CenterVertically
-                                ) {
-                                    Column(modifier = Modifier.weight(1f)) {
-                                        Text(
-                                            food.name,
-                                            fontWeight = FontWeight.Bold,
-                                            style = MaterialTheme.typography.bodyLarge,
-                                            color = MaterialTheme.colorScheme.onSurface
-                                        )
-                                        Text(
-                                            "Qty: $submissionConfirmQuantity x GH‚Çµ ${"%.2f".format(food.price)}",
-                                            style = MaterialTheme.typography.bodyMedium,
-                                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                                        )
-                                    }
-                                    
-                                    Text(
-                                        "GH‚Çµ ${"%.2f".format(totalSum)}",
-                                        style = MaterialTheme.typography.titleMedium,
-                                        fontWeight = FontWeight.ExtraBold,
-                                        color = MaterialTheme.colorScheme.primary
-                                    )
-                                }
-
-                                Row(
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .background(MaterialTheme.colorScheme.surfaceVariant, shape = RoundedCornerShape(12.dp))
-                                        .padding(12.dp),
-                                    horizontalArrangement = Arrangement.SpaceBetween,
-                                    verticalAlignment = Alignment.CenterVertically
-                                ) {
-                                    Text(
-                                        "Payment Mode:",
-                                        style = MaterialTheme.typography.bodyMedium,
-                                        fontWeight = FontWeight.SemiBold,
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                                    )
-                                    Row(verticalAlignment = Alignment.CenterVertically) {
-                                        val payIcon = when (submissionConfirmPaymentMode) {
-                                            "WALLET" -> Icons.Default.AccountBalanceWallet
-                                            "POD" -> Icons.Default.Payments
-                                            else -> Icons.Default.CreditCard
-                                        }
-                                        Icon(
-                                            payIcon,
-                                            contentDescription = null,
-                                            modifier = Modifier.size(16.dp),
-                                            tint = MaterialTheme.colorScheme.primary
-                                        )
-                                        Spacer(modifier = Modifier.width(4.dp))
-                                        Text(
-                                            text = when (submissionConfirmPaymentMode) {
-                                                "WALLET" -> "Smart Wallet"
-                                                "POD" -> "Pay On Delivery"
-                                                else -> "Direct Gateway"
-                                            },
-                                            style = MaterialTheme.typography.bodyMedium,
-                                            fontWeight = FontWeight.Bold,
-                                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                                        )
-                                    }
-                                }
-
-                                // Biometric Security & Prevent Duplication Warning Banner
-                                Row(
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .background(MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.4f), shape = RoundedCornerShape(12.dp))
-                                        .border(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.2f), shape = RoundedCornerShape(12.dp))
-                                        .padding(10.dp),
-                                    verticalAlignment = Alignment.CenterVertically
-                                ) {
-                                    Icon(
-                                        imageVector = Icons.Default.Fingerprint,
-                                        contentDescription = "Biometric Security",
-                                        tint = MaterialTheme.colorScheme.primary,
-                                        modifier = Modifier.size(20.dp)
-                                    )
-                                    Spacer(modifier = Modifier.width(8.dp))
-                                    Text(
-                                        "Biometric Check: Fingerprint verification authorizes order payment and initiates immediate preparation.",
-                                        style = MaterialTheme.typography.bodySmall,
-                                        fontWeight = FontWeight.SemiBold,
-                                        color = MaterialTheme.colorScheme.onPrimaryContainer
-                                    )
-                                }
-
-                                Spacer(modifier = Modifier.height(8.dp))
-
-                                // Actions
-                                Row(
-                                    modifier = Modifier.fillMaxWidth(),
-                                    horizontalArrangement = Arrangement.spacedBy(12.dp)
-                                ) {
-                                    OutlinedButton(
-                                        onClick = { showSubmissionConfirmation = false },
-                                        enabled = !submissionIsProcessing,
-                                        modifier = Modifier.weight(1f).height(48.dp).testTag("confirm_cancel_button")
-                                    ) {
-                                        Text("Go Back")
-                                    }
-
-                                    Button(
-                                        onClick = {
-                                            val activity = com.example.ui.util.BiometricHelper.findActivity(context)
-                                            if (activity != null && com.example.ui.util.BiometricHelper.isBiometricAvailable(context)) {
-                                                com.example.ui.util.BiometricHelper.showBiometricPrompt(
-                                                    activity = activity,
-                                                    title = "Authenticate with Fingerprint",
-                                                    subtitle = "Verify biometric identity to confirm GH‚Çµ ${"%.2f".format(totalSum)} checkout",
-                                                    onSuccess = {
-                                                        submissionIsProcessing = true
-                                                        submissionConfirmCallback?.invoke()
-                                                    },
-                                                    onError = { err ->
-                                                        // Fall back cleanly to standard authorized placement
-                                                        submissionIsProcessing = true
-                                                        submissionConfirmCallback?.invoke()
-                                                    }
-                                                )
-                                            } else {
-                                                submissionIsProcessing = true
-                                                submissionConfirmCallback?.invoke()
-                                            }
-                                        },
-                                        enabled = !submissionIsProcessing,
-                                        colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary),
-                                        modifier = Modifier.weight(1f).height(48.dp).testTag("confirm_submit_button")
-                                    ) {
-                                        if (submissionIsProcessing) {
-                                            CircularProgressIndicator(
-                                                modifier = Modifier.size(18.dp),
-                                                strokeWidth = 2.dp,
-                                                color = MaterialTheme.colorScheme.onPrimary
-                                            )
-                                        } else {
-                                            Icon(imageVector = Icons.Default.Fingerprint, contentDescription = null, modifier = Modifier.size(18.dp))
-                                            Spacer(modifier = Modifier.width(6.dp))
-                                            Text("Authorize & Pay")
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-
-            // FEEDBACK DIALOG
-            feedbackTargetOrder?.let { order ->
-                Dialog(onDismissRequest = { feedbackTargetOrder = null }) {
-                    Card(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .verticalScroll(rememberScrollState()),
-                        shape = RoundedCornerShape(16.dp)
-                    ) {
-                        Column(modifier = Modifier.padding(24.dp)) {
-                            Text(
-                                "Rate & Review Vendor",
-                                fontWeight = FontWeight.Bold,
-                                style = MaterialTheme.typography.titleMedium,
-                                color = MaterialTheme.colorScheme.primary
-                            )
-                            Text("Rate '${order.foodName}' vendor and share your experience:", fontSize = 11.sp)
-                            Spacer(modifier = Modifier.height(16.dp))
-
-                            // 1. Food Quality Star Rating
-                            InteractiveStarRatingBar(
-                                rating = foodQualityRating,
-                                onRatingChanged = { foodQualityRating = it },
-                                label = "üçî Food Culinary Quality",
-                                starSize = 28.dp
-                            )
-                            Spacer(modifier = Modifier.height(8.dp))
-
-                            // 2. Sanitation Star Rating
-                            InteractiveStarRatingBar(
-                                rating = cleanlinessRating,
-                                onRatingChanged = { cleanlinessRating = it },
-                                label = "ü´ß Booth Hygiene & Cleanliness",
-                                starSize = 28.dp
-                            )
-                            Spacer(modifier = Modifier.height(8.dp))
-
-                            // 3. Service Speed Star Rating
-                            InteractiveStarRatingBar(
-                                rating = speedRating,
-                                onRatingChanged = { speedRating = it },
-                                label = "‚ö° Processing Speed",
-                                starSize = 28.dp
-                            )
-                            Spacer(modifier = Modifier.height(8.dp))
-
-                            // 4. Price-to-Portion Value Star Rating
-                            InteractiveStarRatingBar(
-                                rating = priceRating,
-                                onRatingChanged = { priceRating = it },
-                                label = "üí∞ Price-to-Portion Value",
-                                starSize = 28.dp
-                            )
-
-                            Spacer(modifier = Modifier.height(12.dp))
-
-                            OutlinedTextField(
-                                value = feedbackComment,
-                                onValueChange = { feedbackComment = it },
-                                label = { Text("Verbal Comments (Optional)") },
-                                modifier = Modifier.fillMaxWidth(),
-                                maxLines = 3
-                            )
-
-                            Spacer(modifier = Modifier.height(12.dp))
-                            HorizontalDivider(modifier = Modifier.padding(vertical = 12.dp))
-
-                            Text(
-                                "ü•ó Specific Food Item Review",
-                                fontWeight = FontWeight.Bold,
-                                style = MaterialTheme.typography.titleMedium,
-                                color = MaterialTheme.colorScheme.secondary
-                            )
-                            Text("Rate the specific food item '${order.foodName}' specifically:", fontSize = 11.sp)
-                            Spacer(modifier = Modifier.height(12.dp))
-
-                            // Specific Food Item Star Rating
-                            InteractiveStarRatingBar(
-                                rating = foodItemRating,
-                                onRatingChanged = { foodItemRating = it },
-                                label = "Dish Star Rating",
-                                starSize = 32.dp
-                            )
-
-                            Spacer(modifier = Modifier.height(8.dp))
-
-
-                            OutlinedTextField(
-                                value = foodItemComment,
-                                onValueChange = { foodItemComment = it },
-                                label = { Text("How was the meal preparation / portion size? (Optional)") },
-                                modifier = Modifier.fillMaxWidth(),
-                                maxLines = 2
-                            )
-
-                            Spacer(modifier = Modifier.height(16.dp))
-
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.End
-                            ) {
-                                TextButton(onClick = { feedbackTargetOrder = null }) {
-                                    Text("Cancel")
-                                }
-                                Spacer(modifier = Modifier.width(12.dp))
-                                Button(
-                                    onClick = {
-                                        viewModel.submitOrderFeedback(
-                                            orderId = order.id,
-                                            vendorId = order.vendorId,
-                                            quality = foodQualityRating,
-                                            cleanliness = cleanlinessRating,
-                                            speed = speedRating,
-                                            value = priceRating,
-                                            comment = feedbackComment.ifBlank { "Tasted pristine, good portions." }
-                                        ) {
-                                            viewModel.submitFoodFeedback(
-                                                orderId = order.id,
-                                                foodItemId = order.foodItemId,
-                                                rating = foodItemRating,
-                                                comment = foodItemComment.ifBlank { "Delicious! Prepared to perfection." }
-                                            ) {
-                                                feedbackTargetOrder = null
-                                                // Reset states
-                                                foodItemRating = 5
-                                                foodItemComment = ""
-                                                feedbackComment = ""
-                                                foodQualityRating = 5
-                                                cleanlinessRating = 5
-                                                speedRating = 5
-                                                priceRating = 5
-                                            }
-                                        }
-                                    }
-                                ) {
-                                    Text("Submit Rating & Review")
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-
-            // POPUP REAL-TIME KITCHEN ALERTS (FROM VENDOR ESTIMATED TIME UPDATE)
-            val activePreparingOrderWithNoAck = studentOrders.firstOrNull { it.status == "PREPARING" && it.id !in acknowledgedOrders }
-            activePreparingOrderWithNoAck?.let { order ->
-                AlertDialog(
-                    onDismissRequest = { /* No-op to force acknowledgement */ },
-                    title = {
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(8.dp)
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.Timer,
-                                contentDescription = "Prep Speed Alert",
-                                tint = MaterialTheme.colorScheme.tertiary
-                            )
-                            Text(
-                                text = "Cooking Prep Alert",
-                                fontWeight = FontWeight.Bold,
-                                style = MaterialTheme.typography.titleMedium
-                            )
-                        }
-                    },
-                    text = {
-                        Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                            Text(
-                                text = "Your requested food is being prepared by the kitchen stand!",
-                                style = MaterialTheme.typography.bodyMedium
-                            )
-                            Card(
-                                modifier = Modifier.fillMaxWidth(),
-                                colors = CardDefaults.cardColors(
-                                    containerColor = MaterialTheme.colorScheme.tertiaryContainer
-                                )
-                            ) {
-                                Column(modifier = Modifier.padding(14.dp)) {
-                                    Text(
-                                        text = "ORDERED FOOD:",
-                                        fontSize = 9.sp,
-                                        fontWeight = FontWeight.Bold,
-                                        color = MaterialTheme.colorScheme.tertiary
-                                    )
-                                    Text(
-                                        text = "${order.foodName} x ${order.quantity}",
-                                        fontWeight = FontWeight.Bold,
-                                        style = MaterialTheme.typography.titleSmall,
-                                        color = MaterialTheme.colorScheme.onTertiaryContainer
-                                    )
-                                    Spacer(modifier = Modifier.height(10.dp))
-                                    Text(
-                                        text = "VENDOR ESTIMATED WAIT TIME:",
-                                        fontSize = 9.sp,
-                                        fontWeight = FontWeight.Bold,
-                                        color = MaterialTheme.colorScheme.tertiary
-                                    )
-                                    Text(
-                                        text = order.estimatedPickupTime,
-                                        fontWeight = FontWeight.ExtraBold,
-                                        fontSize = 18.sp,
-                                        color = MaterialTheme.colorScheme.onTertiaryContainer
-                                    )
-                                    Spacer(modifier = Modifier.height(4.dp))
-                                    Text(
-                                        text = "It will take about '${order.estimatedPickupTime}' to finish preparing your meal.",
-                                        fontSize = 11.sp,
-                                        color = MaterialTheme.colorScheme.onTertiaryContainer.copy(alpha = 0.8f)
-                                    )
-                                }
-                            }
-                            Text(
-                                text = "We'll notify you with a READY status update when it's hot and complete!",
-                                fontSize = 11.sp,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                        }
-                    },
-                    confirmButton = {
-                        Button(
-                            onClick = { acknowledgedOrders.add(order.id) },
-                            colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.tertiary)
-                        ) {
-                            Text("Acknowledge Wait Time", color = MaterialTheme.colorScheme.onTertiary)
-                        }
-                    }
-                )
-            }
-
-            // Real-time floating order notification banner for students
-            if (studentAlerts.isNotEmpty()) {
-                Column(
-                    modifier = Modifier
-                        .align(Alignment.BottomCenter)
-                        .fillMaxWidth()
-                        .padding(horizontal = 16.dp, vertical = 8.dp),
-                    verticalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    studentAlerts.forEach { alert ->
-                        Card(
-                            colors = CardDefaults.cardColors(
-                                containerColor = MaterialTheme.colorScheme.primaryContainer,
-                                contentColor = MaterialTheme.colorScheme.onPrimaryContainer
-                            ),
-                            elevation = CardDefaults.cardElevation(defaultElevation = 8.dp),
-                            shape = RoundedCornerShape(12.dp),
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .animateContentSize()
-                        ) {
-                            Row(
-                                modifier = Modifier
-                                    .padding(12.dp)
-                                    .fillMaxWidth(),
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(12.dp)
-                            ) {
-                                Box(
-                                    modifier = Modifier
-                                        .background(MaterialTheme.colorScheme.primary, CircleShape)
-                                        .padding(8.dp)
-                                ) {
-                                    Icon(
-                                        imageVector = Icons.Default.Notifications,
-                                        contentDescription = "Order Status Notification Alert",
-                                        tint = MaterialTheme.colorScheme.onPrimary,
-                                        modifier = Modifier.size(24.dp)
-                                    )
-                                }
-                                
-                                Column(modifier = Modifier.weight(1f)) {
-                                    Row(
-                                        modifier = Modifier.fillMaxWidth(),
-                                        horizontalArrangement = Arrangement.SpaceBetween,
-                                        verticalAlignment = Alignment.CenterVertically
-                                    ) {
-                                        Text(
-                                            text = "üîî ORDER IS READY!",
-                                            fontWeight = FontWeight.ExtraBold,
-                                            style = MaterialTheme.typography.titleSmall,
-                                            color = MaterialTheme.colorScheme.primary
-                                        )
-                                        IconButton(
-                                            onClick = { viewModel.dismissStudentAlert(alert.id) },
-                                            modifier = Modifier.size(24.dp)
-                                        ) {
-                                            Icon(
-                                                imageVector = Icons.Default.Close,
-                                                contentDescription = "Dismiss Notification",
-                                                modifier = Modifier.size(16.dp),
-                                                tint = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.6f)
-                                            )
-                                        }
-                                    }
-                                    Spacer(modifier = Modifier.height(4.dp))
-                                    Text(
-                                        text = alert.data.message,
-                                        style = MaterialTheme.typography.bodySmall,
-                                        fontWeight = FontWeight.Medium,
-                                        color = MaterialTheme.colorScheme.onPrimaryContainer
-                                    )
-                                    Spacer(modifier = Modifier.height(2.dp))
-                                    Text(
-                                        text = alert.data.time,
-                                        fontSize = 9.sp,
-                                        color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.5f)
-                                    )
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-
-            // Interactive Notification Center / Inbox Dialog
-            if (showNotificationCenter) {
-                Dialog(onDismissRequest = { showNotificationCenter = false }) {
-                    Card(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .heightIn(max = 500.dp),
-                        shape = RoundedCornerShape(16.dp),
-                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-                        elevation = CardDefaults.cardElevation(defaultElevation = 8.dp)
-                    ) {
-                        Column(modifier = Modifier.padding(16.dp)) {
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.SpaceBetween,
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Row(
-                                    verticalAlignment = Alignment.CenterVertically,
-                                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                                ) {
-                                    Icon(
-                                        imageVector = Icons.Default.Notifications,
-                                        contentDescription = null,
-                                        tint = MaterialTheme.colorScheme.primary,
-                                        modifier = Modifier.size(22.dp)
-                                    )
-                                    Text(
-                                        "Laravel Notifications",
-                                        style = MaterialTheme.typography.titleMedium,
-                                        fontWeight = FontWeight.Bold,
-                                        color = MaterialTheme.colorScheme.primary
-                                    )
-                                }
-                                IconButton(onClick = { showNotificationCenter = false }) {
-                                    Icon(Icons.Default.Close, contentDescription = "Close")
-                                }
-                            }
-
-                            Text(
-                                text = "Real-time updates synced in real-time from Accra Technical University's Laravel database subscription.",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.8f),
-                                modifier = Modifier.padding(bottom = 12.dp)
-                            )
-
-                            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
-
-                            if (studentNotifications.isEmpty()) {
-                                Box(
-                                    modifier = Modifier
-                                        .weight(1f)
-                                        .fillMaxWidth(),
-                                    contentAlignment = Alignment.Center
-                                ) {
-                                    Column(
-                                        horizontalAlignment = Alignment.CenterHorizontally,
-                                        verticalArrangement = Arrangement.spacedBy(8.dp)
-                                    ) {
-                                        Icon(
-                                            imageVector = Icons.Default.Info,
-                                            contentDescription = null,
-                                            tint = MaterialTheme.colorScheme.outline,
-                                            modifier = Modifier.size(48.dp)
-                                        )
-                                        Text(
-                                            "No notifications yet.",
-                                            fontWeight = FontWeight.Medium,
-                                            style = MaterialTheme.typography.bodyMedium,
-                                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                                        )
-                                        Text(
-                                            "You'll get an instant alert here when a Chef moves your plates to READY.",
-                                            fontSize = 11.sp,
-                                            textAlign = TextAlign.Center,
-                                            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
-                                            modifier = Modifier.padding(horizontal = 16.dp)
-                                        )
-                                    }
-                                }
-                            } else {
-                                LazyColumn(
-                                    modifier = Modifier
-                                        .weight(1f)
-                                        .fillMaxWidth()
-                                        .padding(vertical = 8.dp),
-                                    verticalArrangement = Arrangement.spacedBy(8.dp)
-                                ) {
-                                    items(studentNotifications) { notif ->
-                                        val isUnread = notif.read_at == null
-                                        Card(
-                                            modifier = Modifier.fillMaxWidth(),
-                                            colors = CardDefaults.cardColors(
-                                                containerColor = if (isUnread)
-                                                    MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.15f)
-                                                else
-                                                    MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f)
-                                            ),
-                                            shape = RoundedCornerShape(8.dp),
-                                            border = if (isUnread) BorderStroke(
-                                                1.dp,
-                                                MaterialTheme.colorScheme.primary.copy(alpha = 0.3f)
-                                            ) else null
-                                        ) {
-                                            Column(modifier = Modifier.padding(12.dp)) {
-                                                Row(
-                                                    modifier = Modifier.fillMaxWidth(),
-                                                    horizontalArrangement = Arrangement.SpaceBetween,
-                                                    verticalAlignment = Alignment.CenterVertically
-                                                ) {
-                                                    Row(
-                                                        verticalAlignment = Alignment.CenterVertically,
-                                                        horizontalArrangement = Arrangement.spacedBy(6.dp)
-                                                    ) {
-                                                        if (isUnread) {
-                                                            Box(
-                                                                modifier = Modifier
-                                                                    .size(8.dp)
-                                                                    .background(MaterialTheme.colorScheme.error, CircleShape)
-                                                            )
-                                                            Text(
-                                                                "UNREAD ALERT",
-                                                                color = MaterialTheme.colorScheme.error,
-                                                                fontWeight = FontWeight.ExtraBold,
-                                                                fontSize = 9.sp
-                                                            )
-                                                        } else {
-                                                            Text(
-                                                                "HISTORICAL",
-                                                                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
-                                                                fontWeight = FontWeight.Bold,
-                                                                fontSize = 9.sp
-                                                            )
-                                                        }
-                                                    }
-                                                    Text(
-                                                        text = notif.data.time,
-                                                        fontSize = 9.sp,
-                                                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)
-                                                    )
-                                                }
-                                                Spacer(modifier = Modifier.height(6.dp))
-                                                Text(
-                                                    text = notif.data.message,
-                                                    style = MaterialTheme.typography.bodySmall,
-                                                    lineHeight = 15.sp,
-                                                    color = MaterialTheme.colorScheme.onSurface
-                                                )
-                                            }
-                                        }
-                                    }
-                                }
-                            }
-
-                            Spacer(modifier = Modifier.height(12.dp))
-
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.spacedBy(8.dp)
-                            ) {
-                                if (studentNotifications.isNotEmpty()) {
-                                    Button(
-                                        onClick = {
-                                            viewModel.clearAllStudentNotifications()
-                                        },
-                                        colors = ButtonDefaults.buttonColors(
-                                            containerColor = MaterialTheme.colorScheme.primary,
-                                            contentColor = MaterialTheme.colorScheme.onPrimary
-                                        ),
-                                        shape = RoundedCornerShape(8.dp),
-                                        modifier = Modifier.weight(1f),
-                                        contentPadding = PaddingValues(vertical = 10.dp)
-                                    ) {
-                                        Text("Acknowledge & Mark Read", fontSize = 11.sp, fontWeight = FontWeight.Bold)
-                                    }
-                                }
-                                OutlinedButton(
-                                    onClick = { showNotificationCenter = false },
-                                    shape = RoundedCornerShape(8.dp),
-                                    modifier = Modifier.weight(1f),
-                                    contentPadding = PaddingValues(vertical = 10.dp)
-                                ) {
-                                    Text("Dismiss Panel", fontSize = 11.sp, fontWeight = FontWeight.Bold)
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-
-            if (showQualityRatingsLeaderboard) {
-                Dialog(onDismissRequest = { showQualityRatingsLeaderboard = false }) {
-                    Card(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .heightIn(max = 550.dp),
-                        shape = RoundedCornerShape(16.dp),
-                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-                        elevation = CardDefaults.cardElevation(defaultElevation = 8.dp)
-                    ) {
-                        Column(modifier = Modifier.padding(16.dp)) {
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.SpaceBetween,
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                                    Icon(Icons.Default.Star, contentDescription = null, tint = Color(0xFFFFB300), modifier = Modifier.size(22.dp))
-                                    Text(
-                                        "ATU Quality Leaderboard",
-                                        style = MaterialTheme.typography.titleMedium,
-                                        fontWeight = FontWeight.Bold,
-                                        color = MaterialTheme.colorScheme.primary
-                                    )
-                                }
-                                IconButton(onClick = { showQualityRatingsLeaderboard = false }) {
-                                    Icon(Icons.Default.Close, contentDescription = "Close")
-                                }
-                            }
-                            
-                            Text(
-                                "Live standings & hygiene audits of Accra Technical University cafeteria booths compiled from student compliance ratings.",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.8f),
-                                modifier = Modifier.padding(bottom = 12.dp)
-                            )
-                            
-                            val rankedVendors = remember(allVendors, allFeedback) {
-                                allVendors.map { vendor ->
-                                    val metrics = viewModel.getVendorMetrics(vendor.id, allFeedback)
-                                    vendor to (metrics["overall"] ?: 0.0)
-                                }.sortedByDescending { it.second }
-                            }
-                            
-                            if (rankedVendors.isEmpty()) {
-                                Box(
-                                    modifier = Modifier.weight(1f).fillMaxWidth(),
-                                    contentAlignment = Alignment.Center
-                                ) {
-                                    Text("No metrics found yet. Complete first handovers to trigger standings!", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                                }
-                            } else {
-                                Column(
-                                    modifier = Modifier
-                                        .weight(1f)
-                                        .fillMaxWidth()
-                                        .verticalScroll(rememberScrollState()),
-                                    verticalArrangement = Arrangement.spacedBy(10.dp)
-                                ) {
-                                    rankedVendors.forEachIndexed { index, pair ->
-                                        val vendor = pair.first
-                                        val overall = pair.second
-                                        val metrics = viewModel.getVendorMetrics(vendor.id, allFeedback)
-                                        
-                                        Card(
-                                            modifier = Modifier.fillMaxWidth(),
-                                            colors = CardDefaults.cardColors(
-                                                containerColor = when (index) {
-                                                    0 -> MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.4f)
-                                                    else -> MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f)
-                                                }
-                                            ),
-                                            shape = RoundedCornerShape(12.dp),
-                                            border = androidx.compose.foundation.BorderStroke(
-                                                1.dp,
-                                                when (index) {
-                                                    0 -> Color(0xFFFFB300)
-                                                    else -> MaterialTheme.colorScheme.outlineVariant
-                                                }
-                                            )
-                                        ) {
-                                            Column(modifier = Modifier.padding(12.dp)) {
-                                                Row(
-                                                    modifier = Modifier.fillMaxWidth(),
-                                                    horizontalArrangement = Arrangement.SpaceBetween,
-                                                    verticalAlignment = Alignment.CenterVertically
-                                                ) {
-                                                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                                                        val medal = when (index) {
-                                                            0 -> "üëë"
-                                                            1 -> "ü•à"
-                                                            2 -> "ü•â"
-                                                            else -> "üç¥"
-                                                        }
-                                                        Text(medal, fontSize = 16.sp)
-                                                        Column {
-                                                            Text(vendor.fullName, fontWeight = FontWeight.Bold, fontSize = 13.sp)
-                                                            Text("Booth: ${vendor.info.ifBlank { "Main Area" }}", fontSize = 10.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                                                        }
-                                                    }
-                                                    Card(
-                                                        colors = CardDefaults.cardColors(containerColor = Color(0xFFFFB300)),
-                                                        shape = RoundedCornerShape(6.dp)
-                                                    ) {
-                                                        Text(
-                                                            text = if (overall > 0.0) "${"%.1f".format(overall)} ‚òÖ" else "N/A",
-                                                            fontSize = 12.sp,
-                                                            fontWeight = FontWeight.ExtraBold,
-                                                            color = Color(0xFF2E2E2E),
-                                                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp)
-                                                        )
-                                                    }
-                                                }
-                                                
-                                                if (overall > 0.0) {
-                                                    Spacer(modifier = Modifier.height(8.dp))
-                                                    Row(
-                                                        modifier = Modifier.fillMaxWidth(),
-                                                        horizontalArrangement = Arrangement.spacedBy(12.dp)
-                                                    ) {
-                                                        Column(modifier = Modifier.weight(1f)) {
-                                                            Text("üçî Culinary: ${"%.1f".format(metrics["foodQuality"])}‚òÖ", fontSize = 9.sp, fontWeight = FontWeight.Bold)
-                                                            Spacer(modifier = Modifier.height(2.dp))
-                                                            LinearProgressIndicator(
-                                                                progress = { ((metrics["foodQuality"] ?: 0.0) / 5.0).toFloat().coerceIn(0f, 1f) },
-                                                                modifier = Modifier.fillMaxWidth().height(4.dp),
-                                                                color = Color(0xFF4CAF50),
-                                                                trackColor = MaterialTheme.colorScheme.surfaceVariant
-                                                            )
-                                                        }
-                                                        Column(modifier = Modifier.weight(1f)) {
-                                                            Text("ü´ß Hygiene: ${"%.1f".format(metrics["cleanliness"])}‚òÖ", fontSize = 9.sp, fontWeight = FontWeight.Bold)
-                                                            Spacer(modifier = Modifier.height(2.dp))
-                                                            LinearProgressIndicator(
-                                                                progress = { ((metrics["cleanliness"] ?: 0.0) / 5.0).toFloat().coerceIn(0f, 1f) },
-                                                                modifier = Modifier.fillMaxWidth().height(4.dp),
-                                                                color = Color(0xFF2196F3),
-                                                                trackColor = MaterialTheme.colorScheme.surfaceVariant
-                                                            )
-                                                        }
-                                                        Column(modifier = Modifier.weight(1f)) {
-                                                            Text("‚ö° Speed: ${"%.1f".format(metrics["speed"])}‚òÖ", fontSize = 9.sp, fontWeight = FontWeight.Bold)
-                                                            Spacer(modifier = Modifier.height(2.dp))
-                                                            LinearProgressIndicator(
-                                                                progress = { ((metrics["speed"] ?: 0.0) / 5.0).toFloat().coerceIn(0f, 1f) },
-                                                                modifier = Modifier.fillMaxWidth().height(4.dp),
-                                                                color = Color(0xFFFF9800),
-                                                                trackColor = MaterialTheme.colorScheme.surfaceVariant
-                                                            )
-                                                        }
-                                                    }
-                                                }
-                                            }
-                                        }
-                                    }
-                                }
-                            }
-                            Spacer(modifier = Modifier.height(8.dp))
-                            Button(
-                                onClick = { showQualityRatingsLeaderboard = false },
-                                modifier = Modifier.fillMaxWidth(),
-                                shape = RoundedCornerShape(8.dp)
-                            ) {
-                                Text("Acknowledge Rankings", fontWeight = FontWeight.Bold)
-                            }
-                        }
-                    }
-                }
-            }
-
-            EditBudgetDialog(
-                showDialog = showEditBudgetDialog,
-                onDismiss = { showEditBudgetDialog = false },
-                initialValue = monthlyBudgetLimit,
-                onSave = { limit ->
-                    viewModel.setMonthlyBudgetLimit(limit)
-                    showEditBudgetDialog = false
-                }
-            )
-
-            if (showRewardsCatalogDialog) {
-                val livePts = loyaltySummary?.loyalty_points_balance ?: currentTotalPoints
-                RewardsCatalogDialog(
-                    availablePoints = livePts,
-                    onRedeemReward = { pointsCost, rewardTitle, discountAmount ->
-                        viewModel.redeemLoyaltyPoints(pointsCost)
-                        HapticHelper.notification(context, "SUCCESS")
-                        android.widget.Toast.makeText(context, "Redeemed $rewardTitle! Point balance updated.", android.widget.Toast.LENGTH_SHORT).show()
-                    },
-                    onDismiss = { showRewardsCatalogDialog = false }
-                )
-            }
-
-            if (showIndoorMapDialog) {
-                com.example.ui.components.CafeteriaIndoorMapDialog(
-                    onDismiss = { showIndoorMapDialog = false }
-                )
-            }
-
-            if (showDailyHealthSummaryDialog) {
-                com.example.ui.components.DailyHealthSummaryDialog(
-                    orders = studentOrders,
-                    availableMenu = allFoodItems,
-                    viewModel = viewModel,
-                    onDismiss = { showDailyHealthSummaryDialog = false }
-                )
-            }
-
-            if (showDietaryPreferencesDialog) {
-                DietaryPreferencesDialog(
-                    currentPreferences = dietaryPreferences,
-                    onSavePreferences = { newPrefs ->
-                        viewModel.updateDietaryPreferences(newPrefs)
-                        android.widget.Toast.makeText(context, "Dietary profile updated! Recommendations refreshed.", android.widget.Toast.LENGTH_SHORT).show()
-                    },
-                    onDismiss = { showDietaryPreferencesDialog = false }
-                )
-            }
-        }
-    }
-}
-}
-}
-}
-
-@Composable
-fun EditBudgetDialog(
-    showDialog: Boolean,
-    onDismiss: () -> Unit,
-    initialValue: Double,
-    onSave: (Double) -> Unit
-) {
-    if (!showDialog) return
-
-    var editBudgetInput by remember { mutableStateOf(initialValue.toString()) }
-
-    Dialog(onDismissRequest = onDismiss) {
-        Card(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(16.dp)
-                .testTag("edit_budget_dialog"),
-            shape = RoundedCornerShape(16.dp),
-            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
-        ) {
-            Column(
-                modifier = Modifier.padding(16.dp),
-                horizontalAlignment = Alignment.CenterHorizontally
-            ) {
-                Text(
-                    text = "Set Monthly Budget Limit",
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.primary
-                )
-
-                Spacer(modifier = Modifier.height(12.dp))
-
-                OutlinedTextField(
-                    value = editBudgetInput,
-                    onValueChange = { editBudgetInput = it },
-                    label = { Text("Budget Limit (GH‚Çµ)") },
-                    placeholder = { Text("e.g. 200.00") },
-                    singleLine = true,
-                    modifier = Modifier.fillMaxWidth().testTag("budget_limit_input_field"),
-                    shape = RoundedCornerShape(8.dp),
-                    keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(
-                        keyboardType = androidx.compose.ui.text.input.KeyboardType.Number
-                    )
-                )
-
-                Spacer(modifier = Modifier.height(16.dp))
-
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(12.dp)
-                ) {
-                    OutlinedButton(
-                        onClick = onDismiss,
-                        modifier = Modifier.weight(1f)
-                    ) {
-                        Text("Cancel")
-                    }
-
-                    Button(
-                        onClick = {
-                            val limit = editBudgetInput.toDoubleOrNull() ?: 0.0
-                            if (limit >= 0.0) {
-                                onSave(limit)
-                            }
-                        },
-                        modifier = Modifier.weight(1f).testTag("save_budget_button")
-                    ) {
-                        Text("Save Limit")
-                    }
-                }
-            }
-        }
-    }
-}
-
-fun checkDietaryConflicts(dietaryPrefs: String, cartItems: List<com.example.ui.viewmodel.CartItem>): List<String> {
-    if (dietaryPrefs.isBlank()) return emptyList()
-    val conflicts = mutableListOf<String>()
-    val activePrefs = dietaryPrefs.split(",").map { it.trim().lowercase() }.filter { it.isNotEmpty() }
-    
-    for (item in cartItems) {
-        val name = item.foodItem.name.lowercase()
-        val desc = item.foodItem.description.lowercase()
-        val allergens = item.foodItem.allergens.lowercase()
-        
-        for (pref in activePrefs) {
-            when {
-                pref.contains("vegetarian") -> {
-                    val meatKeywords = listOf("beef", "chicken", "pork", "fish", "meat", "mutton", "sausage", "kebab", "bacon", "turkey", "lamb")
-                    if (meatKeywords.any { name.contains(it) || desc.contains(it) }) {
-                        conflicts.add("'${item.foodItem.name}' contains ingredients not matching your Vegetarian preference.")
-                    }
-                }
-                pref.contains("vegan") -> {
-                    val animalKeywords = listOf("beef", "chicken", "pork", "fish", "meat", "egg", "cheese", "milk", "butter", "honey", "yogurt", "cream", "mutton", "sausage", "kebab", "bacon", "turkey", "lamb", "mayonnaise")
-                    if (animalKeywords.any { name.contains(it) || desc.contains(it) }) {
-                        conflicts.add("'${item.foodItem.name}' contains ingredients not matching your Vegan preference.")
-                    }
-                }
-                pref.contains("gluten-free") -> {
-                    val glutenKeywords = listOf("wheat", "flour", "bread", "spaghetti", "noodle", "pasta", "gluten", "batter", "biscuit", "cake", "cookie")
-                    if (glutenKeywords.any { name.contains(it) || desc.contains(it) } || allergens.contains("gluten")) {
-                        conflicts.add("'${item.foodItem.name}' contains gluten, which conflicts with your Gluten-Free preference.")
-                    }
-                }
-                pref.contains("lactose-free") -> {
-                    val dairyKeywords = listOf("milk", "cheese", "butter", "cream", "lactose", "yogurt", "mayo")
-                    if (dairyKeywords.any { name.contains(it) || desc.contains(it) } || allergens.contains("dairy") || allergens.contains("lactose")) {
-                        conflicts.add("'${item.foodItem.name}' contains dairy, which conflicts with your Lactose-Free preference.")
-                    }
-                }
-                pref.contains("nut-free") -> {
-                    val nutKeywords = listOf("nut", "peanut", "cashew", "almond", "walnut")
-                    if (nutKeywords.any { name.contains(it) || desc.contains(it) } || allergens.contains("nut") || allergens.contains("peanut")) {
-                        conflicts.add("'${item.foodItem.name}' contains nuts, which conflicts with your Nut-Free preference.")
-                    }
-                }
-                pref.contains("halal") -> {
-                    val porkKeywords = listOf("pork", "bacon", "ham", "lard", "alcohol", "beer", "wine")
-                    if (porkKeywords.any { name.contains(it) || desc.contains(it) }) {
-                        conflicts.add("'${item.foodItem.name}' contains non-Halal ingredients.")
-                    }
-                }
-                pref.contains("kosher") -> {
-                    val porkKeywords = listOf("pork", "bacon", "ham", "shrimp", "crab", "shellfish", "lard")
-                    if (porkKeywords.any { name.contains(it) || desc.contains(it) }) {
-                        conflicts.add("'${item.foodItem.name}' contains non-Kosher ingredients.")
-                    }
-                }
-            }
-        }
-    }
-    return conflicts
-}
-
-// ==========================
-// SKELETON LOADING PATTERNS
-// ==========================
-
-@Composable
-fun Modifier.pulseAnimation(): Modifier {
-    val transition = rememberInfiniteTransition(label = "pulse")
-    val alpha by transition.animateFloat(
-        initialValue = 0.3f,
-        targetValue = 0.9f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(1000, easing = LinearEasing),
-            repeatMode = RepeatMode.Reverse
-        ),
-        label = "alpha"
-    )
-    return this.graphicsLayer { this.alpha = alpha }
-}
-
-@Composable
-fun MenuSkeletonItem() {
-    Card(
-        modifier = Modifier
-            .fillMaxWidth()
-            .pulseAnimation(),
-        shape = RoundedCornerShape(12.dp),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.2f))
-    ) {
-        Row(
-            modifier = Modifier
-                .padding(12.dp)
-                .fillMaxWidth(),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Box(
-                modifier = Modifier
-                    .size(80.dp)
-                    .clip(RoundedCornerShape(8.dp))
-                    .background(MaterialTheme.colorScheme.onSurface.copy(alpha = 0.08f))
-            )
-            
-            Spacer(modifier = Modifier.width(12.dp))
-            
-            Column(
-                modifier = Modifier.weight(1f),
-                verticalArrangement = Arrangement.spacedBy(6.dp)
-            ) {
-                Box(
-                    modifier = Modifier
-                        .height(14.dp)
-                        .fillMaxWidth(0.6f)
-                        .clip(RoundedCornerShape(4.dp))
-                        .background(MaterialTheme.colorScheme.onSurface.copy(alpha = 0.12f))
-                )
-                Box(
-                    modifier = Modifier
-                        .height(10.dp)
-                        .fillMaxWidth(0.85f)
-                        .clip(RoundedCornerShape(4.dp))
-                        .background(MaterialTheme.colorScheme.onSurface.copy(alpha = 0.06f))
-                )
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Box(
-                        modifier = Modifier
-                            .height(12.dp)
-                            .width(60.dp)
-                            .clip(RoundedCornerShape(4.dp))
-                            .background(MaterialTheme.colorScheme.onSurface.copy(alpha = 0.12f))
-                    )
-                    Box(
-                        modifier = Modifier
-                            .height(16.dp)
-                            .width(80.dp)
-                            .clip(RoundedCornerShape(8.dp))
-                            .background(MaterialTheme.colorScheme.onSurface.copy(alpha = 0.06f))
-                    )
-                }
-            }
-        }
-    }
-}
-
-@Composable
-fun OrderHistorySkeletonItem() {
-    Card(
-        modifier = Modifier
-            .fillMaxWidth()
-            .pulseAnimation(),
-        shape = RoundedCornerShape(12.dp),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.2f))
-    ) {
-        Column(modifier = Modifier.padding(14.dp)) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Row(
-                    modifier = Modifier.weight(1f),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                        Box(
-                            modifier = Modifier
-                                .height(14.dp)
-                                .fillMaxWidth(0.5f)
-                                .clip(RoundedCornerShape(4.dp))
-                                .background(MaterialTheme.colorScheme.onSurface.copy(alpha = 0.12f))
-                        )
-                        Box(
-                            modifier = Modifier
-                                .height(10.dp)
-                                .fillMaxWidth(0.35f)
-                                .clip(RoundedCornerShape(4.dp))
-                                .background(MaterialTheme.colorScheme.onSurface.copy(alpha = 0.06f))
-                        )
-                    }
-                    Box(
-                        modifier = Modifier
-                            .size(36.dp)
-                            .clip(RoundedCornerShape(18.dp))
-                            .background(MaterialTheme.colorScheme.onSurface.copy(alpha = 0.06f))
-                    )
-                }
-
-                Column(horizontalAlignment = Alignment.End, verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                    Box(
-                        modifier = Modifier
-                            .height(20.dp)
-                            .width(70.dp)
-                            .clip(RoundedCornerShape(10.dp))
-                            .background(MaterialTheme.colorScheme.onSurface.copy(alpha = 0.08f))
-                    )
-                    Box(
-                        modifier = Modifier
-                            .height(12.dp)
-                            .width(50.dp)
-                            .clip(RoundedCornerShape(4.dp))
-                            .background(MaterialTheme.colorScheme.onSurface.copy(alpha = 0.12f))
-                    )
-                }
-            }
-            
-            Spacer(modifier = Modifier.height(10.dp))
-            HorizontalDivider(color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.05f))
-            Spacer(modifier = Modifier.height(10.dp))
-            
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Box(
-                    modifier = Modifier
-                        .height(10.dp)
-                        .width(120.dp)
-                        .clip(RoundedCornerShape(4.dp))
-                        .background(MaterialTheme.colorScheme.onSurface.copy(alpha = 0.06f))
-                )
-                Box(
-                    modifier = Modifier
-                        .height(24.dp)
-                        .width(90.dp)
-                        .clip(RoundedCornerShape(12.dp))
-                        .background(MaterialTheme.colorScheme.onSurface.copy(alpha = 0.1f))
-                )
-            }
-        }
-    }
-}
-
-// ==========================================
-// ü•≥ CELEBRATORY ORDER CONFETTI ANIMATION OVERLAY
-// ==========================================
-@Composable
-fun ConfettiOverlay(
-    isVisible: Boolean,
-    onFinished: () -> Unit = {}
-) {
-    if (!isVisible) return
-
-    val particles = remember {
-        val colors = listOf(
-            Color(0xFFFF1744), Color(0xFFFF9100), Color(0xFFFFEA00),
-            Color(0xFF00E676), Color(0xFF00E5FF), Color(0xFFD500F9)
-        )
-        List(75) {
-            ConfettiParticle(
-                x = (10..90).random() / 100f,
-                y = -0.05f - (0..30).random() / 100f,
-                vx = (-25..25).random() / 1000f,
-                vy = (15..45).random() / 1000f,
-                size = (6..14).random().dp,
-                color = colors.random()
-            )
-        }
-    }
-
-    val transition = rememberInfiniteTransition(label = "ConfettiTransition")
-    val progress by transition.animateFloat(
-        initialValue = 0f,
-        targetValue = 1f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(2800, easing = LinearEasing),
-            repeatMode = RepeatMode.Restart
-        ),
-        label = "ConfettiProgress"
-    )
-
-    LaunchedEffect(Unit) {
-        delay(3600)
-        onFinished()
-    }
-
-    androidx.compose.ui.window.Dialog(
-        onDismissRequest = onFinished,
-        properties = androidx.compose.ui.window.DialogProperties(
-            usePlatformDefaultWidth = false,
-            dismissOnBackPress = true,
-            dismissOnClickOutside = true
-        )
-    ) {
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .background(Color.Transparent)
-                .clickable { onFinished() }
-        ) {
-            androidx.compose.foundation.Canvas(
-                modifier = Modifier.fillMaxSize()
-            ) {
-                val canvasWidth = size.width
-                val canvasHeight = size.height
-
-                particles.forEach { particle ->
-                    val curY = ((particle.y + particle.vy * progress * 40f) % 1.2f) * canvasHeight
-                    val curX = (particle.x + particle.vx * progress * 20f).coerceIn(0f, 1f) * canvasWidth
-                    if (curY in 0f..canvasHeight) {
-                        drawCircle(
-                            color = particle.color,
-                            radius = particle.size.toPx(),
-                            center = androidx.compose.ui.geometry.Offset(curX, curY)
-                        )
-                    }
-                }
-            }
-        }
-    }
-}
-
-private data class ConfettiParticle(
-    val x: Float,
-    val y: Float,
-    val vx: Float,
-    val vy: Float,
-    val size: androidx.compose.ui.unit.Dp,
-    val color: Color
-)
-
-// ==========================================
-// ‚≠ê REUSABLE ACCESSIBLE STAR-RATING INPUT COMPONENT
-// ==========================================
-@Composable
-fun InteractiveStarRatingBar(
-    rating: Int,
-    onRatingChanged: (Int) -> Unit,
-    modifier: Modifier = Modifier,
-    maxStars: Int = 5,
-    starSize: androidx.compose.ui.unit.Dp = 28.dp,
-    label: String? = null
-) {
-    Column(modifier = modifier) {
-        if (!label.isNullOrBlank()) {
-            Text(
-                text = "$label ($rating/$maxStars Stars)",
-                fontWeight = FontWeight.SemiBold,
-                fontSize = 12.sp,
-                color = MaterialTheme.colorScheme.onSurface
-            )
-            Spacer(modifier = Modifier.height(4.dp))
-        }
-        Row(
-            horizontalArrangement = Arrangement.spacedBy(4.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            modifier = Modifier.padding(vertical = 2.dp)
-        ) {
-            for (star in 1..maxStars) {
-                val isSelected = star <= rating
-                IconButton(
-                    onClick = { onRatingChanged(star) },
-                    modifier = Modifier
-                        .size(starSize + 10.dp)
-                        .testTag("star_rating_${label?.lowercase()?.replace(" ", "_") ?: "item"}_$star")
-                        .semantics {
-                            contentDescription = "Rate $star out of $maxStars stars for ${label ?: "item"}"
-                        }
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.Star,
-                        contentDescription = "$star Stars rating option",
-                        tint = if (isSelected) Color(0xFFFFB300) else MaterialTheme.colorScheme.outline.copy(alpha = 0.25f),
-                        modifier = Modifier.size(starSize)
-                    )
-                }
-            }
-        }
-    }
-}
-
-/**
- * Lottie-based visual feedback animation component for real-time order status updates.
- * Provides subtle animated transitions when an order moves from 'Preparing' to 'Ready for Pickup'.
- */
-@Composable
-fun LottieOrderStatusUpdateView(
-    status: String,
-    modifier: Modifier = Modifier
-) {
-    val isReady = status.uppercase() == "READY"
-    val isPreparing = status.uppercase() == "PREPARING"
-
-    val lottieUrl = when {
-        isReady -> "https://assets5.lottiefiles.com/packages/lf20_jbrw3hcz.json"
-        isPreparing -> "https://assets9.lottiefiles.com/packages/lf20_a15m22pt.json"
-        else -> "https://assets2.lottiefiles.com/packages/lf20_usmfx6bp.json"
-    }
-
-    val composition by rememberLottieComposition(LottieCompositionSpec.Url(lottieUrl))
-    val lottieProgress by animateLottieCompositionAsState(
-        composition = composition,
-        iterations = LottieConstants.IterateForever
-    )
-
-    val transitionColor = when {
-        isReady -> Color(0xFF2E7D32)
-        isPreparing -> Color(0xFF1976D2)
-        else -> Color(0xFFF9A825)
-    }
-
-    Box(
-        modifier = modifier
-            .fillMaxWidth()
-            .clip(RoundedCornerShape(12.dp))
-            .background(transitionColor.copy(alpha = 0.08f))
-            .border(1.dp, transitionColor.copy(alpha = 0.3f), RoundedCornerShape(12.dp))
-            .padding(10.dp)
-            .testTag("lottie_order_status_animation_box")
-    ) {
-        Row(
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(10.dp)
-        ) {
-            if (composition != null) {
-                LottieAnimation(
-                    composition = composition,
-                    progress = { lottieProgress },
-                    modifier = Modifier.size(42.dp)
-                )
-            } else {
-                val infiniteTransition = rememberInfiniteTransition(label = "lottiePulse")
-                val pulseScale by infiniteTransition.animateFloat(
-                    initialValue = 0.88f,
-                    targetValue = 1.12f,
-                    animationSpec = infiniteRepeatable(
-                        animation = tween(700, easing = FastOutSlowInEasing),
-                        repeatMode = RepeatMode.Reverse
-                    ),
-                    label = "pulseScale"
-                )
-                Icon(
-                    imageVector = when {
-                        isReady -> Icons.Default.CheckCircle
-                        isPreparing -> Icons.Default.Restaurant
-                        else -> Icons.Default.Schedule
-                    },
-                    contentDescription = "Order status transition animation",
-                    tint = transitionColor,
-                    modifier = Modifier
-                        .size(32.dp)
-                        .scale(pulseScale)
-                )
-            }
-
-            Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    text = when {
-                        isReady -> "üéâ Order READY FOR PICKUP!"
-                        isPreparing -> "üë®‚Äçüç≥ Kitchen Preparing Meal..."
-                        else -> "‚è≥ Order Received"
-                    },
-                    style = MaterialTheme.typography.titleSmall,
-                    fontWeight = FontWeight.Bold,
-                    color = transitionColor
-                )
-                Text(
-                    text = when {
-                        isReady -> "Lottie Visual Feedback: Present your PIN at counter!"
-                        isPreparing -> "Subtle Lottie animation active during preparation transition."
-                        else -> "Queued for kitchen prep."
-                    },
-                    style = MaterialTheme.typography.bodySmall,
-                    fontSize = 11.sp,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-            }
-        }
-    }
-}
-
-/**
- * Dedicated Rewards Catalog dialog for students to redeem earned loyalty points for discounts and perks.
- */
-private data class RewardCatalogItem(
-    val id: String,
-    val title: String,
-    val description: String,
-    val pointsCost: Int,
-    val discountAmount: Double,
-    val category: String,
-    val icon: androidx.compose.ui.graphics.vector.ImageVector,
-    val accentColor: Color
-)
-
-@Composable
-fun RewardsCatalogDialog(
-    availablePoints: Int,
-    onRedeemReward: (pointsCost: Int, rewardTitle: String, discountAmount: Double) -> Unit,
-    onDismiss: () -> Unit
-) {
-    var selectedCategory by remember { mutableStateOf("All Rewards") }
-    var redeemedVoucherInfo by remember { mutableStateOf<String?>(null) }
-    
-    val rewardsList = remember {
-        listOf(
-            RewardCatalogItem("1", "GH‚Çµ 5 Cafeteria Voucher", "Valid on all meals across ATU booths", 100, 5.0, "Discounts", Icons.Default.ConfirmationNumber, Color(0xFF1976D2)),
-            RewardCatalogItem("2", "Free Sobolo Drink", "Claim 1 free chilled ginger hibiscus Sobolo", 120, 10.0, "Free Beverages", Icons.Default.LocalDrink, Color(0xFFD32F2F)),
-            RewardCatalogItem("3", "GH‚Çµ 10 Traditional Combo Discount", "GH‚Çµ 10 off Jollof Rice, Waakye or Fufu", 180, 10.0, "Discounts", Icons.Default.Restaurant, Color(0xFF388E3C)),
-            RewardCatalogItem("4", "Free Savoury Meat Pie", "Redeem 1 free fresh flaky pastry snack", 130, 15.0, "Free Snacks", Icons.Default.Fastfood, Color(0xFFF57C00)),
-            RewardCatalogItem("5", "GH‚Çµ 15 VIP Campus Meal Pass", "Instant GH‚Çµ 15 discount on any full order", 250, 15.0, "VIP Perks", Icons.Default.Star, Color(0xFF7B1FA2)),
-            RewardCatalogItem("6", "Free Ice Cold Beverage", "Claim 1 330ml chilled beverage", 100, 8.0, "Free Beverages", Icons.Default.LocalBar, Color(0xFFC2185B))
-        )
-    }
-
-    val categories = listOf("All Rewards", "Discounts", "Free Beverages", "Free Snacks", "VIP Perks")
-    val filteredRewards = remember(selectedCategory) {
-        if (selectedCategory == "All Rewards") rewardsList
-        else rewardsList.filter { it.category == selectedCategory }
-    }
-
-    Dialog(
-        onDismissRequest = onDismiss,
-        properties = androidx.compose.ui.window.DialogProperties(usePlatformDefaultWidth = false)
-    ) {
-        Surface(
-            modifier = Modifier
-                .fillMaxWidth(0.92f)
-                .wrapContentHeight()
-                .padding(vertical = 16.dp),
-            shape = RoundedCornerShape(24.dp),
-            color = MaterialTheme.colorScheme.surface,
-            tonalElevation = 8.dp
-        ) {
-            Column(
-                modifier = Modifier
-                    .padding(20.dp)
-                    .fillMaxWidth()
-            ) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        Box(
-                            modifier = Modifier
-                                .size(40.dp)
-                                .clip(CircleShape)
-                                .background(Color(0xFFFFB300).copy(alpha = 0.15f)),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Icon(Icons.Default.Star, contentDescription = "Rewards", tint = Color(0xFFFFB300), modifier = Modifier.size(24.dp))
-                        }
-                        Column {
-                            Text("Rewards Catalog üéÅ", fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleMedium)
-                            Text("Redeem student loyalty points for perks", fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                        }
-                    }
-                    IconButton(onClick = onDismiss, modifier = Modifier.testTag("close_rewards_catalog_btn")) {
-                        Icon(Icons.Default.Close, contentDescription = "Close")
-                    }
-                }
-
-                Spacer(modifier = Modifier.height(14.dp))
-
-                // Points balance card
-                Card(
-                    modifier = Modifier.fillMaxWidth(),
-                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.tertiaryContainer.copy(alpha = 0.6f)),
-                    shape = RoundedCornerShape(14.dp)
-                ) {
-                    Row(
-                        modifier = Modifier.padding(14.dp).fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Column {
-                            Text("AVAILABLE LOYALTY BALANCE", fontSize = 10.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onTertiaryContainer)
-                            Text("$availablePoints PTS", fontSize = 22.sp, fontWeight = FontWeight.ExtraBold, color = MaterialTheme.colorScheme.tertiary)
-                        }
-                        Surface(
-                            shape = RoundedCornerShape(20.dp),
-                            color = MaterialTheme.colorScheme.tertiary,
-                            contentColor = MaterialTheme.colorScheme.onTertiary
-                        ) {
-                            Text("‚âà GH‚Çµ ${"%.2f".format(availablePoints * 0.05)} Value", fontSize = 11.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp))
-                        }
-                    }
-                }
-
-                if (redeemedVoucherInfo != null) {
-                    Spacer(modifier = Modifier.height(10.dp))
-                    Box(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .clip(RoundedCornerShape(12.dp))
-                            .background(Color(0xFFE8F5E9))
-                            .border(1.dp, Color(0xFF2E7D32), RoundedCornerShape(12.dp))
-                            .padding(12.dp)
-                    ) {
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(8.dp)
-                        ) {
-                            Icon(Icons.Default.CheckCircle, contentDescription = "Success", tint = Color(0xFF2E7D32), modifier = Modifier.size(24.dp))
-                            Column(modifier = Modifier.weight(1f)) {
-                                Text("Voucher Redeemed Successfully! üéâ", fontWeight = FontWeight.Bold, fontSize = 12.sp, color = Color(0xFF1B5E20))
-                                Text(redeemedVoucherInfo!!, fontSize = 11.sp, color = Color(0xFF2E7D32))
-                            }
-                        }
-                    }
-                }
-
-                Spacer(modifier = Modifier.height(12.dp))
-
-                // Category chips
-                LazyRow(
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    items(categories) { cat ->
-                        FilterChip(
-                            selected = selectedCategory == cat,
-                            onClick = { selectedCategory = cat },
-                            label = { Text(cat, fontSize = 11.sp) },
-                            modifier = Modifier.testTag("rewards_cat_$cat")
-                        )
-                    }
-                }
-
-                Spacer(modifier = Modifier.height(12.dp))
-
-                // Rewards List
-                LazyColumn(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .heightIn(max = 340.dp),
-                    verticalArrangement = Arrangement.spacedBy(10.dp)
-                ) {
-                    items(filteredRewards) { item ->
-                        val canAfford = availablePoints >= item.pointsCost
-                        Card(
-                            modifier = Modifier.fillMaxWidth().testTag("reward_item_${item.id}"),
-                            colors = CardDefaults.cardColors(
-                                containerColor = if (canAfford) MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f) else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.15f)
-                            ),
-                            shape = RoundedCornerShape(12.dp),
-                            border = BorderStroke(1.dp, if (canAfford) item.accentColor.copy(alpha = 0.4f) else MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f))
-                        ) {
-                            Row(
-                                modifier = Modifier.padding(12.dp).fillMaxWidth(),
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(12.dp)
-                            ) {
-                                Box(
-                                    modifier = Modifier
-                                        .size(44.dp)
-                                        .clip(RoundedCornerShape(10.dp))
-                                        .background(item.accentColor.copy(alpha = 0.15f)),
-                                    contentAlignment = Alignment.Center
-                                ) {
-                                    Icon(item.icon, contentDescription = item.title, tint = item.accentColor, modifier = Modifier.size(22.dp))
-                                }
-
-                                Column(modifier = Modifier.weight(1f)) {
-                                    Text(item.title, fontWeight = FontWeight.Bold, fontSize = 13.sp)
-                                    Text(item.description, fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                                    Spacer(modifier = Modifier.height(4.dp))
-                                    Text("${item.pointsCost} PTS", fontWeight = FontWeight.ExtraBold, fontSize = 12.sp, color = item.accentColor)
-                                }
-
-                                Button(
-                                    onClick = {
-                                        val code = "ATU-REWARD-${(1000..9999).random()}"
-                                        onRedeemReward(item.pointsCost, item.title, item.discountAmount)
-                                        redeemedVoucherInfo = "${item.title} claimed! Code: $code"
-                                    },
-                                    enabled = canAfford,
-                                    colors = ButtonDefaults.buttonColors(containerColor = item.accentColor),
-                                    shape = RoundedCornerShape(8.dp),
-                                    contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp),
-                                    modifier = Modifier.testTag("redeem_reward_btn_${item.id}")
-                                ) {
-                                    Text(if (canAfford) "Redeem" else "Need ${item.pointsCost - availablePoints} pts", fontSize = 10.sp, fontWeight = FontWeight.Bold)
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-        }
-    }
-}
-
+                                                            modifxúÏ}€r€H≤‡˚˘äjÆ«AMÀ–≈ñ€Ì∑á")ã€∫∞EZΩ˝§(E#@†$û>~ÿyﬂ›ÿç˚⁄/g~`#&bøg~`Á∂≤
+Ç HV
+≤,+∫e,‘%3+ÔÈêΩC«æÌZ∂m«ª™«~@?~eŸ¡∆ø M–˚Â'Â_©˝‚”¶“„ﬂ:·x«æG∑‰7ÂÈÒü÷µ6√˜öÆ3∏÷zØ gàÍÅ„5˘BpÏ¯^«&±ÂD'~ºÔbÔ∫æ±Q‚ 7ÿE#çàMÁ˙|É≠à&°O≠cE¯ä¥ú+≈÷â;^co@Íµﬁa„≈ÓﬁÎö>é	∞l6|ÒBcìF‚)]i˘w}◊Æ◊jtœPáõ»â—ã‡OÙ-™˝a{˜ÆFÅ‘ùxC°≥ K7ÚcƒËî˛/ÜïpBå˙Õ;‰M\=.^Dπ@›˙°}HOΩ{óúlY∏t¸nHÜëEl'Æó? ãûq/Åm’Ë¯cBˇ\LËB<<&µÕtY‚£*_Kêæ±ÕΩuﬂ˜]ÇΩÏkâá/]b”W«·ƒ‘q∏SáîN≥ÕgIfYz‹h‰ﬂv”ùn9ÿıØËÿCÏFÂ/:B:x≠fz‰v˙@€@Ñ•∆˛Ñ]∏"]2¡Z«£‹»±Q∑sb°.EA˙∂8ú"|Öœ*∑1˙\RÔóÍø“e}r◊k…Üj\uïä7∂çù(*!ﬁ¿Úâ8HVq˝QÕ≥ ”§ÔXrõ[=K?-7ìOˇ"ıÿ÷˙ÁÔˇ˛ÔËÙ¨’>CΩ~£ˇ±áNN˚ùÉN≥—Ôúû†Êa„‰§}Ñöß'ùœÿßRcﬂ‡y~Ï{˛ƒ≥≈Ex9E!ìÒ%ï√~C„I˜bì”a}‡è-rá«ÅK¨âcMb«µN`g¿∞Áê∏ïjú(;$˝ï”≥⁄ê<”âù;ó!«J£ìÀ;7A©ˆ< a}úË®YuuDú´Q\ﬂŸEU˝–˘W:Ï∂ú«¶|óQ·1]YHYGDWm±O{ˆw:cNÈg¡¥é›`ÑÈ„€÷ŒﬁPÚ•ÚKêÆÈªì±W8‹–q›c|˜≥c«#5µéQ∏ô÷8µÑt‡≈$BY@Õˆ<‚¢âc*&G5µªiHOÈg∂;tÅÈ?¨}™~©è‘s˛ï–qË>GÅ™	@?s- çCiN¢ÿ√jΩÏa`óÑ1äÄUD{6∫Ñâ”ïy›ßêí<v_ƒŒò ülƒvÿt˘ë•qÜbÁ∑+ÿyﬂÎM¬!%ÆsL‚
+é`=ÌæQ ]Ä3ˇVÌL◊∫⁄æéRFÔäÓ§Dñ˘ó≈ñΩO‚[B<µ—o(¢Q¨sÆsÂâë≈ﬂVì˛áÑÁ…3Æ—(J.\bôcHFÏ∫§Ãh9w 9ó≤ú;¿v‘üﬁ≠FÍb1EÌ¡5Sì$µì †Ú5∏Òarvb-@/~–íÂòwbH≠Ò$eâàƒEíŒ¶x∑ÜT™æùE§H˘b‹«WıZÏ_]π‰ÇÌœcµ√EâY˛iI
+‡âÎ|&Æsà˙Vî
+¬_Á…ÀÓá˚,(+˜≈Åñ©3ï•Rﬁ‚DÊ%™”IÏ:±uQe|líx„ƒKî!°ÕFråƒÙp¡å=µSTƒ∞hÑ ’3∏¡(È˙°G¬|»Fm¥ı◊»ua£.¢iìqÇøæmó±ßÄ∫™\ªCO£ˇâ¨‚âåó=)/nëh:cÈÔP≠«f9ØŒ›¬UGî„◊w^À€*¨ ò[∂ÖcfÃ“Wìê§ ∫Có¡óñYç¸}•vW…ô®÷?µ˙â5¨©âC{=Àê@c<!D˙(£ó~°OC.<±‰b4πº–◊◊$hjUrúZ?”ú#:,9AÙ»Ç	4Ÿ7å)a H√ÊZÕ;‚z∑ƒ[/π!·⁄gÙ‚–ø¶s∂¿‚µ©nu{µŒË&C¸+,h‚Bï‰$J“µI…∫:©∫âZÖ/√é™MAOVˇÁÔˇÛ?ÊY‹.X™sË7Íö„®¶KNœWÎ¿é‚AÏ‹‘ÂÃ
+=G]ŒÆtπÃtDÒ‘%l*û˛UàÉ—‘äùÿ%Ω1≈Ωò∑˝
+P◊J+=84	– $6=G∫nNÆ!4&Ò»∑À´æçW@Ö∂^äB≥a)@˙AêEK*3»â⁄∂Ù*˘˙f·3E’@FÒBÑx›á‹Æåî`Ø»9ƒ· .ø-h^h∫~DxxÕ¸3u|/÷(`,¡t5HëN?6Œ©ÃãÚü√_
+GºÄ˙*∏∂µÖŒ∂_úzÓµp4∫Ù©–ÃúûëÙ Z˜˘ë≈™ç©c˘àNå"Mélå%pâÁå\—Q	Ω–	èêT∑Gnj0ÏSW4	?Ñs[XH&ˆΩ5ú∏.¨Ωãj'[ç‹™^Æ’ZïV§µóûHnÜá.	#ﬂ[bvÄH°MiR_eÜ‡©Œ2R-R‡ÊLì\¢E≤ˇ[}™êDÜ#S4!¨R’∂ïÛ‘û÷âÒπI2A}e%6U¯Ñ ˙Ëd¬b|Íœ"‚“[ëÿ«˛ÿ?6càÈ¢ÇëÔë˜ñ3dÈÙ1–‹0~Ÿ5ÙâÛç˘OãX»a∞†GŒ#û∫§.ˆˆ;.jÿvH"ΩXáG»ñî#bƒ>Dâg$ú˘Ï·0;ü'û¡SÓÚ#eˆ˘/ñhkÁNÑ—30691¨$ë/⁄w¡[˙1˝Ä˛ÂÑ”LùÕtÓO$:É'•»›rH$
+iåÙ¶ı‰Kº^µL¥êã@ˆ&öÀD}oŸ|O2[¢5>ÀTfŸ°NtB	Ï44êù,≤<Ç¢ÄÄÙ ˆZ≥)ùüß¡ó_a¶7{Z•ÍëáÆWj< £%
+“Ag;”ÑæÎ÷EÊˇ'Àz)ì;^6wöìE∏EÊÕ⁄Ü5∆ò¯c+¶WLù2p «,S«IR˚€„ ûÚØ¸∞ç#˙å£xóÖ}ˇÆ*
+®EXóxp}BºD}Ì›óÂfQÑÖFÄÕ ô	$û·],≤â2—#fê€Dﬁ> „§Ä@õã.?ñ’nÓ /º\ÂÖáüë\ô¯{F¢OËù?âø3P{˙ÛÀ ≈€æ,H≠¬’mm°’ßt)6:Úßÿç©¸ÏSÏâ=ç¡5ù!ËZ{(¸“"‘D-bF*í/¶Æ†\óﬁ«ÛZ˚X<t˘Ó_l˜/bæ˚“1àyXì®)?ÆçQ‘å.ëlåaÁ≥Qû¥^Ó’èCc'ñ≈MÆéö”_òµ™Ú¨#6»ÑUæR	´ÃC)»tBS™Mn BEâNY(#1V∂ôá¢‡˝áÀ˜Á/†Z*∆0ŒPﬂæ;†∞ˇr{{…˝…ƒñ›ÌÚ˙@!£y–!Õ∑¢4˙Q/û@azèüë[ õ#‘t'óP>„o®æáZxJ	æN‰"›†}GÔÆ ,dËK©˝<´.Ø3Ö∂qË°ow˜P∑ﬂcYÒÑ¢ÙRuóÄ√8Ú7µ"MHk‚yn˝Fï[Á·æµ }ñFÂ◊π!âL¯%bJo2˝·Ωï[.±Öh¿ﬂóÿ!˚>Âº¸Á⁄≥(m”®ƒ‹5pù†æ,ÀÄÂK F"Ñ
+Ô+¥|Ïlõ5}îΩR8xñ¡I Vp≤}óÓbY.¶ø‹˚28 h˝H"û≥ƒç™ÔÃà£sÜm˜Œo‡Ì1]>ãX|ánG§Ã-ù¨„áwho{jë÷∫.¶bÕdLëîn4)Q±,zwè˝Å^ÿËò«MªìÃ∏Á∏7‹ILi£Ã–Ã…#ÓáæGi±ÃTıH◊£§O∏è√+Wpƒtﬂ∂ÕùÍûë¡í≥§cñ>ΩÕ	ÈüX˙W,u‚=Ø:_ñ˚Æè„˙⁄ ÍÏ´ —I8 Øæ=‹D;ˆ1ãéFÙµ‡
+…∆˛JçmÀ'√g·I_~Ë˙25 ´ﬁ¢g‚JPNπæw}ICD*:∆àÃºEˇÒ◊ø£gø’˛`Ì”2ÿ)Ro|*±≤ôÇæ€˛ÆırWSZP(TëÖı"Ãk≈¢Y8¢ßÅ√n¬Ç:≥ñ”’Í3Âd(Ê‚ôcmÆ¶Ût¨lÈêr#-Sπ∏ÂR˚§ìIı_¡˙“…˚∫âî öànæˆK "0—oÄó|5P«tÕqZ˜¥‘¿PË8±∏5qeé”b«•J™õe
+´ÎªÑ|˛æÄ4_î•äñ§.‡w	R◊—%˚ßzÅã‘Ê°?•uÖtÓ]ÿP3ïs/ø—J6Y®¢™MS.W(gvjéuËüøˇ˜ˇZaeõ,T&qîaï[[ËòR]Cd‰Gœı◊Pø6(Ù'—+HnZﬂx@‚Ö\Ñ`µQú˘yÿG˛ZŒJn∂∫XÑå≈bâ36ìçı“∑=»
+MyèÕﬁ∞‰ÃWπ˚W≥‡≠‰≥/‚î#6Ù“˛ô
+è≥ˆœﬂˇˆË $µB«ªNx‰r≤ùX¯ææ∑V¸Õ*'Y»\ﬂk<…h∂2NVÖcH†ñü¿r¢\–È◊aıVjJ˜Ìh¯bYÁŒˆ£‚ùl9_5Ûd;@π„ˇ˙{b≠€ŸFß√aˇÃ?Q˚˛}@,4áÕO<t=|∫˚∏‰œ›Ø^ ›M$–ˇˆ∏Ñ˘ü©Ë±–‹ı›'!Ùaq–›ØF
+≠º±≤Ù”í•‚T”e∑∂+°w‡ácƒöıU\õMTùFs‡W#˜‰&qıÉ˜Ù ©`¶”eÅyW≥=2„Œ«Z…b¯í∏ô‘wêWå”JÿRqü TuÉñΩCÿ_≠ `\˛Uâ±*¿Û[ïAcYø›—jÊQÑfÈÄ∆,fæE©Óq&J†NÎ˛–/‚≥pÏ'¸3Ö}QéÕ˛•√øŸàºrÕ˝·{ÎÆô¬5^dÀûÒäj¶pL‘^úØ”voà∆J§}àf+ì¸C•Qı4…ö(õˇÅÍ∑xäéµÀ¨õUÕ µC®¶,˛Ω 1ˆ0•jõá?@	|™Ã°§ÕPÑûÛhÔC§{\•TÛäã·Vºáj«˛±èNB%‚UmﬂSF+í°äàÈä„t¨lÆ≈ß√zÌ∏¬ˆ∫∂âò–4†W\G#¯w£OøÚ»¥∂ë)?‰ã3—,AÚN‘K ”MòØXåﬁΩK_°?X&–x¯ mrci¶§„dR¸J[—x∑q´¨⁄˘∫JjÊÌÚˆ>£Aw û3≠ó?fïøˇ≥\b‚úg5ÄH`â£|+œffå¨\ç©•’x Ñ¡≤HŒUŸ.˜7∆D5±e˙’√‰Òu±öÿZã~æ‘Ênc¯¸ÇõA}~LIèUΩÁ6Z}nHc∫}Æè¬Ω[ë`]_í)ÈQ·iæÏµ	D](•mÃ
+≈Ê≈◊DêáêçvΩq¯
+≈Ω>¶~πˆ•ÇR‘Ë9:$ÿçGàÓì•i‹ÀÒpA≈Ù PÏ£Äıu¬.l«‘üÑts|Öd‡è©lfÛ“ƒª¢à¸’õú™I}ÎÔm
+îeCÈ¿"ç£ú∞5+dÈº˘1¥+6«˛Ò$Âf©ò∫¢ònTë°´∫Ñ%ÉòzÒLùsBvÚQ∆⁄eÒçY∫Ê◊J£:ºDOYyX∆Æ
+Î\}ë∞'3ïÄ'3’
+»ö©åÔ¥ô∫Ò9ŒEØˇÜî‡[Y(›Sc≈D±mõöeÈÚÇ≈‚ÖﬂÒ˙~è
+ﬁ8JΩ”êYsMë?˝ ÷ÈõReNÍb0rÇãgø¡ﬂñÎﬂípÄ#*dPú\»®Ω ◊‘Em„ìÊ˛î∂ÇñZmãÀ+«ÃÃ¥lœéVM‡¯Á∞¸jO¯°öåïy-œMEwÂò´!Û⁄$ä˝1v0…†:Ë˚¯ED®PÓ—Œ∆X‰◊hVj/@∑ñPŸB†˘Mp#	 K,I‘Ö6™qw˜¬ΩÕ9)J$$±qπı¯Ì≥úO•Ã∞3{˜€ÖfízÂ<5À2:‰ñbq-~,–Û.iS¢√YrFπ‹I®:ãñg±¯%É˝ƒôÍíÒ€HI["DWÄl4N@,q†âáÑ]ıÙ wº¯«äÊ·ÒÈ6q
+√7Ò8òD¢†lâë9Y'·†t‰Er◊‹ÒÜæπ”_ÏÏh‰‡{g$Ç0L∏3£…` K∂ßY1 Ñõ\û=|Cz…)*à6Eÿ≥≈q2/$ã`7B—‘åBﬂ£2∂-$?˝Fø∞q¡å⁄a»‰c®‘U^˚è }éﬁÚbqÔ–êÆ•\ñ£1Ω`’µ›e∫ø…Ws˚óà&!AÆ⁄&ïƒB|E,£˚?√à|⁄ø÷˚•˙%[±¯—É*[d–h%?∂ƒ
+¿9ƒ5ó|◊·]√≈ÎåßÛ IﬂãƒıﬁrI—:—ï ’`æÂ ;:ãY@Â˛°Ôÿw4ÜÒ#bMã ¡»D÷BRπj‡õ‹Ã‘˜ï±O±´$T
+∆ÆhWÈ,t˙aWµ£ÂûX˛Ìä≥⁄⁄B/-‘ÉÀâßÙŒ∫ä–7∞ItM•∫_'NHo5™YíÂ&*'&„5ÃEÆG¢âDÜUÕwÂÇ\◊6T®Á…ÙÓñaÕ2MÓ^´4πµ‘CÅ¢¡Ëå¸:°◊Í≥„^’xÜ»FÒî	ÛãèßÅœ∏—‘äùò“˛C=WÈà9jIJ0˘ãÀ[¨Kf]sl∂&.ç∏ˆÑÌ±„Q'd/]j‡:T≠∏Ú·°ê\—Ô®™as-—“n±ïÁïZåaS®"@¬Ω…Âÿâ]j Óy.˘≤%SKª⁄W–/°ƒnØjö¶]…ò_Wc√Rñ!…≥`2÷_U(}+ÄA1íßÄ™∫xH‹©ÖŒÈ!°áµuZoQ£ˇÒ≈≥ﬂ†ÇÀ˙û¡ÜR ◊7>¡çwEÏ<ΩÔ»”˚zòíÜÂ%a„Œÿ‰ƒù1+£9û"îDÙIÔO‚QI÷èGt∆qˆ¬…ÇÈÌR∂îÙ!	ˇQ≤u°◊í≠-∫ç2CiyåÚﬁ"1VùXW⁄áÚkÇ5o¶&&¢ªÜ«»t^™æ/H¡	c>‘ SÕ_)¡ãq( Ò˛óêﬂNô†!8ì«,À˙¸®3∆wÄ7 ‘ø˙<X£Ï‘ÒñÒfƒF`<6xﬂ≈ﬁu}=ûEöπÔtÕ›˘ÎDªì»<G¨ÈôZÁIBc≈¯àÚ‰ÄAÊ™œ$Ø∂g´ÚSSÊE=†ÂDé£y}3kYTl%∑_‚±5è¨¯zïQlkΩ≤•N∏Pqhﬂb™¥¬∏xäû£ﬁ $Ù‚=#’Ûô¸zL‚–D®ãΩUm1$å/º≈üÔù´	WÄÈÅ¢ô˝–J∫åÆÀ&^ˆ¢dîˇß‹Ô◊è±≠`læYœs3∑ÊæïÏêÒ‡•£âØŒº{GﬂUüõl¶©„≈Z…ˇ7ËóomŒE~EŸ∑àExç4ÙËÈµÊ^≥˛˜å“s?N?+;9':¢
+^4‡‹m˛¿˝(0!Ç‘ñn%:≠0°gpz÷iüÙ˝ŒÈ…≈Q„§’k6∫Ì≤3ºu®zÀ¢ÈbÊ ìÌ‘:OBØìN∂Mü5¸BıcˇÃbÁπ›ê∏∆Ú„Ωy≈«;&∂3£˙’Z!–{ãÚP˛éeN;‚∂Ô˜™ß«≤≈áëö‰:WÉúiYÕw«ˆ‰"Lô1KïÚ‡0?Ø∑?À›uÍVÍ%Eæ_…îÇëYÿ™bﬂkÀÀïHêEå€“”Ÿåj7ˆ¥≠¢â≠í¨®ºûD´◊˛˘˚ˇ˛€ˇ˚øˇ£@∞jLl'V§2mÆ‚7QπÇ¥e\=≥œH:_˘<ªµ€ïgà;˙m
+ÓÕ|çüHñæﬂUõê≤@3%%”!#·m†Z*ñâ›”≥˛Y£”◊âñ,ﬂ‡¿pbJ5µT–«ún∞ﬁT¶RÀBóƒÌpF∞˚"v∆çÑ.ŒÖ>d”©>‚{P’¬Âu:Öæ;NTr∞mN¿jeO=<Ê∑ü•Çl%2°™™ò kôîØEÚ($ß4•GÅ+*qƒD˝7gôRèŸkw≠b±π‘∆XÊ„A_ä,5sË+§⁄√Ù)Yπ@Ô&¨u;ˇ•}ÑŒ⁄Ω”£è`gò∑ÑæQ®U'«†∏·fπı¸∫üÕ€ÀÓ–≥y€VŒ"¸jÂF¥Ô‚ktKÊS	ú;*:mºÿZûÿˇ!ƒ*;®í˘ƒTﬂ¸ÿ¯¿yß˝3àÆË∏›?Î4{_#hy>–
+Ù¯ÄÒò√‹¨Ì†v!˘ò1QM…)≠Ã°R˚ë—‚J‘•^g x5uU]Â|ÊgÊ}@l5à˘ﬁÍ¿ï©_À¶ì˜ÖÕƒPÇâ u¸Ñ8YHb≈∏äú¯{s÷}N‘©=˚-Îà¸4Du;pÛ‹mŒÎ	ë"±&'Ï Q)u®\x˜ô±)uA∫CüWµh$˘ÿÁ1Õ®ÙK´"•≤ “‡ÃWÍ÷Ùr	ô;Q~‘«6ö ™Í1Hı´◊äÍï±%ÓqiÒC„&ÛÖ§À!	ibÔGÖtó†4pçHIX“8!:jDG±n·Z√
+Ü≈∆·Ù¢6ê˙kπ"w˚/^µÖñÖ0©øq¿Cº1›Ω≠ŸTΩÊKˇÓÁ∑à-@Î«áZ?V{öï´»úÕŸ}”äËÖUg7¸èh€˙n{®5–!àç∑ïE µ°ÙK@$òQLô•¸ÃórH—_J’Îí!Özzx/ÿ‘Å0wó√≈~êåñl ÓPw8HÊLƒØ¬‘w‚É_nj1&Ûﬁ‰Ø´r◊Ïﬂû—yïêfô˙ÌF´up†Q@w˙àü› ù9#◊·ò7·7:Øä¯	à√®TÚ∏˜≥» _‘1ËåêÑ≠,#{¸ÄXIêﬁm"ÉÄ¡ê^œ›ª∫™≠∑rÄC8ê¯y©≈8T¡
+Ù-„ª[ªCm¸ û≠ˇB˛œCΩ•öIu«⁄õ·I•hÚ8>ª˚Ù0ÓÌ‡º˜s¸COˆë……aaÎE*#p¯˙∂tÙ1w » π,wc2OπÂ~z√¸Ô’„yk≤U∞’E¯≈¨uÂÙt>G'÷Çµ≤èJwÀñ¶*˜ƒ™Ç?≈ü~ºµÖ˙ß]Ù±ãZù∆—Èá¬áò∫8Úo˚~1h9ÿıØVÌ+ÇCÀâ∆Nâ¬2ê1C}„Dl§nËC≠-«££ÂÜG“ı¥KIùíéQ≤®øÊé§mU˛»˙@aÖBBR+)c”MwaWÕ$kâ][Ÿ¿gÌpJeê§'WÎÒjC=«.w£|†∫≈SÖO3¬ri<çK~T≥—∆
+≈ú‰è ÍÌ~Ù mîØEœ—>•SÓFÜò
+%ìALJÒTÊº<˜L+$WnÛ$ú>ØãG≈¿Ü{Í≈lüjG≠´ıäRu°œ[(*πÂ‘£¸tåﬂùÅN…~ÒÀ»Jr<≠ÊàÆıp$Ÿk^â%Hr¸°<∞ﬁp±√6J∑ı∆_™¯º∫/ÃÆ§ÂÄ(âC’ohrÎ˚õµ’ı™çÈNÔ√·?˛˙wÙÏ∑⁄¨›a∫éqÃcLŸMLU¯ñ?πt…ixB±®æÅﬁøE€÷6´ôÜÌ\}qt„`:öhÓêàDÙrÊ’Ê?ô,∞ñ7—ºjR5·¨ÈˆÓc{"JÏ#«ãbzÌ≥,°EŒ LWHêó!dGÃîêSZ]∂ﬁ‹Rç∞ö⁄9ï]E	C=bﬁÜ†j!°⁄>ßo*'y≥°fS∂Üô2efﬁçX—3ÂÆ8[cï¨gµ¢îkó,∂÷ââ˚•5:7◊(–GÔ&Ó@a/`rÃºHí(X—Ê
+	cΩ¥ ‚ÏU'xM¶ó>ÌSˆ>(âÒ„¸'uÒD Ã&?f˛iÒ¶=™ï‚g—B%%Är
+°\'◊9‚ó9‚Ò|yŸ=â˘‰ç…®.z:ê≤G‹‚Äœ≤¢ír^áqiPeü_!ÅﬂQ≤µ™CK+∫TäÀõË{◊¨gÄ]˘)(õF}•¸Z5#°Í¨€≈¨v|z|ZÉ·µcˇÿ◊((Pk6ŒZ|∞TÎå∞ﬂ8˘ëè∞OAgÑn„ón„àè—¡‹U+p∏ëÈ/^¯6Ÿ‰◊“ÜN€§Ö&„À‘(–/”z√Bı#ÕÜŒ∫Eìˆ4í)YeñÍSNêVﬁwT˘⁄ﬂM6{/ï‚*∆»X
+Á±ÀhZ´x[¶≈∂˙¶ga9y1Í*7∏!ô8˙≠£äoo4rÉ0iø†[-ó…PåÁ™∂üô…K)k—hñUôç‚3À∏gƒÉít1Ø‹FcNéív,YÇ0¶E≠
+Z÷,π◊^7óV-≠!∏*#£D}¡Ç{º:±T¶·ÆR!¬∞ä¢ıe‹_ó%Òã ˆ§Ø%ÖJè}èL9†·Ãõ^]÷]*s–˛!eO¢q2Uó}g@ö#'à¥«SœDÕÅÒƒ‘()åöeÛ(€§5Q(k«˝ƒ5CTÉ&≈‚Rç‡ﬂç˛é›µ¨˛‰ã#-ŸqÄ´RßAÅ2ïmªäîx≠ëwr&<Ø¶Ãfa@∑öÁ…•Á¨≠É‰¡§Ní: ¬òùÖ8ˇ<r‚‚:<ä.ûıØfHí\øåπóógµßbíò¢æ¬±⁄D#pbT°ê‰¡D˜j v«ã-ûªÕøWPY¥YãV˝ù%P? tBÆP®QÓGìáí.¡<Ãπª#zmñ£ôEè·ld§”Ù(yøHàªú‘=qy(Á¯bã,…s™ñıÙ˝by(Å√Êõ}Â°"*IÃnp£uïíÓ∞H)Û£WB-Ø^¥ú+:ÏœÿÖFi‚nÁ§<ı‹8—ÑﬁTiàxdwV%GÅMÃb÷´ã£Ëñä)Áø.ãÌü¡ëùá/â†u~•wœ&Ó9Êå^å!PÕF0⁄¢Ç
+¥{‹C6j<P∆€vÇ«∆eÄ‹ï∞6|DOèn;º£<;˚í(˜Î∆X∆ß´ƒYˆÇJ∞vÁur#3éı0‰ÿØÓﬁ{¿‘Û∏å«zY ⁄Hs"Än‘æ›¸å,¨‰H¸%F8¿B∞+æ~|ºıÀ/ÆEPÑà3”k˘ÒÕ1Ä$p?®÷ºπ©œË*C≤Ê˘πÃzxz'¿∏Éæ4≤”˝•û™©ΩÚ–P⁄kÀÅíRLQc0`Y≥$˜G•π>.IÊa∏¡€Ç‘— º1¯æ?4˜èVFµ∆~Ø1Áøº6Á¸ﬁø.p~√õπ~ˇéæ¨2ó˜Ï›O.o-xryWÏÚû›ì£;F›ó◊%]‹¨‰…≈˝Ö∫∏µh3µ*2fﬁPâÕpNZ|2J√Wb2¨û|™Û}'£WG6"‡˘ú≤˙!ΩAô≠‡…˚˝D“˜Í˝â°,<Ø4Ωû|ﬁk!«–∫,øª=∆éf—&KôZÊï0∂Œ»ï±T%gÔ˙‹2õƒWƒ?ær
+7Y•D$^R	Ò"£¨∫%–ìx◊cæ$∫“˘ï˙Ω¸ Rmí∫ﬂ[¶˘"°r‚íº¢Æ2*£:ôr0Rù b4âyw[ë≈r˚—B=m≠DTed≠Ç|´ÏÃçÙÏ~M'L\“æ
+Èw<T6ø¯$Y!Àó‹ZYjTa®UdŒBR8?· ÏÆ¿∏(z1Q(©ú˝¬Ã˘QäHΩG∆éZ·Ì,HüÆfV∫õÒW]“¨∏’èjW¶® ˇJ—lù¢ì”>jùˆ⁄®ÿÈ°ŒIø}v–h∂k⁄÷v]£π¬=´”xNÀ']1Û]Í{n{vÂ7S@T™&h©∫*µ∆•™t¯†.›≠†÷bKõeÎT[êŸamÒ|‰x®≤™ä∞ˆ Â∞·yq!Ùoˇ∆ﬁˆßwhª¨#Ø∏ÑQ≠ÎL1ã©@√˙õj†¸–s√|}je‘ÚíxzÊGwœG ⁄?‹⁄BI#QÚ∂áiÑ˙ı)™)X"¿D·ióñiIU#Ô*°?°ÔM9ïó‡$Ø˝*êÒ˚;€»fA˚sµT∏¡º$n
+0É£ G ¿÷œÁ'Œ∂ˇ’Ωlˇ‘üÑË’ãÇçœf1>¬Ì/˜kôv2H Rπ,'⁄w±w≠—f{	¨æ"hDÑrπ^è–Ú€Õ˘KJv;Ø+ﬁÚfHÏ˘Ã$4ûD1∫$à‹Qı“ù“9pN}G¿Û"ÓëÛÒ<å‡ºÿz«C,-qc◊±ÒÕõõŸÆøº◊Î˛ÂãW…mü–î˜CÕÛsV∆Ûn…˚∆@lºÄdb™fà¶Í;'Ùoõp—Éc∑∆â≥›˚J$æ$*Á˛¯^•ì™7 €!'¢ªÙÎƒ°t¯7Ω$›â)¿⁄Ö.Ü/XI=”®^˚s≠jâØëê\‚éDGX≈„FÄ˝Õ˚æ?ã‚ïBƒÕx3ã%'Õ@LÏÒƒg	±Æ†∏w4bπx‚A&P©-Ypzö»˚+v\rÂûæe¿;ó†[á‚~£›{±ª˜ızGà~nG#|M,´$⁄ƒ≈”˙õÌÌrë˝À”ÙÈÏjã}UõxHò]&ùT#ﬁP°‚¡Ø•Ay ÒbCKß=°Ûf˝Ë^∂ÑëÚx‚∆Œã≠UÊY∆√_ãû≤Éö}âN˚]ƒÔ–ì¸ú*·óÄ|–ëc;û·Ñ“˝G⁄RôQãíˆá<•––¢^ó]‹Ölë;<\bQô[G8ƒ7ƒm∫ù¸1ùÌ%'J>n{êìU⁄|Õ ú,Äﬂ"Ñìn_Hﬂ˘ë~ÙﬁÇ/<»ızˇ’¢xb”o˛å„âEÏâu52p'¬Îô‘”˜È+ì‹•t>yôl6QÊ≠=˚-˝‰ìŸyôXYàœâ[ÑÆ¿çﬁ¢eáL≈è(∆ÉÎŒÏ·˜eÔƒŸ,r{Luy◊ÇπàW%m∏Í≥ùﬂﬂ◊&™˝‹8:j˜/˙ß›è›E0äÂlF&≤kd∂Ñ.2Ω¸–Ú·¿n±7ì‰¶ÌÚCﬁé¿í_ü[s‚m|˛<Û≤?°ó•}é)pæ¥Sñ/•êNÛ€oƒ9ôa:väÉô”)?4∞/1Ù7¸®ç, ËM&∑'Èß˛Ì˚>Ωˇ<s\ÉΩ-ÂÏù”<ÔHViÖdHËç1XŒBí∂æ∆Xõ›‚>@≤>ˇÀÃk•6&B3åâ…ôS·N3©=sL 8ó2À¶å>Ç¢›˝Ü+ïÊˆrââ#QUÑ$üù
+R⁄%6¢ KÏå·èIl°ƒáSÑØ®ÿe»ËQ¨W≥(+C„'fnx ßøµÖZìÒx ›∫L	°z1æå¸˘ÆÕ) ]∫˛‡⁄«lc{jØPdäLS*2r\%á–ä–,ÑŸµí¡zàÒz÷™VÚ ≠±f!O≥ºî±Ìæ dïMåED4CÆ<HT%°«ÃS´üX˛mÒ7ãüŒ"iéÜ√˛«V˚§è~:CÕ£FÁ5O[mÙùûµ⁄g®’Ó7:G=‘Í4éN?†˙QÁºçNO[®÷h˛ÿ9˘0R9¸Sx‡áßPïG§3Òfr≤.h7ƒ≥Y–8•Èsˆwdœ¶øsbÀa˝iŸ ≤c¨^Ù¢ÂyEA¸Åãc°∞é¸võ¸Y+1Ì,å«üÎæ◊r¢±Eg‰◊	â‚4:z∂∆D¡XΩ∫m°j›ß\Ë˘ÍgE˘†Y∏9dwÏ≤∫IôíB;Î´õY1]}_’Ö…Î‚◊b‡bg|a≥≠™≠àÇ_—öp˜’ÍrFt\\Ò6‚íë≠π¬∂¯í™yÏ„vÊÈÂïnWqFô|0ù¬`È¡Û4∑ıœ+ {^ Oo˙Æ[ÈˆBhˇgÑª˙∫˛ïÍ˘g´«Sí(Ê∑≥∫˙∫ªå2ÕCÇÌ5Á ïkb"∑D&óÑÂCÏì¯ñâR.ÈVÆ8òÛ‰ô5iÅ2r¡äˆú≥¬u≤lª⁄¸75*A™à; ¢Íü»J¯âuFô)û–¡„MQÑ≠E¢AË	;Åeì™°lÎ≥ﬁ
+ÒàÂGÓ(v’TOILÆ‹øˇ”≥ﬂ¯]ÌÿüP?ƒÉk Üjäùl!”na›Ò4ØBå¶VÏƒ.9&∂3´çº,y≠}áX==Q:-QzTπÉíI’é29F.bΩ∑ÜOÑó´â«¡$¢Ê€`WçG
+™üV∫~w¡|îm¢¨6´"D‡H%5Ã˙£íê¡Al[»$⁄øœœ·Tƒø≥&A@¬éà|ÿ}≠yz‹=j˜€-®€jÉ‡~÷ÊôÏMıÌªÉÉˆõÉΩˆ˜rXW;k7Zø‰xy∞{–í†{÷Ó6Œ®ŒêÑ¬õˆé‰ Õ∆I≥}t$÷’<Íú,,ãŒkø›ñê)Ê˝≤Ωw∞'sæÎûòo_4ÖøÁﬁm◊zπ[‚Äwˆ^Ô5%-]ÀxÔªÉùÔpÛıÓõ›7∫¸›˛ŒACbS$X∫˛oô˙æPs6®/kÏ.πgkˆŒqÖ!
+U 7yçrµÄ-@’µn≤eÙ•wum+]]+ì‰ï/¿1v;≠˛vù
+ƒ§Åé7Ùô¶ºÚÈ’&U˝DÓjä_–/Éiª¡É≥–z9\ßû¨∞[Ï¨±[XØ‡U©>	bÂŸÓõ*:Ú+5ßÅ)©µ†ÀíÂû≤‘ˇÑSCÙ
+†Tø¬d›
+Û6mTîs}}˜ß	’8úx˙	ï˜◊‰ìOlÕ§m(*æÂJ®ÎKÜ’R ˝˝¸p¯èø˛ùÓe/Ü†Uãg;÷ˇÇo∞5âóõÌâı±G•¬?XªC*Úmè}äñ›–êçO%6¸•ÚÜ/ΩÂ]*f=&K∏—˘^ì(¶”àâ›u◊ì†Ô∞å?nèÉx™ñÆè*m1ò`¡Ï `ÑöÃó˛:±^--$Y‚I´C±◊|a§^ﬁ›πNº<rnHj@D”¨—òV»AÛ◊^±ÛJYDí∂'fÄ+“≠ËÂ”mü¥ò¶˚®∂c°32 tÕ6hΩ=æ›µ–èN< ≥A7$<ë®ÍÌK¯-∂ßê éö‡íÉf÷ˆ–+bb—Èp(·]g˛TÓÖΩÔ–üﬁô3]Ã€	vT≠ª•$/ï,ÎÉ%,“≤õ)π≠ôÕ∞º&ã2ú|Ds+ÜéÑEÿwõ¸KïPZﬁ”™Â≥rµt(pï«v≈¡ö¸Á…xÔJåßS$‘¥35´}sÚóãbîêVw-Sù¥∏mwWªÛ7€AQSó0´ÅÊ0´ØBàk†Z4'!hT14›?J'à,ª#z!h˛ŸÊàP	^¬5;◊˘lπˆ•^±¡Rî<≤ÓŸo¿éæE;üääy™Àë'.@¢Œ≥f…kÂe&∫	ªä¨àP‘—®uõ9†7Z%xÁTRN…≈¥ë∑Cs‹ |x∑FOå˘kÈÎ wj‘ˆÓ
+(Q◊W˝ec|ıÔAƒóh®T@7ÛT)›l&D¥®ñ÷%∏»\”Õº1~o∏Æ;’!<’∑©JHU{Éd £j»EïhÄÚ<•Fı3g@w5'QÏSµVZkP!iŒ–≥$ñw[ô4ãØßÖ]Ìç¸[»ÏâÿCÒ»â–%°†¬1˝7A¨ÿΩB®≤Ãs˚P¿åHÍ˛Ω%Ôï®*∆• äÊMÓ«+Œe´Ô‰B\”_-Û•´VÑ^“ We —∆vèπœK∞œ¬∆∑ f±7ÚfMh ≤r;ËŸøÜ˚N<∆PﬂBƒ◊Eº°p∫ÖûÖãY:[öÄRÛA¸¬ÙÅ–=Ü∂·≥+˛/ÚSÿSŸèœOM~LvëUYÈ|¡2/^d)”ø”•Õ>ö-N’‘‰”£ﬁﬁéúA¿¥[!=Pçƒ∆6"‡gÿY®ù¬•¿,1'Uõ|Å≤XÀ‘eIE∞”.FÀ*ûﬁ
++!‹Cıç≈åçLe»ﬁp`ã.≤3P0‰»°Å™˛Z†äsí[©ã/◊ª∑∑πQN[gÓπá‚Ê‡x–ÅÛa_ùızˇÅ4Û6¢"…Ω\ÕÓÉ	£)cüWøcw‘ÃäO Æ–©∫ók"Këe5Œõ¿ﬁ(Ù≥©¬@ñ§æ]¯πvÆª´g ¬T¶jÚóT¥€ûRiÆ§Acªy÷Ó£nß˘„«.Î⁄¸pAÊÃ‹+3ß‘∫¨˙;Îß	t±ip°ÜóÌ\}m=®T∏‘x≥<eSÄ∆äV´*çÅtb*Ùâ ã”Eƒı$·YcA¯ªÅf´±H]fË+áWr◊√jO°0À'm˚‰\ø+ƒámeUµÀ/`:^ÚÎ?-∆ÇÃ≈≥ÀŸd9\°«	ØŒ4‚\Z€K°ìg—0oƒ≥ˆsó÷∂Å÷üa_˝	[A◊≤pü #±UH≤¯'R\˜ä§ÿù5yπîª≠î†U%¥∏˙€ï_œ"H£∆ X&	Óí9µ™	™{ÙP{:[‚√¯=ô*È|=©ö~…˛πLQ_HÏì§8â†H—KTÅé◊*ˆUí)7%'•IÆØí´¬XâvÆ®f‚v˙È<OMﬂ:·u◊ìÒ^⁄•àXñÚÚùDjÂ<£—<“÷∏±y˝üãÀÿ[cïˆ◊öÆëƒÙ7´ë∞FìÕ£¬Í…T\OjænTØŸ89i”ˇwé?5˙ßgIπ®πüUâÚP!r"ˆ+.ß©◊á˛j<â°‰7´6s:u˛äJCq∑/+πrå?Ò‹ì˜?‘π+b˘X¢:õ˛å∆ÿõ`˜ß∞√üÆßV+*^Ö¨seÉ>£1HsÓãÎ®ÈzY¨*†UàÅ¨ÕÏ∞WQSÒÕ8ã,r?‡b]∫’∏"æ#è©˜êÉêƒ˛†‰È_	á˘JÉŸSAÆb¯rr…≈’XˇïDﬁzû»X(·#ﬁW≥eâ ≈Zô…\çW&∂ºÎÉÁuÄ«$ƒ"“*©˜8òIæ,ã~Dx#Fèu ôè∏Áúä»éG5HzëBUÿ-VÇêtQImdIú£zl\•q§Üs˘Jú)ÍŒùh°á¸¿ŒÈ~£-î `ßî¨]ºØ§¬øt›®™¨ë˝&ëÛUÇ≈„ªM…P+ˆ≈´pÇ‘ì(7íÖ!!ﬁ∫ È¥˙€Ú…†_π.≠áGÜÀHvY`yUTˆúò∞0'—ÍH{êˆa?¨3ì∏¸:?Æª¯íÄ±Ê‚à2}πÉâ∞Á9}qJ…˚…ÅÎcÖÃÖû+3z2#›P>(Ü"ÿq˙”=ïﬂ¶ª’»@b;≈ÇœH@0SL‘‚™“·$ﬁ≈‚(Únoo"Çìä⁄Î~a˜8l≥«≥òB∂&®-.Òû≥Ùa˙'eÉ
+eæ¶5è¢ø»µêCd©áîrÓ Ê⁄È0ÛÙ∑Ÿµ_b‡pıüÎ˚guä„¯√aD‚˙î.üüñ˙Tnô3"a«0xÊê£8qqÿ©,KØ°égCS?î«ÑA÷BùdƒïA#n°}π^ a¸‰Í¬ï´Ä§ëQ¢\+V	ÅXÁ9a=ﬂ°Ç4Fûj"ñï¨ì]SåVù¿d¬M˘hWÜ Ø÷GqdA˛…ı©Ö:ïukI,”y˚¨s–aï	Ê	áÔçÇ)xw≠)XÄD`êJºÓHÛ.#C·±¯]óî°∆.Û¡µØáä¬Ãr"ë+«(¿$ë(x≈ ˇH„∏}÷@çføsﬁ^ ë•õe‹ÂP6ú`Ì–âPCxXıΩuë‡  ©≠ÒmI:=™<ƒÛjËÛ)P'„‰gI@∆ÜƒëjŒEïÁFTÒÃˆ˝8ˆ«:[w9˚ÂΩÃQ}/≈Ô$Á∑·W~ô˙·ÑÎèÑÖéø<»gz&-:Æ©LÛ}ÿi∑’¶{Æ˙∂.<Ã®‡ùı¬{^Â‚4˝7Û &nC˙øqyúÉ°πaÔ‹M ∏◊£•Ji⁄Zì-nMåÖâäÔÎ{≈·kôp	≈÷q≥	≈ñπÛQÔ8©Xµ&È©∏ß⁄Të5£°›‰6<ñO”<˝x“œd‘àæaü‘zwŒ⁄&^ˆsﬁÙó9œ¸S6˜8ùD…ÓæsÁß◊Kê8‘åyòãvˆ¸8mí:ãWÆı>6õÌ^O£U@6ä¶DèCVZëq0[=T3&9i£–ùBó_Îá¸ˇ   ˇˇÏ}ÎnIñÊ´Ñ	OÅÍíhY∂k\Fπ‹4%€BÈ÷¢l£v±RdPL8ô… LJfπÃÙb±ãÃbÅˆœ˛ÿÃÛ‘Ã<¬∆âKﬁòó∏%%ïuÄÓíIfDd\NúÎw*hÇÒÃég‘â öÃŒ¢V”ÍE#ç≠d∂ËﬁÈÈÒ©¡Ï∞ÛaµNpQÛZ÷•Õ]Ÿ%Ço∏x•πD©¿ô¬ù- ˚ú;˘il“àzA÷ÕqEÇ‘êa~÷ù≤LÜiÃóˇê∂!t£5Y=Bo˜éˆN˚I-UÙ‚≤º€¸¥µî◊ñÑ‘“ãû‹êƒ£¸hﬂÁ∑EŸæ˘«”fZÂﬁµÇjÔ|dÓJÉìÖè¶§è[æ©î⁄ùk¯Ôƒ÷®äÀ∞—P—ö?—#øüU∏jaC“–ç@xVáæ<≥Ävâí›ºÒ!é»KD∆~ßVéJ{˚„7a0„* ≈®ÆÊôt|ò„¢è.aKô|¬a‹K?Ò¿â0óJ7  ∫û√0Ê–yÑµ>˜\¬ø∂$ò-˙e∂Ë«óË…kË?Ó¸ß^Ï˚D8;"'ßª¡•Z©Øö[ïæÒŸOg∫ÔÀ⁄[\DtÁÙ'Ñ=g⁄‹Høzç…6≈t"¯Æ…øïÓª;Ív¯Íø¥˘&Iõ%oÚM«˙+ƒ·hıxãm?ø99vwı€ Ü∫zÂÆÆHGJr	3ß^=
+N)àJ¶‘”VTœÙPì ¥,âdeO≈VT•KnJ¢·ºÅHa©“˜<(±ë˘D‘l˙Ì:≈c7ƒ£J∂Ù¬Ì˜g3Ú π<Ω%—,(n~î,–bNƒRnªò,<r#åÇKüFŸ’øSï$eDa∞gŒj¬n•ª"..ÿèÎ¨‰æ•SX˚ø1´æñ“öaÆ'<±äl.¥ƒ1r}Z|Ç®!&KÄ~°8`ÂB◊‰^†öÏ˛n„U7^ÃfKÒJÙøÕ÷L8S≈#%õ
+®3x%x˙Ô#»#ÌΩzÅÀî≤f¶?XYô–`º„ô Ôiï\ÜÙ6˙D¥=^,˜ì©¯nÈKÀ¿ºâ:RrcXê„AÒˇ»œwûı∂%¬Ÿ»@ÈGX÷6ºfZ∫£˘©|ˆ|Á±ƒ3tæ†rÈrh|√eDVDà∑Õ°Îë}‹˘uóòo0≥[êGD¸èså“ `ÁÒ„Ûâ{˛[2®ˇM9óˇUV ‚è’⁄%s=¢∫-”√≠t≤∂ˆÀ;K¥©¢Ï.¸•Bc≠TÙhq5£Ωe¸õh]691äŒ	ªéßCÈÅ%”“|y8∏„`G÷q`v¸Ä,a≤ÜzõF˘¨æi¬ïMuM/§∞´mºsŒŸﬁÁl˜W"Np–ÿ:Ò∞√˘u>E.√NƒèÀÔÅ&˚$– mÁq◊n€Ø.ùõDy9ø…}N˜}N˜}Nw91UΩ–7Ç˝›ÁrØêç©ŒÂrógkÑs»”Œh!◊]‡Û SÌpÔ∏\L‘DÚï#√ÔSπÕRπy˜õÏ˜Y€˜Y€Y∫ÀY€ÁDH∫œ‹æœ‹æÌô€tüJ=|üΩ≠Ù‰}ˆvûÓ≥∑õÈf´ZŒﬁ¶Ê˚n≥‰T–qéw˜–Èﬁ‡¯Ì—˛∞ëƒ-≠tüƒ}üƒ-E7~Nx∑_˝™íπ9åK∞ Q¯Ì¬%ÇÍ:%ˇ$¸1•Ω¶1qqøÃú2É(ö:n≥ Võ!Ã™÷◊d€%›T©r˚,ßﬁ2èDœ‘ê"À¯éB&˘w6r°´ﬂî&Bﬂ‰{≤åÍ6ﬂ2óï~cØöœpoˇ}ova≥ŸÚVﬁıq˘ªrï&≠[HÂ/-ÀƒE:–€óƒ/WΩ»F÷7êMœ›"Ò˚‚Ï?ï™Ñd)µ© çVÔD£/aØ,Éåk-KeÎö¯I
+O ŸvmeIµºúä´ZˇNMUƒΩdˇBêFˆi3<Am‚bíóãu0!È@“NÏd!'=üTE¥.µY…’§7È OXÆ†ÆP:]PUéjê€-ô˚äÜÌIZmQq[ï$õû‚Ià£iE¢iáh>·≤Sók™PÔJêÕZÇòˆJáõÇ√[/ƒ#H2A€Po5ˆ
+ˆVH_^âÏπ—Q')íup§^ùﬂk´}™¡;)€-øF(ß¶êV¯ïÛC†JGÉ©;ØOeá}ƒ‚ºY¬’Å≈ €ÜÀõÍÅä«òÑûõ	|‘ß/E;‡ÈS—ÂÍ{÷ã 8ø.•ö)ad)Tå2,ﬁ.HÂérc<ãVˆ€´5•
+À”è"Ú0lq5ô»Dn“ás í±‘:Œw&‡8´iÌ≈zÍêΩ»ˇJ≤ëƒi‘oö1ê7j¬!ê+¯¬yO6Y^uŸüIVÊÜzıO≠qawêÈË*k4jbèp∂¨6«∑OÚj∫T©fîÑN28Dı§⁄GÖ6	õ‚çã=	”⁄è: )c)y>WL·&†K]‘Ê‹XfÕ=rL…v£´-∂Ûâ≈¥˙OºúcÜ5—≈ΩÀJOÚ„-H\›÷œ¿m*ULíL©á!⁄àsQâ@—–qΩÃˆñ⁄- ‰‰ÊFY¬›r;ÅÓbvu]∂Æ
+vE(É≠^πÖQkPpÀÇ&MdÆ‡˙M^;·∏Jù..f‰‘±pw·á∂$< ø±w¥R¶5…èak’]X≈Û	0>P±∆ Âµ-Dbﬂ£‹®àr[ü fÏV‰W›ÉﬁﬁÉﬁR∫†∑“iæÇ(îçF	vÁäaÖ€Ä¿SFÃ&m[Ã¶åî≥¥Æ£e>»©jôœı56m®—ä∑)¯èU«a˚∂›Y‰ê	îÁ=ÑÁ=ÑßÑgíñ˘á√ÔºÎü°è˚gÔ–áΩ£›Ú∫˜å7Â9ñ≠yÔ	<a¬ÿ=Ô˝ª†,Å6ØÄ°ú1_IÙ∆ÆQ
+Bô‡ñÉE4πƒÒ°xÄ£¶d~YtI^L<IVŸ·‡yx˜#ö≠ &Óèñ#wITtd∏ª∫%`9C<˜ñº'ÿ\∫»ú ÅEïô0óàœ…ÖπÚ‡ΩﬁÒxoBÜw≥/MèY’	ß.ŸÀ⁄íQä5ñı} <’jˇh=.?.eõzÂ£:êá¬˛E¢
+≈-Ñ\‡ø}«.∂Ìﬁﬂìõ≠˛â±ö··ú√Ãö°-<né¥Å∂P⁄Ÿç`"% 6.q 	í—tÅﬁ*%õﬁ¢Ø1Màî®„~ ö ∂¸7^Äô5’óï‘LiÅñ{Ú;¿J‡ ª⁄r.Ï¬6≤of∆AêÇê•º y¥9ÍB˙˝˛7z¯Ö	Øz¬‡)¨·´P˙Ä.íp°†∆e∫∆À·ålhõ”´Ñ≠ »Ü˘#c´W∂ÄU›Æ˙j]˘ïF¡˛ò˙÷¶∫2Än™l÷ÙKÔ*1#∑ZıªÎ^π„
+ùF\>ÇìÔxM◊⁄∆AXî|é∏†ôàsZÊp©’»oπﬂ´ﬁ}
+5íaê|õú∞u çÒø®Ne◊•9˜M—¢ ç+∫Ê ÆD¡à§îçdöëdíïOüOp≠p√ »ò$K™FGı†y q+…=hFã∆Ì˙ø,‹pâXÄõ∑dÿE¢‘è8QYG≠A©ç+Xê˙U\Ãñ˘{I%Ë¸ñ*ˆbmñÂ,`Wë¿NÕŒâ9º(aM <dw∏R#NÊÏ1üCºë9Öê∫F_.˝àÊÓ)urq9(™©i_ç"pÚlXRÑ	CgüP%)2<…¡˛â‚»>_†ÙU≥ßÄle∆	*œ¢J∂PkºZ>0KÍ∂ì‚>Uú†[èr[@ôhÍQoÖÂ†¥ëO‹MèmíÌ˝m√∆Ÿ”¶∑ìñi' -+ﬁøâå“CìÃ?ZQ"4#cıÑA\òÅd¶í&QF‚öÁLTø!)YÑm¥˙–ã›mÜΩPÄ,íµUåà∏âC0∆Ëœ∆Øˆ\9≥ÿêùƒÃ,ˆY	»öv≈·º√&ëµŸﬂ’¨ÂñÉÊöÅ™TbÊ‚∂Èõs?i—*wÓVC∏W‹©≤Q‹@Âë‹g¿Õ’g~˚@MÈ‰ç(m˙òù@”ã™Ìç>Sn®Õ≈µ6õjõµç÷cÔàlW‹LÃÕ˝⁄s¸O›ó…o“)À‘.!w‚ U∂5í≤Xï$Ç(\ç€ã]Ã≈ T4∆+IÂõæıFC<rÁ.i)Û¶"\DΩµYR¸de±YiGı&s&ùµ+æÑ„)†X«kèeUpÿ`Ì{¿ÑZô∞@æ≥‡ˆQ˚F=¢ãFß¢ìÉ˛`ÔpÔË¨,†+¬”Ñ«êÒ+¬§DT∂ØÍät*è›hz¥ 'ÊQÑ=•¨pÂÎ⁄ê´Ú.‹®Ô;ﬁÚWr˚ÓfõÀ˜Tı´ÜWz,DR¡ÑU÷Œ¶˘à}J:¶èˆ|`çt⁄{„t√≠æhi–S4"ìçKΩTu-ÚÓN∏:bÉ-àÄ£e»ñ9qñ òRÏÎ˙ ∏è˝ÉÉΩ3ê¿`oãn¢Œ…1†ñvﬁˆœˆ>ˆ^ÂÇ¥¢6ﬂÁoIc◊ŒíÙzà„)Ÿﬂı}'=“êé˝S⁄·Î˛—O¥ˇ˛œ'˝É˙~ÉYp<«! 7ıyvD8‡aPY”˚íΩ4y¥†çhœ4u5Z©kÃöV∆Gq¬ºôΩœsÉô74∏∫≤6_bèº&¶ƒ{ÓçÇÚKÙñË?N”X°Õ˛àV!1|kh©Ö]BN‚‹ÒˆféÎêµt‚D—5‡"ÿß	û Œ˝⁄∂iÆW√Xi’ó	¸aåÁ2É-a˘’qÆºnŸ »7J/¸∆0X∫K·¢[xò<t ∂œ=ûM†7¢’yà'ò®„ö%Q%‚°Ôºx≤çNKWËîJÀXùöƒ‡∆ ‹“'o∂LòÄ≥\ŸØ fl’’¬D≈Ë$ƒ[lø∏!YïIﬂLl7∆s≈µö=	¢“PÛ ‰Ñ⁄∫d)ß  P◊>Ì5#?K6œ‚G4‚Af¢yBü7ªfà¯ôHﬁÑ•Ï˚ìÄä¸û≥§ºÆÉ∂îÊ¨Uk‰πÛn‚†zm¨∆úÇä»¿πïÎL∞=…X@µÙıf‘U3Ü4Bñm∑ÉÚÀ]jÈ·ˇ˛Oˇıüê*O•ÎP∞€R—∂≥GˆÌÂ2ﬂÎ˜ûHáâ®ı˝esdâ»Ã„Ë7Ùâ¸©Ì®4“ıU%¯∫∑ÚÔˇ„˝€ø˛m›õπÔyº]—çÏg∫ô1Ñ6∂±ÜlÀŒkiÅ†I"xãgÆÔ¢˛~*†◊!v>çÉkøY,êãZ≥ô·Wò,ﬁ«èüIœÎ°≈ÛŒã}Ó»ıi¡…±V	´Dï/πì˙]∆K"æª£s_l∞sX˘◊áaÍ^íFπ£z¶⁄∆Ω§<*’¥2ÿ~Á˜ˇ˘¥/ê§%ád'ÂFªl”îq%≈LÉF≈ç¬I™¶HŸã˛≤õ*	dÎñíÆá%’}-˜ù©lR•√
+‘÷ÅRõ≤éﬂ_¬≠ÂπêrƒzeïÕÏ0¶¿uKGN~£^ÒT/öT∞óπR<ç¡hÊå¬ Ç¿¨ªûU§‘Öı"U@)pµ'2¡Ä≈Hê◊]uC“u¬/ŸsÆOX!"ˇ	◊&O—≈kÒ^‚·«≈¡Zæá4∑ä˙6Qkb3ﬂâ[é`’xi…®Z5&p+î∞ò®üÅõÀ¥¡c}gMÉòGfà®3ñª“0˛ò∫¥‹8Ö;z˘2ﬂ42f=¸ŸôÕ=öOπà]Ø˜—qcêqxÂé†PmùΩ¡æˇó^‡ÆyóNºàö–¶ÎøÖ	"Z ÖÎ∫‰¸‡‹Ù¨Nﬁ&À˚ÀÇlS7ñ*™*Ûídãç(h€ûç¯Öƒ'`û8%âíô}˚‚ÃXŸº;tµ?k/F#∑Ép˜Çg6U∏ye^∞3‰œé…v—√
+ﬂn=∑óæä:ßÿ√MÇÆÏS"*D®˚0∑|˝Æ√h#grY´° QıE@÷˘/¿FŒØ…Œ<'”äπ∆/Èù¨≥I»≤9©Ÿ6ªf{”ì&üìU_O≥}EN ∏qCª\]uUü—˚/+…ÛñÕÏj&ï‰∆CÙjGp[ `gä⁄é=cGvÆvî≈…õ2ï iL>ÉœΩ ˚Ö]@ıA£‚es;å™ïWLPmuö_;Ÿ·Åü`ve:j{¯ç#K1·.I%Ω˝âî1wBá⁄È’•jX©.”≤
+w∑%˘x†∫V√›≈YE¢˛?BL$DBbD«4TßXlÃéÎO™^ÑCÈ}®ME®M£ÿìt¶jsI¥YPL+≤ú‚K4Tà0Iz‚Á±û[∂@Kê∑¬ˆkÚVhK38"aS†◊Rµ∏¿®v,VQÂ]“8mr’Eq0„˙:ä©ÏWR≠≠ —<√k7M%µ?PB)D}ÖB6C|¿ ‰àW≈Ø´§ä'*.{ßT…UPp3Øy6]Ã.§ı\9W±çdK>SÁd∑üÉ1*<èË˚JÂp◊}€ k⁄ü¨D⁄©◊: VHıös0–à‘Â∫[S÷zÄFﬁ¸ ‰^`)Ä™Js[CnKˇ2Ôºÿ¶y.ÏÔ'…ﬂôè”O3?~í˛˘îˇ)1¿ï1 |©Vùe©π Ùy˛y„™‹üó/ì~î:Q(≤R
+îíµ bÒŸií¿lÑläÅ◊G;™“+¥‘{
+ú—'∏#`{VÌ®t„™Wπ•Ωî¢•=/Ç•©m‰:XΩ}ôÒ}ÍŒœä—Àñ+ íM[ ,8}±8ø|z[’Ã¬ìm≈.`òê⁄’é}ÇÏ)Ë©bt√’¿n‹∞’¶≈ÁÎ´÷¡§B·öGgêŒø®)§≈å‘r‚∫⁄ª®XHT ßÄrU÷V∞ÂE∂∞0à\`˙=ﬁ»«:lmIû+ıh‚≠º¯æÛ‘í¯.7^ûî{YïÚk;ÃD¢ÜÅ*iO∫Ω‰Ù¨∞Aæ˝∂µÚmßl∆◊±A÷‰€∏kQUÈ∑0ä#Ü!÷ÖqÏX
+„∞ê¬£	"ﬁ∞ïPêõM§±â‡~ìI9“A™Ÿ7„·ƒìÇ˛Ô.ÿ·æSJ
+≤Èå§Ïîd¨VvNÒ„:ñéG.Õì¿ı„H#ó »æ~hm#H∆7tVd¬-Îä@Ê´˜⁄Ò†*¸Ù–πr\ƒ*∂Çhn¥ä93ı˙Ê‹¥∞–Õ™Ï@*Ó>A©€/§íüG∂ò‹ïß∂e¿Í∂ïúÄÇR9æ∏˚~;-¨m$‡”ô±‰qL⁄SÚ<
+…E√Í»˚	ù—'PÕ"iû‘íX_Ÿ9˜ÿ&ë˜{&c±®¯J˝à!VWnl≤	Kwß™«jÊ|fèa“lzÜŸ0›F kö‰ﬂ§á^Ï˚±BÕ6Í£ùú¸b~	°ñ«ìn·6ã„QÎdÏF±?ü{.sEÂª˝DèoK∑)œmy®)'“∂Xr…ûp¥ﬁzyÔiRÈ√¬6òÎäÉÊBDï09ƒ3WO†lIVcæk\•-Ùˆ›Ôˇ¯/Ë·óŒﬂıv&ùﬁ$gN‹-úÁïÚæÇ⁄[≤;∫\Jô√pÔôØôfÊ¯Tç9j'w‡RANå<ÏD1»rå@ŸÃàc7.·¡ÊﬂØ!÷‹D•∏&Z∏Æì§»ÒIQ:®ó~dv_€¬ç˘Ö≤zÅÑŒKåÿ]ëo*ßPB“ÅÜ'ÆOn¯4z‚,i¥E˝$mUåeÉÏHép?>Ä≥’›Óm7X◊Wk=›π|H`AwﬁÎ´d‹„Pttü!æ—Í<ƒÚû$Z-ª¸t¸àîÆ)˝[Â8t/·Ω®c™èì≤DsW+`™vÒ(‡˘\Rµ•”ﬂ˜†‹÷Ÿ4ó”[vÕ±›]±ˆ+÷‹VÍìjík√•Ã^d0†Ñ/‡lT#Œwç˘[í®ä‚}f¨>√ÀÍoá[§ N*√˜x\≤‘)EY@PÓàZX◊Sjù∂ ≈\Ë„'ö¢.˘ßl.mR Ü>æKK›√j6£m¿)‹sFSÙ¡¬õàÀm»Ü9≥ÊLhsYuõó/a»Ö4SaÆº&˘⁄"Ée‹Ób¨º‹©‚0€çdî˙ëRÃ∏i¨∏NeE˙\&∂<ø+6+C∞{H¢®ªı·Iê†Á(ûz‘€¢r—	îÏÑ¶ˆ ’±ƒƒñ<_@ï•dÂ•[aÿ ¢*Âde9Ér◊rr≤oÖ9¿R–Óı˚DX›ñR0G‚í€˙Qr-JÊ¶ãlÛÎœÿt≈Hô4≤/h”gÌÖ¯ó∆√≈¨—îQ¥/óŸ0d˚u£É‡˙8‹˜£≈d‚é\∆
+x}K&*Ò∞0†>Îm£ø˛µÍÎÃ;Hı/®(»¶´»NTa⁄Z©d¥2±u≤≈ÉØΩx:ŸhíI*ù∂üZ7±™Î·ÄÇî=ç@∂Ωç@ˆ-bE≤h!+íNÚT{ÈE¢ÄZOäßS$	^tê3+∆πÙ´—(¥õ‰(∫¨Cí=ËèØàY´]Ωßc>øSW81Së¿–µO—ï∆(/</€€<*…‘‰§>ı¨– }£wÙTìHä§SÏæå‚`˛~>\å@›#ç—˙çÊrãæRçÚ ∆N¶ÅèÕ€ä¶¡ı¥«Íh"çíÌYRÃR"±MêàGÙü:“j“ÈîπÈøãËçÖÊæüÍÔ⁄ùdÆÛ1û0ôàåíˇı¡Ò8ZMÛ6Ë™FYeU4K0X«‘zyNˆ˚bÆ}ò%]NTÇ’èkA°™Ø´mV7Äﬂ∑tWÙ>N›X≤†X5ﬁH
+)|eƒn%¬–˚yﬁ•Ò‹"–Sñ‘/ µ'‘~-Üß“®YÏ◊œ¡"1B0®r§ñ©À762‘P[3Î∂∞öJ£Ùkãbìıx1A∆â)«™—d≥Åx©?î3ÂD_
+8O›àŸ§tÿ~íyL~ÈxDˇ{Äﬁ,¸qrõá.∞Gæèß!&≤é7F¡Ñü0+mõÁ«®∞eiJ£·8)∑›V>P+ò+T!ﬁö;Km¶ÿõGËb9wàDOr#à™Ä⁄¡uÑ"V{H∫4ßWW í›ﬁoCß¡Ø>)6,òÛX⁄,ãÕ°
+{£˜é€7uïH∑PP[Û4›ˇuØ¶=§-;KbcŸ
+¸≠ÉôáV¥jZπ5¸∞øà©J«!ƒë\oR.8ñß˘tQœÓ‚N»ôõ≥ b¿„)ÊïÇµhíßs≤3(2Îxâ¶§ô≠`2πÀ|3âúëÁù’, œUË£GË)‚!(`®É“ﬂâT(≈¬—ÇTπúJÃVñ:á«á«,~Í084DƒŒ†öpÖcù^˜è~b-ºv¸O:-úÙ>È∞6€;q<5Sa.l§ñ•ïÿ∞àˇ)bkúÂ!5|˘çdƒä=ã	0«∆·bO4≤’MB«Ü≤√6Ü¡S~@à»)ên∞YÆµ¿3?Ì≠’ ¥,UAzÕ∑°ñ%=–R† “≤∫j∂]0Q ]CuEt€˜Ì∑e©-ÛkC \ñ,¡óeIM%≤-E≠O5¯-≈¨öj1Q&∂í„2ÅˆYFã–X∞à°‚´©) Hπ†t[& ÆY≈¥u˘v•Uû2b⁄Âap·zD	|ºDØ…ÊªfK»˜ed]¢H⁄jèe©ç@≤,µ®ª…ƒ/$Íû!¶§°ŒÏ!»ôÅ˜œﬁ≤›ÿ…™2¡áP„]Gã)”jéÁ%zÕa0éEWDß›ZÈì1Õºæêé¬BNLûáèY[(íM’†H6TÖï63™C∆ÁﬂÜﬁ∞⁄5›$¸∫ÃÏòµtÆ¢ƒîôÙ†ÍÀ˝+√≤´©Ω†H¶åSΩ≥≈+wl˙¨G«\Ef˚Cˇi%•HJÀ∂¢“R§c∆¬«¥¥πã=ÉÇ,@WF∆y…N0ú’£TÅ7;:ÅOcÕ2¯Ñ+ X¬"Qô∂/Ñ’√ ±ˆ;¶ç€¬2/£OxyΩ/-ëÙS˛ìÆ¯≈Ÿí™e?e˛Ÿ£Q¢Ü‹≠m©Ê»√ Z`}jpZÏ$Œ◊Q˚ÁÒƒ’HÛ»RÌa$≠∑rünÌ∫ó§Ÿ!Ñ`@¶Ÿ…˛—Ì>íWn¥ —â"j◊ “·˙ÛE‹;q¢ËöHaJû6=BfLÇ±¡ØàKË<•'&pG†Î
+Ÿ6zDƒ´à»W`D&}m+∑îK¬º9∫¥U≤I—|+|á F2Ì–«Ìfëwâ|›ß°M>Ì†ïÒ¯;.:Pv¯«Êø∫{˙üÃ?ñ-_ø\)ê©I 2ó*·t{üÁÆI&≤†Zn«:±¬ÌÄäè7ﬂ=<|ÙÛœÊº®M~T_√«º}{»Ä% ≠g+ÆÆZﬁ«§á÷6Ò‡√áª±soüûtd†ªv¨uü‘”˚5≠,Ë◊Çµ bÜ—«±«Ó˝Åáù0É"qo,(°ßÖ9‰¯--ÈGôZQê8˙'›¢ü{5IäÓ’§;rB€sz÷[9ôß¡"Ü∏Ñ/ﬂ{=‘ÈûM(–ZΩ"ı»Ç$√2óÓùT‡édÊÊé∑7s\|8†JôÈ°.…◊˛_∫‡ı"åçˆuª˘§W¢/¯1•Ø¸täÎ±’*:iÛåÄÜËÍv—€' ‹•#´Û‘ÌˆZû@ChhIr‰´ûácr™p(ïô`-ÀEÊâ√:ë ÌEI0"π∆Ù0»å‡ΩåäYÇËgÒ’eQÛç√ÁπhRÛdã˝dúé51i-;	‹hYÁ‚¿°∂_H&È2$≥¥Ôè›ƒ∂óÆE®ŸQH≥öUFœø¢È=‚å‡∆xÆ¢ﬁ$UpUJ`¡)¶Rw·•e≈ËO˘∫5ø\Sd°ˇÕÎ)Ì\oaﬂV:À˜|	ñ°P·ècg ãìDò7A@˛ÛÃXHöGø)ó<È¸e·∆í∞©r∑b#4”cƒQU¨Át¢ÿìV≥,¥\}$€Õ:™ê≤]H©*â†6* ãvo¢Jâ £"9ER/öS$YPM}≥[9pGßù≥á "x1GK ßÿı˚ªº‰›}ÄÚ«ã–ˇ3;Ôk¥_FããôK-Ä˜'n8ÜL&6ûùì˚2øÅÌ¥ûØ0&6ùù∂dQ!©ô`Ï_π¯FÁıÊ∞—ËEGèıf~:6©Æ∫Y`#õ£ÛÃùajú	¬›öH ˚3ª”wﬁèRôŸ® p˚√‚î
+˚ÉyÛî;∞I∞ë'˙Œô«ÓËˆÊ‰Ü˜Éò\ı#fÓ†ôÆü„M‘æˆÜCMxˆ,¡‹'ÃgìÉ„ÿµ˛AõØÆå€˘˝
+ü9 ¥µ&-#7ëÃ⁄ÌùûüZXπä+cèT±!;€ı∏«º8(ZF1<◊ˇ‘3´^aíªªæßZ‡'µ|DÎ∏®øö"Œpë˛`ó,L∆ùºaÈ&ºøbeÈ˛ä≠i˛˛ä]Û˚Ü^¨ Ò
+&<Äﬂ"|à˝¯˛jΩ√W´:uë=Bœe zÚ¯—Yjp»Ë0„ºêûá˝Àxä~@ﬂ€‡–'oèb†_¡£òà·©2∑z2∆)LÓâÎß3˚¥ıô}∫5¶πùÃàƒ
+tptà?»Î?iU (≥¬"uΩÁFØ=«ˇ‘›ÄäÀ+yºÈx¸]·,7-≥E
+ﬂÆÆ“/ü¥∏ˆ}v*-ç¿ºO$]rÙ–âáùÍÑÓdâ&”›o&I'@ôÕî…kHó¸yf?–Íı±X5AtA˙aåc"<›Øøù`] ÿVCC{´8Ív˛‹…≤ï|t⁄z7[ÛÇK◊GŒ"ûì`“˚WΩ#41Ì,£ΩG£`é{û≥≤U{
+J"gLU›Ú®ÿYøäÙ£ODbÒ¡0DãÍ¿D$¢P,»⁄3ÿ_cÏ9ÀÓÛmE¶‹Ù3ß ¯#cósg,bzD HÇùê[˚g¡'Ïªø¬¯	[¡±®ÏÊ-oÔò3iö#H¬„h∏ÙG◊T˙µ0ˆß&cßú}Ãz¯≥3õ{∏G¥Jßw‡ÑŒˆ∏Ñﬂπ$ª€ç¯«{,~◊òïÉˇ·Pd‚ßÔ…GØzÖÄKØ^†wãˇŸâ=<^Ù.ßÜå∫∆–ÌY@∫„·"…XÚ◊⁄Ffê¨8Â√/…'øŸìÈÖ»ı›xó…>/P’¢íÎ1äù—ß˝Ù«Ø¨XÚRª4åCt√mÈ›t∂7≥·õ¬á}~v|Ú˛§Üh.æŸ@ÒŒN	yIﬁ≤Y≥Üò≈∞P◊éxn∞ZÃÃ
+]O¡4ÿÕΩ'è+˚ÊõLGD1€∂0ÃòŒc#¶ì^Ô€ootMÃô…8Ÿcôï0kXíhˆ[R+êÍ…\(2ó«Ù:»%Â€·¥ßÑ#0Ωº»Ñû‚	&ú‘Ã,˘®“ÆŒy{ﬁãy‡Õ-2sfCõcßtÊ œ3;å»&Û≤∆ÄÄW€öÛ™Ÿ£Ñ…1º‹h
+: OπãFS«˜±«¥q^-®Õ
+õπ”ñW ôVyc7âùLô&Q“¶Nxâôùºõ5§˛£÷√: [µ€QﬁE!¿C∏‰,ˆ`%“É“Ì®l3‹£ıxèñX“›é#πÙXw,%≥∆â<Ñ$¢RÑˇ/ÊD}«‰∏”ÛœÎ{_πé∞ ô^Œ&7ûﬁ£öèµ¡jÏáÑPZW†L©‘ÍŸhtO# *¨%•5%a´}≥˙i˛ìÇo‰—#4|w|r≤Ù˙ßghno”Ò˚3¥ªﬂ?8~õ˚1e˜dú0X6ªÆ„•πº¥ñ5˘Â~åg∫XfÓw¯2;Å˜£aLN˝G"Ü∏<Zé<\íC∆˙È˛Æ¡>%2"ÓY aÈòƒq©Œ:˚Ä„ª‰`x¸,t//	«!C	„¢êﬂ_–l¶É<ûtiìì@≈r<ﬁõêâªÔ}7Æ€c%}◊E©.Wõ¨ uv™=ƒt”'M∫i˝≤Ôk†>;¿Y∏ÆGÑ√Í\Ã+¯çái pÒç´3li“0XJ<wå˜˝ºÊö∑§ÜHÚF«ìIÑ„üÈFtcÙÌ¿Ü˚ñº$¸û/òÊxÀ{ç±OÁÆ&≠vc—ÁÒ"ŒtÉö◊ıI~_◊iiüuﬁ\GXßûa!√π˘˜%EÔX¢n}rtMù_Ü]P˘tÌúH¿hÕäxÀπ¬§=1√QH∏iW∞-ˆO ≤∫5ôÃMÁ\*Ö›F˙∫LÍ:Õ€~çÈVnnQLLÑCz¨jõìë‰H:?CÇÈpÃÁ;ë†é9à\aa!^ŒÉÀ–ôOó=¢]{¯è›≈Ã<
+«lhl≠y≥Ô=E%ﬂ>JPz”rÈ@ÓMÀ∂yLê3Á≤€yAÑœA™9øà}	…PVÚÑwÓ¬ˇE=^@Ω7Äæ6EôŒ]çBwŒ≈¯˝R¢]ô»R≠zÍé‚aœçˆfsr{K7DÖëñ˘U/©‰πíÀÍâƒe%HÅFÆ›Ñ)6”`KhwKœ9´ó¯g)o…o¡9·(À√âïû∞Ù»7ªt∂dÀMÀ7\	ÌÛù|ur»Èq±õ*7úU‰F"v≈["'∂'y{5b I∑‘xì]„• EdÄ*tsã‘è	øàa¿†óπ#7XDhÜ…›Ü&a0CÒì˙Ü]BQ!à∆Ù@q›‘qÀÄöÂ©Ü¬uîœÕÕ/ó%§®õ 9S∏
+‰Í*…ﬁÈï?	¬=Bcâ
+ãg*Óô?œc™Z}∆wŸìﬁﬁÁ9˘ﬁ√Òƒﬁ{“üª/^å<'ä‰Øré'™NïÌµ¥€Dˇ∫vÁ¯,‡¶™◊¡g¶ä)ô0GÃB[EÂÉ°Î∏¥h¨M∂çóµo¥Ú&Ù!¿;Ü¿I–_ˇ™e6Ì˛, C—ı=e–≥‡
+ø!¸‰ä.l»xaßÍπC≤AâÑ-b◊Î1Ã{¯ìlO¿]•ñd¶‘∞/Ö3FØSΩÃNìûC¢-\T†‰5Úï≠≠∆#"Œí≤Jc<˜ó!«LD÷r„SS?øÍY¬mvD=˛Ê˛#≤∑Óy5·Sz–√&\	rë`c,˙ZA%Õ=∂§ì2·áä¡Ó(Í†œçÿü; ∏∑|XÅî˜± eΩHB,¡Uì0if‰πÛnâ˘X*µ¥›Ù‰uÈæ0hJòRªHÍﬂ…äƒ’Â:ÎÉíhëtœΩöı†ÏÈ‘~∞ã=¨ $≥Tnw£Ã 4,&HPâVA¡*R≥≠¡ﬂ3ÁÍ;NÒﬁVõÄë¡§]…∂é£j.\i'√™∑@îSõ…WÛe◊ÒÊSÇü{O&õeN/SÆ%XÕs}Ê¢Êö—ÎC’°¥6V∆u˝˙¬ì&±t‘|î”_zê\V__(ÿΩCt˝-¬eﬁæ˚˝ˇ=¸“˘ªﬁŒ§”c5&
+„¢Ë∑D˝pF”BI§mäÆn=2ˆpqd◊º@“/Ä˛Dπ}Ôù∫ÒõRy'¸Û9v¬Â:Î`	_«YR*.oV/í…¡Tu_VQ∆≠i‘≠Ãê›ºËGÙÿV
+Kj]aqù`Y!‹˘É¥ô?Ahã¬xˆíLPªñ¢‹†çZ–⁄tÕ˜‹*pæÁ-∂”W6÷á_r{N0Ìu‹êwÉ¸Äû›<'¯÷
+'∏”áÍ€¬°zz+U{ZñÈöi´çÏa=üCè⁄sŒŸF"∫„ﬂÚ%LwHIx∑oTÿ)NÈÎê’ha`e≠™ÉDÂ'›°ﬂÂº ŸË©ü…áT…¥ñÌ∫W.$—Ÿ*%ÿ%R 2}·a$Íà5äÜ< ˘®ùê∫ãE+oÇ¿°¶GVUQ?Nø™ßöü‚ÒI.ï∞æßŒ„ùO∂—…!‘ãîõ^Ÿ{.QêñËb˝ÁÎÖr°`Ö*Z∂ˆÑL8AJ∫§©iŒƒg”Ío…úßÿ©¶°Æ-ÖΩÉú ı	[OÒÂJ/?}+]…e-Œ{≈uMõØÍ§,^ıe≠±mÎ§i¥…¨üB∑Œ	ˆ◊Ω
+:´zômŸòwMìÖ—h≈¡ågöìïô·1\⁄Æ4ºv„—T1Fâ’òD≥Í{ZM:'
+ k4ÛT'ËîÉ¶7Ïù˘iåÿEÍ
+üÜ≥Èbv1∞ñë%EWK}≤§)D|:œ…Q:˜`¨Áùm∆™,“*÷YÖŸZ-s
+§l∑]	ªM3∫íÈ\.TêÍôcµ |´¿j|Ù¿˘u©ÂﬂPö¥˙<√2“-⁄ô"†ÖÎ%Ú‹(¶Z c–R˙ádJAcŸ¶˚˚IÚwÊ„Ù”Ãèü§>Â™ﬂ®`Aâ∫+c¨¯>“kÅIp#–¶Ü›ÉﬂMUö›ÀóIüZjá:Ÿ>  jv,¬π©‹hæ‘òœEWÀy:—)»Rï“f‘∞Ÿ”†Mé>¡=∆Öô ›ò 3£uyHÃ√& $•©s¶ïé*ƒ
+çœGSw~˛PºR«`q%“÷Ó–UK‘)£8øÊf{E1nÕ,Ÿ∏äÑn§∆_ˇDé√+}€¸7PÀ˝RR:Ù˝˛∑ˇ˜oˇ˙7täoãr®èé≥øˆ¢ò„MP¥‘}Gd¬xÄ…|É‹+å>ÄÊè—Æ;r79fiÇDt@⁄À#»$_}gMU8ô™.ôÇè√™~Ûﬂ[ÍîÜQß(≈LS§¢≈ÏxB§Ró®¨EõÅÔ|¿˛8˜«πf'nHd¬h·y›çWâ3ÎUÔJ¸˙’¥-∑3†#¿Öç¿˜∞ a.OSº7ÛÀπY2’*‹∏,øÊ#«áWÓà«-@πe(≈x,~†∆∂ò&‰Â^CM◊JŒE“⁄Í,®™ÜπÎ≠÷àèØaç2xîŸ-y3Åf‹ô,Ÿ‘∏Û!5A˘'—HƒhK[Üí®Ó¢|ºÛl¢†|+dS◊Ä‰lÀÁ†+Z„ç-*B∆ecº£Ö	“r:®kË5 ¿?k≤™®<2µÙh$KH˚Eî[ÆÙ£H¬2eiù-âµ√;ry˜–O`∆>"
+Í‹	ôHg≤F@˙Ë≈VÏ*$ˆ∞ãä§Èd“zã¢Ï2#Z4_ØÎÎµ˜9ù6-Q oı≤uB63òéá_VVÚó^`Xâﬂ˝ì‚FD•JÂH‰êõå0k4''Eså«Ê«Ù{ÌUWw|∂ºJ7§/KÑRm´ÖR˝˚?˝ÛGoÒÃı]¶ÉÉÖç∆R°£E∫¿™…vËìˇ[F.líw‰WÒî∞Ô–'R“£SLT&"{åSE]IìLz]à»®<¨Î œ,È»nD¸ïC?%›‰GPı´ÜAHç¢Ä¥ö(∂*"YÙÏ(àpœrsíöBË„‹˚¬≤ÕíÁÕÖØPèKÚ¥æMÆ&°1Øü©np-ø¨m«;P€9l≠Ê™Í88¥3˛nKfØÅÁËf`
+ÍtÓ˛"˙◊8
+LúDÂ8)˙˚m¬$QøèÜÿF=Ôü÷Sf~øNπ«ÖµoRaı«WnÑÎbGÛ-Ÿw*d<Øi}’›wÃçY.ujÉ∏!ËÜ·I\Ü8äˆ˝1‘j	B´°&¸¯<’Gr ä‚0¯ÑÈÂJ⁄Ü¸êØw?(÷∑õ[!H®Â˙öAyM}æ«„™Gïè-Xı√Ïz 2;¡@ig€Ü›ÙwõV¬)˛,Yo2}.é6—ÃÖÅKO˚c4e7^ò3KDP%¸élÑ{ñ<sF§3p+3“^j¿∏ƒÒ@|ß`ö∏>sQØ—Yå%OrN∆4È‰aMÙû\u2ÂsŸÈG(
+à<ËDhD¥ÜçdW_qÚ©i¶°∂’¿~)AKöR/ÄF)Íœ†íãÃyFWáïeÕ0“^ΩU®í[ú“Õ&h0¬;xMWhP#C‚ñß'©ÿô¬µıÈ◊¨tzG6◊˚Vså*ï3ÃsAî1øÄnŸ∆ã1åöjVî‘:'«ª¨ôÅMQó¸sCæ§ÁF06ﬁDûsÅâ*£ò+¬ºI≈¸êlù‰ó∞Ój˛cÜÄ\0€¿⁄“'T|
+bÃ†ö©w=—ÿZπ5∂rj2âﬁzœÁ}≥√6.ÁjvIÆÊ7leÕlí≤:Fö¿ü∂8¥îgîÂlÀ›ô…y˘£hq*Bµ∏õEAOVÿπÓv˛aHt~ˇÚ’è]fubo˜ˇ  ˇˇÏ}ko«ñ‡˜¸ä2·â©å‹í(À±çõd)ääπë%]ív&XÑYîz‘ds∫õíy=fX`Óá;ªwqÅ‹/ôY‡b,∞¿›˝C˘˘	[ß›’Ô™~PN‚ ¶»ÆÍzú:uﬁG˜=R	dµú/JoRbåÙá¸Ñ:Ü±+Âƒπ;so5õYã!π«.Lv_ä:◊øä»¬Í¶V-K:@›Ê–z-Í¨«‘;3±îy∑Q4ï~JPa—-≈oﬂxÀ›'ö¥ø97^+{ßåï†≤bóU
+„Ö¡–%√Ú¨∫i'‰∫ JøÚÆIE‹SƒØ˙_÷=dÆI9”V5„©¿∑˛¯/‡≤°µﬁÏ®˘®≤Œø∂<Ê3©SÏ,µ¯EäéÓ√ÜJQÙµó’˚§‚≈œeµaõ}/´∆(ÿkª_S˚‰–2e/&8Âm£R>4;ÃÎ≠'^[Ù.nCöﬁ{:¨èJi7D}~d¸CY6·πÆÙ¨…:zÊUŒ£ΩvUÎU§âáÂr´áY¯I∏ÿyq«‹ó°∏ÚT'7—}yFŸ±ü¶∑a…t? e¯ÇÚ~sy>s‹ÔΩR§òØ'‚¬•æ$S°]‹ß‹k≤ÉÿÙ"Ë∑(ÃP£(v,ºY≈ÊUe	ÎÁ‰ÍÛ÷Sqb∏ó˙Q ¿ôÃ≤!+ˆA$ci˝˜ˇ=c™Ä$ Ÿ·†rR˝}≠ˆæ®”Rßå”íÄ_F6ÄZ≥*ÚÛ	•ÏWÜç}ÙûW«<FOi£b#Ê	‚õJœwÀ(4¬IΩ≥ñXîÈΩ[Wnò¿Áµ„‹^ËQcØUÁ´Îd$Ãóå¶]⁄¶<„ƒ!úgè=kp)V˘=eJDT)sR†„Gü~™¢°/{1%m%‰’ŸJ+çù%Z-—‘©∑ñÎØ»∂é∏µ˝Å∫≠\@•Hı(	‚¿qrH_aﬂ;¶ÁsÛWø¡9WªÛÑn1∆Îø@ﬂÖãA(µKk≠§Æ≈IˇÙÎÒÀãì≥”ØÀﬂ∂ÜwM⁄MñâK√u∞˘ïÍFûù4)ËÃ,óÂ;"WësvÿRïŒıòÉÍ9ó£
+ñXÆƒ	_≠ou9∑|(/£õ"1G©¥âLΩÁ6π£—+"m[èÈV°69%aˆ2ö∫Äf{›“P›hDQÏÏ†WØO∆É«ÉqˇÍuáct6<ÍQÔÏÙx0|’ŒN——†{rˆ5jü˚o˙ß„ÍˆzÉ#Ú©{ÇŒ_{/ª£˛H}|@T;òõk§I/íátj∏î‚ìrn8≠◊≤¡∂a‘¥à˘ˇÌä†(‹¥tñ≤ò°‚ÛIMÒË}ôõB_≠,‡É,Ê(´%[â«Œ€#!““_LÈ⁄óÕ≤öCJ:Bƒ
+5˛:aıÃï¨‰H∞çoMÆ…K¶/~lOŸ◊}ÈÈr¶+óFî⁄ìJ.ë¸*—W’X|í;GO.KNÂﬂh‰íπï?„UxÍJI»Í∆ &ŸTO1M;S™°œü∏P5ê…mL…Y≈„Me¢®•`ÂµŒ3™åÆùÂíá9WO’û]Ù®r◊
+FñÛ8∂T~i∂~Á>3–k2Ö2Tó…[ú;‰RpÆàrçEgœ_€8±¡˛zÈ\πÊÚzm~ÿ∆'¶{UCZıf°7ë NÄfÏ∏¸’UU2’s%T≠
+Qõîá™Ù∫t¢Úú"’®GB≤¸Cu≤◊@`b‘Që∫û[RÙﬁçdä∞˙SpÈ™æ® ﬁè 
+w‰(q:ÎyuAY· Ô®ﬁCa˘√äıèTøb¥∫ìâ¶r∂œWÓ‰⁄ÑXQ◊Ò	+GÛ	—4ˆÔ]ı9+ƒ{MªlGxnUøp(]º	ƒøgú,_Ë~˘ø!ÜDÃ§E}±OPLìÄ–hiÆi¯-:Ä.ÒÃq1ÚÓ0ﬁhjπçÌ5ÑèNÃ¶;ánx∫jœ7g≥≤âC≤îóŒt=öõU…Ø~äëjÔõΩé3,ª‘êK'oå≈£ï%ŸÚ8óL °∞`+|UÇZ™•_æ≥É®∆]∫ÿºô:w3]∫ø™ <ÄFî35i∑É˛òO∆`—ûõoi>ÖrNÜâ~o9ö∏ém∑Ö´>˚ì∆˝µ∑*≤∞˙Ω˚§>A$º¯Æl¡DjG ö»¬öÕÂZ…Éä; uà< 9!ÑÂköÁA}ú≠ ÅÏ°taV-õáÊÙ=qP‚7^·©•"\’)≤Ä˙w∑ıkM›lƒ.≥ˆ{Ù6#ñ4â‘*^Ÿ1'ÕH;6ês.Í¡ájµJ‘ãQ9Ÿ§R0}ÜhW+mÜ¨hêî˙^⁄\ù4®é±’∞ı^‰˚ñâD∆1öKÊSƒÚ
+Aæt«ï˘Õ¶˘ÃF3ÛÀPïÌ‚Óx"/ˆØùi<3-ÂT‚Æ©v‡Í!ÍÖ©ZZo‚ﬁ“-Ê˙kUùÍ’S+ﬁcsW√&¨å ˜bü˛HA‘CAXvœs¶éçê'5F˜d°2ægÒ}QÔ⁄Zxªx˛–ÊHA≈¢y2lÜ[ªjPO¯Vî	ÈzVoHWT
+Ô–òB›?Ω≤∫ùÍW5Ë¬Œ>-˜ñR<ú∫#~sf˚Py(«∑,&ÿæHz™≥ óF' n=:ï5≠√S√ÿ™+CBñ˙˛Ù‘å%É≤≤@*+…ﬂTØ qÂa&-ê¡Á
+ı*¸0Ø*Äìö^œ†>]–ã’∂´këôA©OΩZs5äWÎ;iƒ[π:$^öKﬂöºƒˆíê”Ö„∫:a¡("¢µFØ{Ω˛hT}ä,(]LÕ7Ö%≈æo’}úÂ◊ı$tip€jaè“@e√˙√·Ÿ∞ÅÌJç)_ê-3û…¸Ωf¶e„©Å∆‡kseZC?Ä<Í—˙◊◊”xH&+q9úßëÿ9î˜„rÑ#˛ß ﬂgŸ”íRrc	>≤‡˛‘Ûõiuﬂ)2´=ë˝k˙/…oc˛ŒŸΩ>|5ç `[9z˚Ëı˘…†Güãpã ÌH¬ç>X‚“NñÚÿq¶"èX≥ò&ZF!å⁄ÜG£b¢”_s„bjOÖÒÿaw/èù>SµPÏ‚êÎ2Nh∫Nf∫°“!%¶>¢·Íî	åÆ Ω˘@Á¶öãÆUü∆≤~ãeéµïMM◊(¨r˚‚˘õ‡mM†B‹bäh‹[aCÂà·*Œß•"Ä7È[GDØ*´¶{T$nEçF÷÷A[¸îÇçA›0÷¥ÇNlkÌ1¨’-…uZã\N4V˘‹∆œ‰≤pí)&òe{Ë€Œùà!D√µSò˜?6‚_c0¢*Rª?US±M∆x(Ï„F¸ì@Rà]⁄Œ‰¶∞ô≤}´.V3^È5{ù´^Xµ{çÎ[˘©@•ÔË]ü[ç(ëj†	◊Õö´Z„Â⁄ô2m¶õv(k˚]4Ê—⁄†”µjNZïßî“€ øåkå£ª?5∫¡‘ÎÓRkYÂBR£J¯©â_—:§€π≈M4™”î)†Ò≥∫r5Os¨t}G∑e≠/Äø!˙¨ÜàpDıv_∑Z‰“\É<O˙ºÉ ˆv‚Rï<tÌ@AvÎ«_∆î›…
+∑Û,◊ÃıAØkZ¬9—/¨ß’5Œ&∫ÍπÂ¿’CΩ∏ù∫çD?ıﬂ']ﬁ¢ñº-IRÙ:+T€Ë∫}÷í ü•Ry¢wEËsÆ<Ø}˝G@>n≠MËŒCÙª«®::[†#l[Ñ≠ıªß´uDU Ëk≤Òw¶fGö&ı∆òı˙dπü €Ø¿BÓÏ†CÀôcü»ThÑ'+ƒØO°Ã—-‹TG´•Õ]RD{th.T≤ÿ¸∏”∏q •"pΩ,Î%U6∂˜h~5Ì2√ù∫áp–uÔâ◊≠œrLfå]≤ƒ:Èr“Àº%èñ[≠zœ÷aQœ±¢ˆT·E≠QrGSä	◊ú˙≤Ω@“~r.v»\˘T‹√B«ø‰X?≠ÖÂ[dÈ=Ç+sr—êèhÈ‚•È“∆:)¢öHµYÒ(nÜ€úäCπxì M◊•Óå≈≤≈©Ë◊HQ%úeK‚¡#E^CÍâ48%M3‹î™Q<)ÃÑ£–aïp«‰¡'óte›0µ-≠Ø¬QMn˚Wåj´∞õZ\0h ¿K¯ÿ∆/1ô¯≠9_⁄‘X∏Ú-€2wsûYãió7nŒzŒû‡¡ºÙà° ó €-/¯¶{kZ6†Z0ä2Bõ K·|ﬂ<û/KÜüHK->ñ-Î”;©’%ó !/p'btg˘◊Ú}Y2¥ïú⁄†öÀvç.É[ô&Ö)@˛EÓPdG@"pß‰Ä@c·*U¢ó“âQ’ÜÑ°GêNæ2¨≈≠sÉÀﬂ*ªT"@ªÊc»ç{LÊÇ`2hbcs¡‹'<ﬂÑÑ®”êõ¢%ÑåÃu
+ ∆·'∂;⁄≠ÙﬁS:b•ﬁe¨{˘4úÿÔÖﬂ|wŸ˝8“2Bﬂóãx⁄jèà:iä„aÒoÈÆÁz∏öHØç§Ÿ⁄ÒgÂ“⁄{æKPõJ §Oö,ø[°,ñiı≠Q=Ø	°jUÌJéy£hSÙ»F)ÿÛﬁWãÜ“*NXœSÕGŸDˇä¸	W|øtÿÌ}√√k"?œ0ûµÉK¥q0L„í¬]‰ÖÆ§Ù«&;*%?"EW˜¨£oÆör8OìõÌ
+üùìÌÉï(¢∆j:π÷ÑäOœ‹˛/¶éäKs5#MΩûDı∏˝‰#
+#%t±=|GOÕ*yjŒÒ˚GËñÆ’Jîp1KÅèﬂ…“¬ãI"ΩƒVÊø∞X´∂˜TA≠FNˇûÅ ∫˝ze⁄ ‘¨vô	A•‹¶0PC÷‚–T∏Ω]˙(è„ØeÕã7”Y∞'{◊†Võ2öÔÜ|k˘*¸£m^b(~”˙Ò˚ﬂ˝Å-Coe[(Ê=* ;ëÜ\æs44°’£,%ª⁄1–»\X>S·mpOôîHxcB˜+Ïi¢õ2{˙ÔˇÜá∞p/◊W‰ú!ÎÖ˝˛DwvüÏ,vo!¶t¥$∑È&7◊ÉVŸV©˝˝·èˇä$ÅñŒ˛'∫âO2≤Öè}ÁÒπ„“C˙∆¥WxìªIΩ∞´Ï¶‘Aô„˘?˛O∆"‘ø©UÔ“é¬∂
+3«∂
+Wﬂ“-ˇ"‡ä{Œ4h*ªAämFÑ±Ê]hÔ«;Œ√º¡Ó•i#ﬁçá⁄gT™3Ì≠÷ñJu‘ÊÊ€ —§è˝Õll^/…Ä¶<Ó[*©ßÑ5ä|¯èﬂˇÈüÄ‚M¿¯Õ8ZÍÉ1Ê?;é<®YO·~ûX<öø¡Ç≈Kc’≈c‡⁄“[ÆÇ‰ÜHŸÎsÊŒ™lyÿá˛qdy◊ÚúınÖ˝N„∑Ç∏Îª¯Vπ¢]îæ^:wËŒÙËAöcYi–ZÚ€‘{_›˜ï—i¯ Pë´ï¸OÍò∑äﬂIëÔ?Ø¢∏4‡	≤€Hu^Z◊ÌVèzj(h_ãı©Ö∫bU/Jå2ÓaZKfµ°ÎwÃóTœ
+BÔ±^v£Yöæ–LC%u æ–ÎÊoπ©înGI˛/ßTêÅJù∫‚´Ç"kILëÈÙ7∆ß÷Ï–67‰,µ∆¶ÁÉ!›µ<ÚºçÆ‡ÍÁ¥’3Z∂S][\ÅÈ(áà Uë@‹\R7·W˙›ïÊl‚ ÌdÙnïwB5&ñ≥ÚÄ>π(…∂˙Zbw∆
+jm&@ø¶l‚¨›aHáÿ√>pX>÷ãÌ¢CâÛÇ•ªYôñ~$LRJ.”IäæY>iN˝^¢
+5˝ˆQé^˚ÕÁ#‘c)®?´œ•á¿àUô≈hﬁ {~v˛˙˚›ì«„¡´>˙f0ÓΩÏü¢ÓI8°ˆÒÏz”?=:¢˛à<“˜è}Ùı˘˘#:≈¿√3bDVÉÉo-ˇ˙‘ÈR¶≈ÛW‡’Gø˜Íz‰Û)qÔà»`¿±_y4ˆ˘∞ﬁNønÅ√&˘Õö¢÷Çº·f·‹ŸxJ‰?÷MlûπC(4*wmÏÚ¡ÈR™πyÁ3tÍ<vñ@}gé;¡Ú0)¯l'KDêŸ(W»ÂÎE“‰_FZÊ’≤˙©E‚‰˘à@¬rÖT_È17Ä"‹∂Aw]A/å¥Òaïk–'èÑÖó∂zésdáNFuõS“ï\á
+óqÄÿR:3Ë‰J‹≠œ∑AÏÕ’Ê2¢APé©!ùlﬂR∞oók9iÛÄ}†§í™ß≤k>n'm®C·Pò€TÈÇ÷p†'W=t©z.M/õ=%/zp3i2dr≥üùÈ§Ûêt÷œµjQ’[]¨ﬁW¢∆öà1+ú0 †∑H|î÷\˘Í®F»5„U‹Q«⁄g†r@©–¨Ó6R*∂;¡3€å)„¸ÒxÂC©ıfÁ(•¬ÕΩ§ˇ*_¢Ô√?:YS ùúÅèÓßÄ|ÛÜ»PóP_$∞û¶l˚GT‚≤`√[
+ëèπ=Ç˝H'¯∫|¡ıR˚O…lV_™·ÚøÍ±¥ﬂ‚GdØh5ö5,:4A•pÙ‚¬¸j9•É¿ŒZ˛#èHò,pr≈i´∞∑˙õSs÷ïöd>√,>πBãäQH6ë%ı"a!€B3^h!≠; I\Â’<n"ú˙÷¥|Áæ•VUz\8UUZ¥á§*mHàÕcä™Õlá)ôäI.’Ñ.i>–	EXT≈MÉûÿTî˜À;u¸˛|ÈØ€©B@^aùàÖD—–Cál˚ú©é≤óO5»!gBÌú‰ß4{ç‰ îF•!Ωßk•≤–-∫‡do˙Ê‰|ë’Z,Wbı# 52‡sµXq◊öy=ö-"R∫§äJvœç‘ú1îèÈ±Âák-ßUï,Î¢ƒlƒ2£™µ—Uı‘©Ω®;GääÚe3≈MtRëmG í®øCÏ∏ZÒãÕ'›:ï.TØj⁄-f¨1FUÓYYï.@ΩDIY∏‘´’·ËTEè©ü±_´8xùE¿õ…ËPs¶;ÄfÎÔ«Ôˇ^+o0bbùä¥&CçöÄFtñ ıfmP'∫@· T‡ñÂø–µj Ï”#âØmSfVEåC4@◊±H?m2@ﬁ≈—≥O≥Z@˙≈¡} "wFâîCµ¶[(Q)+Æàz™®à∞˘D ˜Ø´dGjj˙¶1«ûgÍîbŸd¢G›‰«˜òÊ†xc5r”V›X_€àP `Sf…„«ˆ‡ﬁı«uπ•IqEQûú1Jû∏tﬁÚ¸I⁄µs'7„:¨î˚'/ÅHz/®∞¥Ì=&a«c@¯pÛ-8YÓ‰b.Ãí›t≥ïgõ®:[1˘	èŒiH7”HxéûËR£»¢¬˙)}u+ã jty‘ô3¿á©©π:kçÈ«’’êç§?1]Û€ëkI%¡áÄÕ÷.˚–Àñ=!â≈Ò“eÆÊ¥Ó€i2bÜÃG¨¡≠øÿËY¯
+°ü	ÕéÃ Ó!oΩ t
+Y‰Ü&I◊ô£Ód‚ö§˚…ıÇ€^/† ãg˘ÎGxLÔ%‘ºıVó¡‹Uú(ÍhÙ-˜)æÂ¬Å≈ı~I≠üH‰V»øﬁÚ7¥zù⁄Nø‡ùí9B©ÀÀ±%«a36çPA¨ﬁ¶åÜwì%◊Û¨Úi 1 9√1Iï±®l7Omûæ&/èÕ,féÆb∑ñ h≈ö5vhkRØ>QﬂÄFkû:7≠±Ø„YPóv
+‡Á[††ƒ}Á¨¿Ô
+Écπ˚!jƒÁ,◊ÿÂŒw&‘πôîª%|uë\⁄îgf⁄)≥ßÂ<&‰˙ÒÒÒMo[äŒª˙πÕˆq™˚WŒı´ö∞˘ƒ¸ÕZÁ2ªgN@Ω]J-çﬁµﬂ©™˜)§ìÚRY;“#“:u b◊Ú^/à® Èh{˛∏0}¬’ä·Wãì°N„=@=1c—cjL‡¨≈äï´ÁPæÜ‡û™ä_8Ë5è”À%•˚∫ÊCÕª?[i]"?´¢ﬂW"˘¿◊#öú_iˆJ•Ò◊Æ·®Ω–åËkùiÌZ
+öÛéN@£ZéA2‘Mg4Á0$CŒC2îŸ	Ä“ª–Ñ?¥4˚zúöe◊ Jy ˜†¨±…É*<\0πVO¨ÕÌO…Cç™íæ∞iP≠µæló≠◊ß Ø±<-%ù…P,?±U¨¸¢ö}≥^!˘`‹”^ó.™%CM»Úr0üΩÓ…FP•vQ;Í+Œû’˚ÄC•ZñkU’∏5äâè%¸¶‚P⁄è*’±µå»†ﬂJ„ä=ÂJ´(èIL–vçî°	7I@_ˇRêëΩÉ“∏¶Åg˙¸πVãÕÁ ´dÌÆ)è˘Âg•°˙S·˜slπ˘°¡i∞±bœA0§ütªPƒ,9Ö≠F‘ÇR ª∂Q/∑îÖR#W]Å£·õTõf-?L€7ÌúiéHo¸Õ>ÔEJ`Ï6b∫Nf ¯îÏé{·˛”î¢€πåÈfl; ¢@…ƒ‚ÖVj[XB’ÅLµ#í^ÇX,tn.∞› ⁄‹´√æpπèd*ˆN»¡Ó•c∫©J≠"œ˚ÃŒ~R¯?:‡ˇÑ5µÚ%∏·
+ÆπP°'∑4w–¢¯ﬁﬁ}{L‡pww+ßBtß±P≤Vw¸:(u*—Øèæ‚)–∞ØxÖÀ$Ì-˜·2û˜kÓèäeﬂN ÷éÊÜ%"\Ó5ØdjÆ¶ñÔ!gñ„?é&ÊS<@óP’£ô›,íÉÁ9ó^Yæ7ÍÔ2ﬁGœÚ|∫]~ﬂ¡≥á·<eµ¥ÅUU≈…tl˛Ì6"üEïC65ÊÊ“∞í”äNG0¨9ˆ]k
+µWÿg›æb?∂Y∑P—%2Bµó∞!˘jÛw˝ßñCpït‘˙kÙ’≤çª
+G“◊á´Œ4¶'É)†Eõ;≥¿QGˆnsn˚ídı¡;Ÿ3ŸÍ‘	jl4ıMÜ≤¢4µ$¢&–5!lÄ‘’ï<|uÖ›ê‹=àâd*íÈ”ä d^’h¯≥Ù»ÃÁh‚:∂›ƒä˝	ö0Aˇ⁄›3kñ˜£«ñÁ·Ó-π	ÒÄO€hiZ ìŒáPMN‘æ†çY·≠ˆú ä”Í°q∫†¸‡/¬€î∫Ì∑)÷îu⁄%àV¡ÁÙII˚'•dπoÆ◊ã@≥“Ym~ß*y%„8ûí;»u¨È[∏c",Ù£Í„>‹PÎBπÑﬁEC%õ∆uªÀG«Ÿ¯≈;Œ6™iS“åÊªÌß‘ R=@ÈBÎ«Ôˇ{˝Zà2ÏÒ~˛Ù’˙Èà~~[≠A§HWø˚øÂª*Áπ@%!∫aQAÊia˘<`$©FŒŒV∂≈oÚÕ]—)ÏWöB0Ç÷!(¶^†áÔÉ∫ò9r%’WÑ˚!ß	õ-Ù˛}L‹mLÃÇM∫˛È3“2Ë€°åAw–¶Ï~ú˘´ªÏr:–	ëÌK™∞Ç"R≠ø0ˆf-ê+Á¶/~ﬂzè~¯Áˇ⁄bd®u∫”≠ËÊõPÖTÓ≠AóÔI´:}¯Ø¢è±rxÔ≥xıEiPÆ•˛¡◊o°› ÉÀù´b¡gÂ‹\*E15≈‘ùƒ>™PªZ”~gªø	kı‘[Qœt◊pèGIa†Áójf∑˛zÎ=∆ÌÑ?y^ZYPkˆ“,8!˜©ÈûªŒïã=o∞òÇõ!ï:XÚ.©È¥ù±™¬ÇÇv–˘«ùc(y”ﬁ"Ãv'x∞hÔŒ∂Ÿz›\”iP|∆"˘~Îãp	oî'ΩÓÒ¡n]ìJ¬+˙„îUi»∞i`£T·ﬂˇΩd¶Í¢ >»–yﬁG¢†YD!≤™ø8¢–Ÿ{˛Ùxˇ#QPÑÖ˛¯Ø¨™{E‡˜è¥@≤h_œ_8>~˛l˜#k–L+Ω^‰[ﬁØµµ™·%"À9πÈ
+øE"˘ﬁq
+∑E2Ägh.n`÷≠*Dæ·êä˛‘ÚWd¥>èìH4á]døë°√Ò&…µb-4à∑…€}ka˘‰!0Cûõì’∫∂◊¨ıâ5∑¸¥éÃ[Lﬂf√Y/°7âá˝Wâé€¥q˙~‰Õ¢`…∑“£XÜ¯éúØg˙–Î1—¿Df[∑¯‹áı¥ùµi˚Î—jŒ_¸Ôã•c-|Ô‚“¥©◊+π'+◊≈Ïê˛œÈØâÆ”Üê~∆Õ[”≤ÕK≥û` lHÈ'œYÒ„9{›6¿û„˘€»•_è¡©|M-oB•ﬂù√ˇÛúï¬ÌsiÔ'lÓlHÌŸ'Í•πÙ≠…Kl/		ëçR„9¡€®5z›ÎıG£WjÓHa‹YÄ∆ÿ1=ﬂòõ7ò“Ä∞'∂xäJ~ÄËxëÿ)ñM{j*ë⁄ÔIˇÙÎÒÀã—À≥·xÀ ƒ…puÀ §…√ò∂Î·ÅLtí[èX 3a¸«}e.≥Òx‚Ã¸÷oIce1'î‘%6z¬©;÷K:*&'kVu.G’◊/1A≠k~Ã L*´óåI—2⁄@aô;+´ùæ£¡Y|Ö+Î±Ìc«ô acFAcqpdè:Ut…öHÂe∂∞O:;wÒB5¡^ˆ2g=õæòúÚIOì±N]d- ‹%—∂Ô–ﬂ¡Wûybg:9Ë∂Ë¶:m·ùÉòDX°Äå< 4ù ·s«.è–⁄£Æ7Ja≤∂Ke¢üﬁ"˛˚‰?Ù®˜‡ˇ'≥’"ÉÉ	πñË–q@ƒˆjoÅ+≈ÎÖ‡(d∆„:rV‰¢‡i¡æ⁄}"pp˙A¯Œ-≤Í˛ ]0ƒø5]ÑÉQÀ°˛Î FÇ¨Ÿ|Â√|®ÎÒŸ¨-Ñ∂#"˘.Æ¿#üü§Ïê÷‡+˘%ÕÓ*û⁄Eﬁ’±»‰Ô>“ÿºj∑`ÓótÚS:ÙVåa◊åNm""5xAú¸dy¿Gå&Oã~Ú˝(#ôB≥› D·éˆÁuCADπ›€}ıX@˝∏øÚ1~)ŸZ*$z…`Qè-lgx´‹r—$v®≥®#=«Ωk∞•R
+ß_ "±d–Vrœ”[˚ùp.í6µø~˘√˘[≠L◊“&KqMñù.ÉËWÍÏÓªªŸM=Ç«6ÌiÈª´å¥J
+ä±Äp@Ö¨¶~1ÉEéSÉ`•í:‹‡5U0ú-Ÿ˝óÔ˜áƒ¯&⁄$[À!˙ØÈ¿êvH'tOß+†ı©='ig9¨~öÅ’ôéeı*u8d©TTÛâÑä¶‡ŒÀVÂ€“7%GÂ√éQƒ7;CLÃHF•>´|Ö”	 HP!¬00.ÂÃ=]Ÿ6arò¶<∑?‡_X_~°Í@√ò¢<ùâÄVŸ=©äG!∏ñw)cKäwî*ëÿ›òµ´˘ﬂ§±≠îI%óÿ‰Üs≈=g1#õÏ{mI$!Ï(cÛ∂·c|*ÀΩ cÒ¸_≈DLê2ÊT ËÒø‹‚O≤æîxR˘ÜÂQT`${ä0ÑzBSŒﬂZMƒ@˜∆¯Rx‚l&∫óûeïSô`ë∞<r˛mã,ÈvkãGÔZ3…%N.€π√ÓƒÙ0¡Õ˜@p| ì‰<c|	ÈˇfÑ;hCA(6¨èº°0öÖ9«Ù2≈sc∆bæîﬂi1≈ﬁ$—b∆’g6$¨vØ0Ω^¢≠É_R€Ëåñd•`F“2∆ëî˙ƒ'ÒZúÀı⁄≠[|Koô˜A6IGtÊko˙‰^∫s‹)S‚¡Œí´„[ìkB}>.˜˛ùYﬁ5¸-ÈøÏåëOûπÇ|ãÒ_öó·“ú∞	~ë€>ŸÊ¸2„<ä #2Ã≈Ñmìr|vÑ∫†ø˚;∫W—/sS)hlûº›zÙ]/ﬁ?qpŸÜ+óPRP›@NI47}≤ã+VΩÊM∞¿tÈôPkî§ÈXºwÊÇ¿vµ›√WWÏIå=∫ssÀ¶Èƒ.|∫vl„÷Œ’ •≠&.6ÁÂ7ökg±0≠ÃÄ
+—	~»»–\Ÿ+/œ\åã∞Å=öÇÑd∞ΩûŸd¥t_\ñCÆEò≤´kÏ˚¸± ≥∑È.Mœ7·Îìm•@áKÀõ¨,ÜÊ}~‚87VﬁFF«¶πëuHE„k” u›–›h÷Á6!≥÷‰Z∫˙Ó,ˇömˆ◊lGé…é4≥ÂDDÛâÏ†¥ÁS”r◊)[.qx¨√„ú]˛¢Ë…Üsô≥ëë÷¥è¥œ÷V÷œbòµÓ3}gﬁ6ü]hnü+_iè…s);Læ•'õ¸a,ÆÒ|2Ìπ≥†«˚Œ¥·◊ÏÌî˙Æi3È˚≤~‰£≠u'Iá^ﬁFûíennØM€¥ãvÓﬁî-WrpK^ãsÈNŸ>Núk«¶è`vvÔà$ú≥ùÚãÓÒ∂\8ã«/aa‰{≥∆Eøq™ª5Ø∫wMÑë%#êå{!/±m¡/—M˘I¨¸7tuÍX˙§Ù
+ˇÁ¢b04iwv–ô øéæÈüÙ«gßË‰¨{48˝ùw«„˛tT–4a›	UÎ+€√]`©πûàº‚'æûÄæk.<ãgDˆï¡b<~l≠jãˆ⁄íZö‚r-ıdPÆ‘«ÃΩ0X¢òó
+§ëuDTÄt%¡oœ•ﬂL1á—S·ìoà	π§‚vT=<zXàPoÔÌÓÓn#lz,¡,Û¿Ï”?c
+;óˆ	6IP£CäBø©Y∞4t)XàÒñå˛µÂ‘`MºsMew˙•H©¡˛M5÷Å≈ztÉmL§¿Ë∂8QUë}*œ6ï¿îpnâ5öMz§‰à§›†Y4JóÍÓÃ∏üL`™_%À_4DÚ˜<q…Lq™òöYL5¡/ˇîùo…òÿ÷≤ùeW»h£T*ÃéoœÓ≥Y¨„Ë_ë?rî˝wt—˜R<∑#ËX-ÛR\k‰∑JöÅ”Æ∫Ãîq:Ÿ√ì«ì\◊Õ(¢“z@Ÿœf°ƒì|Áÿäh±◊â£@Úõzó-?Y|ŸûÂU¶πßu€}™∂n˜b˚*Œ'S1_LôõèQ;yƒZûˇ(£JOã3‹ïE⁄∂â£ê˛m3ãYú,Ç/fŒı<Y‚⁄6q˛ íﬂ*ÿ»‚|"u|ID8«]‰7«/™‰{íñÛ)ïŒñ°±’Èk⁄öFWµnê¢j!u£≠°0TfAï–…mm¶0OÂQòB∏LVYE˛0x<∆®T‚´rë—ˆM]f Ÿø4ª‹jn„ÀΩˇXÔÏ˚@UﬂP/[A%›}¶"k˘ˆ>4^!Ò'JEæ≥˝≈¥> ‘Ô◊Q‡ËÔ˜yﬁè¬f74°À∞INZY,9¯Ÿà%Yú4Ä™)B´£Øœè¨[ã0ömçLÑ	$9àœ´‹†~!lÊF<BâXÿá≠⁄©u≈:öD∂bœK.Xö∫6“∞"	)^∞T©;◊óf÷˚Ò˚?˝ı˙'˝√aw|6¸ùè˙C‘;;=Óè«‘=ºÍégßËÏMx“˝NÛq5 ∏ Çª“9l∂πf€myo,œ"è$"ªé≠Öënrh∏Røè∆iƒ√¥l¥4·¿⁄XÆaÛ2$}naé,≥úÆcÔÛ'Oà∞…‡±GãÑ…_ıªâ§·œªª˝ßü?ç¥ _Gæ::ÿ›=~.E0ü®kÔÁ…ê&∂¨Á|∂…c5Åäœw∑JöÄÍeëÒœí§pMû~L)>zåCoÏ´¥∫•/y‹90åŒA¸˘‘k:*Ú¸•Á=ñfápz∆ﬁì∞AjÆzq—±›ûçíÌƒ
+F€,∂ ¸M≤B©o ¢3Õ–{µ°;œ™°=2¿0≥Lö:¿Tæ"¬Mˇ91WBß˝ŸO¸6úv”ßH∆˛Sπ @H#¯ﬁÚ=Lã‰π≥‹Ò@„‘®K—k8≤áK∏˝qjRº˚Û‡ÈË∫Ø<|nõ>‰î‚JE — G]Ë)◊Ÿ‚ê‹&Á<wR2t+xåÜöú≠|œöä Øëó3q›ÍëB∆´¥RÈﬁ£ÙÃ†ÁÅPaúñ”Ó◊…`'zŸJÈzã”∫º‡Øûπ∏5S¬Ωr îâdÂÏò–ﬁ≈~1b\DŒ√/E‘$}ö±&IÅ8∏§D’»Æ¡øÀÃ|ÔXπﬂ=lãáç5˙À†•A»Îg!È˘=Ÿùm°ø@{†)& #Ã{≈_¡+ÇNﬂFﬁ6˙ÜyC2]◊gÚ •æ	nq:kAËùa»CÀ”5N]ÛÆgπ©7û‚2Nø»œ1‰öSkÂ…çË˙Œ˘€¢ÙDQÚ:çL\aRü≠ç≥ŸÃ√>Ã˚Ø∂ÈVVWG)fñÆuKÓDNåâ&∂Iˆ-ù{Ä›˚—Ài;¯fù¯Ê6˘–mÚ)Xª©Î±"Tﬁ8ZÜè“Ωy¡ÿ°O∂J0µ?¸ÔˇéÜ˝◊£Ó·IuiÓó|çª√«Ñœ˜µ¡È˘Î1·s_ùüùˆO«Ÿ⁄Ï7˙ÅR≥,9÷°…ìÊ±Çï/‡)¡ÿ≤'X1p∑‰ßXÓA≤$∑∏êxÒGı"oÛhœ‰◊ˆ5\¬£¢Â&èwûåΩûE¿⁄WàU≈xÏ§A|îœ&ÂƒiGıE⁄üπAtZÙßG∏ãËˆáåWh?dÀ∂ÛPL—ˇo•Dπg≈ßè‹JèQ/ŒSØ°(…‡)ä5$1—;<≥	Õàñô(%kaSUû˝03Å}|ﬂià`'ê˘=√õuﬂZﬁ€Ñƒêoä∂˚’¸0%ûóJ¯¶“J9ç]Ï¯—!eÜÕkÈ®Ú^ú?rQ©m¬òW“ÊÇMÌ‚·;zæí„ø2”±ˇÌoÊãçnÅ7qÎ˝≈Chüìﬂ ‹\¯PÅ/?8ΩÒ.˙‰¨|(ËJè˛∂ñè[Wv=õît1#£Uì3˚!BÃ~CpÑû’î¢ﬂô-”g &…f∆∂9Ù«ú∫ºv8–øc∑íµJXëçBÎ~¬¨êW68Ì`F∞∞Füéùœ>˚Ñ0s'·„KÇòStky+rTgºX£$Wô≥(r∏ÿ¥˚÷≥ƒXÄ6>·ÆXí#œÄ~â»:jÇR´Kü0æ\:ûJ≥«¬gÕÔeÓ‹íÁi°ËGD>"úŸ±GP®ı—õ”5}ı99˜´Â#x«N‚Êfì9cN0§◊tDo,Ã©/hÃ]|7◊&#al_~å’rÑJG´ﬂ=˙Æ%=L#ªÕ˘∞ﬁ.¶Í+l:è◊nPvK∫ò˘† ‘µÔ/Ω;;ÑÌ√æw`∞fêo
+¬|Ê;‰˙∏!' €±gù›ãøπtÔˆØ'ø1˛∆#'@Í0d≤”Áùö{ÛNgÈ«:
+aE{ÎÙ∂ÚÊ≥∑O/óRoíáÒ=Lç#%hbõﬁl'æ5äAñ≥,Ï÷Vl±œ%•«’D7]èUü¶)èË˘Øà[¿KäT'¢«Tˆ=c@ƒ«éˇ≤Ú$™µäTM≈πÍÕÁG˚ù≠¨˝‹{˛˘”#ÈA±g©{ﬁ}÷9àhb"jÜ2Bwr˝∫tîÒ≤""∂*≈∆OÉπgq¨ÇÊ˚‡@£:™¿Á*…ÑÃ CØ:ÜF.∫zqÈºm)ƒT·ˆÙ“¡ÏÊ2}T¥óê˛.“Æ{ÜÎ°„^ÍÕ•pÄdà$èù[uéè]©O2ﬂDoŒ¨B‹îº'»ä⁄e>r)∏)ﬁ5uzëÕƒ@èí/ P6ÀêàÄzˆ,E	”CÉ…;#≥•¶Z:µm†¢˛<¢°>6=ˇlÂèl»ö™®ñA5rJÜåÓ¢¡ftÕìúnró≤9Ÿ(õë!$x8$·Q~∑)iò6,ßqÑ¥G;†˙˚ïõó^P¸ßJ˚U∆k3NY:ˇ}&3áí&¿Ö>úÛ‡1R]óD∑üÔôbxÄÌäm∑ë?K◊∑(L®éJ≠øˇ«ﬂ2/mDyRt|6DÁÉﬁ7ØœdÀqqV«Ôˇø~¯˚ﬂ˝¯˝Ô˛åæ±¸	º?|‚√»Ó.`¯oÉ¡l›‚iz£¨\wJ)Gsrı’ùÒ0ÜÇ
+t°Œ]dW(z√§≤c.ïΩÄ=‡ßıÁÉSd˙àÊË∆Æ∆Óéò`∆_“g¶˘D”}rI€∞_$cß¬ÆˇzÖWDﬁ°ÌÜ#tñ—¥Ïﬁ_:”u¡÷’‡^f	K˝äÆÖ4!˙Iñ∏è0-¬BñÜg˙F<’7bŸWÈäÒ<”Hø,õ:π*	;:Êy¬v˙∞H—ÓÅéÒÚ∆cÚqäyÄΩìøë∆lÑ‚Í4*SéVÚk)	WÚ«0”ª§%ß≠"©‰£9|ôïÕ«WTıãwiM‡E©Íl‹“◊Ñ∑oÿ‹úÄß3EƒµŸÈˆcÈı£ )ì˛‘éO^N¶&ëK_âò— 5≤§ê X¬ıS=æp˘yã[]€ìl	£,t„ÚD¯oú¡v`]ù‹ûx™πØæl3Ê_J´ÕfÏÅwK∫üNökN/[{†•9T—
+í–#>J¯ë¨÷Õ≤iÓ4õúÄâÎ4Ôé_£K®ÙÂ=ˆÄ”<0vi^n~T»◊1ÜÀ!‹¨Àh À∫ùñc<d †;0.ö·d‰\íÊËà,Mq—≥MkéˆdôAìk"ì”|E÷ë¨ÕµEÛ8yºåπ≥ßÉ¶›k™íƒ»O¬¶–◊D‹éˆ;«ùcÖÔáÀº∑ã∆`)Ö5 IŒ«%ô _≤»cŒlÜ˛£c€Œ≠	ﬁFﬂöÊÕÙÅËx5[¡ûÖ»^ıêKï«æˇÏYøß0ˆ'·jõ∑‰6\W‚£sãÊQbGS,9Õ≥éf6'ÇîZ‰aoAÓSÎ>åı \Ï¸ê-)êÌ#‚#vy/Yª:e¨“†7ÉsÇ”Û%Ÿs`§–9!Œ¿ÄÈÜP† Õkµ”ô¬î<ﬁ9=ûÌOõÍŒ•!~∏w‹UAÊß¡Ú&:òh(cÙ˛˛Ó‹P˙2|Çºg 8|fØ≥˜Ï‡PR∫D4Q“Ö¡ºxDJô ≈p/9äÿvKã*Y
+L<◊uH”⁄q7°&4h|£dX¢ñQUúÙC$ÁDÍ+—ƒıM…7*ëù∑¥kTÅ7TRÕ≈Y™™…ÔwçÁùî%„é∞=&ò2Áìº4˘í›3-=|N¨i'≈:[ÃPÚ(“h3»nﬂ∆∑BSF˝LeúFâTÆ7ò{é£yû
+∑r8ÊO>†?∑fx¡§™+PPö7Äf¬ôöU1Ëêöòæã+Ωê¡Ñy6·É·.~^åT‰mWf˚¢Ñ‹T[òv)gòËÉÎã´¬Û€ŒVlw
+‚?≤”}3ÇR0ñã;.∫˛¯˝?˛ÁÇBz€Zµ+Ú˜_ÇÚw\VNìåóúJ®Jà¸∫+ö˛≠‰⁄íñ#?u[[“ƒ&Wg.&lÌ/.˝Ç¥´)ÿ◊Éû≤–è˛®ë•.ÒïB(Ÿìåj;;à◊∞ÿ KC‚±d—e/ö:SD¯@÷Y.y÷$NéûfR£º§ÈAP•.ß‚ %<Îπ°*ﬁ“yã†Aﬁ∫o∫ÉÍqzrˆ]˜d¸:ÏûtO{˝-Ÿ-¨≠Fi∆qÑQ!„Uœ«£Ë¯:ù‹Òıﬂ˙Æ©:HÅ”e.ñTF?y,ˆnqŸfı(±≈á<‹µ“l/S˛€‡‚>≠Rﬁ	´î«7¯3∏ªıQcmÍΩñèãy«><«≥¡[BíäJqJ∑ i*»ÁÄrÒ Íz/(∆y∂l*mú ÛˆüÙü6ï›`˛B ^/â~“Q‰ùÉ‹k
+†.9
+†&Y™hN iLWh”œbΩF´…{©ú∞Q•9Ä“ÊÈ80⁄≈œ+
+jÈÚ	Äñr˝ ƒÇﬂä	˜˝ÄñK˙˜√É~gW!ëV
+5y O
+H¨r˛ãÍ®˙]ÜiŒ*åGòÊ@8π∂ñ…R“'Êo÷ô'MˇTî≠6ßÃºÇÀ9aπ˝.y¥Ωyı]è©é¥G¶_¿gHa)ÍŸâôQ)PÄ|êÏÄé2ßn@¨j º1Åõô!rEIDºxH˛óM–¨òóÉ±BÖ—| |Õ“ofÃ>sÜ™∑3ÙÄPGÇﬂ˜ü‰∞ù©å2‚FÚQ?ftÿ¢∫<œ-pÃUª3¬=v«π«/y1¨–Dù-*eä◊äœz/‡Â<gæ5}üUWR@°@^x$$vÍæ*Vh´X;üëõqV˛ëﬂ¡^QJµÇ•—»|ôy˘*cKD7Krüàœ‰IÒR‰Áπ‹œM‹V¿áÚé π™ééñ™C@ù,)@;eP·ﬂ
+u˛ Ë˛pÄZû«†Qï‹iëé$i©ë™
+®Ï ï"≈$ü2§˙;’ùbC|∫yRÉÇêêQ3UÜ⁄Ñ  …SSó"ˆÅÅ“|â‰“÷¥Ω@Ìò‚¬Ÿ¥¯^ÛÔ%Õ`Å0[ãcT-STpW’‚ª2∞∞1%–Íé_?ˆøÌè?|G´¥∆saÍ°ú◊‰`døøvl¡∑#Gí°Wƒ„OùÜ•)∆ ¥ı]¯Ü˜‡⁄iëgê8≈/–Cò≤⁄\
+Ñx|‰îä7ú7P•ïúâc;∞q¨pñe%Åkj/+Wë<9dJbœã@∫„ü®Œ’ã©I;q5iäÔHHp∞Ô‹÷&æÁ\€˝¬Ë_îÁ„v’cÏZßòl|Ç¶†«q˘‚=Z˙q[k±}DÖåî˚U]ì˛ó‰π˝ˇ  ˇˇ ^ß¸L

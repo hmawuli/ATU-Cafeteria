@@ -5825,6 +5825,158 @@ fun VendorDashboardScreen(
                             }
                         }
 
+                        // 1d. Update Vendor Login Credentials (Username & Password)
+                        var editVendorUsername by remember(currentUser) { mutableStateOf(currentUser?.username ?: "") }
+                        var editVendorPassword by remember { mutableStateOf("") }
+                        var editVendorConfirmPassword by remember { mutableStateOf("") }
+                        var vendorCredsSuccessMsg by remember { mutableStateOf<String?>(null) }
+                        var vendorCredsErrorMsg by remember { mutableStateOf<String?>(null) }
+                        var isUpdatingCreds by remember { mutableStateOf(false) }
+
+                        Card(
+                            modifier = Modifier.fillMaxWidth().testTag("vendor_credentials_card"),
+                            shape = RoundedCornerShape(16.dp),
+                            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                            border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.3f))
+                        ) {
+                            Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Icon(
+                                        Icons.Default.Lock,
+                                        contentDescription = "Vendor Credentials",
+                                        tint = MaterialTheme.colorScheme.primary,
+                                        modifier = Modifier.size(20.dp)
+                                    )
+                                    Spacer(modifier = Modifier.width(8.dp))
+                                    Column {
+                                        Text(
+                                            "Vendor Login Credentials",
+                                            fontWeight = FontWeight.Bold,
+                                            style = MaterialTheme.typography.titleSmall,
+                                            color = MaterialTheme.colorScheme.primary
+                                        )
+                                        Text(
+                                            "Update your booth login username and access password",
+                                            fontSize = 10.sp,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                                        )
+                                    }
+                                }
+
+                                if (vendorCredsSuccessMsg != null) {
+                                    Card(
+                                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.7f)),
+                                        shape = RoundedCornerShape(8.dp)
+                                    ) {
+                                        Text(
+                                            vendorCredsSuccessMsg ?: "",
+                                            fontSize = 11.sp,
+                                            fontWeight = FontWeight.SemiBold,
+                                            color = MaterialTheme.colorScheme.onPrimaryContainer,
+                                            modifier = Modifier.padding(10.dp)
+                                        )
+                                    }
+                                }
+
+                                if (vendorCredsErrorMsg != null) {
+                                    Card(
+                                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.7f)),
+                                        shape = RoundedCornerShape(8.dp)
+                                    ) {
+                                        Text(
+                                            vendorCredsErrorMsg ?: "",
+                                            fontSize = 11.sp,
+                                            fontWeight = FontWeight.SemiBold,
+                                            color = MaterialTheme.colorScheme.onErrorContainer,
+                                            modifier = Modifier.padding(10.dp)
+                                        )
+                                    }
+                                }
+
+                                OutlinedTextField(
+                                    value = editVendorUsername,
+                                    onValueChange = { 
+                                        editVendorUsername = it.lowercase().trim()
+                                        vendorCredsErrorMsg = null
+                                    },
+                                    label = { Text("Vendor Username") },
+                                    modifier = Modifier.fillMaxWidth().testTag("vendor_edit_username_input"),
+                                    singleLine = true,
+                                    leadingIcon = { Icon(Icons.Default.Person, contentDescription = null, modifier = Modifier.size(18.dp)) }
+                                )
+
+                                OutlinedTextField(
+                                    value = editVendorPassword,
+                                    onValueChange = { 
+                                        editVendorPassword = it
+                                        vendorCredsErrorMsg = null
+                                    },
+                                    label = { Text("New Password / PIN") },
+                                    modifier = Modifier.fillMaxWidth().testTag("vendor_edit_password_input"),
+                                    singleLine = true,
+                                    visualTransformation = androidx.compose.ui.text.input.PasswordVisualTransformation(),
+                                    keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(keyboardType = androidx.compose.ui.text.input.KeyboardType.Password),
+                                    leadingIcon = { Icon(Icons.Default.Key, contentDescription = null, modifier = Modifier.size(18.dp)) }
+                                )
+
+                                OutlinedTextField(
+                                    value = editVendorConfirmPassword,
+                                    onValueChange = { 
+                                        editVendorConfirmPassword = it
+                                        vendorCredsErrorMsg = null
+                                    },
+                                    label = { Text("Confirm New Password") },
+                                    modifier = Modifier.fillMaxWidth().testTag("vendor_edit_confirm_password_input"),
+                                    singleLine = true,
+                                    visualTransformation = androidx.compose.ui.text.input.PasswordVisualTransformation(),
+                                    keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(keyboardType = androidx.compose.ui.text.input.KeyboardType.Password),
+                                    leadingIcon = { Icon(Icons.Default.Check, contentDescription = null, modifier = Modifier.size(18.dp)) }
+                                )
+
+                                Button(
+                                    onClick = {
+                                        vendorCredsSuccessMsg = null
+                                        vendorCredsErrorMsg = null
+                                        if (editVendorUsername.isBlank()) {
+                                            vendorCredsErrorMsg = "Username cannot be empty."
+                                            return@Button
+                                        }
+                                        if (editVendorPassword.isBlank()) {
+                                            vendorCredsErrorMsg = "Password cannot be empty."
+                                            return@Button
+                                        }
+                                        if (editVendorPassword != editVendorConfirmPassword) {
+                                            vendorCredsErrorMsg = "Passwords do not match."
+                                            return@Button
+                                        }
+                                        isUpdatingCreds = true
+                                        viewModel.updateVendorCredentials(
+                                            newUsername = editVendorUsername,
+                                            newPassword = editVendorPassword
+                                        ) { success, error ->
+                                            isUpdatingCreds = false
+                                            if (success) {
+                                                vendorCredsSuccessMsg = "Login credentials updated successfully! You can now use this username and password to log in."
+                                                editVendorPassword = ""
+                                                editVendorConfirmPassword = ""
+                                            } else {
+                                                vendorCredsErrorMsg = error ?: "Failed to update credentials."
+                                            }
+                                        }
+                                    },
+                                    enabled = !isUpdatingCreds,
+                                    modifier = Modifier.fillMaxWidth().testTag("save_vendor_credentials_btn"),
+                                    shape = RoundedCornerShape(10.dp)
+                                ) {
+                                    if (isUpdatingCreds) {
+                                        CircularProgressIndicator(modifier = Modifier.size(16.dp), color = MaterialTheme.colorScheme.onPrimary, strokeWidth = 2.dp)
+                                        Spacer(modifier = Modifier.width(8.dp))
+                                    }
+                                    Text("Update Username & Password", fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                                }
+                            }
+                        }
+
                         // 2. Real-time Operating Status
                         Card(
                             modifier = Modifier.fillMaxWidth(),
@@ -7669,461 +7821,18 @@ fun VendorDashboardScreen(
                                             color = when (alert.type) {
                                                 "OUT_OF_STOCK" -> MaterialTheme.colorScheme.onErrorContainer
                                                 else -> MaterialTheme.colorScheme.onSurface
-                                            }
-                                        )
-                                        
-                                        Spacer(modifier = Modifier.height(4.dp))
-                                        
-                                        val timeString = java.text.SimpleDateFormat("HH:mm:ss", java.util.Locale.getDefault()).format(java.util.Date(alert.timestamp))
-                                        Text(
-                                            text = "Raised at: $timeString",
-                                            fontSize = 8.sp,
-                                            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)
-                                        )
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-            },
-            confirmButton = {
-                TextButton(onClick = { showVendorNotificationsDialog = false }) {
-                    Text("Close")
-                }
-            },
-            shape = RoundedCornerShape(16.dp)
-        )
-    }
-
-    // VENDOR CHAT WITH STUDENT DIALOG
-    activeChatOrder?.let { order ->
-        val student = allUsers.find { it.id == order.customerId }
-        val messagesFlow = remember(order.id) { viewModel.getMessagesForOrder(order.id) }
-        val chatMessages by messagesFlow.collectAsStateWithLifecycle(initialValue = emptyList())
-        var replyMessageText by remember { mutableStateOf("") }
-        val listState = rememberLazyListState()
-
-        LaunchedEffect(chatMessages.size) {
-            if (chatMessages.isNotEmpty()) {
-                listState.animateScrollToItem(chatMessages.size - 1)
-            }
-        }
-
-        Dialog(onDismissRequest = { activeChatOrder = null }) {
-            Card(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .fillMaxHeight(0.75f)
-                    .testTag("vendor_chat_dialog"),
-                shape = RoundedCornerShape(16.dp),
-                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
-            ) {
-                Column(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .padding(16.dp)
-                ) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Column(modifier = Modifier.weight(1f)) {
-                            Text(
-                                text = "Chat with Student",
-                                style = MaterialTheme.typography.titleMedium,
-                                fontWeight = FontWeight.Bold,
-                                color = MaterialTheme.colorScheme.primary
-                            )
-                            Text(
-                                text = "Order #${order.id} â€¢ ${student?.fullName ?: "Student"}",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                        }
-                        IconButton(
-                            onClick = { activeChatOrder = null },
-                            modifier = Modifier.testTag("vendor_chat_close_btn")
-                        ) {
-                            Icon(Icons.Default.Close, contentDescription = "Close Chat")
-                        }
-                    }
-
-                    HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
-
-                    LazyColumn(
-                        state = listState,
-                        modifier = Modifier
-                            .weight(1f)
-                            .fillMaxWidth(),
-                        verticalArrangement = Arrangement.spacedBy(8.dp),
-                        contentPadding = PaddingValues(vertical = 4.dp)
-                    ) {
-                        if (chatMessages.isEmpty()) {
-                            item {
-                                Box(
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .padding(24.dp),
-                                    contentAlignment = Alignment.Center
-                                ) {
-                                    Text(
-                                        text = "Send a message back to the student regarding their order inquiry.",
-                                        textAlign = androidx.compose.ui.text.style.TextAlign.Center,
-                                        style = MaterialTheme.typography.bodySmall,
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
-                                    )
-                                }
-                            }
-                        } else {
-                            items(chatMessages) { msg ->
-                                val isMe = !msg.isFromStudent
-                                val alignment = if (isMe) Alignment.End else Alignment.Start
-                                val bgContainerColor = if (isMe) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.secondaryContainer
-                                val textCol = if (isMe) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSecondaryContainer
-
-                                Column(
-                                    modifier = Modifier.fillMaxWidth(),
-                                    horizontalAlignment = alignment
-                                ) {
-                                    Card(
-                                        colors = CardDefaults.cardColors(containerColor = bgContainerColor),
-                                        shape = RoundedCornerShape(
-                                            topStart = 12.dp,
-                                            topEnd = 12.dp,
-                                            bottomStart = if (isMe) 12.dp else 0.dp,
-                                            bottomEnd = if (isMe) 0.dp else 12.dp
-                                        )
-                                    ) {
-                                        Column(modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp)) {
-                                            Text(
-                                                text = msg.message,
-                                                color = textCol,
-                                                style = MaterialTheme.typography.bodyMedium
-                                            )
-                                            Spacer(modifier = Modifier.height(2.dp))
-                                            Text(
-                                                text = msg.senderName,
-                                                fontSize = 8.sp,
-                                                fontWeight = FontWeight.Bold,
-                                                color = textCol.copy(alpha = 0.6f)
-                                            )
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                    }
-
-                    HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
-
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        OutlinedTextField(
-                            value = replyMessageText,
-                            onValueChange = { replyMessageText = it },
-                            placeholder = { Text("Type reply to student...") },
-                            singleLine = true,
-                            shape = RoundedCornerShape(12.dp),
-                            modifier = Modifier
-                                .weight(1f)
-                                .testTag("vendor_chat_input_field")
-                        )
-
-                        Button(
-                            onClick = {
-                                if (replyMessageText.isNotBlank()) {
-                                    val currentVendorUser = allUsers.find { it.role == "VENDOR" && it.id == order.vendorId }
-                                    viewModel.sendChatMessage(
-                                        orderId = order.id,
-                                        senderId = order.vendorId,
-                                        senderName = currentVendorUser?.fullName ?: "Vendor Booth",
-                                        recipientId = order.customerId,
-                                        message = replyMessageText.trim(),
-                                        isFromStudent = false
-                                    )
-                                    replyMessageText = ""
-                                }
-                            },
-                            shape = RoundedCornerShape(12.dp),
-                            modifier = Modifier.testTag("vendor_chat_send_btn")
-                        ) {
-                            Icon(Icons.Default.Send, contentDescription = "Send")
-                        }
-                    }
-                }
-            }
-        }
-    }
-}
-}
-
-// ==========================================
-// SIMPLIFIED VENDOR KITCHEN TERMINAL VIEW
-// ==========================================
-
-@Composable
-fun SimplifiedKitchenTerminalView(
-    incomingOrders: List<Order>,
-    allUsers: List<User>,
-    viewModel: CafeteriaViewModel,
-    onExitTerminal: () -> Unit,
-    modifier: Modifier = Modifier
-) {
-    var selectedFilter by remember { mutableStateOf("ALL") }
-    val filteredOrders = remember(incomingOrders, selectedFilter) {
-        incomingOrders.filter { order ->
-            when (selectedFilter) {
-                "PENDING" -> order.status == "PENDING" || order.status == "ORDER_PLACED"
-                "PREPARING" -> order.status == "PREPARING"
-                "READY" -> order.status == "READY" || order.status == "OUT_FOR_DELIVERY"
-                else -> order.status != "COMPLETED" && order.status != "DELIVERED" && order.status != "CANCELLED"
-            }
-        }.sortedBy { it.id }
-    }
-
-    Column(
-        modifier = modifier
-            .fillMaxSize()
-            .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.2f))
-            .padding(16.dp)
-    ) {
-        // Kitchen Terminal Banner
-        Card(
-            modifier = Modifier.fillMaxWidth(),
-            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer),
-            shape = RoundedCornerShape(16.dp)
-        ) {
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(16.dp),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Column {
-                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        Text("ğŸ³", fontSize = 24.sp)
-                        Text(
-                            "Kitchen Terminal Express",
-                            style = MaterialTheme.typography.titleMedium,
-                            fontWeight = FontWeight.Bold,
-                            color = MaterialTheme.colorScheme.onPrimaryContainer
-                        )
-                    }
-                    Text(
-                        "Tap status button to toggle order readiness in real-time",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.8f)
-                    )
-                }
-
-                OutlinedButton(
-                    onClick = onExitTerminal,
-                    colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.onPrimaryContainer),
-                    modifier = Modifier.testTag("exit_kitchen_terminal_btn")
-                ) {
-                    Text("Exit Express", fontSize = 11.sp, fontWeight = FontWeight.Bold)
-                }
-            }
-        }
-
-        Spacer(modifier = Modifier.height(12.dp))
-
-        // Large Status Filter Chips
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .horizontalScroll(rememberScrollState()),
-            horizontalArrangement = Arrangement.spacedBy(8.dp)
-        ) {
-            val filterOptions = listOf("ALL" to "All Active", "PENDING" to "Pending", "PREPARING" to "Preparing", "READY" to "Ready for Pickup")
-            filterOptions.forEach { (code, label) ->
-                val count = incomingOrders.count {
-                    when (code) {
-                        "PENDING" -> it.status == "PENDING" || it.status == "ORDER_PLACED"
-                        "PREPARING" -> it.status == "PREPARING"
-                        "READY" -> it.status == "READY" || it.status == "OUT_FOR_DELIVERY"
-                        else -> it.status != "COMPLETED" && it.status != "DELIVERED" && it.status != "CANCELLED"
-                    }
-                }
-                FilterChip(
-                    selected = selectedFilter == code,
-                    onClick = { selectedFilter = code },
-                    label = { Text("$label ($count)", fontSize = 12.sp, fontWeight = FontWeight.Bold) },
-                    shape = RoundedCornerShape(20.dp),
-                    modifier = Modifier.testTag("kitchen_filter_$code")
-                )
-            }
-        }
-
-        Spacer(modifier = Modifier.height(12.dp))
-
-        if (filteredOrders.isEmpty()) {
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .weight(1f),
-                contentAlignment = Alignment.Center
-            ) {
-                Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    Text("ğŸ‰", fontSize = 48.sp)
-                    Spacer(modifier = Modifier.height(8.dp))
-                    Text("All quiet in the kitchen!", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
-                    Text("No incoming orders matching filter.", fontSize = 11.sp, color = Color.Gray)
-                }
-            }
-        } else {
-            LazyColumn(
-                modifier = Modifier.weight(1f),
-                verticalArrangement = Arrangement.spacedBy(12.dp)
-            ) {
-                items(filteredOrders, key = { it.id }) { order ->
-                    val studentUser = allUsers.find { it.id == order.customerId }
-                    Card(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .testTag("kitchen_order_card_${order.id}"),
-                        shape = RoundedCornerShape(16.dp),
-                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-                        border = BorderStroke(
-                            2.dp,
-                            when (order.status.uppercase()) {
-                                "PENDING", "ORDER_PLACED" -> Color(0xFFFF9800)
-                                "PREPARING" -> Color(0xFF2196F3)
-                                "READY" -> Color(0xFF4CAF50)
-                                else -> MaterialTheme.colorScheme.outlineVariant
-                            }
-                        ),
-                        elevation = CardDefaults.cardElevation(defaultElevation = 4.dp)
-                    ) {
-                        Column(modifier = Modifier.padding(16.dp)) {
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.SpaceBetween,
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                                    Surface(
-                                        color = MaterialTheme.colorScheme.primaryContainer,
-                                        shape = RoundedCornerShape(8.dp)
-                                    ) {
-                                        Text(
-                                            "#${order.id}",
-                                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
-                                            fontWeight = FontWeight.ExtraBold,
-                                            fontSize = 14.sp,
-                                            color = MaterialTheme.colorScheme.onPrimaryContainer
-                                        )
-                                    }
-                                    Text(
-                                        studentUser?.fullName ?: "Student #${order.customerId}",
-                                        fontWeight = FontWeight.Bold,
-                                        style = MaterialTheme.typography.titleMedium
-                                    )
-                                }
-
-                                Surface(
-                                    color = Color(0xFFE8F5E9),
-                                    shape = RoundedCornerShape(8.dp)
-                                ) {
-                                    Text(
-                                        "PIN: ${order.pickupPin}",
-                                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
-                                        fontWeight = FontWeight.Bold,
-                                        fontSize = 12.sp,
-                                        color = Color(0xFF2E7D32)
-                                    )
-                                }
-                            }
-
-                            Spacer(modifier = Modifier.height(10.dp))
-
-                            // Big item name & quantity
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.SpaceBetween,
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Text(
-                                    order.foodName,
-                                    fontSize = 18.sp,
-                                    fontWeight = FontWeight.ExtraBold,
-                                    color = MaterialTheme.colorScheme.onSurface
-                                )
-                                Text(
-                                    "${order.quantity}x",
-                                    fontSize = 22.sp,
-                                    fontWeight = FontWeight.Black,
-                                    color = MaterialTheme.colorScheme.primary
-                                )
-                            }
-
-                            Spacer(modifier = Modifier.height(12.dp))
-                            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
-                            Spacer(modifier = Modifier.height(12.dp))
-
-                            // Prominent readiness status toggle button
-                            when (order.status.uppercase()) {
-                                "PENDING", "ORDER_PLACED" -> {
-                                    Button(
-                                        onClick = { viewModel.updateOrderStatus(order.id, "PREPARING", "15 mins") },
-                                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFFF9800)),
-                                        modifier = Modifier
-                                            .fillMaxWidth()
-                                            .height(52.dp)
-                                            .testTag("kitchen_action_start_prep_${order.id}"),
-                                        shape = RoundedCornerShape(12.dp)
-                                    ) {
-                                        Icon(Icons.Default.PlayArrow, contentDescription = null)
-                                        Spacer(modifier = Modifier.width(8.dp))
-                                        Text("â–¶ ACCEPT & START PREPARING", fontSize = 14.sp, fontWeight = FontWeight.Bold)
-                                    }
-                                }
-                                "PREPARING" -> {
-                                    Button(
-                                        onClick = { viewModel.updateOrderStatus(order.id, "READY") },
-                                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF2196F3)),
-                                        modifier = Modifier
-                                            .fillMaxWidth()
-                                            .height(52.dp)
-                                            .testTag("kitchen_action_mark_ready_${order.id}"),
-                                        shape = RoundedCornerShape(12.dp)
-                                    ) {
-                                        Icon(Icons.Default.Check, contentDescription = null)
-                                        Spacer(modifier = Modifier.width(8.dp))
-                                        Text("âœ” MARK READY FOR PICKUP", fontSize = 14.sp, fontWeight = FontWeight.Bold)
-                                    }
-                                }
-                                "READY", "OUT_FOR_DELIVERY" -> {
-                                    Button(
-                                        onClick = { viewModel.updateOrderStatus(order.id, "COMPLETED") },
-                                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF4CAF50)),
-                                        modifier = Modifier
-                                            .fillMaxWidth()
-                                            .height(52.dp)
-                                            .testTag("kitchen_action_complete_${order.id}"),
-                                        shape = RoundedCornerShape(12.dp)
-                                    ) {
-                                        Icon(Icons.Default.DoneAll, contentDescription = null)
-                                        Spacer(modifier = Modifier.width(8.dp))
-                                        Text("ğŸ HANDED TO STUDENT (COMPLETE)", fontSize = 14.sp, fontWeight = FontWeight.Bold)
-                                    }
-                                }
-                                else -> {
-                                    Text("Status: ${order.status}", fontSize = 12.sp, color = Color.Gray)
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-        }
-    }
-}
-
-// ==========================================
+  xœì\ÛnãÆ¾÷SLÔE ^®íxÇè&•%9V¶IëE®ZIÓ¥H†ÙV6ÚË^´½)zU @_¡@(OGèÿÏpx>ÊZgƒô_À+‘3Ã9ü‡ï?P„T¥‡ª-w+·¬ÜpäèSê6—¶ÁfŒºä¹ğ?jÊæŞ<Òg÷<ùV7	gK:â.³æğà?ê·ºÆé=×Flé˜´£szf»K7çç'Ëå‰ç5öd³g¦Ö·§ºIµ9å:ÓW&oîîj3Ù#l…Ã4¡Ë5|œÇõeõŒaBÍÊ­‘p	°œÆPg5ˆÎOÈ³p¡½ZƒÍl‹Ø÷<Ö<§^ç©mÚâHa\¦›ã]RM\MÅgÛ­Ü°Àµ,75ì–³Ğ¡ß¾örV}§ªµ,çöâùw³ï¤¯Æ¯<Ä·tj[3æ.OWœÛlÁûTwdy»i[m“Mßa3â-ì»kj¶{is ©Î™myØv¹{¦›%»#ªQ›¶i{´‘ŞÈÂ){İAşÚ+Ë FÛv-êğbóàsŞ µüô°#ş{ñ‚\w/;WCÒ>oÉÛŞøœŒÆo:İË1éôZı«oD3}ÊÙ-m/t~åÔıZ3)‡åÚø…<ÿ*ÅÙã+ƒZÈüºi¾ñ¨ëi3fĞœqäÕ+ÙO›®<n/©Û3"KÃ@>=}N½3Ó¾ƒa\àÑåè'Ù°}ä–Ñ;PRÔDÉ¿PlWÌ/Ò2>òV “›uìI(&ò–7â *o_ôÙŒN×S“6™Å8âµn®p—éÒáë>óPÙDàÂ\sí?O¢æ³^®¸~cRñ€«Y³ÑHNĞ„1ÅİÈºûú÷âYâzsw'èĞ×WH°ÑÁ4y3º8Íu‘d36#ñFÌ6íâZ`<ÌFÓ-
+•¦.lÒØîqºL?<'q¶÷N[JÈM‡yKæyCúİ
+4² £Á5keši‰ië®‘VÈ,SÎ€!MóB¿Ë¾hf«,Õæ\À}í‹<5æÊãc}ŞlÜ
+ÑŸàÆL±ÊÆnZY—Šjº‹ĞÖôÁuûvÎÓ¦ğ¥-î4AcqÁ8íRmïI]_KÖéÃP«¥•möªîtt'Ñ‚ål¶hæè†¶1©¯Š¦ˆ4´ïòMs¤‰~¾1]Ø.û÷Õl¹®nÍaó„Z‹|Ór:¥üR+¤[À`Ì–Éæ–E}ÖÚğ‡º×~s9LŞê‘üƒÊZëäŞƒY¦|G©ÄQ°%”ÜŠ$#©î+ ¯MšbM¾vì¹«;‹5 3nÒj°Õ²|4ÄDoÅê`È³à‹vj›FyïrPä¸ ñÜìÃPTvêí¨Ôw¿{ö^Ù®òÓŸşM½÷íé×Ú4á¥¾¤äëÒPÛş°¿±õh	¼·K¢Éw0âõ@ÙùØ«pì(0Ë³+ÅÎ’¨Le?EÈ6¹áVl–Z"€¸¬&şñ4_Ãk	î!åpÖêM]æ ¢"ˆ7	.©à¡yp8óòy ğ:ì–9¡RÓJ©	§Dx‡™ƒ"z)²$Hx¼‘,uRD·«j]k<´	ÆéºyœmÌùÇ:û	ƒøŸÈô¢û{”i‘Š˜*î`½XO€w%MNíûjNqİC‹R¬–ÙOñéáQñ1DÉ?’";]:NÙæ*ªSPfbZ‡èÊq!7:(8n¾ ãåÒ9 Cd)¸Ê\ßKcÖw+æ®µ¡|¦X>úr–áÚÌ¸U¿t@ñh+&Ã4Â¸hcÕÔß¥êÙ¦qRôøÇCå­6dŠ±‚rAõbB¾ñÒ›Gò<B“y¸ùŸ@Pg®½ôE¥ŞzDNPÛàh»‰é¯ŠU„—@½»Õ¿™·“NMøŒRÜô•(p‡(½íQivÈû0­Š“²­AÍiƒ¦'V:³2C¥Ç¸FQŠ¸IvXckú2ÛåÏ£ús’ß*.©À£¯4¶!0ÔÁ!X­z^è·QßğôR=<di1”äÕı•s
+‡ÜFƒo9²\•›
+üfBæö•¤€oG"ÕO& ù  µoüë’²‹¾òª?@%c-=øZcW‡uHåéªÃzé*¤GŸŠÈŒºè ×ß×G%xÔ ›GC’”à“$8ú¼F>©zëjYĞ§Ï=»üÁ¢™õb‹ŠÆ=àÚëÕŠ›`†É3FÍ³ë'e’¹—b¾·-ág·8k#JånÀjñ²‘cÂR eâTŞû)¼ñğ€3ß1Ó4ó=ÅãyÀ+&íÃòQşÜU‰2)Ê%–û½›8æU#*¢mf´ŒYÎŠOfx²Eñ²|¸[3úW:M'ÉÓ—É±SS·Ş•L‰ãÊuá´eóŸÙ™P×FK
+½Ì¿6È§Ÿ&¤rÏbéÑÂ‡)Q4EíĞ)¬nÖÄs{ˆ×Tºö/ÒYM¿î"Æı*½‰¸¼ANm›/j5\:eƒ#33ÑÕÇQ˜´ŞÑ8øzU½'¤˜ã­ª¶~@ÊPlÆcmèSë¥lU‚³ı¸;ÙòÂîxoƒ€{ñ•h\şÅ;/^€2¨JØzÔ»ô{g½nG•u¼îÛçİK2î/z—­>¹îußÖxçmôÃÒ…ÙÊ"¢4OÅxÍøtA­1u—ÌÒÍkPARÛ0kjÃ¥¹H·x'~/¾|%^©Dÿ~öïzìœ÷Æµº&›ØV÷qõÔÒÜ%Ï¿"o,æ}Å?'ûD-œâ,Øğ(Ö|PãŒ™ğ ’rV¿Tl ªŸ‰NÔ‹Œ–ªÄ—¿—xL”%ã-59dVmÒì5iæ¦¨1€Óï]~ÓÀm‘:s,+OXœàæ?¤o^;İádĞoµ»´’h†İAk˜?tp;İuØmu¾ÍîæßÊœÏ›ñäìj8étû½ëîğÛôÀ"–õÌ]4tÇ°4®©Ûşˆy·Û­Ëv·ßOîBDT5Ïv9âÜ ¶II¯ø/Œ‹(µeØ*¨“Ğ0Î?wQ™6K+;rBÚ‡³„GœUpe&P¾x%iäT·¢ÒtL®®‹²ÍÊ–dè7ñ¨%r	‘ÊtÊ¶Zl?Š´q||-Ê#jPò‹ƒ
+Jrjú›ø•E†]ºa?ÿø×ÿ4ö¢Ñ•Ã#$ßz—)‘èŞ;.Å¢äb@´µâ—ÍC=UÒbÉ<E{–u5şokc¬;ÄW¼7²ä3šöaßºTñ€]s‰_ÌçXK]°åÛÈ*n²]I¥{œã$gU÷¦.©8H‘»º¹qL”½¬@ÛÊ!}kÇÑ¼ uåz7½9ğ¾ÖS˜ıä”®	÷—‘ƒí‹¨qB±ŒŠÿÁFWE¨´î:ÕƒåéƒÃDĞ¬k_wÁIÎ÷h{Á/h”2<UŒN™ÁÑBU+ëy›
+¶Ê¯~qâ÷KV¯„[åù¥?
+b£ø7Z¦IZ¢j0„¬xk .˜x‰"GÅpuu×¿çƒJ¼>ı±†cwÉ „eå$X*6|y¤«O ê@ºGLı†š»Y)uï8!b…q //g³©„ñ8x‘‹xÆó|üN1|‡ÁøÄàù>èbùxßÈ'¦UŠâ)4öOCùø½8OôËñŠÊür$)˜(—ÙXycÀ	g.¨Dq¿OõİòB,‚#±ægòBó™à¸İ„Â;,Wxy*ÀË‡ûù1œB%¯ô»”¸É3\h–~ÿ *Ã¼q—=¿$.³¶m«?£gÕû×«C+(ßÏ.ÏHæ²Ìu±qıùÇ¿ı%ÎcGÇ¹˜ºüó3µòyh¾[1Êúa™›ÏBŸÀ$ªj	ójıp—v Ú%õÈR‡)àwÉMZ&ÈPğQà'íW_×€YÅ_E•´ÅµÿŞ`¹-—bTÊn²-.^{ä]Uå‡Gvó[Á¼ÂÈòS'¥/‘E©¸l¨v9qjÔ´ÖS`pc©óÏzGHÑï
+)úïå?íÆöëêOÅ‡wíw%‰§ò*%‰“¢‘9må8Ôê­–”Ò^!ÄënîßŸ}y¼¿_MIà¦p€Ãƒ/??û¬Â !p
+;µ[g/+<]A£OLúqUŞ¼ÈOïœ2à”[İÏ„¤Øª«n6y¹i½Y	{…
+-)e¼PXV¡h‘Û{iLÑ^STEb~ùØ]”ü*íšuŸµ¢Ä[)óÌ/tIRjÁú5ièd5e räq²²ÆŠòĞX÷»zıªµ(ü:ú ?‘P90š¤mı"R=†ˆ ©ì·Ã×CU‡k¶SuX'4^MÄJ[åTôE©–æ‰a}aÓ»Çg/»_VŠG+–óÎQcĞ»<!ŠE90«‡<™NÙ+¦"'µíNv¿è|vøT¯Ş®+Ù/¨IUôâ9esùv …ªäSğÌg2^;ş¾ªÈhuù”29³m£zÅy”»«—™oÉR×x'¯\İmq#J¿)V~¸¯¨ß¢iåêÊ"WQ™úôİ¶¶²Ê oäãµJ…÷0ÒUô8%ææfü\Uñ#7g¨Ã‹qAùÒ­ÊPûÙ?-Ú¿d”£2¨RR¥hú",<^9–ÊÉ®$ø%¦X®¾¼$°s^yA|”òÒ×7É´u,¬•
+óÔ€ysiÓ·×E_Ÿ_¦°¥]S¡GüÛšxø†ßÄq©S5™¤ÒÊŞ­{ÁºS_ƒQ·ïrªtñÇ=ªïX>¸çV¤È"™7øéŸÿ%­v»;N[Ã1‰J@Êcİ A‘¤Ç¾…”q~4ÚCNŸT]øAİß°º ñn‚¦mı«Vílõ«Šıƒ\´†¯‰`rrv5$ƒ^ûõ›ÁÇ¬'¤@îeÔv|Tz#¬yRİáçt~Ãº(Æ¤œşª5GÇ¶h«>Zİñóÿ39o]vº2¾
+~¼µ©ø>Yô1é•Ğ¬¼lH	Ã’ÒczÈ,{ªR‚QoÖ[ÿááø§^ûú   ÿÿ •TÚ™

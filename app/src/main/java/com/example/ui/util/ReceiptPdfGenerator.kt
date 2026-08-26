@@ -331,3 +331,192 @@ fun generatePdfOrderHistoryReport(context: android.content.Context, studentName:
         android.widget.Toast.makeText(context, "Error generating history report: ${e.localizedMessage}", android.widget.Toast.LENGTH_SHORT).show()
     }
 }
+
+fun generatePdfWalletTransactionReport(
+    context: android.content.Context,
+    studentName: String,
+    studentIndex: String,
+    currentBalance: Double,
+    transactions: List<com.example.data.WalletTransaction>
+) {
+    try {
+        val pdfDocument = android.graphics.pdf.PdfDocument()
+        val calculatedHeight = kotlin.math.max(600, 180 + transactions.size * 32 + 120)
+        val pageInfo = android.graphics.pdf.PdfDocument.PageInfo.Builder(600, calculatedHeight, 1).create()
+        val page = pdfDocument.startPage(pageInfo)
+        val canvas = page.canvas
+        val paint = android.graphics.Paint()
+        val textPaint = android.graphics.Paint().apply {
+            color = android.graphics.Color.BLACK
+            textSize = 10f
+            isAntiAlias = true
+        }
+        val titlePaint = android.graphics.Paint().apply {
+            color = android.graphics.Color.parseColor("#E65100") // Warm Brand Amber/Orange
+            textSize = 16f
+            isFakeBoldText = true
+            isAntiAlias = true
+        }
+        val subTitlePaint = android.graphics.Paint().apply {
+            color = android.graphics.Color.parseColor("#37474F")
+            textSize = 11f
+            isAntiAlias = true
+        }
+        val tableHeaderPaint = android.graphics.Paint().apply {
+            color = android.graphics.Color.WHITE
+            textSize = 10f
+            isFakeBoldText = true
+            isAntiAlias = true
+        }
+
+        // Draw background
+        canvas.drawColor(android.graphics.Color.WHITE)
+
+        var y = 40f
+        // Draw Header
+        canvas.drawText("ACCRA TECHNICAL UNIVERSITY - CAFETERIA HUB", 20f, y, titlePaint)
+        y += 20f
+        canvas.drawText("Official Student Digital Wallet Statement & Transaction History", 20f, y, subTitlePaint)
+        y += 18f
+        
+        val dateString = java.text.SimpleDateFormat("dd MMM yyyy, HH:mm:ss", java.util.Locale.getDefault()).format(java.util.Date())
+        canvas.drawText("Student: $studentName ($studentIndex)  |  Current Available Balance: GH₵ ${String.format("%.2f", currentBalance)}", 20f, y, textPaint)
+        y += 14f
+        canvas.drawText("Generated On: $dateString  |  Official Security Verified Document", 20f, y, textPaint)
+        y += 22f
+
+        // Table Header Background
+        paint.color = android.graphics.Color.parseColor("#263238")
+        canvas.drawRect(20f, y, 580f, y + 24f, paint)
+
+        // Column Titles
+        val cols = listOf("Date / Time" to 25f, "Type" to 140f, "Description / Details" to 210f, "Reference" to 420f, "Amount" to 510f)
+        for (col in cols) {
+            canvas.drawText(col.first, col.second, y + 16f, tableHeaderPaint)
+        }
+        y += 24f
+
+        var totalDeposits = 0.0
+        var totalSpending = 0.0
+
+        val cellPaint = android.graphics.Paint().apply {
+            color = android.graphics.Color.BLACK
+            textSize = 9f
+            isAntiAlias = true
+        }
+        val borderPaint = android.graphics.Paint().apply {
+            color = android.graphics.Color.parseColor("#CFD8DC")
+            strokeWidth = 1f
+            style = android.graphics.Paint.Style.STROKE
+        }
+
+        // Draw wallet transaction rows
+        for (i in transactions.indices) {
+            val tx = transactions[i]
+            if (tx.amount >= 0) totalDeposits += tx.amount else totalSpending += kotlin.math.abs(tx.amount)
+
+            // Alternating row colors
+            if (i % 2 == 1) {
+                paint.color = android.graphics.Color.parseColor("#FAFAFA")
+                canvas.drawRect(20f, y, 580f, y + 28f, paint)
+            }
+
+            val formattedDate = try {
+                java.text.SimpleDateFormat("dd MMM yyyy HH:mm", java.util.Locale.getDefault()).format(java.util.Date(tx.timestamp))
+            } catch (e: Exception) {
+                "Recent"
+            }
+            canvas.drawText(formattedDate, 25f, y + 17f, cellPaint)
+
+            val typePaint = android.graphics.Paint().apply {
+                textSize = 9f
+                isFakeBoldText = true
+                isAntiAlias = true
+                color = if (tx.amount >= 0) android.graphics.Color.parseColor("#2E7D32") else android.graphics.Color.parseColor("#C62828")
+            }
+            canvas.drawText(tx.type.uppercase(), 140f, y + 17f, typePaint)
+
+            val displayDetails = if (tx.details.length > 32) tx.details.substring(0, 30) + ".." else tx.details
+            canvas.drawText(displayDetails, 210f, y + 17f, cellPaint)
+            canvas.drawText(tx.reference.take(12), 420f, y + 17f, cellPaint)
+
+            val amtText = (if (tx.amount >= 0) "+GH₵" else "-GH₵") + String.format("%.2f", kotlin.math.abs(tx.amount))
+            canvas.drawText(amtText, 510f, y + 17f, typePaint)
+
+            // Gridline
+            canvas.drawLine(20f, y + 28f, 580f, y + 28f, borderPaint)
+            y += 28f
+        }
+
+        // Draw bottom border
+        canvas.drawLine(20f, y, 580f, y, borderPaint)
+        y += 22f
+
+        // Financial Summary Box
+        val sumLabelPaint = android.graphics.Paint().apply {
+            color = android.graphics.Color.BLACK
+            textSize = 10f
+            isFakeBoldText = true
+            isAntiAlias = true
+        }
+        val depValPaint = android.graphics.Paint().apply {
+            color = android.graphics.Color.parseColor("#2E7D32")
+            textSize = 11f
+            isFakeBoldText = true
+            isAntiAlias = true
+        }
+        val spValPaint = android.graphics.Paint().apply {
+            color = android.graphics.Color.parseColor("#C62828")
+            textSize = 11f
+            isFakeBoldText = true
+            isAntiAlias = true
+        }
+
+        canvas.drawText("Total Transactions: ${transactions.size}", 20f, y, sumLabelPaint)
+        canvas.drawText("Total Loaded: +GH₵ ${String.format("%.2f", totalDeposits)}", 180f, y, depValPaint)
+        canvas.drawText("Total Spent: -GH₵ ${String.format("%.2f", totalSpending)}", 380f, y, spValPaint)
+        y += 35f
+
+        // Footer block
+        val footerPaint = android.graphics.Paint().apply {
+            color = android.graphics.Color.GRAY
+            textSize = 8f
+            textAlign = android.graphics.Paint.Align.CENTER
+            isAntiAlias = true
+        }
+        canvas.drawText("This is an official digital statement generated by the Accra Technical University Smart Cafeteria System.", 300f, y, footerPaint)
+        y += 12f
+        canvas.drawText("Authorized Cashless Hub • Security PIN & Biometric Protected Records", 300f, y, footerPaint)
+
+        pdfDocument.finishPage(page)
+
+        val fileName = "ATU_Wallet_Statement_${System.currentTimeMillis()}.pdf"
+        val file = java.io.File(
+            context.getExternalFilesDir(android.os.Environment.DIRECTORY_DOWNLOADS),
+            fileName
+        )
+        pdfDocument.writeTo(java.io.FileOutputStream(file))
+        pdfDocument.close()
+
+        val authority = "com.example.fileprovider"
+        val uri = androidx.core.content.FileProvider.getUriForFile(context, authority, file)
+
+        val intent = android.content.Intent(android.content.Intent.ACTION_SEND).apply {
+            type = "application/pdf"
+            putExtra(android.content.Intent.EXTRA_STREAM, uri)
+            putExtra(android.content.Intent.EXTRA_SUBJECT, "ATU Cafeteria - Student Wallet Statement")
+            putExtra(android.content.Intent.EXTRA_TEXT, "Attached is the official ATU Cafeteria Digital Wallet Statement detailing transaction history and balance.")
+            addFlags(android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION)
+        }
+        
+        val chooser = android.content.Intent.createChooser(intent, "Download / View Wallet Statement PDF")
+        chooser.addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
+        context.startActivity(chooser)
+        
+        android.widget.Toast.makeText(context, "Wallet Statement PDF generated and saved successfully!", android.widget.Toast.LENGTH_LONG).show()
+
+    } catch (e: Exception) {
+        e.printStackTrace()
+        android.widget.Toast.makeText(context, "Error generating wallet statement PDF: ${e.localizedMessage}", android.widget.Toast.LENGTH_SHORT).show()
+    }
+}

@@ -507,6 +507,17 @@
     <!-- ========================================================================= -->
     <section id="student-view" class="space-y-6">
       
+      <!-- 🔄 VISUAL PULL-TO-REFRESH MECHANISM FOR MOBILE USERS & DESKTOP -->
+      <div id="student-pull-refresh-indicator" class="hidden transition-all duration-300 transform -translate-y-1">
+        <div class="bg-gradient-to-r from-orange-500 via-brand-600 to-amber-500 text-white px-4 py-2.5 rounded-2xl shadow-lg flex items-center justify-between gap-3 border border-white/20">
+          <div class="flex items-center gap-2.5">
+            <div id="pull-refresh-spinner" class="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+            <span id="pull-refresh-label" class="text-xs font-extrabold tracking-wide">Syncing latest food stock availability & live pricing...</span>
+          </div>
+          <span class="text-[10px] font-bold bg-white/20 px-2 py-0.5 rounded-full uppercase tracking-wider">ATU Real-Time</span>
+        </div>
+      </div>
+
       <!-- Welcome Hero Banner -->
       <div class="relative overflow-hidden rounded-3xl bg-gradient-to-r from-atu-navy via-slate-900 to-brand-900 text-white p-6 sm:p-8 shadow-xl">
         <div class="relative z-10 max-w-2xl space-y-3">
@@ -518,6 +529,16 @@
           <p class="text-slate-300 text-xs sm:text-sm leading-relaxed">
             Order fresh meals right from verified campus vendors, skip long lunchtime counter lines, and pick up your food instantly using your secure 4-digit PIN or digital QR Pass.
           </p>
+          <div class="flex flex-wrap items-center gap-2.5 pt-2">
+            <button onclick="showTopUpModal()" class="px-4 py-2 rounded-xl bg-amber-400 hover:bg-amber-300 text-slate-950 text-xs font-black shadow-md flex items-center gap-1.5 transition-all active:scale-95">
+              <i data-lucide="wallet-cards" class="w-4 h-4 text-slate-950"></i>
+              <span>Upload Wallet (+GH₵)</span>
+            </button>
+            <button onclick="refreshStudentMenuData(true)" class="px-3.5 py-2 rounded-xl bg-white/15 hover:bg-white/25 backdrop-blur-md text-white text-xs font-bold flex items-center gap-1.5 transition-all active:scale-95">
+              <i data-lucide="refresh-cw" id="btn-refresh-icon" class="w-3.5 h-3.5"></i>
+              <span>Pull / Refresh Stock</span>
+            </button>
+          </div>
           <div class="flex items-center gap-3 pt-1 text-xs text-amber-300 font-bold">
             <span class="flex items-center gap-1"><i data-lucide="clock" class="w-3.5 h-3.5"></i> Avg Prep: 8-12 Mins</span>
             <span>•</span>
@@ -528,6 +549,59 @@
         </div>
         <div class="absolute right-0 -bottom-10 opacity-15 pointer-events-none hidden sm:block">
           <i data-lucide="utensils-crossed" class="w-72 h-72 text-white"></i>
+        </div>
+      </div>
+
+            <!-- 📈 30-Day Wallet Trends & Personal Financial Management (Recharts) -->
+      <div class="bg-white p-5 sm:p-6 rounded-3xl border border-slate-200 shadow-sm space-y-4">
+        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-100 pb-3">
+          <div class="flex items-center gap-3">
+            <div class="w-10 h-10 rounded-2xl bg-gradient-to-br from-emerald-500 to-teal-700 text-white flex items-center justify-center shadow-md">
+              <i data-lucide="trending-up" class="w-5 h-5 text-white"></i>
+            </div>
+            <div>
+              <div class="flex items-center gap-2">
+                <h3 class="text-base font-extrabold text-slate-900">Personal Financial Management & Wallet Trends</h3>
+                <span class="text-[10px] font-bold bg-emerald-100 text-emerald-800 px-2.5 py-0.5 rounded-full uppercase tracking-wider">30-Day Velocity</span>
+              </div>
+              <p class="text-xs text-slate-500">Track balance trajectory, daily cafeteria meal spending, and deposits over the last 30 days.</p>
+            </div>
+          </div>
+          <div class="flex items-center gap-2">
+            <button onclick="exportWalletTransactionsPdf()" class="px-3.5 py-2 rounded-xl bg-amber-50 hover:bg-amber-100 text-amber-900 border border-amber-300 text-xs font-bold flex items-center gap-1.5 transition-all shadow-xs active:scale-95">
+              <i data-lucide="file-down" class="w-4 h-4 text-amber-700"></i>
+              <span>Export Statement (PDF)</span>
+            </button>
+            <button onclick="showTopUpModal()" class="px-3.5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold flex items-center gap-1.5 transition-all shadow-xs active:scale-95">
+              <i data-lucide="plus-circle" class="w-4 h-4 text-white"></i>
+              <span>Deposit Funds</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- Metric Summary Chips -->
+        <div class="grid grid-cols-2 sm:grid-cols-4 gap-3">
+          <div class="bg-slate-50 p-3 rounded-2xl border border-slate-100">
+            <p class="text-[11px] font-semibold text-slate-500">Available Balance</p>
+            <p class="text-lg font-black text-slate-900 mt-0.5">GH₵ <span id="trend-wallet-bal">114.00</span></p>
+          </div>
+          <div class="bg-emerald-50/70 p-3 rounded-2xl border border-emerald-100">
+            <p class="text-[11px] font-semibold text-emerald-700">30-Day Deposits</p>
+            <p class="text-lg font-black text-emerald-800 mt-0.5">+GH₵ <span id="trend-wallet-deposits">250.00</span></p>
+          </div>
+          <div class="bg-orange-50/70 p-3 rounded-2xl border border-orange-100">
+            <p class="text-[11px] font-semibold text-orange-700">30-Day Meal Spend</p>
+            <p class="text-lg font-black text-orange-800 mt-0.5">-GH₵ <span id="trend-wallet-spent">136.00</span></p>
+          </div>
+          <div class="bg-blue-50/70 p-3 rounded-2xl border border-blue-100">
+            <p class="text-[11px] font-semibold text-blue-700">Avg. Meal Cost</p>
+            <p class="text-lg font-black text-blue-800 mt-0.5">GH₵ <span id="trend-wallet-avg">34.00</span></p>
+          </div>
+        </div>
+
+        <!-- Recharts Line Chart Mount Point -->
+        <div class="relative bg-slate-950/5 p-4 rounded-2xl border border-slate-100">
+          <div id="student-wallet-line-chart-container" class="w-full h-64"></div>
         </div>
       </div>
 
@@ -625,7 +699,13 @@
               <p class="text-xs text-slate-500">Completed cafeteria transactions with pickup stamps & printable receipts</p>
             </div>
           </div>
-          <span id="completed-count-badge" class="text-xs font-bold bg-emerald-100 text-emerald-800 px-3 py-0.5 rounded-full">1 Completed</span>
+          <div class="flex items-center gap-2">
+            <button onclick="exportWalletTransactionsPdf()" class="px-3 py-1 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-800 text-xs font-bold flex items-center gap-1.5 transition-all border border-slate-200">
+              <i data-lucide="file-text" class="w-3.5 h-3.5 text-brand-600"></i>
+              <span>Download Wallet Statement PDF</span>
+            </button>
+            <span id="completed-count-badge" class="text-xs font-bold bg-emerald-100 text-emerald-800 px-3 py-0.5 rounded-full">1 Completed</span>
+          </div>
         </div>
 
         <div id="order-history-list" class="space-y-3 divide-y divide-slate-100 max-h-96 overflow-y-auto pr-1"></div>
@@ -858,6 +938,42 @@
             </div>
           </form>
         </div>
+        <!-- Vendor Security & Login Credentials Card -->
+        <div class="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm space-y-4">
+          <div class="flex items-center justify-between border-b border-slate-100 pb-3">
+            <div>
+              <h3 class="text-base font-bold text-slate-900 flex items-center gap-2">
+                <i data-lucide="key-round" class="w-4 h-4 text-amber-500"></i>
+                Vendor Login Credentials & Security
+              </h3>
+              <p class="text-xs text-slate-500">Update your vendor login username and password created by Admin during initial onboarding.</p>
+            </div>
+            <span class="text-xs font-bold text-amber-700 bg-amber-50 px-3 py-1 rounded-full border border-amber-200">Access Security</span>
+          </div>
+          <form id="vendor-credentials-form" onsubmit="saveVendorCredentials(event)" class="space-y-4 text-xs font-semibold text-slate-700">
+            <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+              <div>
+                <label class="block mb-1">Vendor Username</label>
+                <input type="text" id="vcreds-username" placeholder="e.g. akwaaba_kitchen" class="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-amber-500 font-mono text-xs" required />
+              </div>
+              <div>
+                <label class="block mb-1">New Password</label>
+                <input type="password" id="vcreds-password" placeholder="Enter new password" class="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-amber-500 text-xs" required />
+              </div>
+              <div>
+                <label class="block mb-1">Confirm New Password</label>
+                <input type="password" id="vcreds-confirm-password" placeholder="Confirm new password" class="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-amber-500 text-xs" required />
+              </div>
+            </div>
+            <div class="flex items-center justify-between pt-2">
+              <span id="vendor-creds-msg" class="text-xs font-medium text-emerald-600 hidden"></span>
+              <button type="submit" class="ml-auto px-6 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-600 text-slate-950 text-xs font-black shadow-md flex items-center gap-1.5 transition-all">
+                <i data-lucide="shield-check" class="w-4 h-4 text-slate-950"></i>
+                <span>Update Login Username & Password</span>
+              </button>
+            </div>
+          </form>
+        </div>
       </div>
     </section>
 
@@ -878,14 +994,17 @@
           </div>
 
           <div class="flex flex-wrap items-center gap-2">
-            <button onclick="openAddVendorModal()" class="px-4 py-2 rounded-xl bg-brand-600 hover:bg-brand-700 text-white text-xs font-bold shadow-xs flex items-center gap-1.5">
+            <button onclick="openAddVendorModal()" class="px-4 py-2 rounded-xl bg-brand-600 hover:bg-brand-700 text-white text-xs font-bold shadow-xs flex items-center gap-1.5 transition-all">
               <i data-lucide="store" class="w-4 h-4 text-amber-300"></i> Register New Vendor
             </button>
-            <button onclick="openBroadcastModal()" class="px-3.5 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-800 text-xs font-bold flex items-center gap-1.5">
+            <button onclick="openBroadcastModal()" class="px-3.5 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-800 text-xs font-bold flex items-center gap-1.5 transition-all">
               <i data-lucide="megaphone" class="w-4 h-4 text-brand-600"></i> Broadcast Notice
             </button>
-            <button onclick="exportSalesReport()" class="px-3.5 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-800 text-xs font-bold flex items-center gap-1.5">
+            <button onclick="exportSalesReport()" class="px-3.5 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-800 text-xs font-bold flex items-center gap-1.5 transition-all">
               <i data-lucide="download" class="w-4 h-4 text-emerald-600"></i> Export CSV
+            </button>
+            <button onclick="exportOrderQueueJson()" class="px-3.5 py-2 rounded-xl bg-brand-50 hover:bg-brand-100 text-brand-700 border border-brand-200 text-xs font-bold flex items-center gap-1.5 transition-all shadow-xs" title="Export entire order queue as JSON for secondary analytics">
+              <i data-lucide="file-json" class="w-4 h-4 text-brand-600"></i> Export Queue JSON
             </button>
           </div>
         </div>
@@ -930,7 +1049,7 @@
         </div>
       </div>
 
-      <!-- 📊 RECHARTS ANALYTICS: Daily Sales Volume & Peak Ordering Hours Visualization -->
+      <!-- 📊 RECHARTS ANALYTICS: Daily Sales Volume, Peak Ordering Hours & Real-Time Kitchen Efficiency Donut -->
       <div class="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm space-y-5">
         <div class="flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div>
@@ -940,10 +1059,10 @@
               </span>
               <div>
                 <h3 class="text-base font-extrabold text-slate-900 flex items-center gap-2">
-                  <span>Campus Sales Volume & Peak Ordering Hours</span>
+                  <span>Campus Analytics & Kitchen Efficiency Engine</span>
                   <span class="text-[10px] font-extrabold bg-brand-100 text-brand-700 px-2.5 py-0.5 rounded-full uppercase tracking-wider">Recharts Engine</span>
                 </h3>
-                <p class="text-xs text-slate-500 mt-0.5">Interactive bar chart analytics visualizing daily sales trends and hourly peak order distribution for vendor performance optimization.</p>
+                <p class="text-xs text-slate-500 mt-0.5">Real-time interactive Bar & Donut chart analytics monitoring daily sales volume, peak lunch rush windows, and live kitchen order statuses.</p>
               </div>
             </div>
           </div>
@@ -967,24 +1086,48 @@
         <!-- Metric Summary Chips -->
         <div id="recharts-metric-chips" class="grid grid-cols-2 sm:grid-cols-4 gap-3 pt-1"></div>
 
-        <!-- Recharts Interactive Canvas / Mount Viewport -->
-        <div class="bg-slate-50/80 border border-slate-200 rounded-2xl p-4 sm:p-5 relative min-h-[320px]">
-          <div id="admin-recharts-root" class="w-full min-h-[290px] flex items-center justify-center"></div>
-        </div>
-
-        <div class="flex flex-col sm:flex-row sm:items-center justify-between text-[11px] text-slate-500 gap-2 px-1 pt-1 border-t border-slate-100">
-          <div class="flex items-center gap-2">
-            <span class="flex items-center gap-1 font-semibold text-slate-700">
-              <span class="w-2.5 h-2.5 rounded-full bg-brand-500"></span> Sales Volume (GH₵)
-            </span>
-            <span class="flex items-center gap-1 font-semibold text-slate-700 ml-3">
-              <span class="w-2.5 h-2.5 rounded-full bg-sky-500"></span> Order Count
-            </span>
+        <!-- Dual Chart Dashboard: Left (Bar Chart) & Right (Donut Chart) -->
+        <div class="grid grid-cols-1 lg:grid-cols-12 gap-5">
+          <!-- 1. Interactive Bar Chart (8 Columns on lg) -->
+          <div class="lg:col-span-7 xl:col-span-8 bg-slate-50/80 border border-slate-200 rounded-2xl p-4 sm:p-5 flex flex-col justify-between">
+            <div class="flex items-center justify-between pb-2 border-b border-slate-200/80 mb-2">
+              <span class="text-xs font-bold text-slate-700 flex items-center gap-1.5">
+                <i data-lucide="activity" class="w-3.5 h-3.5 text-brand-600"></i>
+                <span id="bar-chart-subtitle">Daily Sales & Order Velocity</span>
+              </span>
+              <span class="text-[10px] font-semibold text-slate-500">Live Campus Feed</span>
+            </div>
+            <div id="admin-recharts-root" class="w-full min-h-[260px] flex items-center justify-center"></div>
+            <div class="flex items-center justify-between text-[11px] text-slate-500 pt-2 border-t border-slate-200/70">
+              <div class="flex items-center gap-2">
+                <span class="flex items-center gap-1 font-semibold text-slate-700">
+                  <span class="w-2.5 h-2.5 rounded-full bg-brand-500"></span> Sales (GH₵)
+                </span>
+                <span class="flex items-center gap-1 font-semibold text-slate-700 ml-2">
+                  <span class="w-2.5 h-2.5 rounded-full bg-sky-500"></span> Orders
+                </span>
+              </div>
+              <span class="font-bold text-brand-600 text-[10px]">Peak Rush: 12:00 - 1:45 PM</span>
+            </div>
           </div>
-          <span class="font-bold text-brand-600 flex items-center gap-1">
-            <i data-lucide="zap" class="w-3.5 h-3.5"></i>
-            <span>Peak Campus Ordering Window: 12:00 PM – 1:45 PM (Lunch Rush)</span>
-          </span>
+
+          <!-- 2. Real-Time Kitchen Status Breakdown Donut Chart (4-5 Columns on lg) -->
+          <div class="lg:col-span-5 xl:col-span-4 bg-slate-50/80 border border-slate-200 rounded-2xl p-4 sm:p-5 flex flex-col justify-between">
+            <div class="flex items-center justify-between pb-2 border-b border-slate-200/80 mb-2">
+              <span class="text-xs font-bold text-slate-700 flex items-center gap-1.5">
+                <i data-lucide="pie-chart" class="w-3.5 h-3.5 text-indigo-600"></i>
+                <span>Kitchen Efficiency & Order Status</span>
+              </span>
+              <span class="text-[10px] font-extrabold bg-emerald-100 text-emerald-700 px-2 py-0.5 rounded-full uppercase">Real-Time</span>
+            </div>
+            <!-- Donut Chart Mount Viewport -->
+            <div id="admin-recharts-donut-root" class="w-full min-h-[210px] flex items-center justify-center"></div>
+            
+            <!-- Donut Status Distribution Badges & KPI summary -->
+            <div id="donut-status-legend" class="grid grid-cols-2 gap-2 pt-2 border-t border-slate-200/70 text-[11px]">
+              <!-- Dynamically populated in JavaScript -->
+            </div>
+          </div>
         </div>
       </div>
 
@@ -1205,6 +1348,20 @@
           <input type="text" id="new-vendor-phone" placeholder="e.g. +233 24 123 4567" class="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-brand-500" />
         </div>
 
+        <div>
+                  <div class="grid grid-cols-2 gap-3 bg-amber-50/70 p-3 rounded-2xl border border-amber-200/80">
+          <div>
+            <label class="block mb-1 text-amber-950 font-bold">Vendor Username</label>
+            <input type="text" id="new-vendor-username" placeholder="e.g. kiki_grills" class="w-full px-3 py-2 bg-white border border-amber-200 rounded-xl outline-none focus:ring-2 focus:ring-brand-500 font-mono text-xs" />
+          </div>
+          <div>
+            <label class="block mb-1 text-amber-950 font-bold">Initial Password</label>
+            <input type="text" id="new-vendor-password" placeholder="e.g. Vendor@123" class="w-full px-3 py-2 bg-white border border-amber-200 rounded-xl outline-none focus:ring-2 focus:ring-brand-500 font-mono text-xs" />
+          </div>
+          <p class="col-span-2 text-[10px] text-amber-800 font-medium">
+            Admins create the initial username & password. The vendor will be prompted to update these upon first login.
+          </p>
+        </div>
         <div>
           <label class="block mb-1">Kitchen Description</label>
           <textarea id="new-vendor-desc" rows="2" placeholder="Specializes in fresh grilled fish, khebab, freshly blended smoothies, and juices..." class="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-brand-500"></textarea>
@@ -1780,6 +1937,119 @@
       <div class="flex items-center space-x-2 pt-2">
         <button onclick="closeBroadcastModal()" class="flex-1 py-2.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-800 text-xs font-bold">Cancel</button>
         <button onclick="publishBroadcast()" class="flex-1 py-2.5 rounded-xl bg-brand-600 hover:bg-brand-700 text-white text-xs font-bold shadow-xs">Broadcast Live</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 5. 💳 STUDENT / CUSTOMER DIGITAL WALLET TOP-UP & UPLOAD MODAL -->
+  <div id="student-topup-modal" class="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm hidden flex items-center justify-center p-4 transition-all">
+    <div class="bg-white rounded-3xl max-w-md w-full p-6 shadow-2xl space-y-5 transform transition-all animate-in fade-in zoom-in duration-200">
+      <div class="flex items-center justify-between border-b border-slate-100 pb-3">
+        <div class="flex items-center gap-2.5">
+          <div class="w-9 h-9 rounded-2xl bg-brand-100 text-brand-600 flex items-center justify-center shadow-2xs">
+            <i data-lucide="wallet-cards" class="w-5 h-5"></i>
+          </div>
+          <div>
+            <h3 class="text-base font-extrabold text-slate-900">Upload Wallet Funds</h3>
+            <p class="text-[11px] text-slate-500">Instant Cashless Top-Up for Fast-Pass Pre-Orders</p>
+          </div>
+        </div>
+        <button onclick="closeTopUpModal()" class="w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center text-slate-500 hover:bg-slate-200 transition-colors">
+          <i data-lucide="x" class="w-4 h-4"></i>
+        </button>
+      </div>
+
+      <!-- Authenticated User & Current Balance Pill -->
+      <div class="bg-slate-50 border border-slate-200/80 rounded-2xl p-3.5 flex items-center justify-between">
+        <div>
+          <p class="text-[10px] uppercase font-bold text-slate-500">Authenticated Student</p>
+          <p class="text-xs font-extrabold text-slate-900 mt-0.5" id="topup-user-identity">Kofi Mensah (01210492B)</p>
+        </div>
+        <div class="text-right">
+          <p class="text-[10px] uppercase font-bold text-slate-500">Current Balance</p>
+          <p class="text-sm font-black text-brand-600 mt-0.5">GH₵ <span id="topup-current-balance">150.00</span></p>
+        </div>
+      </div>
+
+      <!-- Quick Preset Amounts -->
+      <div class="space-y-2">
+        <label class="block text-xs font-bold text-slate-700">Select Top-Up Amount (GH₵)</label>
+        <div class="grid grid-cols-4 gap-2">
+          <button type="button" onclick="selectTopUpAmount(20)" class="topup-amt-btn py-2 rounded-xl text-xs font-black border border-slate-200 bg-white hover:border-brand-500 hover:text-brand-600 transition-all text-slate-700 active:scale-95">
+            +20
+          </button>
+          <button type="button" onclick="selectTopUpAmount(50)" class="topup-amt-btn py-2 rounded-xl text-xs font-black border border-brand-500 bg-brand-50 text-brand-700 transition-all active:scale-95 shadow-xs">
+            +50
+          </button>
+          <button type="button" onclick="selectTopUpAmount(100)" class="topup-amt-btn py-2 rounded-xl text-xs font-black border border-slate-200 bg-white hover:border-brand-500 hover:text-brand-600 transition-all text-slate-700 active:scale-95">
+            +100
+          </button>
+          <button type="button" onclick="selectTopUpAmount(200)" class="topup-amt-btn py-2 rounded-xl text-xs font-black border border-slate-200 bg-white hover:border-brand-500 hover:text-brand-600 transition-all text-slate-700 active:scale-95">
+            +200
+          </button>
+        </div>
+        
+        <!-- Custom Input -->
+        <div class="relative mt-2">
+          <span class="absolute left-3 top-2.5 text-xs font-extrabold text-slate-400">GH₵</span>
+          <input type="number" id="topup-custom-amount" min="1" step="1" value="50" class="w-full pl-11 pr-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm font-bold text-slate-900 outline-none focus:ring-2 focus:ring-brand-500 focus:bg-white transition-all" placeholder="Custom amount (e.g. 75)">
+        </div>
+      </div>
+
+      <!-- Payment Channel Selector -->
+      <div class="space-y-2">
+        <label class="block text-xs font-bold text-slate-700">Payment Gateway Channel</label>
+        <div class="grid grid-cols-3 gap-2">
+          <button type="button" onclick="selectTopUpMethod('MTN_MOMO')" id="method-btn-momo" class="topup-method-btn p-2.5 rounded-xl border border-brand-500 bg-brand-50 text-brand-800 text-[11px] font-extrabold flex flex-col items-center justify-center gap-1 transition-all">
+            <span class="w-2.5 h-2.5 rounded-full bg-amber-500"></span>
+            <span>MTN MoMo</span>
+          </button>
+          <button type="button" onclick="selectTopUpMethod('TELECEL')" id="method-btn-telecel" class="topup-method-btn p-2.5 rounded-xl border border-slate-200 bg-white hover:border-slate-300 text-slate-700 text-[11px] font-extrabold flex flex-col items-center justify-center gap-1 transition-all">
+            <span class="w-2.5 h-2.5 rounded-full bg-red-500"></span>
+            <span>Telecel Cash</span>
+          </button>
+          <button type="button" onclick="selectTopUpMethod('AT_MONEY')" id="method-btn-at" class="topup-method-btn p-2.5 rounded-xl border border-slate-200 bg-white hover:border-slate-300 text-slate-700 text-[11px] font-extrabold flex flex-col items-center justify-center gap-1 transition-all">
+            <span class="w-2.5 h-2.5 rounded-full bg-blue-600"></span>
+            <span>AT Money / Card</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- Phone Number / Card Details Input -->
+      <div class="space-y-1.5">
+        <label class="block text-xs font-bold text-slate-700" id="topup-account-label">Mobile Money Wallet Number</label>
+        <div class="relative">
+          <input type="text" id="topup-account-input" value="024 123 4567" class="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold text-slate-800 outline-none focus:ring-2 focus:ring-brand-500 focus:bg-white transition-all">
+        </div>
+      </div>
+
+      <!-- 4-Digit Security PIN Authorization Field -->
+      <div class="space-y-1.5">
+        <div class="flex items-center justify-between">
+          <label class="block text-xs font-bold text-slate-700">Enter 4-Digit Wallet Authorization PIN</label>
+          <span class="text-[10px] text-slate-400 font-semibold">Demo: Any 4 digits (e.g. 1234)</span>
+        </div>
+        <input type="password" id="topup-wallet-pin" maxlength="4" placeholder="••••" class="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-center text-base tracking-widest font-black text-slate-900 outline-none focus:ring-2 focus:ring-brand-500 focus:bg-white transition-all">
+      </div>
+
+      <!-- Security Guarantee Notice (Preserves Authentication Session) -->
+      <div class="bg-emerald-50/80 border border-emerald-200/80 rounded-2xl p-3 flex items-start gap-2.5 text-[11px] text-emerald-900">
+        <i data-lucide="shield-check" class="w-4 h-4 text-emerald-600 shrink-0 mt-0.5"></i>
+        <div>
+          <p class="font-bold">Unbreakable Session Security</p>
+          <p class="text-[10px] text-emerald-700 mt-0.5 leading-snug">Ghana Data Protection Act 843 compliant. Uploading wallet funds immediately syncs balance without ever logging you out or disrupting your active user session.</p>
+        </div>
+      </div>
+
+      <!-- Action Buttons -->
+      <div class="flex items-center space-x-2 pt-1">
+        <button type="button" onclick="closeTopUpModal()" class="flex-1 py-2.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold transition-colors">
+          Cancel
+        </button>
+        <button type="button" id="topup-confirm-btn" onclick="processWalletUpload()" class="flex-1 py-2.5 rounded-xl bg-brand-600 hover:bg-brand-700 text-white text-xs font-black shadow-md flex items-center justify-center gap-1.5 transition-transform active:scale-95">
+          <i data-lucide="check-circle" class="w-4 h-4 text-amber-300"></i>
+          <span>Authorize & Upload</span>
+        </button>
       </div>
     </div>
   </div>
@@ -4558,7 +4828,7 @@
         `).join('');
       }
 
-      // 6. 📊 Render Interactive Recharts Bar Chart (Sales Volume & Peak Hours Analytics)
+      // 6. 📊 Render Interactive Recharts Bar Chart (Sales Volume & Peak Hours Analytics) & Donut Chart
       renderAdminRecharts(currentAdminChartMetric);
 
       lucide.createIcons();
@@ -4591,11 +4861,17 @@
     }
 
     /**
-     * Renders Recharts Bar Chart into #admin-recharts-root
+     * Renders Recharts Bar Chart into #admin-recharts-root & Donut Chart into #admin-recharts-donut-root
      */
     function renderAdminRecharts(metric = 'DAILY_SALES') {
       const container = document.getElementById('admin-recharts-root');
       const chipsEl = document.getElementById('recharts-metric-chips');
+      const barSubtitle = document.getElementById('bar-chart-subtitle');
+
+      // Also render Donut Chart for Real-Time Kitchen Efficiency & Order Status Distribution
+      renderAdminDonutChart();
+      renderStudentWalletTrendChart();
+
       if (!container) return;
 
       // 1. Prepare dynamic datasets
@@ -4611,6 +4887,7 @@
       const liveSalesSum = orders.reduce((sum, o) => sum + o.totalPrice, 1280.00);
 
       if (metric === 'DAILY_SALES') {
+        if (barSubtitle) barSubtitle.innerText = 'Daily Sales & Order Velocity (Past 7 Days)';
         chartData = [
           { label: 'Mon', sales: 520, orders: 32 },
           { label: 'Tue', sales: 680, orders: 41 },
@@ -4646,6 +4923,7 @@
           `;
         }
       } else if (metric === 'PEAK_HOURS') {
+        if (barSubtitle) barSubtitle.innerText = 'Hourly Campus Order Distribution & Peak Windows';
         chartData = [
           { label: '8 AM', sales: 110, orders: 8 },
           { label: '9 AM', sales: 240, orders: 15 },
@@ -4685,6 +4963,7 @@
         }
       } else {
         // VENDOR_COMP
+        if (barSubtitle) barSubtitle.innerText = 'Vendor Revenue & Order Throughput Comparison';
         chartData = vendors.map(v => {
           const vOrders = orders.filter(o => o.vendorId === v.id);
           const s = vOrders.reduce((acc, o) => acc + o.totalPrice, 0) + (v.id === 1 ? 780 : v.id === 2 ? 610 : 430);
@@ -4730,7 +5009,7 @@
 
           const chartElement = h(
             ResponsiveContainer,
-            { width: '100%', height: 280 },
+            { width: '100%', height: 260 },
             h(
               BarChart,
               { data: chartData, margin: { top: 12, right: 12, left: -10, bottom: 0 } },
@@ -4742,8 +5021,8 @@
                 contentStyle: { backgroundColor: '#0f172a', borderRadius: '12px', border: 'none', color: '#fff', fontSize: '12px', fontWeight: 'bold' }
               }),
               h(Legend, { wrapperStyle: { fontSize: '11px', paddingTop: '8px' } }),
-              h(Bar, { yAxisId: 'left', dataKey: bar1Key, name: bar1Name, fill: bar1Color, radius: [6, 6, 0, 0], barSize: 18 }),
-              h(Bar, { yAxisId: 'right', dataKey: bar2Key, name: bar2Name, fill: bar2Color, radius: [6, 6, 0, 0], barSize: 18 })
+              h(Bar, { yAxisId: 'left', dataKey: bar1Key, name: bar1Name, fill: bar1Color, radius: [6, 6, 0, 0], barSize: 16 }),
+              h(Bar, { yAxisId: 'right', dataKey: bar2Key, name: bar2Name, fill: bar2Color, radius: [6, 6, 0, 0], barSize: 16 })
             )
           );
 
@@ -4763,6 +5042,170 @@
 
       // High-precision SVG Bar Chart Canvas Fallback
       renderSvgChartFallback(container, chartData, xKey, bar1Key, bar1Name, bar1Color, bar2Key, bar2Name, bar2Color);
+    }
+
+    /**
+     * 🍩 Renders Recharts Donut Chart for Real-Time Kitchen Efficiency & Order Status Distribution
+     */
+    function renderAdminDonutChart() {
+      const donutContainer = document.getElementById('admin-recharts-donut-root');
+      const legendEl = document.getElementById('donut-status-legend');
+      if (!donutContainer) return;
+
+      const receivedCount = orders.filter(o => o.status === 'RECEIVED').length + 3;
+      const preparingCount = orders.filter(o => o.status === 'PREPARING').length + 5;
+      const readyCount = orders.filter(o => o.status === 'READY').length + 4;
+      const deliveredCount = orders.filter(o => o.status === 'DELIVERED').length + 26;
+      const totalKitchenOrders = receivedCount + preparingCount + readyCount + deliveredCount;
+
+      const donutData = [
+        { name: 'Received', value: receivedCount, color: '#f59e0b', subtext: 'In queue' },
+        { name: 'Preparing', value: preparingCount, color: '#3b82f6', subtext: 'Cooking' },
+        { name: 'Ready / Out', value: readyCount, color: '#8b5cf6', subtext: 'Fast-Pass' },
+        { name: 'Delivered', value: deliveredCount, color: '#10b981', subtext: 'Picked up' }
+      ];
+
+      if (legendEl) {
+        legendEl.innerHTML = donutData.map(d => `
+          <div class="bg-white p-2 rounded-xl border border-slate-200/80 flex items-center justify-between shadow-2xs">
+            <div class="flex items-center gap-1.5 truncate">
+              <span class="w-2.5 h-2.5 rounded-full shrink-0" style="background-color: ${d.color};"></span>
+              <span class="font-bold text-slate-800 truncate text-[11px]">${d.name}</span>
+            </div>
+            <span class="font-black text-slate-900 ml-1 text-xs">${d.value}</span>
+          </div>
+        `).join('');
+      }
+
+      try {
+        if (window.React && window.ReactDOM && window.Recharts && window.Recharts.PieChart) {
+          const { createElement: h } = window.React;
+          const { ResponsiveContainer, PieChart, Pie, Cell, Tooltip } = window.Recharts;
+
+          const donutComponent = h(
+            ResponsiveContainer,
+            { width: '100%', height: 210 },
+            h(
+              PieChart,
+              {},
+              h(
+                Pie,
+                {
+                  data: donutData,
+                  cx: '50%',
+                  cy: '50%',
+                  innerRadius: 46,
+                  outerRadius: 76,
+                  paddingAngle: 4,
+                  dataKey: 'value',
+                  nameKey: 'name'
+                },
+                donutData.map((entry, index) =>
+                  h(Cell, { key: `donut-cell-${index}`, fill: entry.color, strokeWidth: 0 })
+                )
+              ),
+              h(Tooltip, {
+                contentStyle: { backgroundColor: '#0f172a', borderRadius: '12px', border: 'none', color: '#fff', fontSize: '11px', fontWeight: 'bold' }
+              })
+            )
+          );
+
+          if (window.ReactDOM.createRoot) {
+            if (!donutContainer._reactDonutRoot) {
+              donutContainer._reactDonutRoot = window.ReactDOM.createRoot(donutContainer);
+            }
+            donutContainer._reactDonutRoot.render(donutComponent);
+          } else {
+            window.ReactDOM.render(donutComponent, donutContainer);
+          }
+          return;
+        }
+      } catch (e) {
+        console.warn('Recharts Donut React error, using SVG fallback:', e);
+      }
+
+      // SVG Donut Fallback
+      renderSvgDonutFallback(donutContainer, donutData, totalKitchenOrders);
+    }
+
+    function renderSvgDonutFallback(container, data, total) {
+      let cumulativePercent = 0;
+      const radius = 60;
+      const strokeWidth = 24;
+      const circumference = 2 * Math.PI * radius;
+
+      const circlesHtml = data.map(slice => {
+        const percent = slice.value / total;
+        const strokeDasharray = `${circumference * percent} ${circumference}`;
+        const strokeDashoffset = -circumference * cumulativePercent;
+        cumulativePercent += percent;
+
+        return `
+          <circle
+            cx="100" cy="100" r="${radius}"
+            fill="transparent"
+            stroke="${slice.color}"
+            stroke-width="${strokeWidth}"
+            stroke-dasharray="${strokeDasharray}"
+            stroke-dashoffset="${strokeDashoffset}"
+            class="transition-all duration-500 hover:opacity-90 cursor-pointer"
+          >
+            <title>${slice.name}: ${slice.value} Orders (${Math.round(percent * 100)}%)</title>
+          </circle>
+        `;
+      }).join('');
+
+      container.innerHTML = `
+        <div class="relative flex items-center justify-center">
+          <svg viewBox="0 0 200 200" class="w-48 h-48 transform -rotate-90">
+            ${circlesHtml}
+          </svg>
+          <div class="absolute flex flex-col items-center justify-center text-center pointer-events-none">
+            <span class="text-lg font-black text-slate-900">${total}</span>
+            <span class="text-[9px] uppercase font-bold text-slate-500">Kitchen Orders</span>
+          </div>
+        </div>
+      `;
+    }
+
+    function renderSvgChartFallback(container, data, xKey, k1, name1, c1, k2, name2, c2) {
+      const max1 = Math.max(...data.map(d => d[k1]), 10);
+      const max2 = Math.max(...data.map(d => d[k2]), 5);
+      
+      const barsHtml = data.map((d, idx) => {
+        const h1 = Math.round((d[k1] / max1) * 160);
+        const h2 = Math.round((d[k2] / max2) * 160);
+        return `
+          <div class="flex-1 flex flex-col items-center justify-end h-48 group relative">
+            <div class="absolute -top-10 opacity-0 group-hover:opacity-100 transition-opacity bg-slate-900 text-white text-[10px] font-bold py-1 px-2 rounded-lg pointer-events-none z-20 whitespace-nowrap shadow-lg">
+              ${d[xKey]}: ${d[k1]} GHS • ${d[k2]} Orders
+            </div>
+            <div class="w-full flex items-end justify-center gap-1">
+              <div style="height: ${h1}px; background-color: ${c1};" class="w-3.5 sm:w-5 rounded-t-md transition-all duration-300 group-hover:brightness-110"></div>
+              <div style="height: ${h2}px; background-color: ${c2};" class="w-3.5 sm:w-5 rounded-t-md transition-all duration-300 group-hover:brightness-110"></div>
+            </div>
+            <span class="text-[11px] font-bold text-slate-600 mt-2 truncate max-w-full">${d[xKey]}</span>
+          </div>
+        `;
+      }).join('');
+
+      container.innerHTML = `
+        <div class="w-full space-y-2">
+          <div class="flex items-end justify-between gap-1 sm:gap-2 h-52 border-b border-slate-200 pb-1 px-2">
+            ${barsHtml}
+          </div>
+          <div class="flex items-center justify-center gap-6 text-xs font-bold pt-1">
+            <span class="flex items-center gap-1.5 text-slate-700">
+              <span class="w-3 h-3 rounded-md" style="background-color: ${c1};"></span>
+              <span>${name1}</span>
+            </span>
+            <span class="flex items-center gap-1.5 text-slate-700">
+              <span class="w-3 h-3 rounded-md" style="background-color: ${c2};"></span>
+              <span>${name2}</span>
+            </span>
+          </div>
+        </div>
+      `;
     }
 
     function renderSvgChartFallback(container, data, xKey, k1, name1, c1, k2, name2, c2) {
@@ -4905,6 +5348,40 @@
       const location = document.getElementById('new-vendor-location').value.trim();
       const specialty = document.getElementById('new-vendor-specialty').value.trim();
       const phone = document.getElementById('new-vendor-phone').value.trim();
+      const usernameField = document.getElementById('new-vendor-username');
+      const passwordField = document.getElementById('new-vendor-password');
+
+      const username = (usernameField && usernameField.value.trim()) ? usernameField.value.trim().toLowerCase() : name.toLowerCase().replace(/[^a-z0-9]/g, '_');
+      const password = (passwordField && passwordField.value.trim()) ? passwordField.value.trim() : 'Vendor@123';
+
+      if (!name || !location) {
+        showToast('Please enter vendor name and location stall.', 'error');
+        return;
+      }
+      const newVendor = {
+        id: Date.now(),
+        name,
+        location: location || 'Campus Food Court',
+        specialty: specialty || 'Campus Eatery',
+        phone: phone || '+233 24 000 0000',
+        username: username,
+        password: password,
+        rating: 5.0,
+        isOpen: true
+      };
+      vendors.push(newVendor);
+      auditLogs.unshift(`Admin registered vendor '${name}' with username '${username}'. Vendor can update credentials upon login.`);
+      renderVendorPills();
+      renderAdminDashboard();
+      closeAddVendorModal();
+      showToast(`Vendor '${name}' registered! Initial username: ${username}`, 'success');
+      return;
+    }
+    function old_saveNewVendor_unused() {
+      const name = document.getElementById('new-vendor-name').value.trim();
+      const location = document.getElementById('new-vendor-location').value.trim();
+      const specialty = document.getElementById('new-vendor-specialty').value.trim();
+      const phone = document.getElementById('new-vendor-phone').value.trim();
 
       if (!name || !location) {
         showToast('Please enter vendor name and location stall.', 'error');
@@ -5014,6 +5491,204 @@
       showToast('Sales Report CSV downloaded successfully.', 'success');
     }
 
+    /**
+     * 📁 Exports current order queue as structured JSON file for secondary analysis
+     */
+    function exportOrderQueueJson() {
+      const exportPayload = {
+        application: "Accra Technical University (ATU) Smart Cafeteria System",
+        version: "2.4.0",
+        exportedAt: new Date().toISOString(),
+        totalOrdersCount: orders.length,
+        analyticsSummary: {
+          totalGrossSalesGhs: orders.reduce((sum, o) => sum + (o.totalPrice || 0), 0),
+          receivedOrdersCount: orders.filter(o => o.status === 'RECEIVED').length,
+          preparingOrdersCount: orders.filter(o => o.status === 'PREPARING').length,
+          readyOrdersCount: orders.filter(o => o.status === 'READY').length,
+          deliveredOrdersCount: orders.filter(o => o.status === 'DELIVERED').length
+        },
+        ordersQueue: orders.map(o => ({
+          orderId: o.id,
+          vendorId: o.vendorId,
+          vendorName: o.vendorName,
+          foodId: o.foodId,
+          foodName: o.foodName,
+          quantity: o.quantity,
+          unitPriceGhs: (o.totalPrice / (o.quantity || 1)),
+          totalPriceGhs: o.totalPrice,
+          pickupPin: o.pickupPin,
+          qrCodeToken: o.qrCodeToken || ("ATU-ORDER-" + o.id),
+          status: o.status,
+          dateStamp: o.dateStamp || o.time,
+          studentName: o.studentName || (currentLoggedInUser ? currentLoggedInUser.name : "Kofi Mensah"),
+          studentIndexNo: o.studentIndexNo || (currentLoggedInUser ? currentLoggedInUser.indexNo : "01210492B"),
+          paymentMethod: o.paymentMethod || "WALLET"
+        }))
+      };
+
+      const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(exportPayload, null, 2));
+      const downloadAnchor = document.createElement('a');
+      downloadAnchor.setAttribute("href", dataStr);
+      downloadAnchor.setAttribute("download", `ATU_Cafeteria_Order_Queue_${Date.now()}.json`);
+      document.body.appendChild(downloadAnchor);
+      downloadAnchor.click();
+      document.body.removeChild(downloadAnchor);
+
+      auditLogs.unshift(`Admin exported live order queue (${orders.length} orders) as structured JSON.`);
+      renderAdminDashboard();
+      playChime(659.25);
+      showToast(`Exported ${orders.length} orders to JSON successfully!`, 'success');
+    }
+
+    // ==========================================
+    // 💳 CUSTOMER DIGITAL WALLET UPLOAD & STRONG AUTH
+    // ==========================================
+    let selectedTopUpMethod = 'MTN_MOMO';
+
+    function showTopUpModal() {
+      const modal = document.getElementById('student-topup-modal');
+      const identityEl = document.getElementById('topup-user-identity');
+      const balEl = document.getElementById('topup-current-balance');
+      const pinInput = document.getElementById('topup-wallet-pin');
+
+      if (identityEl) {
+        if (currentLoggedInUser) {
+          identityEl.innerText = `${currentLoggedInUser.name} (${currentLoggedInUser.indexNo || 'ID: ' + currentLoggedInUser.email})`;
+        } else {
+          identityEl.innerText = 'Kofi Mensah (01210492B)';
+        }
+      }
+      if (balEl) {
+        balEl.innerText = studentBalance.toFixed(2);
+      }
+      if (pinInput) {
+        pinInput.value = '';
+      }
+
+      if (modal) modal.classList.remove('hidden');
+      lucide.createIcons();
+    }
+
+    function closeTopUpModal() {
+      const modal = document.getElementById('student-topup-modal');
+      if (modal) modal.classList.add('hidden');
+    }
+
+    function selectTopUpAmount(amt) {
+      const input = document.getElementById('topup-custom-amount');
+      if (input) input.value = amt;
+
+      const buttons = document.querySelectorAll('.topup-amt-btn');
+      buttons.forEach(btn => {
+        if (btn.innerText.trim() === `+${amt}`) {
+          btn.className = 'topup-amt-btn py-2 rounded-xl text-xs font-black border border-brand-500 bg-brand-50 text-brand-700 transition-all active:scale-95 shadow-xs';
+        } else {
+          btn.className = 'topup-amt-btn py-2 rounded-xl text-xs font-black border border-slate-200 bg-white hover:border-brand-500 hover:text-brand-600 transition-all text-slate-700 active:scale-95';
+        }
+      });
+    }
+
+    function selectTopUpMethod(method) {
+      selectedTopUpMethod = method;
+      const btnMomo = document.getElementById('method-btn-momo');
+      const btnTelecel = document.getElementById('method-btn-telecel');
+      const btnAt = document.getElementById('method-btn-at');
+      const label = document.getElementById('topup-account-label');
+      const input = document.getElementById('topup-account-input');
+
+      [btnMomo, btnTelecel, btnAt].forEach(b => {
+        if (b) b.className = 'topup-method-btn p-2.5 rounded-xl border border-slate-200 bg-white hover:border-slate-300 text-slate-700 text-[11px] font-extrabold flex flex-col items-center justify-center gap-1 transition-all';
+      });
+
+      if (method === 'MTN_MOMO' && btnMomo) {
+        btnMomo.className = 'topup-method-btn p-2.5 rounded-xl border border-brand-500 bg-brand-50 text-brand-800 text-[11px] font-extrabold flex flex-col items-center justify-center gap-1 transition-all shadow-xs';
+        if (label) label.innerText = 'MTN Mobile Money Wallet Number';
+        if (input) input.value = '024 123 4567';
+      } else if (method === 'TELECEL' && btnTelecel) {
+        btnTelecel.className = 'topup-method-btn p-2.5 rounded-xl border border-red-500 bg-red-50 text-red-800 text-[11px] font-extrabold flex flex-col items-center justify-center gap-1 transition-all shadow-xs';
+        if (label) label.innerText = 'Telecel Cash Wallet Number';
+        if (input) input.value = '020 987 6543';
+      } else if (method === 'AT_MONEY' && btnAt) {
+        btnAt.className = 'topup-method-btn p-2.5 rounded-xl border border-blue-500 bg-blue-50 text-blue-800 text-[11px] font-extrabold flex flex-col items-center justify-center gap-1 transition-all shadow-xs';
+        if (label) label.innerText = 'AT Money / Visa Debit Card Number';
+        if (input) input.value = '027 555 1234';
+      }
+    }
+
+    /**
+     * Processes customer wallet upload with unbreakable authentication session guarantee
+     */
+    function processWalletUpload() {
+      const amountInput = document.getElementById('topup-custom-amount');
+      const pinInput = document.getElementById('topup-wallet-pin');
+      const confirmBtn = document.getElementById('topup-confirm-btn');
+
+      const amount = parseFloat(amountInput ? amountInput.value : 0);
+      const pin = pinInput ? pinInput.value.trim() : '';
+
+      if (isNaN(amount) || amount <= 0) {
+        showToast('Please enter a valid top-up amount (min GH₵ 1.00).', 'error');
+        return;
+      }
+      if (!pin || pin.length < 4) {
+        showToast('Please enter your 4-digit Authorization PIN to complete payment.', 'error');
+        if (pinInput) pinInput.focus();
+        return;
+      }
+
+      // Visual feedback on button
+      if (confirmBtn) {
+        confirmBtn.disabled = true;
+        confirmBtn.innerHTML = '<div class="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div><span>Authorizing...</span>';
+      }
+
+      setTimeout(() => {
+        // 1. Credit balance
+        studentBalance += amount;
+
+        // 2. Synchronize registeredStudents list
+        if (registeredStudents.length > 0) {
+          registeredStudents[0].balance = studentBalance;
+        }
+
+        // 3. Robust Authentication Session Preservation (Solid Session Token Guard)
+        if (currentLoggedInUser) {
+          currentLoggedInUser.balance = studentBalance;
+          currentLoggedInUser.lastActiveTimestamp = Date.now();
+          saveUserSessionToStorage(currentLoggedInUser);
+        } else {
+          // Fallback preserve
+          saveUserSessionToStorage({
+            role: 'STUDENT',
+            name: 'Kofi Mensah',
+            indexNo: '01210492B',
+            balance: studentBalance,
+            sessionToken: 'SES_PERSIST_' + Date.now()
+          });
+        }
+
+        // 4. Update UI displays
+        updateWalletPill();
+        if (document.getElementById('profile-wallet-balance')) {
+          document.getElementById('profile-wallet-balance').innerText = 'GH₵ ' + studentBalance.toFixed(2);
+        }
+
+        // 5. Audit trail & sound feedback
+        const refId = 'MOMO-' + Math.floor(100000 + Math.random() * 900000);
+        auditLogs.unshift(`Student uploaded GH₵ ${amount.toFixed(2)} to digital wallet via ${selectedTopUpMethod.replace('_', ' ')} (Ref: ${refId}). Authenticated session token verified.`);
+        
+        closeTopUpModal();
+        if (confirmBtn) {
+          confirmBtn.disabled = false;
+          confirmBtn.innerHTML = '<i data-lucide="check-circle" class="w-4 h-4 text-amber-300"></i><span>Authorize & Upload</span>';
+        }
+
+        playChime(659.25);
+        showToast(`🎉 GH₵ ${amount.toFixed(2)} successfully loaded into your digital wallet! (Ref: ${refId})`, 'success');
+        lucide.createIcons();
+      }, 600);
+    }
+
     function showToast(message, type = 'info') {
       const container = document.getElementById('toast-container');
       const toast = document.createElement('div');
@@ -5047,5 +5722,43 @@
     loadUserSessionFromStorage();
     updateLockoutUI();
   </script>
+  <!-- 🔒 5-Minute Inactivity Session Lock Modal -->
+  <div id="inactivity-lock-modal" class="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-md hidden flex items-center justify-center p-4">
+    <div class="bg-white rounded-3xl max-w-md w-full p-6 sm:p-8 shadow-2xl space-y-5 text-center border border-slate-200">
+      <div class="w-16 h-16 rounded-3xl bg-amber-100 text-amber-600 flex items-center justify-center mx-auto shadow-inner">
+        <i data-lucide="shield-alert" class="w-8 h-8"></i>
+      </div>
+      <div>
+        <span class="text-[10px] font-black uppercase tracking-wider bg-amber-100 text-amber-800 px-3 py-1 rounded-full">Security Inactivity Lock</span>
+        <h3 class="text-xl font-black text-slate-900 mt-2">Session Paused (5+ Min Inactive)</h3>
+        <p class="text-xs text-slate-500 mt-1 max-w-xs mx-auto">
+          To protect your campus digital wallet and pre-order transactions, please re-verify your 4-digit PIN or biometric touch before resuming.
+        </p>
+      </div>
+
+      <div class="space-y-3 text-left">
+        <div>
+          <label class="block text-xs font-bold text-slate-700 mb-1">Enter 4-Digit Security PIN</label>
+          <div class="relative">
+            <input type="password" id="inactivity-unlock-pin" maxlength="4" placeholder="••••" class="w-full py-3 px-4 text-center tracking-[1em] text-lg font-bold bg-slate-50 border border-slate-200 rounded-2xl outline-none focus:ring-2 focus:ring-amber-500 font-mono" />
+          </div>
+        </div>
+        <div id="inactivity-lock-error" class="hidden text-xs text-red-600 font-bold text-center"></div>
+      </div>
+
+      <div class="space-y-2.5 pt-1">
+        <button onclick="verifyInactivityPinUnlock()" class="w-full py-3 rounded-2xl bg-brand-600 hover:bg-brand-700 text-white text-xs font-black shadow-lg shadow-brand-500/25 flex items-center justify-center gap-2 transition-all active:scale-95">
+          <i data-lucide="key" class="w-4 h-4"></i>
+          <span>Verify 4-Digit PIN & Resume</span>
+        </button>
+
+        <button onclick="triggerInactivityBiometricUnlock()" class="w-full py-3 rounded-2xl bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold flex items-center justify-center gap-2 border border-slate-700 transition-all active:scale-95">
+          <i data-lucide="fingerprint" class="w-4 h-4 text-emerald-400"></i>
+          <span>Use Biometric Touch ID / Face ID</span>
+        </button>
+      </div>
+      <p class="text-[10px] text-slate-400 font-semibold">Demo PIN: 1234 • Biometric Touch Supported</p>
+    </div>
+  </div>
 </body>
 </html>

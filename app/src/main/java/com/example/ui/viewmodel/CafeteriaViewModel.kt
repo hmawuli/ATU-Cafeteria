@@ -1874,6 +1874,70 @@ class CafeteriaViewModel @Inject constructor(
         }
     }
 
+    /**
+     * Allows logged-in vendor to update their login credentials (username and password).
+     */
+    fun updateVendorCredentials(
+        newUsername: String,
+        newPassword: String,
+        onResult: (Boolean, String?) -> Unit
+    ) {
+        val user = _currentUser.value ?: run {
+            onResult(false, "User not logged in.")
+            return
+        }
+        if (user.role != "VENDOR") {
+            onResult(false, "Only registered vendors can update vendor credentials.")
+            return
+        }
+        val cleanUsername = newUsername.trim().lowercase()
+        if (cleanUsername.length < 3) {
+            onResult(false, "Username must be at least 3 characters long.")
+            return
+        }
+        if (newPassword.trim().length < 4) {
+            onResult(false, "Password must be at least 4 characters long.")
+            return
+        }
+
+        viewModelScope.launch {
+            _isLoading.value = true
+            try {
+                // Check if username is taken by another user
+                val existing = repository.userDao.getUserByUsername(cleanUsername)
+                if (existing != null && existing.id != user.id) {
+                    _isLoading.value = false
+                    onResult(false, "Username '$cleanUsername' is already taken by another account.")
+                    return@launch
+                }
+
+                val newHash = repository.sha256(newPassword.trim())
+                val updatedUser = user.copy(
+                    username = cleanUsername,
+                    passwordHash = newHash
+                )
+                repository.updateUser(updatedUser)
+                _currentUser.value = updatedUser
+                userSessionRepo.saveSession(
+                    token = userSessionRepo.getAuthToken() ?: ("AUTH_TOKEN_" + updatedUser.id),
+                    userId = updatedUser.id,
+                    userName = updatedUser.fullName,
+                    role = updatedUser.role
+                )
+                repository.insertAuditLog(
+                    user.id,
+                    "VENDOR_CREDENTIALS_UPDATED",
+                    "Vendor '${user.fullName}' updated login credentials (username: $cleanUsername)."
+                )
+                _isLoading.value = false
+                onResult(true, null)
+            } catch (e: Exception) {
+                _isLoading.value = false
+                onResult(false, e.localizedMessage ?: "Failed to update vendor credentials.")
+            }
+        }
+    }
+
     fun updateUserProfile(
         fullName: String,
         studentStaffId: String?,
@@ -1944,6 +2008,7 @@ class CafeteriaViewModel @Inject constructor(
                     if (amount >= 0) "Securely loaded GH₵ ${"%.2f".format(amount)} via Mobile Money Gateway. Ref: $ref" else "Debited GH₵ ${"%.2f".format(-amount)} for meal payment. Ref: $ref"
                 )
                 
+                userSessionRepo.recordUserActivity()
                 val refreshed = repository.userDao.getUserSync(user.id)
                 if (refreshed != null) {
                     _currentUser.value = refreshed

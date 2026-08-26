@@ -48,8 +48,28 @@ class UserSessionRepository(private val context: Context) {
         
         // 24 Hours of Inactivity Policy for OAuth 2.0 / Security Tokens
         const val OAUTH_INACTIVITY_TIMEOUT_MS = 24L * 3600L * 1000L // 24 Hours (86,400,000 ms)
+        const val INACTIVITY_LOCK_TIMEOUT_MS = 5L * 60L * 1000L // 5 Minutes (300,000 ms)
         const val MAX_FAILED_ATTEMPTS = 5
         const val LOCKOUT_DURATION_MS = 60_000L // 60 seconds temporary lockout
+    }
+
+    /**
+     * Check if session has been inactive for more than 5 minutes, requiring PIN or Biometric re-verification.
+     */
+    fun isInactivityLocked(): Boolean {
+        if (!prefs.getBoolean(KEY_IS_LOGGED_IN, false)) return false
+        val lastActivity = prefs.getLong(KEY_LAST_ACTIVITY_TIMESTAMP, prefs.getLong(KEY_LAST_LOGIN_TIMESTAMP, 0L))
+        if (lastActivity <= 0L) return false
+        val elapsed = System.currentTimeMillis() - lastActivity
+        return elapsed >= INACTIVITY_LOCK_TIMEOUT_MS
+    }
+
+    /**
+     * Unlock session after successful PIN / Biometric authentication and record new activity timestamp.
+     */
+    fun unlockInactivitySession() {
+        recordUserActivity()
+        Log.i(TAG, "Inactivity session lock cleared and refreshed.")
     }
 
     fun addAuthStateListener(listener: AuthStateListener) {
