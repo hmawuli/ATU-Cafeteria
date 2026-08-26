@@ -722,10 +722,15 @@
       <div class="bg-white p-5 sm:p-6 rounded-3xl border border-slate-200 shadow-sm space-y-4">
         <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div>
-            <div class="flex items-center gap-2">
+            <div class="flex flex-wrap items-center gap-2.5">
               <span class="w-3 h-3 rounded-full bg-emerald-500 badge-pulse"></span>
               <h2 class="text-xl font-extrabold text-slate-900" id="current-kitchen-name">Akwaaba Kitchen</h2>
               <span class="text-xs font-black bg-emerald-100 text-emerald-800 px-2.5 py-0.5 rounded-full" id="vendor-status-badge">ONLINE • STALL #01</span>
+              <!-- Dynamic Vendor Station Selector Dropdown -->
+              <div class="flex items-center gap-1.5 bg-slate-100 px-2.5 py-1 rounded-xl border border-slate-200">
+                <span class="text-[10px] font-bold text-slate-500 uppercase">Station:</span>
+                <select id="vendor-station-select" onchange="switchActiveVendorStation(this.value)" class="bg-transparent text-xs font-bold text-slate-800 outline-none cursor-pointer"></select>
+              </div>
             </div>
             <p class="text-xs text-slate-500 mt-1">Vendor Kitchen Portal: Manage food dishes, kitchen staff/workers, stall profile, and live counter orders.</p>
           </div>
@@ -855,17 +860,64 @@
       </div>
 
       <!-- VENDOR SUBSECTION 3: Vendor Workers / Staff Management (Done by Vendor) -->
-      <div id="vendor-sec-workers" class="space-y-4 hidden">
-        <div class="bg-white p-5 rounded-3xl border border-slate-200 shadow-sm space-y-4">
-          <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+      <!-- VENDOR SUBSECTION 3: Kitchen Staff & Worker Management (Done by Vendor) -->
+      <div id="vendor-sec-workers" class="space-y-6 hidden">
+        <!-- 📊 Interactive Recharts Worker Performance Bar Chart Card -->
+        <div class="bg-white p-5 sm:p-6 rounded-3xl border border-slate-200 shadow-sm space-y-5">
+          <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-slate-100 pb-4">
+            <div>
+              <div class="flex items-center space-x-2">
+                <div class="p-2 rounded-xl bg-indigo-50 text-indigo-600">
+                  <i data-lucide="bar-chart-3" class="w-5 h-5"></i>
+                </div>
+                <div>
+                  <h3 class="text-base font-extrabold text-slate-900">Staff Performance & Order Velocity Analytics</h3>
+                  <p id="worker-bar-chart-subtitle" class="text-xs text-slate-500 font-medium">Visualizing individual kitchen worker throughput, service speed & satisfaction</p>
+                </div>
+              </div>
+            </div>
+
+            <!-- Metric Switcher Tabs -->
+            <div class="flex items-center p-1 bg-slate-100 rounded-2xl gap-1 overflow-x-auto shrink-0 border border-slate-200/80">
+              <button id="btn-wchart-orders" onclick="switchWorkerChartMetric('ORDERS_PROCESSED')" class="px-3.5 py-1.5 rounded-xl text-xs font-bold bg-white text-slate-900 shadow-xs flex items-center gap-1.5 transition-all">
+                <i data-lucide="package-check" class="w-3.5 h-3.5 text-brand-600"></i>
+                Orders Processed
+              </button>
+              <button id="btn-wchart-speed" onclick="switchWorkerChartMetric('SPEED_OF_SERVICE')" class="px-3.5 py-1.5 rounded-xl text-xs font-bold text-slate-600 hover:text-slate-900 flex items-center gap-1.5 transition-all">
+                <i data-lucide="timer" class="w-3.5 h-3.5 text-sky-600"></i>
+                Speed of Service (Mins)
+              </button>
+              <button id="btn-wchart-rating" onclick="switchWorkerChartMetric('STAFF_RATING')" class="px-3.5 py-1.5 rounded-xl text-xs font-bold text-slate-600 hover:text-slate-900 flex items-center gap-1.5 transition-all">
+                <i data-lucide="star" class="w-3.5 h-3.5 text-amber-500"></i>
+                Satisfaction & Fast-Pass
+              </button>
+            </div>
+          </div>
+
+          <!-- Dynamic Metric Summary Chips -->
+          <div id="worker-metric-chips" class="grid grid-cols-2 sm:grid-cols-4 gap-3">
+            <!-- Populated dynamically via JS -->
+          </div>
+
+          <!-- Recharts Canvas Container -->
+          <div class="bg-slate-50/70 p-4 sm:p-5 rounded-2xl border border-slate-100">
+            <div id="vendor-worker-recharts-root" class="w-full h-64 sm:h-72 flex items-center justify-center text-xs text-slate-400">
+              Loading worker performance telemetry...
+            </div>
+          </div>
+        </div>
+
+        <!-- Kitchen Staff Directory Table Card -->
+        <div class="bg-white p-5 sm:p-6 rounded-3xl border border-slate-200 shadow-sm space-y-4">
+          <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-100 pb-3">
             <div>
               <h3 class="text-base font-bold text-slate-900 flex items-center gap-2">
                 <i data-lucide="users" class="w-4 h-4 text-brand-600"></i>
-                Kitchen Workers & Counter Staff
+                Kitchen Workers & Counter Roster
               </h3>
-              <p class="text-xs text-slate-500">Add, update, or remove your chefs, cashiers, and kitchen assistants.</p>
+              <p class="text-xs text-slate-500">Manage chef stations, counter dispatches, shift schedules, and operational status.</p>
             </div>
-            <button onclick="openVendorWorkerModal()" class="px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold shadow-sm flex items-center gap-1.5 self-start sm:self-auto">
+            <button onclick="openVendorWorkerModal()" class="px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold shadow-sm flex items-center gap-1.5 self-start sm:self-auto transition-transform active:scale-95">
               <i data-lucide="user-plus" class="w-4 h-4"></i> Add Kitchen Worker
             </button>
           </div>
@@ -874,11 +926,13 @@
             <table class="w-full text-left text-xs">
               <thead class="bg-slate-50 text-slate-500 border-b border-slate-200">
                 <tr>
-                  <th class="p-3">Staff Name</th>
+                  <th class="p-3">Staff Member & Auth</th>
                   <th class="p-3">Role / Designation</th>
                   <th class="p-3">Assigned Shift</th>
-                  <th class="p-3">Contact Phone</th>
-                  <th class="p-3">Status</th>
+                  <th class="p-3 text-center">Orders Handled</th>
+                  <th class="p-3 text-center">Avg Speed</th>
+                  <th class="p-3 text-center">Rating</th>
+                  <th class="p-3">Shift Status</th>
                   <th class="p-3 text-right">Actions</th>
                 </tr>
               </thead>
@@ -887,9 +941,41 @@
           </div>
         </div>
       </div>
+            <div       <div id="vendor-sec-profile" class="space-y-5 hidden">
+        <!-- 🛰️ Real-Time Station Heartbeat & Live Admin Sync Banner -->
+        <div class="bg-gradient-to-r from-slate-900 via-indigo-950 to-slate-900 text-white p-5 sm:p-6 rounded-3xl border border-slate-800 shadow-md flex flex-col md:flex-row md:items-center justify-between gap-4">
+          <div class="flex items-start sm:items-center space-x-3.5">
+            <div class="w-12 h-12 rounded-2xl bg-indigo-500/20 border border-indigo-400/30 flex items-center justify-center text-indigo-400 shrink-0 relative">
+              <i data-lucide="radio" class="w-6 h-6 animate-pulse"></i>
+              <span class="absolute -top-1 -right-1 w-3 h-3 bg-emerald-400 rounded-full border-2 border-slate-900"></span>
+            </div>
+            <div>
+              <div class="flex items-center gap-2">
+                <h4 class="text-sm sm:text-base font-black text-white">Central Terminal Telemetry & Station Heartbeat</h4>
+                <span id="vprofile-heartbeat-badge" class="px-2 py-0.5 rounded-full text-[10px] font-black bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
+                  ONLINE • LIVE SYNC
+                </span>
+              </div>
+              <p class="text-xs text-slate-300 mt-0.5">Transmits real-time operational status and updates the Central Admin Hub's "Last Active" indicator.</p>
+              <p id="vprofile-last-sync-time" class="text-[11px] text-indigo-300 font-mono mt-1 flex items-center gap-1.5">
+                <i data-lucide="check-circle" class="w-3 h-3 text-emerald-400"></i> Last Heartbeat Ping: Just now (Connected)
+              </p>
+            </div>
+          </div>
 
-      <!-- VENDOR SUBSECTION 4: Vendor Stall Profile Management (Done by Vendor) -->
-      <div id="vendor-sec-profile" class="space-y-4 hidden">
+          <div class="flex items-center gap-2 self-start md:self-auto shrink-0">
+            <button 
+              type="button" 
+              onclick="syncVendorStationHeartbeat()" 
+              id="btn-sync-station-status" 
+              class="px-5 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 active:scale-95 text-white text-xs font-extrabold shadow-lg shadow-indigo-600/30 flex items-center gap-2 transition-all"
+            >
+              <i data-lucide="activity" class="w-4 h-4 text-emerald-300"></i>
+              <span>Sync Station Status</span>
+            </button>
+          </div>
+        </div>
+
         <div class="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm space-y-5">
           <div class="flex items-center justify-between border-b border-slate-100 pb-3">
             <div>
@@ -899,9 +985,14 @@
               </h3>
               <p class="text-xs text-slate-500">Update your public brand name, location, contacts, and opening hours.</p>
             </div>
-            <span class="text-xs font-bold text-brand-600 bg-brand-50 px-3 py-1 rounded-full">Vendor Self-Service</span>
+            <div class="flex items-center gap-2">
+              <button type="button" onclick="syncVendorStationHeartbeat()" class="px-3 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold flex items-center gap-1.5 transition-all">
+                <i data-lucide="refresh-cw" class="w-3.5 h-3.5 text-indigo-600"></i>
+                <span>Sync Status</span>
+              </button>
+              <span class="text-xs font-bold text-brand-600 bg-brand-50 px-3 py-1 rounded-full">Vendor Self-Service</span>
+            </div>
           </div>
-
           <form id="vendor-profile-form" onsubmit="saveVendorProfile(event)" class="space-y-4 text-xs font-semibold text-slate-700">
             <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
@@ -1174,6 +1265,7 @@
                   <th class="p-3">Location / Stall</th>
                   <th class="p-3">Cuisine Specialty</th>
                   <th class="p-3">Contact</th>
+                  <th class="p-3">Terminal Activity</th>
                   <th class="p-3">Rating</th>
                   <th class="p-3">Status</th>
                   <th class="p-3 text-right">Actions</th>
@@ -1264,14 +1356,135 @@
         </div>
 
         <!-- 4. System Logs Feed -->
-        <div id="admin-sec-logs" class="space-y-3 hidden">
-          <h4 class="text-xs font-bold text-slate-700 uppercase tracking-wider">System Event & Transaction Feed</h4>
-          <div id="admin-audit-logs" class="space-y-2 divide-y divide-slate-100 max-h-80 overflow-y-auto pr-2"></div>
-        </div>
-      </div>
-    </section>
+                <!-- 5. Admin Security & Biometrics Governance -->
+        <div id="admin-sec-security" class="space-y-5 hidden">
+          <div class="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm space-y-6">
+            <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-100 pb-4">
+              <div class="flex items-center gap-3">
+                <div class="w-12 h-12 rounded-2xl bg-amber-100 text-amber-800 flex items-center justify-center shadow-xs">
+                  <i data-lucide="fingerprint" class="w-6 h-6 text-amber-700"></i>
+                </div>
+                <div>
+                  <h3 class="text-base font-extrabold text-slate-900">Vendor Terminal Biometric & PIN Security Governance</h3>
+                  <p class="text-xs text-slate-500">Configure global authentication policy and individual account requirements for kitchen dispatch terminals.</p>
+                </div>
+              </div>
+              <span id="biometrics-policy-chip" class="text-xs font-bold px-3 py-1 rounded-full bg-emerald-100 text-emerald-800 border border-emerald-300">Policy: Enforced Globally</span>
+            </div>
 
-  </main>
+            <!-- Global Switch Card -->
+            <div class="bg-slate-50 p-5 rounded-2xl border border-slate-200 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+              <div class="space-y-1 max-w-xl">
+                <div class="flex items-center gap-2">
+                  <h4 class="text-sm font-extrabold text-slate-900">Require Biometrics for All Kitchen Terminal Sessions</h4>
+                  <span class="text-[10px] font-black uppercase tracking-wider bg-brand-100 text-brand-800 px-2 py-0.5 rounded-full">Global Policy</span>
+                </div>
+                <p class="text-xs text-slate-500">
+                  When enabled, all kitchen staff (chefs, cashiers, dispatchers) across all vendors must verify Touch ID / Face ID biometric authentication alongside PINs to operate station terminals.
+                </p>
+              </div>
+              <div class="flex items-center gap-3 self-end sm:self-center">
+                <span id="global-biometric-status-label" class="text-xs font-extrabold text-emerald-600">ENABLED</span>
+                <label class="relative inline-flex items-center cursor-pointer">
+                  <input type="checkbox" id="global-vendor-biometrics-toggle" checked onchange="handleGlobalVendorBiometricsToggle(this.checked)" class="sr-only peer" />
+                  <div class="w-12 h-6 bg-slate-300 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-emerald-600"></div>
+                </label>
+              </div>
+            </div>
+
+            <!-- Worker Security Account Matrix -->
+            <div class="space-y-3">
+              <div class="flex items-center justify-between">
+                <h4 class="text-xs font-extrabold text-slate-700 uppercase tracking-wider">Kitchen Worker Security & Biometric Permissions Matrix</h4>
+                <span id="biometric-staff-count" class="text-xs text-slate-500 font-semibold">5 Staff Enrolled</span>
+              </div>
+              <div class="overflow-x-auto rounded-2xl border border-slate-200">
+                <table class="w-full text-left text-xs">
+                  <thead class="bg-slate-50 text-slate-500 border-b border-slate-200 font-bold">
+                    <tr>
+                      <th class="p-3">Staff Member</th>
+                      <th class="p-3">Kitchen Station</th>
+                      <th class="p-3">Role</th>
+                      <th class="p-3">Shift</th>
+                      <th class="p-3">Biometrics Requirement</th>
+                      <th class="p-3 text-right">Individual Policy Action</th>
+                    </tr>
+                  </thead>
+                  <tbody id="admin-security-workers-table" class="divide-y divide-slate-100 text-slate-700 font-medium"></tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- 4. System Logs Feed with Live Search & Filter Engine -->
+        <div id="admin-sec-logs" class="space-y-4 hidden">
+          <div class="bg-white p-5 rounded-3xl border border-slate-200 shadow-sm space-y-4">
+            <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-100 pb-4">
+              <div>
+                <div class="flex items-center gap-2">
+                  <div class="p-2 rounded-xl bg-brand-50 text-brand-600">
+                    <i data-lucide="shield-alert" class="w-5 h-5"></i>
+                  </div>
+                  <div>
+                    <h4 class="text-base font-extrabold text-slate-900 flex items-center gap-2">
+                      System Event & Audit Trail Feed
+                      <span id="admin-audit-count-badge" class="text-[10px] font-black bg-brand-100 text-brand-800 px-2.5 py-0.5 rounded-full">Live Logs</span>
+                    </h4>
+                    <p class="text-xs text-slate-500 mt-0.5">Immutable audit trail of vendor actions, station syncs, logins, menu updates, and financial movements.</p>
+                  </div>
+                </div>
+              </div>
+              <button onclick="exportAdminAuditLogsPdf()" class="px-4 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold flex items-center gap-2 transition-all shadow-sm active:scale-95 self-start sm:self-auto">
+                <i data-lucide="file-down" class="w-4 h-4 text-amber-400"></i>
+                <span>Download Audit Log (PDF)</span>
+              </button>
+            </div>
+
+            <!-- 🔍 Search Bar & Event Filter Controls -->
+            <div class="flex flex-col md:flex-row gap-3 items-stretch md:items-center justify-between bg-slate-50 p-3 rounded-2xl border border-slate-200/80">
+              <!-- Search Input -->
+              <div class="relative flex-1 min-w-0">
+                <i data-lucide="search" class="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400"></i>
+                <input 
+                  type="text" 
+                  id="admin-log-search-input" 
+                  oninput="handleAdminAuditSearch(this.value)" 
+                  placeholder="Search logs by keyword, vendor name (e.g. Akwaaba Kitchen), user, or action..." 
+                  class="w-full pl-9 pr-8 py-2 bg-white border border-slate-200 rounded-xl text-xs font-semibold text-slate-800 placeholder-slate-400 outline-none focus:ring-2 focus:ring-brand-500 shadow-xs"
+                />
+                <button 
+                  id="admin-log-search-clear-btn" 
+                  onclick="clearAdminAuditSearch()" 
+                  class="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 hidden"
+                  title="Clear search"
+                >
+                  <i data-lucide="x" class="w-3.5 h-3.5"></i>
+                </button>
+              </div>
+
+              <!-- Quick Filter Chips -->
+              <div class="flex items-center gap-1.5 overflow-x-auto pb-1 md:pb-0 shrink-0">
+                <button onclick="setAdminAuditCategory('ALL')" id="audit-filter-all" class="px-3 py-1.5 rounded-xl text-[11px] font-bold bg-brand-600 text-white shadow-xs transition-all">All</button>
+                <button onclick="setAdminAuditCategory('VENDOR')" id="audit-filter-vendor" class="px-3 py-1.5 rounded-xl text-[11px] font-bold bg-white text-slate-600 hover:bg-slate-100 border border-slate-200 transition-all">Vendors</button>
+                <button onclick="setAdminAuditCategory('HEARTBEAT')" id="audit-filter-heartbeat" class="px-3 py-1.5 rounded-xl text-[11px] font-bold bg-white text-slate-600 hover:bg-slate-100 border border-slate-200 transition-all">Heartbeats</button>
+                <button onclick="setAdminAuditCategory('MENU')" id="audit-filter-menu" class="px-3 py-1.5 rounded-xl text-[11px] font-bold bg-white text-slate-600 hover:bg-slate-100 border border-slate-200 transition-all">Menu</button>
+                <button onclick="setAdminAuditCategory('SECURITY')" id="audit-filter-security" class="px-3 py-1.5 rounded-xl text-[11px] font-bold bg-white text-slate-600 hover:bg-slate-100 border border-slate-200 transition-all">Security</button>
+                <button onclick="setAdminAuditCategory('ORDERS')" id="audit-filter-orders" class="px-3 py-1.5 rounded-xl text-[11px] font-bold bg-white text-slate-600 hover:bg-slate-100 border border-slate-200 transition-all">Orders</button>
+              </div>
+            </div>
+
+            <!-- Search Stats & Filter Indicator -->
+            <div class="flex items-center justify-between text-[11px] text-slate-500 font-semibold px-1">
+              <span id="admin-log-results-count">Showing all audit trail events</span>
+              <span class="text-slate-400 font-normal">Real-time cryptographic SHA-256 audit feed</span>
+            </div>
+
+            <!-- Audit Logs List -->
+            <div id="admin-audit-logs" class="space-y-2 divide-y divide-slate-100 max-h-96 overflow-y-auto pr-2 bg-white rounded-2xl border border-slate-100 p-2"></div>
+          </div>
+        </div>
+ </main>
 
   <!-- Sticky Bottom Cart Bar (Student Mode with Dietary Notes) -->
   <div id="sticky-cart-bar" class="sticky bottom-0 z-30 bg-white/95 backdrop-blur-md border-t border-slate-200 p-4 shadow-lg hidden">
@@ -4163,13 +4376,35 @@
 
     let activeVendorId = 201;
 
+    let globalVendorBiometricsRequired = true;
+    try {
+      const savedBio = localStorage.getItem('ATU_GLOBAL_BIOMETRICS_REQ');
+      if (savedBio !== null) globalVendorBiometricsRequired = (savedBio === 'true');
+    } catch(e) {}
+
     let vendorWorkers = [
-      { id: 1, vendorId: 201, vendorName: 'Akwaaba Kitchen', name: 'Kwame Mensah', role: 'Head Chef', shift: 'Morning (06:00 - 14:00)', phone: '+233 24 411 2233', status: 'ACTIVE' },
-      { id: 2, vendorId: 201, vendorName: 'Akwaaba Kitchen', name: 'Abena Darko', role: 'Cashier & Counter Dispatch', shift: 'Full Day (07:00 - 17:00)', phone: '+233 20 555 6677', status: 'ACTIVE' },
-      { id: 3, vendorId: 201, vendorName: 'Akwaaba Kitchen', name: 'Emmanuel Tetteh', role: 'Kitchen Assistant', shift: 'Afternoon (12:00 - 20:00)', phone: '+233 55 888 9900', status: 'ACTIVE' },
-      { id: 4, vendorId: 202, vendorName: 'Campus Chillers & Bakes', name: 'Grace Addo', role: 'Pastry Baker', shift: 'Morning (05:30 - 13:30)', phone: '+233 24 990 1122', status: 'ACTIVE' },
-      { id: 5, vendorId: 203, vendorName: 'Tasty Bites Grill', name: 'Kweku Appiah', role: 'Grill Specialist', shift: 'Afternoon (11:00 - 19:30)', phone: '+233 50 123 7890', status: 'ACTIVE' }
+      { id: 1, vendorId: 201, vendorName: 'Akwaaba Kitchen', name: 'Kwame Mensah', role: 'Head Chef', shift: 'Morning (06:00 - 14:00)', phone: '+233 24 411 2233', status: 'ACTIVE', biometricsRequired: true, ordersProcessed: 54, targetQuota: 60, avgPrepMinutes: 4.8, satisfactionRating: 4.9, fastPassRate: 98 },
+      { id: 2, vendorId: 201, vendorName: 'Akwaaba Kitchen', name: 'Abena Darko', role: 'Cashier & Counter Dispatch', shift: 'Full Day (07:00 - 17:00)', phone: '+233 20 555 6677', status: 'ACTIVE', biometricsRequired: true, ordersProcessed: 68, targetQuota: 70, avgPrepMinutes: 2.3, satisfactionRating: 4.8, fastPassRate: 99 },
+      { id: 3, vendorId: 201, vendorName: 'Akwaaba Kitchen', name: 'Emmanuel Tetteh', role: 'Kitchen Assistant', shift: 'Afternoon (12:00 - 20:00)', phone: '+233 55 888 9900', status: 'ACTIVE', biometricsRequired: true, ordersProcessed: 39, targetQuota: 45, avgPrepMinutes: 6.1, satisfactionRating: 4.7, fastPassRate: 94 },
+      { id: 4, vendorId: 202, vendorName: 'Campus Chillers & Bakes', name: 'Grace Addo', role: 'Pastry Baker', shift: 'Morning (05:30 - 13:30)', phone: '+233 24 990 1122', status: 'ACTIVE', biometricsRequired: true, ordersProcessed: 48, targetQuota: 50, avgPrepMinutes: 3.9, satisfactionRating: 4.9, fastPassRate: 97 },
+      { id: 5, vendorId: 203, vendorName: 'Tasty Bites Grill', name: 'Kweku Appiah', role: 'Grill Specialist', shift: 'Afternoon (11:00 - 19:30)', phone: '+233 50 123 7890', status: 'ACTIVE', biometricsRequired: true, ordersProcessed: 44, targetQuota: 50, avgPrepMinutes: 5.4, satisfactionRating: 4.8, fastPassRate: 95 }
     ];
+
+    try {
+      const savedWorkersRaw = localStorage.getItem('ATU_SAVED_VENDOR_WORKERS_V1');
+      if (savedWorkersRaw) {
+        const parsed = JSON.parse(savedWorkersRaw);
+        if (Array.isArray(parsed) && parsed.length > 0) vendorWorkers = parsed;
+      }
+    } catch(e) {}
+
+    try {
+      const savedMenuItemsRaw = localStorage.getItem('ATU_SAVED_MENU_ITEMS_V1');
+      if (savedMenuItemsRaw) {
+        const parsed = JSON.parse(savedMenuItemsRaw);
+        if (Array.isArray(parsed) && parsed.length > 0) menuItems = parsed;
+      }
+    } catch(e) {}
 
     // =========================================================================
     // VENDOR PORTAL SUB-NAVIGATION & SELF-SERVICE MANAGEMENT
@@ -4196,9 +4431,36 @@
       lucide.createIcons();
     }
 
+    
+    function switchActiveVendorStation(vendorId) {
+      const vId = parseInt(vendorId);
+      const targetVendor = vendors.find(v => v.id === vId);
+      if (!targetVendor) return;
+      activeVendorId = targetVendor.id;
+      targetVendor.lastActiveTimestamp = Date.now();
+
+      if (currentLoggedInUser && currentLoggedInUser.role === 'VENDOR') {
+        currentLoggedInUser.vendorId = targetVendor.id;
+        currentLoggedInUser.name = targetVendor.name;
+        currentLoggedInUser.vendorUsername = targetVendor.username || targetVendor.name.toLowerCase().replace(/[^a-z0-9]/g, '_');
+        currentLoggedInUser.location = targetVendor.location;
+        saveUserSessionToStorage(currentLoggedInUser);
+      }
+
+      renderVendorDashboard();
+      renderVendorMenu();
+      renderVendorWorkers();
+      loadVendorProfileForm();
+      if (typeof renderOrders === 'function') renderOrders();
+      showToast(`Switched terminal view to ${targetVendor.name}`, 'info');
+    }
+
     function renderVendorDashboard() {
       const activeVendor = vendors.find(v => v.id === activeVendorId) || vendors[0];
       if (!activeVendor) return;
+
+      // Update terminal active timestamp on render
+      activeVendor.lastActiveTimestamp = Date.now();
 
       const titleEl = document.getElementById('current-kitchen-name');
       const badgeEl = document.getElementById('vendor-status-badge');
@@ -4209,14 +4471,24 @@
 
       if (titleEl) titleEl.innerText = `${activeVendor.name}`;
       if (badgeEl) badgeEl.innerText = `${activeVendor.isOpen ? 'ONLINE' : 'CLOSED'} • ${activeVendor.location.toUpperCase()}`;
-      
+
+      // Populate dynamic station selector dropdown
+      const stationSelect = document.getElementById('vendor-station-select');
+      if (stationSelect) {
+        stationSelect.innerHTML = vendors.map(v => `
+          <option value="${v.id}" ${v.id === activeVendor.id ? 'selected' : ''}>
+            ${v.name} (${v.location})
+          </option>
+        `).join('');
+      }
+
       const vendorDishes = menuItems.filter(m => m.vendorId === activeVendor.id);
       const myWorkers = vendorWorkers.filter(w => w.vendorId === activeVendor.id);
       const lowStockDishes = vendorDishes.filter(m => (m.stockRemaining || 0) <= (m.lowStockThreshold || 5));
 
       if (dishMetric) dishMetric.innerText = `${vendorDishes.length} Items`;
       if (workerMetric) workerMetric.innerText = `${myWorkers.length} Staff`;
-      if (ratingMetric) ratingMetric.innerText = `${activeVendor.rating.toFixed(1)} ★`;
+      if (ratingMetric) ratingMetric.innerText = `${(activeVendor.rating || 4.8).toFixed(1)} ★`;
       if (lowStockMetric) lowStockMetric.innerText = `${lowStockDishes.length} Alert${lowStockDishes.length === 1 ? '' : 's'}`;
 
       // Render Low Stock Banner
@@ -4237,11 +4509,9 @@
                   </p>
                 </div>
               </div>
-              <div class="flex items-center gap-1 shrink-0">
-                <button onclick="restockDish(${dish.id}, 15)" class="px-2.5 py-1.5 bg-white hover:bg-slate-100 text-red-700 text-[11px] font-black rounded-xl shadow-xs transition-transform active:scale-95">
-                  +15 Restock
-                </button>
-              </div>
+              <button onclick="restockDishQuick(${dish.id})" class="px-2.5 py-1 bg-amber-400 hover:bg-amber-300 text-slate-900 rounded-lg text-[10px] font-black shrink-0 transition-transform active:scale-95 shadow-xs">
+                +20 Portions
+              </button>
             </div>
           `).join('');
         } else {
@@ -4249,141 +4519,16 @@
         }
       }
 
-      renderVendorOrders();
+      // Also render menu and workers table for active vendor
       renderVendorMenu();
       renderVendorWorkers();
-    }
-
-    // --- LOW STOCK ALERT ENGINE & RESTOCK ACTIONS ---
-    function playLowStockTone() {
-      if (!audioChimeEnabled) return;
-      try {
-        const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-        const now = audioCtx.currentTime;
-        [520, 680, 520, 680].forEach((freq, i) => {
-          const osc = audioCtx.createOscillator();
-          const gain = audioCtx.createGain();
-          osc.type = 'triangle';
-          osc.frequency.setValueAtTime(freq, now + i * 0.12);
-          gain.gain.setValueAtTime(0.18, now + i * 0.12);
-          gain.gain.exponentialRampToValueAtTime(0.001, now + (i + 1) * 0.12);
-          osc.connect(gain);
-          gain.connect(audioCtx.destination);
-          osc.start(now + i * 0.12);
-          osc.stop(now + (i + 1) * 0.12);
-        });
-      } catch (e) {
-        console.warn('Low stock tone error:', e);
-      }
-    }
-
-    function enableVendorDesktopAlerts() {
-      if (!('Notification' in window)) {
-        showToast('Browser notifications are not supported on this browser/device.', 'warning');
-        return;
-      }
-      Notification.requestPermission().then(perm => {
-        const btnText = document.getElementById('vendor-notify-text');
-        if (perm === 'granted') {
-          if (btnText) btnText.innerText = 'Push Alerts Active 🔔';
-          playLowStockTone();
-          new Notification('🔔 ATU Kitchen Alerts Enabled', {
-            body: 'You will receive real-time notifications when dishes are running low due to high sales volume.',
-            icon: 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=128&q=80'
-          });
-          showToast('Desktop & Mobile push notifications enabled!', 'success');
-        } else {
-          showToast('Notification permission was dismissed or denied.', 'warning');
-        }
-      });
-    }
-
-    function triggerLowStockAlert(item) {
-      playLowStockTone();
-      auditLogs.unshift(`⚠️ [LOW STOCK ALERT] ${item.vendorName}: "${item.name}" is down to ${item.stockRemaining} portions remaining (High Sales Volume: ${item.totalSold} sold today).`);
-      
-      if ('Notification' in window && Notification.permission === 'granted') {
-        new Notification(`⚠️ Low Stock Alert: ${item.name}`, {
-          body: `Only ${item.stockRemaining} portion(s) left at ${item.vendorName}! High demand detected.`,
-          icon: item.image,
-          tag: `low-stock-${item.id}`
-        });
-      }
-
-      showToast(`⚠️ Low Stock: "${item.name}" has only ${item.stockRemaining} portions left!`, 'warning');
-      renderVendorDashboard();
-      renderAdminDashboard();
-    }
-
-    function restockDish(dishId, portionsToAdd) {
-      const item = menuItems.find(m => m.id === dishId);
-      if (!item) return;
-
-      item.stockRemaining = (item.stockRemaining || 0) + (portionsToAdd || 15);
-      item.inStock = true;
-      playChime(659.25);
-      auditLogs.unshift(`Vendor (${item.vendorName}) restocked +${portionsToAdd || 15} portions of "${item.name}" (Total: ${item.stockRemaining} available).`);
-      showToast(`Restocked +${portionsToAdd || 15} portions of "${item.name}"!`, 'success');
-      renderMenu();
-      renderVendorDashboard();
-      renderAdminDashboard();
-    }
-
-    // --- VENDOR DISH MANAGEMENT (Done by Vendor) ---
-    function renderVendorMenu() {
-      const tableBody = document.getElementById('vendor-menu-table-body');
-      if (!tableBody) return;
-
-      const activeVendor = vendors.find(v => v.id === activeVendorId) || vendors[0];
-      const vendorDishes = menuItems.filter(m => m.vendorId === activeVendor.id);
-
-      if (vendorDishes.length === 0) {
-        tableBody.innerHTML = `
-          <tr>
-            <td colspan="6" class="p-6 text-center text-slate-400">No dishes on your kitchen menu yet. Tap "Add New Dish" above.</td>
-          </tr>
-        `;
-        return;
-      }
-
-      tableBody.innerHTML = vendorDishes.map(item => {
-        const isLow = (item.stockRemaining || 0) <= (item.lowStockThreshold || 5);
-        return `
-        <tr class="hover:bg-slate-50/80 ${isLow ? 'bg-amber-50/40' : ''}">
-          <td class="p-3">
-            <div class="flex items-center space-x-3">
-              <img src="${item.image}" alt="${item.name}" class="w-10 h-10 rounded-xl object-cover border border-slate-200" />
-              <div>
-                <p class="font-bold text-slate-900">${item.name}</p>
-                <p class="text-[10px] text-slate-400 line-clamp-1">${item.description}</p>
-              </div>
-            </div>
-          </td>
-          <td class="p-3 font-semibold text-slate-600">${item.category}</td>
-          <td class="p-3 font-bold text-brand-600">GH₵ ${item.price.toFixed(2)}</td>
-          <td class="p-3 text-slate-500">${item.calories} kcal</td>
-          <td class="p-3">
-            <div class="flex flex-col gap-1 items-start">
-              <button onclick="toggleVendorDishStock(${item.id})" class="px-2.5 py-1 rounded-full font-bold text-[10px] transition-colors ${item.inStock ? 'bg-emerald-100 text-emerald-800 hover:bg-emerald-200' : 'bg-red-100 text-red-800 hover:bg-red-200'}">
-                ${item.inStock ? 'In Stock' : 'Sold Out'}
-              </button>
-              <span class="text-[10px] font-bold ${isLow ? 'text-red-600 bg-red-50 border border-red-200 px-1.5 py-0.5 rounded' : 'text-slate-500'}">
-                ${item.stockRemaining !== undefined ? `${item.stockRemaining} left (${item.totalSold || 0} sold)` : 'Stock OK'}
-              </span>
-            </div>
-          </td>
-          <td class="p-3 text-right space-x-1 whitespace-nowrap">
-            <button onclick="restockDish(${item.id}, 15)" class="px-2 py-1 rounded-lg bg-emerald-50 hover:bg-emerald-100 text-emerald-700 text-[11px] font-bold" title="Quick Restock +15">+15 Stock</button>
-            <button onclick="editVendorDish(${item.id})" class="px-2 py-1 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 text-[11px] font-bold">Edit</button>
-            <button onclick="deleteVendorDish(${item.id})" class="px-2 py-1 rounded-lg bg-red-50 hover:bg-red-100 text-red-600 text-[11px] font-bold">Delete</button>
-          </td>
-        </tr>
-      `}).join('');
-
       lucide.createIcons();
     }
 
     function openVendorDishModal() {
+      const modal = document.getElementById('vendor-dish-modal');
+      if (!modal) return;
+
       document.getElementById('editing-dish-id').value = '';
       document.getElementById('dish-modal-title').innerText = 'Add New Food Dish';
       document.getElementById('dish-modal-btn-text').innerText = 'Publish Item';
@@ -4397,13 +4542,19 @@
       document.getElementById('vdish-threshold').value = '5';
       document.getElementById('vdish-sold-count').value = '0';
 
-      document.getElementById('vendor-dish-modal').classList.remove('hidden');
+      modal.classList.remove('hidden');
+      modal.classList.add('flex');
+      const nameInput = document.getElementById('vdish-name');
+      if (nameInput) setTimeout(() => nameInput.focus(), 60);
       lucide.createIcons();
     }
 
     function editVendorDish(dishId) {
       const item = menuItems.find(m => m.id === dishId);
       if (!item) return;
+
+      const modal = document.getElementById('vendor-dish-modal');
+      if (!modal) return;
 
       document.getElementById('editing-dish-id').value = item.id;
       document.getElementById('dish-modal-title').innerText = 'Edit Food Dish';
@@ -4412,27 +4563,34 @@
       document.getElementById('vdish-price').value = item.price;
       document.getElementById('vdish-calories').value = item.calories;
       document.getElementById('vdish-category').value = item.category;
-      document.getElementById('vdish-desc').value = item.description;
+      document.getElementById('vdish-desc').value = item.description || '';
       document.getElementById('vdish-image').value = item.image;
       document.getElementById('vdish-instock').value = item.inStock ? 'true' : 'false';
       document.getElementById('vdish-stock-count').value = item.stockRemaining !== undefined ? item.stockRemaining : 20;
       document.getElementById('vdish-threshold').value = item.lowStockThreshold || 5;
       document.getElementById('vdish-sold-count').value = item.totalSold || 0;
 
-      document.getElementById('vendor-dish-modal').classList.remove('hidden');
+      modal.classList.remove('hidden');
+      modal.classList.add('flex');
       lucide.createIcons();
     }
 
     function closeVendorDishModal() {
-      document.getElementById('vendor-dish-modal').classList.add('hidden');
+      const modal = document.getElementById('vendor-dish-modal');
+      if (modal) {
+        modal.classList.add('hidden');
+        modal.classList.remove('flex');
+      }
     }
 
     function saveVendorDish() {
       const editingId = document.getElementById('editing-dish-id').value;
-      const name = document.getElementById('vdish-name').value.trim();
-      const price = parseFloat(document.getElementById('vdish-price').value);
+      const nameInput = document.getElementById('vdish-name');
+      const priceInput = document.getElementById('vdish-price');
+      const name = nameInput ? nameInput.value.trim() : '';
+      const price = priceInput ? parseFloat(priceInput.value) : NaN;
       const calories = parseInt(document.getElementById('vdish-calories').value) || 450;
-      const category = document.getElementById('vdish-category').value;
+      const category = document.getElementById('vdish-category').value || 'Main Dish';
       const desc = document.getElementById('vdish-desc').value.trim();
       const image = document.getElementById('vdish-image').value.trim() || 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=400&q=80';
       const inStock = document.getElementById('vdish-instock').value === 'true';
@@ -4443,7 +4601,9 @@
       const activeVendor = vendors.find(v => v.id === activeVendorId) || vendors[0];
 
       if (!name || isNaN(price) || price <= 0) {
-        showToast('Please enter a valid dish name and price.', 'error');
+        showToast('Please enter a valid dish name and price (GH₵).', 'error');
+        if (nameInput && !name) nameInput.focus();
+        else if (priceInput) priceInput.focus();
         return;
       }
 
@@ -4460,6 +4620,8 @@
           item.stockRemaining = stockRemaining;
           item.lowStockThreshold = lowStockThreshold;
           item.totalSold = totalSold;
+          item.vendorName = activeVendor.name;
+          item.vendorId = activeVendor.id;
           auditLogs.unshift(`Vendor (${activeVendor.name}) updated menu item "${name}" (GH₵ ${price.toFixed(2)}, Stock: ${stockRemaining}).`);
           showToast(`Dish "${name}" updated successfully!`, 'success');
         }
@@ -4472,7 +4634,7 @@
           price,
           category,
           image,
-          description: desc || 'Freshly prepared meal.',
+          description: desc || 'Freshly prepared meal from ' + activeVendor.name,
           calories,
           badge: 'Chef Special',
           inStock,
@@ -4482,13 +4644,25 @@
         };
         menuItems.unshift(newItem);
         auditLogs.unshift(`Vendor (${activeVendor.name}) published new dish "${name}" (Stock: ${stockRemaining}).`);
-        showToast(`New dish "${name}" added to menu!`, 'success');
+        showToast(`New dish "${name}" added to kitchen menu!`, 'success');
+      }
+
+      // Update terminal active timestamp
+      activeVendor.lastActiveTimestamp = Date.now();
+
+      // Persist menuItems to localStorage
+      try {
+        localStorage.setItem('ATU_SAVED_MENU_ITEMS_V1', JSON.stringify(menuItems));
+      } catch(e) {
+        console.warn('Failed to persist menu items:', e);
       }
 
       renderMenu();
       renderVendorDashboard();
-      renderAdminDashboard();
+      renderVendorMenu();
+      if (typeof renderAdminDashboard === 'function') renderAdminDashboard();
       closeVendorDishModal();
+      playChime(659.25);
     }
 
     function toggleVendorDishStock(dishId) {
@@ -4496,75 +4670,406 @@
       const activeVendor = vendors.find(v => v.id === activeVendorId) || vendors[0];
       if (item) {
         item.inStock = !item.inStock;
+        activeVendor.lastActiveTimestamp = Date.now();
         auditLogs.unshift(`Vendor (${activeVendor.name}) marked "${item.name}" as ${item.inStock ? 'IN STOCK' : 'SOLD OUT'}.`);
-        renderMenu();
+        try {
+          localStorage.setItem('ATU_SAVED_MENU_ITEMS_V1', JSON.stringify(menuItems));
+        } catch(e) {}
         renderVendorMenu();
-        renderAdminDashboard();
-        showToast(`${item.name} is now ${item.inStock ? 'In Stock' : 'Sold Out'}`, 'info');
+        renderMenu();
+        renderVendorDashboard();
+        if (typeof renderAdminDashboard === 'function') renderAdminDashboard();
+        showToast(`"${item.name}" is now ${item.inStock ? 'In Stock' : 'Sold Out'}.`, 'info');
       }
     }
 
     function deleteVendorDish(dishId) {
       const item = menuItems.find(m => m.id === dishId);
       const activeVendor = vendors.find(v => v.id === activeVendorId) || vendors[0];
-      if (item) {
+      if (!item) return;
+      if (confirm(`Remove "${item.name}" permanently from ${activeVendor.name} menu?`)) {
         menuItems = menuItems.filter(m => m.id !== dishId);
         delete cart[dishId];
+        activeVendor.lastActiveTimestamp = Date.now();
         auditLogs.unshift(`Vendor (${activeVendor.name}) deleted menu dish "${item.name}".`);
+        try {
+          localStorage.setItem('ATU_SAVED_MENU_ITEMS_V1', JSON.stringify(menuItems));
+        } catch(e) {}
+        renderVendorMenu();
         renderMenu();
         updateCartBar();
         renderVendorDashboard();
-        renderAdminDashboard();
+        if (typeof renderAdminDashboard === 'function') renderAdminDashboard();
         showToast(`Dish "${item.name}" removed from menu.`, 'info');
       }
+    }
+
+        let currentWorkerChartMetric = 'ORDERS_PROCESSED';
+
+    function switchWorkerChartMetric(metric) {
+      currentWorkerChartMetric = metric;
+      const btnOrders = document.getElementById('btn-wchart-orders');
+      const btnSpeed = document.getElementById('btn-wchart-speed');
+      const btnRating = document.getElementById('btn-wchart-rating');
+
+      [btnOrders, btnSpeed, btnRating].forEach(btn => {
+        if (btn) {
+          btn.className = 'px-3.5 py-1.5 rounded-xl text-xs font-bold text-slate-600 hover:text-slate-900 flex items-center gap-1.5 transition-all';
+        }
+      });
+
+      if (metric === 'ORDERS_PROCESSED' && btnOrders) {
+        btnOrders.className = 'px-3.5 py-1.5 rounded-xl text-xs font-bold bg-white text-slate-900 shadow-xs flex items-center gap-1.5 transition-all';
+      } else if (metric === 'SPEED_OF_SERVICE' && btnSpeed) {
+        btnSpeed.className = 'px-3.5 py-1.5 rounded-xl text-xs font-bold bg-white text-slate-900 shadow-xs flex items-center gap-1.5 transition-all';
+      } else if (metric === 'STAFF_RATING' && btnRating) {
+        btnRating.className = 'px-3.5 py-1.5 rounded-xl text-xs font-bold bg-white text-slate-900 shadow-xs flex items-center gap-1.5 transition-all';
+      }
+
+      renderVendorWorkerPerformanceChart(metric);
+      lucide.createIcons();
+    }
+
+    function renderVendorWorkerPerformanceChart(metric = currentWorkerChartMetric) {
+      const container = document.getElementById('vendor-worker-recharts-root');
+      const chipsEl = document.getElementById('worker-metric-chips');
+      const subtitleEl = document.getElementById('worker-bar-chart-subtitle');
+      if (!container) return;
+
+      const activeVendor = vendors.find(v => v.id === activeVendorId) || vendors[0];
+      const myWorkers = vendorWorkers.filter(w => w.vendorId === activeVendor.id);
+
+      if (myWorkers.length === 0) {
+        container.innerHTML = `
+          <div class="text-center p-8 space-y-2">
+            <i data-lucide="users" class="w-8 h-8 mx-auto text-slate-300"></i>
+            <p class="text-xs text-slate-500 font-bold">No kitchen staff assigned to ${activeVendor.name}.</p>
+            <p class="text-[11px] text-slate-400">Add team members below to unlock real-time performance analytics.</p>
+          </div>
+        `;
+        if (chipsEl) chipsEl.innerHTML = '';
+        lucide.createIcons();
+        return;
+      }
+
+      // Ensure every worker has metric values
+      myWorkers.forEach((w, idx) => {
+        if (w.ordersProcessed === undefined) w.ordersProcessed = 35 + (w.id % 5) * 8 + (idx * 6);
+        if (w.targetQuota === undefined) w.targetQuota = Math.max(w.ordersProcessed + 8, 50);
+        if (w.avgPrepMinutes === undefined) w.avgPrepMinutes = parseFloat((3.5 + (w.id % 4) * 0.9).toFixed(1));
+        if (w.satisfactionRating === undefined) w.satisfactionRating = parseFloat((4.6 + (w.id % 4) * 0.1).toFixed(1));
+        if (w.fastPassRate === undefined) w.fastPassRate = 92 + (w.id % 7);
+      });
+
+      // Prepare Recharts dataset
+      let chartData = [];
+      let xKey = 'name';
+      let bar1Key = '';
+      let bar1Name = '';
+      let bar1Color = '#2563eb'; // Blue
+      let bar2Key = '';
+      let bar2Name = '';
+      let bar2Color = '#ea580c'; // Brand orange
+
+      const totalOrders = myWorkers.reduce((sum, w) => sum + (w.ordersProcessed || 0), 0);
+      const avgSpeed = (myWorkers.reduce((sum, w) => sum + (w.avgPrepMinutes || 4.5), 0) / myWorkers.length).toFixed(1);
+      const topPerformer = [...myWorkers].sort((a, b) => (b.ordersProcessed || 0) - (a.ordersProcessed || 0))[0];
+      const avgRating = (myWorkers.reduce((sum, w) => sum + (w.satisfactionRating || 4.8), 0) / myWorkers.length).toFixed(1);
+
+      if (metric === 'ORDERS_PROCESSED') {
+        if (subtitleEl) subtitleEl.innerText = `Shift Orders Processed vs Target Quota (${activeVendor.name})`;
+        bar1Key = 'orders';
+        bar1Name = 'Orders Processed';
+        bar1Color = '#2563eb'; // Royal blue
+        bar2Key = 'target';
+        bar2Name = 'Target Shift Quota';
+        bar2Color = '#94a3b8'; // Slate-400
+
+        chartData = myWorkers.map(w => ({
+          name: w.name.split(' ')[0],
+          fullName: w.name,
+          role: w.role,
+          orders: w.ordersProcessed || 0,
+          target: w.targetQuota || 50
+        }));
+
+        if (chipsEl) {
+          chipsEl.innerHTML = `
+            <div class="bg-blue-50/70 border border-blue-200/80 rounded-2xl p-3">
+              <p class="text-[10px] uppercase font-bold text-blue-700">Top Producer</p>
+              <p class="text-base font-extrabold text-blue-950 mt-0.5">${topPerformer ? topPerformer.name : 'N/A'}</p>
+              <p class="text-[10px] text-blue-600 font-semibold mt-0.5">${topPerformer ? topPerformer.ordersProcessed : 0} Orders Cleared</p>
+            </div>
+            <div class="bg-emerald-50/70 border border-emerald-200/80 rounded-2xl p-3">
+              <p class="text-[10px] uppercase font-bold text-emerald-700">Total Shift Output</p>
+              <p class="text-base font-extrabold text-emerald-950 mt-0.5">${totalOrders} Meals</p>
+              <p class="text-[10px] text-emerald-600 font-semibold mt-0.5">Across ${myWorkers.length} staff members</p>
+            </div>
+            <div class="bg-indigo-50/70 border border-indigo-200/80 rounded-2xl p-3">
+              <p class="text-[10px] uppercase font-bold text-indigo-700">Quota Attainment</p>
+              <p class="text-base font-extrabold text-indigo-950 mt-0.5">91.4%</p>
+              <p class="text-[10px] text-indigo-600 font-semibold mt-0.5">Kitchen throughput goal</p>
+            </div>
+            <div class="bg-slate-100 border border-slate-200 rounded-2xl p-3">
+              <p class="text-[10px] uppercase font-bold text-slate-600">Active Station Roster</p>
+              <p class="text-base font-extrabold text-slate-900 mt-0.5">${myWorkers.filter(w => w.status === 'ACTIVE').length} / ${myWorkers.length} On Duty</p>
+              <p class="text-[10px] text-slate-500 font-semibold mt-0.5">${activeVendor.location}</p>
+            </div>
+          `;
+        }
+      } else if (metric === 'SPEED_OF_SERVICE') {
+        if (subtitleEl) subtitleEl.innerText = `Average Meal Preparation & Counter Turnaround Speed in Minutes (${activeVendor.name})`;
+        bar1Key = 'prepMinutes';
+        bar1Name = 'Avg Prep Time (Mins)';
+        bar1Color = '#0284c7'; // Sky-600
+        bar2Key = 'benchmark';
+        bar2Name = 'Benchmark Speed (Mins)';
+        bar2Color = '#f59e0b'; // Amber-500
+
+        chartData = myWorkers.map(w => ({
+          name: w.name.split(' ')[0],
+          fullName: w.name,
+          role: w.role,
+          prepMinutes: w.avgPrepMinutes || 4.5,
+          benchmark: 5.0
+        }));
+
+        if (chipsEl) {
+          chipsEl.innerHTML = `
+            <div class="bg-sky-50/70 border border-sky-200/80 rounded-2xl p-3">
+              <p class="text-[10px] uppercase font-bold text-sky-700">Station Avg Speed</p>
+              <p class="text-base font-extrabold text-sky-950 mt-0.5">${avgSpeed} Mins</p>
+              <p class="text-[10px] text-emerald-600 font-semibold mt-0.5">⚡ 28% faster than benchmark</p>
+            </div>
+            <div class="bg-amber-50/70 border border-amber-200/80 rounded-2xl p-3">
+              <p class="text-[10px] uppercase font-bold text-amber-700">Fastest Turnaround</p>
+              <p class="text-base font-extrabold text-amber-950 mt-0.5">${[...myWorkers].sort((a,b) => (a.avgPrepMinutes||9) - (b.avgPrepMinutes||9))[0]?.name || 'N/A'}</p>
+              <p class="text-[10px] text-amber-600 font-semibold mt-0.5">${[...myWorkers].sort((a,b) => (a.avgPrepMinutes||9) - (b.avgPrepMinutes||9))[0]?.avgPrepMinutes || 0} mins / order</p>
+            </div>
+            <div class="bg-emerald-50/70 border border-emerald-200/80 rounded-2xl p-3">
+              <p class="text-[10px] uppercase font-bold text-emerald-700">Fast-Pass Clearance</p>
+              <p class="text-base font-extrabold text-emerald-950 mt-0.5">45 Secs</p>
+              <p class="text-[10px] text-emerald-600 font-semibold mt-0.5">At pickup counter</p>
+            </div>
+            <div class="bg-slate-100 border border-slate-200 rounded-2xl p-3">
+              <p class="text-[10px] uppercase font-bold text-slate-600">Peak Rush Throttle</p>
+              <p class="text-base font-extrabold text-slate-900 mt-0.5">1.8 Min Delta</p>
+              <p class="text-[10px] text-slate-500 font-semibold mt-0.5">Between shifts</p>
+            </div>
+          `;
+        }
+      } else {
+        // STAFF_RATING
+        if (subtitleEl) subtitleEl.innerText = `Student Satisfaction Score & Fast-Pass QR Verification Rate (${activeVendor.name})`;
+        bar1Key = 'ratingScore';
+        bar1Name = 'Rating (out of 5.0)';
+        bar1Color = '#d97706'; // Amber-600
+        bar2Key = 'fastPassScore';
+        bar2Name = 'Fast-Pass Verification (%)';
+        bar2Color = '#059669'; // Emerald-600
+
+        chartData = myWorkers.map(w => ({
+          name: w.name.split(' ')[0],
+          fullName: w.name,
+          role: w.role,
+          ratingScore: w.satisfactionRating || 4.8,
+          fastPassScore: w.fastPassRate || 96
+        }));
+
+        if (chipsEl) {
+          chipsEl.innerHTML = `
+            <div class="bg-amber-50/70 border border-amber-200/80 rounded-2xl p-3">
+              <p class="text-[10px] uppercase font-bold text-amber-700">Team Satisfaction</p>
+              <p class="text-base font-extrabold text-amber-950 mt-0.5">${avgRating} ★ / 5.0</p>
+              <p class="text-[10px] text-emerald-600 font-semibold mt-0.5">Based on student reviews</p>
+            </div>
+            <div class="bg-emerald-50/70 border border-emerald-200/80 rounded-2xl p-3">
+              <p class="text-[10px] uppercase font-bold text-emerald-700">QR Fast-Pass Accuracy</p>
+              <p class="text-base font-extrabold text-emerald-950 mt-0.5">97.8%</p>
+              <p class="text-[10px] text-emerald-600 font-semibold mt-0.5">Zero pickup error rate</p>
+            </div>
+            <div class="bg-blue-50/70 border border-blue-200/80 rounded-2xl p-3">
+              <p class="text-[10px] uppercase font-bold text-blue-700">Highest Rated Chef</p>
+              <p class="text-base font-extrabold text-blue-950 mt-0.5">${[...myWorkers].sort((a,b) => (b.satisfactionRating||0) - (a.satisfactionRating||0))[0]?.name || 'N/A'}</p>
+              <p class="text-[10px] text-blue-600 font-semibold mt-0.5">5.0 ★ Top Tier</p>
+            </div>
+            <div class="bg-slate-100 border border-slate-200 rounded-2xl p-3">
+              <p class="text-[10px] uppercase font-bold text-slate-600">Sanitation & Hygiene</p>
+              <p class="text-base font-extrabold text-slate-900 mt-0.5">Grade A</p>
+              <p class="text-[10px] text-slate-500 font-semibold mt-0.5">FDA certified staff</p>
+            </div>
+          `;
+        }
+      }
+
+      // Render with React Recharts
+      try {
+        if (window.React && window.ReactDOM && window.Recharts) {
+          const { createElement: h } = window.React;
+          const { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, Legend, CartesianGrid } = window.Recharts;
+
+          const isRatingMetric = metric === 'STAFF_RATING';
+
+          const chartElement = h(
+            ResponsiveContainer,
+            { width: '100%', height: 260 },
+            h(
+              BarChart,
+              { data: chartData, margin: { top: 12, right: 12, left: -10, bottom: 0 } },
+              h(CartesianGrid, { strokeDasharray: '3 3', stroke: '#e2e8f0', vertical: false }),
+              h(XAxis, { dataKey: xKey, stroke: '#64748b', fontSize: 11, tickLine: false }),
+              h(YAxis, {
+                yAxisId: 'left',
+                stroke: bar1Color,
+                fontSize: 11,
+                tickLine: false,
+                axisLine: false,
+                domain: isRatingMetric ? [0, 5] : ['auto', 'auto']
+              }),
+              h(YAxis, {
+                yAxisId: 'right',
+                orientation: 'right',
+                stroke: bar2Color,
+                fontSize: 11,
+                tickLine: false,
+                axisLine: false,
+                domain: isRatingMetric ? [0, 100] : ['auto', 'auto']
+              }),
+              h(Tooltip, {
+                contentStyle: {
+                  backgroundColor: '#0f172a',
+                  borderRadius: '12px',
+                  border: 'none',
+                  color: '#fff',
+                  fontSize: '12px',
+                  fontWeight: 'bold'
+                }
+              }),
+              h(Legend, { wrapperStyle: { fontSize: '11px', paddingTop: '8px' } }),
+              h(Bar, {
+                yAxisId: 'left',
+                dataKey: bar1Key,
+                name: bar1Name,
+                fill: bar1Color,
+                radius: [6, 6, 0, 0],
+                barSize: 20
+              }),
+              h(Bar, {
+                yAxisId: 'right',
+                dataKey: bar2Key,
+                name: bar2Name,
+                fill: bar2Color,
+                radius: [6, 6, 0, 0],
+                barSize: 20
+              })
+            )
+          );
+
+          if (window.ReactDOM.createRoot) {
+            if (!container._reactRoot) {
+              container._reactRoot = window.ReactDOM.createRoot(container);
+            }
+            container._reactRoot.render(chartElement);
+          } else if (window.ReactDOM.render) {
+            window.ReactDOM.render(chartElement, container);
+          }
+        } else {
+          // Render graceful SVG Bar Chart fallback
+          const maxVal = Math.max(...chartData.map(d => d[bar1Key] || 1), 10);
+          container.innerHTML = `
+            <div class="flex items-end justify-around h-48 pt-6 pb-2 px-4 gap-2">
+              ${chartData.map(d => {
+                const val = d[bar1Key] || 0;
+                const pct = Math.max(12, Math.round((val / maxVal) * 100));
+                return `
+                  <div class="flex flex-col items-center gap-1.5 flex-1 max-w-[60px]">
+                    <span class="text-[10px] font-bold text-slate-700">${val}</span>
+                    <div class="w-full bg-blue-600 rounded-t-lg transition-all" style="height: ${pct}%"></div>
+                    <span class="text-[10px] text-slate-500 font-semibold truncate w-full text-center">${d.name}</span>
+                  </div>
+                `;
+              }).join('')}
+            </div>
+          `;
+        }
+      } catch (e) {
+        console.warn('Recharts worker chart render fallback:', e);
+      }
+
+      lucide.createIcons();
     }
 
     // --- VENDOR WORKER MANAGEMENT (Done by Vendor) ---
     function renderVendorWorkers() {
       const tableBody = document.getElementById('vendor-workers-table-body');
       if (!tableBody) return;
-
       const activeVendor = vendors.find(v => v.id === activeVendorId) || vendors[0];
       const myWorkers = vendorWorkers.filter(w => w.vendorId === activeVendor.id);
 
       if (myWorkers.length === 0) {
         tableBody.innerHTML = `
           <tr>
-            <td colspan="6" class="p-6 text-center text-slate-400">No kitchen staff registered. Tap "Add Kitchen Worker" to onboard team members.</td>
+            <td colspan="8" class="p-6 text-center text-slate-400">No kitchen staff registered. Tap "Add Kitchen Worker" to onboard team members.</td>
           </tr>
         `;
+        renderVendorWorkerPerformanceChart(currentWorkerChartMetric);
         return;
       }
 
-      tableBody.innerHTML = myWorkers.map(w => `
+      tableBody.innerHTML = myWorkers.map((w, idx) => {
+        const bioReq = w.biometricsRequired !== undefined ? w.biometricsRequired : globalVendorBiometricsRequired;
+        const ordersDone = w.ordersProcessed !== undefined ? w.ordersProcessed : (35 + (w.id % 5) * 8 + (idx * 6));
+        const prepSpeed = w.avgPrepMinutes !== undefined ? w.avgPrepMinutes : (3.5 + (w.id % 4) * 0.9).toFixed(1);
+        const rating = w.satisfactionRating !== undefined ? w.satisfactionRating : (4.6 + (w.id % 4) * 0.1).toFixed(1);
+
+        return `
         <tr class="hover:bg-slate-50/80">
           <td class="p-3">
             <div class="flex items-center space-x-2.5">
-              <div class="w-8 h-8 rounded-full bg-blue-100 text-blue-700 flex items-center justify-center font-bold text-xs">
+              <div class="w-8 h-8 rounded-full bg-blue-100 text-blue-700 flex items-center justify-center font-bold text-xs shrink-0">
                 ${w.name.charAt(0)}
               </div>
-              <p class="font-bold text-slate-900">${w.name}</p>
+              <div class="min-w-0">
+                <p class="font-bold text-slate-900 truncate">${w.name}</p>
+                <span class="inline-flex items-center gap-1 text-[9px] font-bold ${bioReq ? 'text-emerald-700' : 'text-slate-400'}">
+                  <i data-lucide="${bioReq ? 'fingerprint' : 'shield'}" class="w-3 h-3"></i>
+                  ${bioReq ? 'Biometric Auth Enforced' : 'PIN-Only Access'}
+                </span>
+              </div>
             </div>
           </td>
           <td class="p-3 font-semibold text-slate-700">${w.role}</td>
           <td class="p-3 text-slate-500">${w.shift}</td>
-          <td class="p-3 font-mono text-slate-600">${w.phone}</td>
+          <td class="p-3 text-center font-bold text-brand-700">
+            <span class="px-2 py-0.5 bg-brand-50 rounded-lg text-[11px] font-black">${ordersDone}</span>
+          </td>
+          <td class="p-3 text-center font-bold text-sky-700">
+            <span class="px-2 py-0.5 bg-sky-50 rounded-lg text-[11px] font-black">${prepSpeed}m</span>
+          </td>
+          <td class="p-3 text-center font-bold text-amber-600">
+            <span class="px-2 py-0.5 bg-amber-50 rounded-lg text-[11px] font-black">${rating} ★</span>
+          </td>
           <td class="p-3">
-            <button onclick="toggleWorkerStatus(${w.id})" class="px-2.5 py-1 rounded-full font-bold text-[10px] transition-colors ${w.status === 'ACTIVE' ? 'bg-emerald-100 text-emerald-800' : 'bg-slate-100 text-slate-600'}">
+            <button onclick="toggleWorkerStatus(${w.id})" class="px-2.5 py-1 rounded-full font-bold text-[10px] transition-colors ${w.status === 'ACTIVE' ? 'bg-emerald-100 text-emerald-800 hover:bg-emerald-200' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'}">
               ${w.status === 'ACTIVE' ? 'Active On Duty' : 'Off Duty'}
             </button>
           </td>
-          <td class="p-3 text-right space-x-1">
-            <button onclick="editVendorWorker(${w.id})" class="px-2 py-1 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 text-[11px] font-bold">Edit</button>
-            <button onclick="deleteVendorWorker(${w.id})" class="px-2 py-1 rounded-lg bg-red-50 hover:bg-red-100 text-red-600 text-[11px] font-bold">Delete</button>
+          <td class="p-3 text-right space-x-1 whitespace-nowrap">
+            <button onclick="editVendorWorker(${w.id})" class="px-2.5 py-1 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 text-[11px] font-bold">Edit</button>
+            <button onclick="deleteVendorWorker(${w.id})" class="px-2.5 py-1 rounded-lg bg-red-50 hover:bg-red-100 text-red-600 text-[11px] font-bold">Delete</button>
           </td>
         </tr>
-      `).join('');
+      `;
+      }).join('');
 
+      renderVendorWorkerPerformanceChart(currentWorkerChartMetric);
       lucide.createIcons();
     }
 
     function openVendorWorkerModal() {
+      const modal = document.getElementById('vendor-worker-modal');
+      if (!modal) return;
+
       document.getElementById('editing-worker-id').value = '';
       document.getElementById('worker-modal-title').innerText = 'Add Kitchen Worker';
       document.getElementById('worker-modal-btn-text').innerText = 'Save Staff Member';
@@ -4574,13 +5079,19 @@
       document.getElementById('vworker-shift').value = 'Morning (06:00 - 14:00)';
       document.getElementById('vworker-status').value = 'ACTIVE';
 
-      document.getElementById('vendor-worker-modal').classList.remove('hidden');
+      modal.classList.remove('hidden');
+      modal.classList.add('flex');
+      const nameInput = document.getElementById('vworker-name');
+      if (nameInput) setTimeout(() => nameInput.focus(), 60);
       lucide.createIcons();
     }
 
     function editVendorWorker(workerId) {
       const worker = vendorWorkers.find(w => w.id === workerId);
       if (!worker) return;
+
+      const modal = document.getElementById('vendor-worker-modal');
+      if (!modal) return;
 
       document.getElementById('editing-worker-id').value = worker.id;
       document.getElementById('worker-modal-title').innerText = 'Edit Kitchen Worker';
@@ -4591,18 +5102,25 @@
       document.getElementById('vworker-shift').value = worker.shift;
       document.getElementById('vworker-status').value = worker.status;
 
-      document.getElementById('vendor-worker-modal').classList.remove('hidden');
+      modal.classList.remove('hidden');
+      modal.classList.add('flex');
       lucide.createIcons();
     }
 
     function closeVendorWorkerModal() {
-      document.getElementById('vendor-worker-modal').classList.add('hidden');
+      const modal = document.getElementById('vendor-worker-modal');
+      if (modal) {
+        modal.classList.add('hidden');
+        modal.classList.remove('flex');
+      }
     }
 
     function saveVendorWorker() {
       const editingId = document.getElementById('editing-worker-id').value;
-      const name = document.getElementById('vworker-name').value.trim();
-      const phone = document.getElementById('vworker-phone').value.trim();
+      const nameInput = document.getElementById('vworker-name');
+      const phoneInput = document.getElementById('vworker-phone');
+      const name = nameInput ? nameInput.value.trim() : '';
+      const phone = phoneInput ? phoneInput.value.trim() : '';
       const role = document.getElementById('vworker-role').value;
       const shift = document.getElementById('vworker-shift').value;
       const status = document.getElementById('vworker-status').value;
@@ -4611,6 +5129,7 @@
 
       if (!name) {
         showToast('Please enter the staff member name.', 'error');
+        if (nameInput) nameInput.focus();
         return;
       }
 
@@ -4622,6 +5141,8 @@
           worker.role = role;
           worker.shift = shift;
           worker.status = status;
+          worker.vendorName = activeVendor.name;
+          worker.vendorId = activeVendor.id;
           auditLogs.unshift(`Vendor (${activeVendor.name}) updated worker profile for ${name} (${role}).`);
           showToast(`Staff member "${name}" updated!`, 'success');
         }
@@ -4634,16 +5155,30 @@
           role,
           shift,
           phone: phone || '+233 24 000 0000',
-          status
+          status,
+          biometricsRequired: globalVendorBiometricsRequired
         };
         vendorWorkers.unshift(newWorker);
         auditLogs.unshift(`Vendor (${activeVendor.name}) registered new worker: ${name} as ${role}.`);
         showToast(`Staff member "${name}" registered!`, 'success');
       }
 
+      // Update terminal active timestamp
+      activeVendor.lastActiveTimestamp = Date.now();
+
+      // Persist vendorWorkers to localStorage
+      try {
+        localStorage.setItem('ATU_SAVED_VENDOR_WORKERS_V1', JSON.stringify(vendorWorkers));
+      } catch(e) {
+        console.warn('Failed to persist vendor workers:', e);
+      }
+
+      renderVendorWorkers();
       renderVendorDashboard();
-      renderAdminDashboard();
+      if (typeof renderAdminDashboard === 'function') renderAdminDashboard();
+      if (typeof renderAdminSecurityMatrix === 'function') renderAdminSecurityMatrix();
       closeVendorWorkerModal();
+      playChime(659.25);
     }
 
     function toggleWorkerStatus(workerId) {
@@ -4651,26 +5186,37 @@
       const activeVendor = vendors.find(v => v.id === activeVendorId) || vendors[0];
       if (worker) {
         worker.status = worker.status === 'ACTIVE' ? 'OFF_DUTY' : 'ACTIVE';
+        activeVendor.lastActiveTimestamp = Date.now();
         auditLogs.unshift(`Vendor (${activeVendor.name}) changed shift status of ${worker.name} to ${worker.status}.`);
+        try {
+          localStorage.setItem('ATU_SAVED_VENDOR_WORKERS_V1', JSON.stringify(vendorWorkers));
+        } catch(e) {}
         renderVendorWorkers();
-        renderAdminDashboard();
-        showToast(`${worker.name} is now ${worker.status === 'ACTIVE' ? 'Active On Duty' : 'Off Duty'}`, 'info');
+        renderVendorDashboard();
+        if (typeof renderAdminDashboard === 'function') renderAdminDashboard();
+        showToast(`${worker.name} is now ${worker.status === 'ACTIVE' ? 'Active On Duty' : 'Off Duty'}.`, 'info');
       }
     }
 
     function deleteVendorWorker(workerId) {
       const worker = vendorWorkers.find(w => w.id === workerId);
       const activeVendor = vendors.find(v => v.id === activeVendorId) || vendors[0];
-      if (worker) {
+      if (!worker) return;
+      if (confirm(`Remove staff member "${worker.name}" from ${activeVendor.name}?`)) {
         vendorWorkers = vendorWorkers.filter(w => w.id !== workerId);
-        auditLogs.unshift(`Vendor (${activeVendor.name}) removed worker ${worker.name} from staff roster.`);
+        activeVendor.lastActiveTimestamp = Date.now();
+        auditLogs.unshift(`Vendor (${activeVendor.name}) removed staff member "${worker.name}".`);
+        try {
+          localStorage.setItem('ATU_SAVED_VENDOR_WORKERS_V1', JSON.stringify(vendorWorkers));
+        } catch(e) {}
+        renderVendorWorkers();
         renderVendorDashboard();
-        renderAdminDashboard();
-        showToast(`Worker ${worker.name} removed.`, 'info');
+        if (typeof renderAdminDashboard === 'function') renderAdminDashboard();
+        if (typeof renderAdminSecurityMatrix === 'function') renderAdminSecurityMatrix();
+        showToast(`Staff member "${worker.name}" removed.`, 'info');
       }
     }
 
-    // --- VENDOR STALL PROFILE MANAGEMENT (Done by Vendor) ---
     function loadVendorProfileForm() {
       const activeVendor = vendors.find(v => v.id === activeVendorId) || vendors[0];
       if (!activeVendor) return;
@@ -4738,11 +5284,10 @@
     // ADMIN FUNCTIONS & OVERSIGHT (ADMIN ADDS VENDORS, AUDITS ACTIONS)
     // =========================================================================
     function switchAdminTab(tab) {
-      ['vendors', 'menu', 'workers', 'students', 'logs'].forEach(t => {
+      ['vendors', 'menu', 'workers', 'students', 'security', 'logs'].forEach(t => {
         const btn = document.getElementById(`atab-${t}`);
         const sec = document.getElementById(`admin-sec-${t}`);
         const isCurrent = t === tab;
-
         if (btn) {
           btn.className = isCurrent
             ? 'px-4 py-2 rounded-xl text-xs font-bold bg-brand-600 text-white shadow-sm flex items-center gap-1.5 whitespace-nowrap'
@@ -4752,6 +5297,277 @@
           sec.classList.toggle('hidden', !isCurrent);
         }
       });
+      if (tab === 'security') renderAdminSecurityMatrix();
+      if (tab === 'logs') {
+        renderAdminAuditLogs();
+      }
+      lucide.createIcons();
+    }
+
+    function formatTerminalLastActive(timestamp) {
+      if (!timestamp) return '<span class="inline-flex items-center gap-1 text-[10px] text-slate-400"><span class="w-2 h-2 rounded-full bg-slate-300"></span> Offline</span>';
+      const now = Date.now();
+      const diffMs = Math.max(0, now - timestamp);
+      const diffSecs = Math.floor(diffMs / 1000);
+      const diffMins = Math.floor(diffSecs / 60);
+      const diffHours = Math.floor(diffMins / 60);
+
+      if (diffMins < 5) {
+        const label = diffMins === 0 ? '< 1m ago' : `${diffMins}m ago`;
+        return `<span class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800 border border-emerald-300 shadow-xs">
+          <span class="w-2 h-2 rounded-full bg-emerald-500 badge-pulse"></span>
+          Online Now (${label})
+        </span>`;
+      } else if (diffMins < 30) {
+        return `<span class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 text-amber-800 border border-amber-300">
+          <span class="w-2 h-2 rounded-full bg-amber-500"></span>
+          Idle (${diffMins}m ago)
+        </span>`;
+      } else {
+        const timeStr = diffHours >= 1 ? `${diffHours}h ago` : `${diffMins}m ago`;
+        return `<span class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-slate-100 text-slate-600 border border-slate-300">
+          <span class="w-2 h-2 rounded-full bg-slate-400"></span>
+          Disconnected (${timeStr})
+        </span>`;
+      }
+    }
+
+    
+    // =========================================================================
+    // 🔍 ADMIN AUDIT LOG SEARCH & FILTER ENGINE
+    // =========================================================================
+    let adminAuditSearchQuery = '';
+    let adminAuditCategory = 'ALL';
+
+    function handleAdminAuditSearch(query) {
+      adminAuditSearchQuery = (query || '').trim().toLowerCase();
+      const clearBtn = document.getElementById('admin-log-search-clear-btn');
+      if (clearBtn) {
+        clearBtn.classList.toggle('hidden', !adminAuditSearchQuery);
+      }
+      renderAdminAuditLogs();
+    }
+
+    function clearAdminAuditSearch() {
+      const input = document.getElementById('admin-log-search-input');
+      if (input) {
+        input.value = '';
+        input.focus();
+      }
+      adminAuditSearchQuery = '';
+      const clearBtn = document.getElementById('admin-log-search-clear-btn');
+      if (clearBtn) clearBtn.classList.add('hidden');
+      renderAdminAuditLogs();
+    }
+
+    function setAdminAuditCategory(category) {
+      adminAuditCategory = category;
+      ['all', 'vendor', 'heartbeat', 'menu', 'security', 'orders'].forEach(cat => {
+        const btn = document.getElementById(`audit-filter-${cat}`);
+        if (btn) {
+          const isSelected = cat.toUpperCase() === category;
+          btn.className = isSelected 
+            ? 'px-3 py-1.5 rounded-xl text-[11px] font-bold bg-brand-600 text-white shadow-xs transition-all'
+            : 'px-3 py-1.5 rounded-xl text-[11px] font-bold bg-white text-slate-600 hover:bg-slate-100 border border-slate-200 transition-all';
+        }
+      });
+      renderAdminAuditLogs();
+    }
+
+    function renderAdminAuditLogs() {
+      const adminLogs = document.getElementById('admin-audit-logs');
+      const adminLogsCount = document.getElementById('admin-audit-count-badge');
+      const resultsCount = document.getElementById('admin-log-results-count');
+      if (!adminLogs) return;
+
+      if (adminLogsCount) adminLogsCount.innerText = `${auditLogs.length} Total Events`;
+
+      // Filter audit logs based on search query and category
+      const filteredLogs = auditLogs.filter(log => {
+        const lLow = log.toLowerCase();
+
+        // 1. Check Category match
+        if (adminAuditCategory === 'VENDOR') {
+          const isVendor = lLow.includes('vendor') || lLow.includes('stall') || lLow.includes('kitchen') || lLow.includes('akwaaba') || lLow.includes('chillers') || lLow.includes('tasty bites');
+          if (!isVendor) return false;
+        } else if (adminAuditCategory === 'HEARTBEAT') {
+          const isHeartbeat = lLow.includes('heartbeat') || lLow.includes('telemetry') || lLow.includes('sync') || lLow.includes('terminal');
+          if (!isHeartbeat) return false;
+        } else if (adminAuditCategory === 'MENU') {
+          const isMenu = lLow.includes('dish') || lLow.includes('menu') || lLow.includes('price') || lLow.includes('portion') || lLow.includes('stock');
+          if (!isMenu) return false;
+        } else if (adminAuditCategory === 'SECURITY') {
+          const isSec = lLow.includes('credential') || lLow.includes('password') || lLow.includes('biometric') || lLow.includes('token') || lLow.includes('auth') || lLow.includes('session');
+          if (!isSec) return false;
+        } else if (adminAuditCategory === 'ORDERS') {
+          const isOrder = lLow.includes('order') || lLow.includes('wallet') || lLow.includes('gh₵') || lLow.includes('payment') || lLow.includes('receipt');
+          if (!isOrder) return false;
+        }
+
+        // 2. Check Search Query keyword match
+        if (adminAuditSearchQuery) {
+          return lLow.includes(adminAuditSearchQuery);
+        }
+
+        return true;
+      });
+
+      if (resultsCount) {
+        if (adminAuditSearchQuery || adminAuditCategory !== 'ALL') {
+          resultsCount.innerHTML = `Found <span class="text-brand-600 font-bold">${filteredLogs.length}</span> matching event${filteredLogs.length === 1 ? '' : 's'} (out of ${auditLogs.length} total)`;
+        } else {
+          resultsCount.innerText = `Showing all ${auditLogs.length} audit trail events`;
+        }
+      }
+
+      if (filteredLogs.length === 0) {
+        adminLogs.innerHTML = `
+          <div class="py-10 text-center space-y-2">
+            <div class="w-10 h-10 rounded-2xl bg-slate-100 text-slate-400 flex items-center justify-center mx-auto">
+              <i data-lucide="search-x" class="w-5 h-5"></i>
+            </div>
+            <p class="text-xs font-bold text-slate-700">No matching audit events found</p>
+            <p class="text-[11px] text-slate-400">Try checking your spelling or selecting "All" categories.</p>
+            <button onclick="clearAdminAuditSearch(); setAdminAuditCategory('ALL');" class="mt-2 px-3 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-[11px] font-bold">
+              Reset Filters
+            </button>
+          </div>
+        `;
+        lucide.createIcons();
+        return;
+      }
+
+      adminLogs.innerHTML = filteredLogs.map((log, i) => {
+        let icon = 'activity';
+        let iconColor = 'text-brand-600';
+        let bgBadge = 'bg-brand-50 text-brand-700';
+        let badgeLabel = 'EVENT';
+
+        const lLow = log.toLowerCase();
+        if (lLow.includes('heartbeat') || lLow.includes('telemetry')) {
+          icon = 'radio';
+          iconColor = 'text-indigo-600';
+          bgBadge = 'bg-indigo-50 text-indigo-700';
+          badgeLabel = 'HEARTBEAT';
+        } else if (lLow.includes('credential') || lLow.includes('password') || lLow.includes('username')) {
+          icon = 'key-round';
+          iconColor = 'text-red-500';
+          bgBadge = 'bg-red-50 text-red-700';
+          badgeLabel = 'SECURITY';
+        } else if (lLow.includes('biometric')) {
+          icon = 'fingerprint';
+          iconColor = 'text-emerald-600';
+          bgBadge = 'bg-emerald-50 text-emerald-700';
+          badgeLabel = 'BIOMETRIC';
+        } else if (lLow.includes('dish') || lLow.includes('menu')) {
+          icon = 'utensils';
+          iconColor = 'text-amber-500';
+          bgBadge = 'bg-amber-50 text-amber-700';
+          badgeLabel = 'MENU';
+        } else if (lLow.includes('worker') || lLow.includes('staff')) {
+          icon = 'users';
+          iconColor = 'text-blue-500';
+          bgBadge = 'bg-blue-50 text-blue-700';
+          badgeLabel = 'WORKER';
+        } else if (lLow.includes('vendor') || lLow.includes('stall')) {
+          icon = 'store';
+          iconColor = 'text-purple-500';
+          bgBadge = 'bg-purple-50 text-purple-700';
+          badgeLabel = 'VENDOR';
+        } else if (lLow.includes('order') || lLow.includes('wallet') || lLow.includes('gh₵')) {
+          icon = 'receipt';
+          iconColor = 'text-emerald-600';
+          bgBadge = 'bg-emerald-50 text-emerald-700';
+          badgeLabel = 'ORDER';
+        }
+
+        // Highlight matching query if search is active
+        let displayText = log;
+        if (adminAuditSearchQuery) {
+          const reg = new RegExp(`(${adminAuditSearchQuery})`, 'gi');
+          displayText = log.replace(reg, '<mark class="bg-amber-200 text-slate-900 rounded px-0.5 font-bold">$1</mark>');
+        }
+
+        return `
+        <div class="py-2.5 flex items-start justify-between text-xs text-slate-700 gap-3 hover:bg-slate-50/80 p-2 rounded-xl transition-colors">
+          <div class="flex items-start gap-2.5 min-w-0">
+            <div class="w-7 h-7 rounded-lg bg-slate-100 flex items-center justify-center shrink-0 mt-0.5">
+              <i data-lucide="${icon}" class="w-3.5 h-3.5 ${iconColor}"></i>
+            </div>
+            <div class="min-w-0">
+              <div class="flex items-center gap-2 flex-wrap">
+                <span class="text-[9px] font-black px-1.5 py-0.5 rounded-md ${bgBadge}">${badgeLabel}</span>
+                <p class="font-medium text-slate-800 break-words">${displayText}</p>
+              </div>
+              <div class="flex items-center gap-2 mt-1">
+                <span class="text-[10px] text-slate-400 font-mono">Log ID: ATU-LOG-${String(1000 + (auditLogs.indexOf(log) !== -1 ? auditLogs.indexOf(log) : i)).padStart(4, '0')}</span>
+                <span class="text-[10px] text-emerald-600 font-semibold">• Verified Immutable</span>
+              </div>
+            </div>
+          </div>
+          <span class="text-[10px] font-mono text-slate-400 whitespace-nowrap shrink-0 mt-1">Just now</span>
+        </div>
+        `;
+      }).join('');
+
+      lucide.createIcons();
+    }
+
+    // =========================================================================
+    // 🛰️ VENDOR STATION STATUS HEARTBEAT & ADMIN SYNC
+    // =========================================================================
+    function syncVendorStationHeartbeat() {
+      const activeVendor = vendors.find(v => v.id === activeVendorId) || vendors[0];
+      if (!activeVendor) return;
+
+      const now = Date.now();
+      activeVendor.lastActiveTimestamp = now;
+      activeVendor.isOpen = true;
+
+      // Update current logged-in user state if vendor
+      if (currentLoggedInUser && currentLoggedInUser.role === 'VENDOR') {
+        currentLoggedInUser.lastActiveTimestamp = now;
+        saveUserSessionToStorage(currentLoggedInUser);
+      }
+
+      // Persist to localStorage
+      try {
+        localStorage.setItem('ATU_SAVED_VENDORS_V1', JSON.stringify(vendors));
+      } catch(e) {
+        console.warn('Could not persist vendor heartbeat:', e);
+      }
+
+      // Record in immutable audit trail
+      const timeFormatted = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+      auditLogs.unshift(`[TERMINAL_HEARTBEAT] Vendor "${activeVendor.name}" (${activeVendor.location}) transmitted live station heartbeat sync to Central Administration Hub at ${timeFormatted}.`);
+
+      // Update Vendor Profile UI Timestamp & Feedback
+      const lastSyncEl = document.getElementById('vprofile-last-sync-time');
+      if (lastSyncEl) {
+        lastSyncEl.innerHTML = `<i data-lucide="check-circle" class="w-3 h-3 text-emerald-400"></i> Last Heartbeat Ping: ${timeFormatted} (Active & Live)`;
+      }
+
+      const syncBtn = document.getElementById('btn-sync-station-status');
+      if (syncBtn) {
+        const originalHtml = syncBtn.innerHTML;
+        syncBtn.innerHTML = `<i data-lucide="check" class="w-4 h-4 text-emerald-300"></i><span>Station Synced!</span>`;
+        syncBtn.classList.add('bg-emerald-600');
+        setTimeout(() => {
+          if (syncBtn) {
+            syncBtn.innerHTML = originalHtml;
+            syncBtn.classList.remove('bg-emerald-600');
+            lucide.createIcons();
+          }
+        }, 1800);
+      }
+
+      // Refresh live views
+      renderVendorDashboard();
+      if (typeof renderAdminDashboard === 'function') renderAdminDashboard();
+      if (typeof renderAdminAuditLogs === 'function') renderAdminAuditLogs();
+
+      playChime(880, 'sine');
+      showToast(`Station status synced! Heartbeat sent to Admin Hub. "Last Active" updated to Online Now.`, 'success');
       lucide.createIcons();
     }
 
@@ -4767,6 +5583,7 @@
       const adminWorkersBody = document.getElementById('admin-workers-table-body');
       const adminStudentsBody = document.getElementById('admin-students-table-body');
       const adminLogs = document.getElementById('admin-audit-logs');
+      const adminLogsCount = document.getElementById('admin-audit-count-badge');
 
       if (kpiOrders) kpiOrders.innerText = orders.length + 36;
       if (kpiSales) {
@@ -4777,10 +5594,13 @@
       if (kpiWorkers) kpiWorkers.innerText = vendorWorkers.length;
       if (adminMenuCount) adminMenuCount.innerText = `${menuItems.length} Dishes`;
       if (adminWorkersCount) adminWorkersCount.innerText = `${vendorWorkers.length} Workers`;
+      if (adminLogsCount) adminLogsCount.innerText = `${auditLogs.length} Events`;
 
-      // 1. 🏪 Render Registered Vendors Table (Admin Manages Vendors)
+      // 1. 🏪 Render Registered Vendors Table with Terminal Last Active Indicator
       if (adminVendorsBody) {
-        adminVendorsBody.innerHTML = vendors.map(vendor => `
+        adminVendorsBody.innerHTML = vendors.map(vendor => {
+          const terminalIndicator = formatTerminalLastActive(vendor.lastActiveTimestamp);
+          return `
           <tr class="hover:bg-slate-50/70">
             <td class="p-3">
               <p class="font-bold text-slate-900">${vendor.name}</p>
@@ -4789,7 +5609,8 @@
             <td class="p-3 font-semibold text-slate-700">${vendor.location}</td>
             <td class="p-3 text-slate-600">${vendor.specialty}</td>
             <td class="p-3 font-mono text-slate-600">${vendor.phone}</td>
-            <td class="p-3 font-bold text-amber-500">${vendor.rating} ★</td>
+            <td class="p-3">${terminalIndicator}</td>
+            <td class="p-3 font-bold text-amber-500">${(vendor.rating || 4.8).toFixed(1)} ★</td>
             <td class="p-3">
               <button onclick="toggleVendorStatus(${vendor.id})" class="px-2.5 py-1 rounded-full font-bold text-[10px] ${vendor.isOpen ? 'bg-emerald-100 text-emerald-800' : 'bg-red-100 text-red-800'}">
                 ${vendor.isOpen ? 'OPEN' : 'CLOSED'}
@@ -4799,7 +5620,8 @@
               <button onclick="deleteVendor(${vendor.id})" class="text-red-500 hover:text-red-700 font-bold ml-2">Delete</button>
             </td>
           </tr>
-        `).join('');
+        `;
+        }).join('');
       }
 
       // 2. Render Menu Oversight (Admin sees all items managed by vendors)
@@ -4827,9 +5649,17 @@
 
       // 3. Render Workers Oversight (Admin sees all staff hired by vendors)
       if (adminWorkersBody) {
-        adminWorkersBody.innerHTML = vendorWorkers.map(w => `
+        adminWorkersBody.innerHTML = vendorWorkers.map(w => {
+          const bioReq = w.biometricsRequired !== undefined ? w.biometricsRequired : globalVendorBiometricsRequired;
+          return `
           <tr class="hover:bg-slate-50/70">
-            <td class="p-3 font-bold text-slate-900">${w.name}</td>
+            <td class="p-3">
+              <p class="font-bold text-slate-900">${w.name}</p>
+              <span class="text-[9px] font-bold ${bioReq ? 'text-emerald-700' : 'text-slate-400'} flex items-center gap-1">
+                <i data-lucide="${bioReq ? 'fingerprint' : 'key'}" class="w-2.5 h-2.5"></i>
+                ${bioReq ? 'Biometrics Enforced' : 'PIN Only'}
+              </span>
+            </td>
             <td class="p-3 font-semibold text-blue-700">${w.vendorName}</td>
             <td class="p-3 text-slate-700 font-medium">${w.role}</td>
             <td class="p-3 text-slate-500">${w.shift}</td>
@@ -4840,7 +5670,8 @@
               </span>
             </td>
           </tr>
-        `).join('');
+        `;
+        }).join('');
       }
 
       // 4. Render Registered Students Table
@@ -4859,23 +5690,322 @@
         `).join('');
       }
 
-      // 5. Render Live Audit Stream (Everything vendors and admins do)
+      // 5. Render Live Audit Stream
       if (adminLogs) {
-        adminLogs.innerHTML = auditLogs.map(log => `
-          <div class="py-2.5 flex items-center justify-between text-xs text-slate-600">
-            <div class="flex items-center gap-2">
-              <i data-lucide="activity" class="w-3.5 h-3.5 text-brand-600"></i>
-              <span>${log}</span>
+        adminLogs.innerHTML = auditLogs.map((log, i) => {
+          let icon = 'activity';
+          let iconColor = 'text-brand-600';
+          const lLow = log.toLowerCase();
+          if (lLow.includes('credential') || lLow.includes('password') || lLow.includes('username')) {
+            icon = 'key-round';
+            iconColor = 'text-red-500';
+          } else if (lLow.includes('biometric')) {
+            icon = 'fingerprint';
+            iconColor = 'text-emerald-600';
+          } else if (lLow.includes('dish') || lLow.includes('menu')) {
+            icon = 'utensils';
+            iconColor = 'text-amber-500';
+          } else if (lLow.includes('worker') || lLow.includes('staff')) {
+            icon = 'users';
+            iconColor = 'text-blue-500';
+          } else if (lLow.includes('vendor') || lLow.includes('stall')) {
+            icon = 'store';
+            iconColor = 'text-purple-500';
+          }
+
+          return `
+          <div class="py-2.5 flex items-start justify-between text-xs text-slate-700 gap-3">
+            <div class="flex items-start gap-2.5">
+              <div class="w-6 h-6 rounded-lg bg-slate-100 flex items-center justify-center shrink-0 mt-0.5">
+                <i data-lucide="${icon}" class="w-3.5 h-3.5 ${iconColor}"></i>
+              </div>
+              <div>
+                <p class="font-medium text-slate-800">${log}</p>
+                <span class="text-[10px] text-slate-400 font-mono">Log ID: ATU-LOG-${String(1000 + i).slice(1)} • Immutable</span>
+              </div>
             </div>
-            <span class="text-[10px] text-slate-400 font-medium">Recorded live</span>
+            <span class="text-[10px] text-emerald-700 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded-full font-bold shrink-0">VERIFIED</span>
           </div>
-        `).join('');
+        `;
+        }).join('');
       }
 
-      // 6. 📊 Render Interactive Recharts Bar Chart (Sales Volume & Peak Hours Analytics) & Donut Chart
+      renderAdminSecurityMatrix();
       renderAdminRecharts(currentAdminChartMetric);
-
       lucide.createIcons();
+    }
+
+    // --- ADMIN SECURITY & BIOMETRIC GOVERNANCE LOGIC ---
+    function renderAdminSecurityMatrix() {
+      const toggle = document.getElementById('global-vendor-biometrics-toggle');
+      const label = document.getElementById('global-biometric-status-label');
+      const chip = document.getElementById('biometrics-policy-chip');
+      const staffCount = document.getElementById('biometric-staff-count');
+      const matrixTable = document.getElementById('admin-security-workers-table');
+
+      if (toggle) toggle.checked = globalVendorBiometricsRequired;
+      if (label) {
+        label.innerText = globalVendorBiometricsRequired ? 'ENABLED' : 'DISABLED';
+        label.className = `text-xs font-extrabold ${globalVendorBiometricsRequired ? 'text-emerald-600' : 'text-slate-400'}`;
+      }
+      if (chip) {
+        chip.innerText = globalVendorBiometricsRequired ? 'Policy: Enforced Globally' : 'Policy: Optional per Account';
+        chip.className = `text-xs font-bold px-3 py-1 rounded-full ${globalVendorBiometricsRequired ? 'bg-emerald-100 text-emerald-800 border border-emerald-300' : 'bg-slate-100 text-slate-700 border border-slate-300'}`;
+      }
+      if (staffCount) {
+        staffCount.innerText = `${vendorWorkers.length} Staff Enrolled across ${vendors.length} Kitchens`;
+      }
+
+      if (matrixTable) {
+        matrixTable.innerHTML = vendorWorkers.map(w => {
+          const isBioReq = w.biometricsRequired !== undefined ? w.biometricsRequired : globalVendorBiometricsRequired;
+          return `
+          <tr class="hover:bg-slate-50/70">
+            <td class="p-3">
+              <div class="flex items-center gap-2">
+                <div class="w-7 h-7 rounded-full bg-blue-100 text-blue-700 flex items-center justify-center font-bold text-xs">
+                  ${w.name.charAt(0)}
+                </div>
+                <span class="font-bold text-slate-900">${w.name}</span>
+              </div>
+            </td>
+            <td class="p-3 font-semibold text-brand-700">${w.vendorName}</td>
+            <td class="p-3 font-medium text-slate-700">${w.role}</td>
+            <td class="p-3 text-slate-500">${w.shift}</td>
+            <td class="p-3">
+              <span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-bold ${isBioReq ? 'bg-emerald-100 text-emerald-800 border border-emerald-200' : 'bg-slate-100 text-slate-600 border border-slate-200'}">
+                <i data-lucide="${isBioReq ? 'fingerprint' : 'shield'}" class="w-3 h-3 text-emerald-600"></i>
+                ${isBioReq ? 'Touch ID Required' : 'PIN Only (Biometrics Skipped)'}
+              </span>
+            </td>
+            <td class="p-3 text-right">
+              <button onclick="toggleWorkerBiometricsPolicy(${w.id})" class="px-2.5 py-1 rounded-xl text-[10px] font-bold transition-all ${isBioReq ? 'bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-200' : 'bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-200'}">
+                ${isBioReq ? 'Make PIN-Only' : 'Enforce Touch ID'}
+              </button>
+            </td>
+          </tr>
+        `;
+        }).join('');
+      }
+      lucide.createIcons();
+    }
+
+    function handleGlobalVendorBiometricsToggle(isChecked) {
+      globalVendorBiometricsRequired = isChecked;
+      try {
+        localStorage.setItem('ATU_GLOBAL_BIOMETRICS_REQ', isChecked ? 'true' : 'false');
+      } catch(e) {}
+
+      // Update all worker records in the data structure
+      vendorWorkers.forEach(w => {
+        w.biometricsRequired = isChecked;
+      });
+
+      try {
+        localStorage.setItem('ATU_SAVED_VENDOR_WORKERS_V1', JSON.stringify(vendorWorkers));
+      } catch(e) {}
+
+      auditLogs.unshift(`Admin ${isChecked ? 'ENABLED' : 'DISABLED'} global biometric requirement policy across all ${vendorWorkers.length} kitchen staff accounts.`);
+      showToast(`Global Vendor Biometrics requirement ${isChecked ? 'Enforced' : 'Disabled'}!`, 'success');
+      playChime(isChecked ? 783.99 : 440.00);
+
+      renderAdminDashboard();
+      renderVendorWorkers();
+    }
+
+    function toggleWorkerBiometricsPolicy(workerId) {
+      const worker = vendorWorkers.find(w => w.id === workerId);
+      if (!worker) return;
+
+      const currentReq = worker.biometricsRequired !== undefined ? worker.biometricsRequired : globalVendorBiometricsRequired;
+      worker.biometricsRequired = !currentReq;
+
+      try {
+        localStorage.setItem('ATU_SAVED_VENDOR_WORKERS_V1', JSON.stringify(vendorWorkers));
+      } catch(e) {}
+
+      auditLogs.unshift(`Admin toggled biometric policy for worker '${worker.name}' (${worker.vendorName}) to ${worker.biometricsRequired ? 'REQUIRED' : 'OPTIONAL'}.`);
+      showToast(`Updated biometric security rule for ${worker.name}.`, 'info');
+      renderAdminDashboard();
+      renderVendorWorkers();
+    }
+
+    // --- DOWNLOAD AUDIT LOG (PDF) GENERATOR ---
+    function exportAdminAuditLogsPdf() {
+      try {
+        const jspdfObj = (window.jspdf && window.jspdf.jsPDF) ? window.jspdf : window;
+        if (!jspdfObj || !jspdfObj.jsPDF) {
+          showToast('PDF generator library is initializing... please retry in a second.', 'info');
+          return;
+        }
+        const { jsPDF } = jspdfObj;
+        const doc = new jsPDF({
+          orientation: 'portrait',
+          unit: 'mm',
+          format: 'a4'
+        });
+
+        const pageWidth = doc.internal.pageSize.getWidth();
+        const pageHeight = doc.internal.pageSize.getHeight();
+
+        // Top Header Banner
+        doc.setFillColor(15, 23, 42); // slate-900
+        doc.rect(0, 0, pageWidth, 36, 'F');
+
+        // Accent line
+        doc.setFillColor(217, 119, 6); // amber-600
+        doc.rect(0, 36, pageWidth, 2.5, 'F');
+
+        // Header Titles
+        doc.setTextColor(255, 255, 255);
+        doc.setFont('helvetica', 'bold');
+        doc.setFontSize(14);
+        doc.text('ACCRA TECHNICAL UNIVERSITY (ATU)', 14, 13);
+
+        doc.setFontSize(9.5);
+        doc.setFont('helvetica', 'normal');
+        doc.setTextColor(251, 191, 36);
+        doc.text('CENTRAL CAFETERIA ADMINISTRATION & TERMINAL GOVERNANCE HUB', 14, 20);
+
+        doc.setFontSize(8);
+        doc.setTextColor(203, 213, 225);
+        doc.text('Official System Audit Trail, Credential Activity & Security Log Report', 14, 26);
+        doc.text(`Generated: ${new Date().toLocaleString()} | Security Hash: ATU-SEC-${Date.now().toString(36).toUpperCase()}`, 14, 31);
+
+        // Summary Box
+        let y = 46;
+        doc.setFillColor(248, 250, 252);
+        doc.setDrawColor(226, 232, 240);
+        doc.roundedRect(14, y, pageWidth - 28, 22, 3, 3, 'FD');
+
+        const totalLogs = auditLogs.length;
+        const vendorUpdates = auditLogs.filter(l => l.toLowerCase().includes('vendor') || l.toLowerCase().includes('credential') || l.toLowerCase().includes('dish') || l.toLowerCase().includes('worker')).length;
+        const authEvents = auditLogs.filter(l => l.toLowerCase().includes('auth') || l.toLowerCase().includes('login') || l.toLowerCase().includes('security') || l.toLowerCase().includes('lock') || l.toLowerCase().includes('biometric')).length;
+        const orderEvents = auditLogs.filter(l => l.toLowerCase().includes('order') || l.toLowerCase().includes('wallet') || l.toLowerCase().includes('ghc')).length;
+
+        doc.setFont('helvetica', 'bold');
+        doc.setFontSize(8.5);
+        doc.setTextColor(15, 23, 42);
+        doc.text('SYSTEM AUDIT TRAIL SUMMARY METRICS', 18, y + 6);
+
+        doc.setFont('helvetica', 'normal');
+        doc.setFontSize(7.5);
+        doc.setTextColor(71, 85, 105);
+        doc.text(`Total Audit Records: ${totalLogs}`, 18, y + 12);
+        doc.text(`Vendor Profile & Menu Actions: ${vendorUpdates}`, 18, y + 17);
+
+        doc.text(`Security & Auth Logs: ${authEvents}`, 80, y + 12);
+        doc.text(`Transaction & Order Events: ${orderEvents}`, 80, y + 17);
+
+        doc.text(`Active Authorized Terminals: ${vendors.length}`, 145, y + 12);
+        doc.text(`Biometric Policy: ${globalVendorBiometricsRequired ? 'Globally Enforced' : 'Optional'}`, 145, y + 17);
+
+        // Audit Log Table
+        y += 28;
+        doc.setFillColor(241, 245, 249);
+        doc.rect(14, y, pageWidth - 28, 8, 'F');
+        doc.setDrawColor(203, 213, 225);
+        doc.line(14, y + 8, pageWidth - 14, y + 8);
+
+        doc.setFont('helvetica', 'bold');
+        doc.setFontSize(8);
+        doc.setTextColor(15, 23, 42);
+        doc.text('#', 17, y + 5.5);
+        doc.text('Event Type / Category', 25, y + 5.5);
+        doc.text('Audit Trail Log Details', 75, y + 5.5);
+        doc.text('Status', pageWidth - 26, y + 5.5);
+
+        y += 11;
+        doc.setFont('helvetica', 'normal');
+        doc.setFontSize(7);
+
+        auditLogs.slice(0, 45).forEach((log, index) => {
+          if (y > pageHeight - 20) {
+            doc.addPage();
+            y = 20;
+            // Table header on new page
+            doc.setFillColor(241, 245, 249);
+            doc.rect(14, y, pageWidth - 28, 8, 'F');
+            doc.setFont('helvetica', 'bold');
+            doc.setFontSize(8);
+            doc.setTextColor(15, 23, 42);
+            doc.text('#', 17, y + 5.5);
+            doc.text('Event Type / Category', 25, y + 5.5);
+            doc.text('Audit Trail Log Details', 75, y + 5.5);
+            doc.text('Status', pageWidth - 26, y + 5.5);
+            y += 11;
+            doc.setFont('helvetica', 'normal');
+            doc.setFontSize(7);
+          }
+
+          let category = 'System Event';
+          let tagColor = [100, 116, 139];
+          const logLower = log.toLowerCase();
+          if (logLower.includes('credential') || logLower.includes('password') || logLower.includes('username')) {
+            category = 'Security Credential';
+            tagColor = [220, 38, 38];
+          } else if (logLower.includes('biometric')) {
+            category = 'Biometric Security';
+            tagColor = [13, 148, 136];
+          } else if (logLower.includes('vendor') || logLower.includes('kitchen') || logLower.includes('stall')) {
+            category = 'Vendor Management';
+            tagColor = [124, 58, 237];
+          } else if (logLower.includes('dish') || logLower.includes('menu')) {
+            category = 'Menu Oversight';
+            tagColor = [217, 119, 6];
+          } else if (logLower.includes('worker') || logLower.includes('staff')) {
+            category = 'Staff Profile';
+            tagColor = [37, 99, 235];
+          } else if (logLower.includes('order') || logLower.includes('ghc') || logLower.includes('payment')) {
+            category = 'Order & Wallet';
+            tagColor = [5, 150, 105];
+          }
+
+          doc.setTextColor(100, 116, 139);
+          doc.text(`${index + 1}`, 17, y);
+
+          doc.setTextColor(tagColor[0], tagColor[1], tagColor[2]);
+          doc.setFont('helvetica', 'bold');
+          doc.text(category, 25, y);
+
+          doc.setFont('helvetica', 'normal');
+          doc.setTextColor(30, 41, 59);
+          const splitLog = doc.splitTextToSize(log, 98);
+          doc.text(splitLog, 75, y);
+
+          doc.setTextColor(16, 185, 129);
+          doc.text('VERIFIED', pageWidth - 26, y);
+
+          const itemHeight = Math.max(7, splitLog.length * 4);
+          doc.setDrawColor(241, 245, 249);
+          doc.line(14, y + itemHeight - 2, pageWidth - 14, y + itemHeight - 2);
+
+          y += itemHeight;
+        });
+
+        // Footer
+        const totalPages = doc.internal.getNumberOfPages();
+        for (let p = 1; p <= totalPages; p++) {
+          doc.setPage(p);
+          doc.setFillColor(248, 250, 252);
+          doc.rect(0, pageHeight - 12, pageWidth, 12, 'F');
+          doc.setDrawColor(226, 232, 240);
+          doc.line(0, pageHeight - 12, pageWidth, pageHeight - 12);
+          doc.setFont('helvetica', 'normal');
+          doc.setFontSize(6.5);
+          doc.setTextColor(100, 116, 139);
+          doc.text('Accra Technical University Cafeteria Operations & IT Audit Compliance Directorate', 14, pageHeight - 5);
+          doc.text(`Page ${p} of ${totalPages} • Official Confidential Record`, pageWidth - 14, pageHeight - 5, { align: 'right' });
+        }
+
+        const filename = `ATU_System_Audit_Trail_${Date.now()}.pdf`;
+        doc.save(filename);
+        showToast(`Audit log PDF generated successfully! (${totalLogs} events exported)`, 'success');
+        playChime(659.25);
+      } catch (err) {
+        console.error('Error generating audit log PDF:', err);
+        showToast('Failed to generate audit log PDF: ' + err.message, 'error');
+      }
     }
 
     let currentAdminChartMetric = 'DAILY_SALES';
@@ -6140,24 +7270,113 @@
       return (Date.now() - lastUserActivityTime) >= INACTIVITY_TIMEOUT_MS;
     }
 
+    function resetInactivityPinBoxes() {
+      for (let i = 1; i <= 4; i++) {
+        const el = document.getElementById(`inactivity-pin-${i}`);
+        if (el) el.value = '';
+      }
+      const pinInput = document.getElementById('inactivity-unlock-pin');
+      if (pinInput) pinInput.value = '';
+      const errEl = document.getElementById('inactivity-lock-error');
+      if (errEl) errEl.classList.add('hidden');
+      const firstBox = document.getElementById('inactivity-pin-1');
+      if (firstBox) setTimeout(() => firstBox.focus(), 100);
+    }
+
+    function handleInactivityPinInput(boxIndex, inputEl) {
+      inputEl.value = inputEl.value.replace(/[^0-9]/g, '');
+      if (inputEl.value.length > 1) {
+        inputEl.value = inputEl.value.slice(-1);
+      }
+      
+      let fullPin = '';
+      for (let i = 1; i <= 4; i++) {
+        const box = document.getElementById(`inactivity-pin-${i}`);
+        if (box) fullPin += box.value;
+      }
+      const pinInput = document.getElementById('inactivity-unlock-pin');
+      if (pinInput) pinInput.value = fullPin;
+
+      const errEl = document.getElementById('inactivity-lock-error');
+      if (errEl) errEl.classList.add('hidden');
+
+      if (inputEl.value && boxIndex < 4) {
+        const nextBox = document.getElementById(`inactivity-pin-${boxIndex + 1}`);
+        if (nextBox) nextBox.focus();
+      }
+
+      if (fullPin.length === 4) {
+        setTimeout(() => {
+          verifyInactivityPinUnlock();
+        }, 120);
+      }
+    }
+
+    function handleInactivityPinKeydown(boxIndex, event) {
+      if (event.key === 'Backspace') {
+        const currentBox = document.getElementById(`inactivity-pin-${boxIndex}`);
+        if (currentBox && !currentBox.value && boxIndex > 1) {
+          const prevBox = document.getElementById(`inactivity-pin-${boxIndex - 1}`);
+          if (prevBox) {
+            prevBox.value = '';
+            prevBox.focus();
+            event.preventDefault();
+          }
+        }
+      } else if (event.key === 'ArrowLeft' && boxIndex > 1) {
+        const prevBox = document.getElementById(`inactivity-pin-${boxIndex - 1}`);
+        if (prevBox) prevBox.focus();
+      } else if (event.key === 'ArrowRight' && boxIndex < 4) {
+        const nextBox = document.getElementById(`inactivity-pin-${boxIndex + 1}`);
+        if (nextBox) nextBox.focus();
+      } else if (event.key === 'Enter') {
+        verifyInactivityPinUnlock();
+      }
+    }
+
+    function handleInactivityPinPaste(event) {
+      event.preventDefault();
+      const pasteData = (event.clipboardData || window.clipboardData).getData('text').trim();
+      const digits = pasteData.replace(/[^0-9]/g, '').slice(0, 4);
+      if (!digits) return;
+      for (let i = 0; i < 4; i++) {
+        const box = document.getElementById(`inactivity-pin-${i + 1}`);
+        if (box) box.value = digits[i] || '';
+      }
+      const pinInput = document.getElementById('inactivity-unlock-pin');
+      if (pinInput) pinInput.value = digits;
+      if (digits.length === 4) {
+        setTimeout(() => {
+          verifyInactivityPinUnlock();
+        }, 120);
+      } else {
+        const nextEmpty = document.getElementById(`inactivity-pin-${digits.length + 1}`);
+        if (nextEmpty) nextEmpty.focus();
+      }
+    }
+
     function requireInactivityVerification(onSuccess) {
       if (!checkInactivityLock()) {
+        lastUserActivityTime = Date.now();
         onSuccess();
         return;
       }
       pendingInactivityAction = onSuccess;
       const modal = document.getElementById('inactivity-lock-modal');
-      const pinInput = document.getElementById('inactivity-unlock-pin');
-      const errEl = document.getElementById('inactivity-lock-error');
-      if (errEl) errEl.classList.add('hidden');
-      if (pinInput) pinInput.value = '';
-      if (modal) modal.classList.remove('hidden');
+      resetInactivityPinBoxes();
+      if (modal) {
+        modal.classList.remove('hidden');
+        modal.classList.add('flex');
+      }
       lucide.createIcons();
     }
 
     function closeInactivityModal() {
       const modal = document.getElementById('inactivity-lock-modal');
-      if (modal) modal.classList.add('hidden');
+      if (modal) {
+        modal.classList.add('hidden');
+        modal.classList.remove('flex');
+      }
     }
 
     function verifyInactivityPinUnlock() {
@@ -6167,16 +7386,35 @@
 
       if (!pin || pin.length < 4) {
         if (errEl) {
-          errEl.innerText = 'Please enter your 4-digit security PIN.';
+          errEl.innerText = 'Please enter complete 4-digit security PIN.';
           errEl.classList.remove('hidden');
         }
         return;
       }
 
+      if (pin !== '1234' && pin !== '2024') {
+        if (errEl) {
+          errEl.innerText = 'Invalid 4-digit PIN. (Demo PIN: 1234)';
+          errEl.classList.remove('hidden');
+        }
+        for (let i = 1; i <= 4; i++) {
+          const box = document.getElementById(`inactivity-pin-${i}`);
+          if (box) {
+            box.value = '';
+            box.classList.add('border-red-400');
+            setTimeout(() => box.classList.remove('border-red-400'), 1500);
+          }
+        }
+        if (pinInput) pinInput.value = '';
+        const firstBox = document.getElementById('inactivity-pin-1');
+        if (firstBox) firstBox.focus();
+        return;
+      }
+
       lastUserActivityTime = Date.now();
       closeInactivityModal();
-      showToast('Inactivity session verified! Resuming action.', 'success');
-
+      showToast('Inactivity session verified! Resuming operation.', 'success');
+      playChime(523.25);
       if (typeof pendingInactivityAction === 'function') {
         const action = pendingInactivityAction;
         pendingInactivityAction = null;
@@ -6185,11 +7423,12 @@
     }
 
     function triggerInactivityBiometricUnlock() {
-      showToast('Scanning biometric sensor...', 'info');
+      showToast('Scanning biometric touch sensor...', 'info');
       setTimeout(() => {
         lastUserActivityTime = Date.now();
         closeInactivityModal();
-        showToast('Biometric authentication verified! Resuming session.', 'success');
+        showToast('Biometric touch verified! Resuming session.', 'success');
+        playChime(659.25);
         if (typeof pendingInactivityAction === 'function') {
           const action = pendingInactivityAction;
           pendingInactivityAction = null;
@@ -6198,9 +7437,6 @@
       }, 600);
     }
 
-    // =========================================================================
-    // 🏪 VENDOR LOGIN CREDENTIALS UPDATE
-    // =========================================================================
     function saveVendorCredentials(event) {
       if (event) {
         event.preventDefault();
@@ -6286,10 +7522,14 @@
 
       <div class="space-y-3 text-left">
         <div>
-          <label class="block text-xs font-bold text-slate-700 mb-1">Enter 4-Digit Security PIN</label>
-          <div class="relative">
-            <input type="password" id="inactivity-unlock-pin" maxlength="4" placeholder="••••" class="w-full py-3 px-4 text-center tracking-[1em] text-lg font-bold bg-slate-50 border border-slate-200 rounded-2xl outline-none focus:ring-2 focus:ring-amber-500 font-mono" />
+          <label class="block text-xs font-bold text-slate-700 mb-2 text-center">Enter 4-Digit Security PIN</label>
+          <div class="flex justify-center items-center gap-3 my-2" id="inactivity-pin-boxes">
+            <input type="password" inputmode="numeric" maxlength="1" id="inactivity-pin-1" class="inactivity-pin-cell w-12 h-14 text-center text-xl font-black bg-slate-50 border-2 border-slate-200 rounded-2xl outline-none focus:border-amber-500 focus:bg-amber-50/50 transition-all font-mono shadow-xs" oninput="handleInactivityPinInput(1, this)" onkeydown="handleInactivityPinKeydown(1, event)" onpaste="handleInactivityPinPaste(event)" autofocus />
+            <input type="password" inputmode="numeric" maxlength="1" id="inactivity-pin-2" class="inactivity-pin-cell w-12 h-14 text-center text-xl font-black bg-slate-50 border-2 border-slate-200 rounded-2xl outline-none focus:border-amber-500 focus:bg-amber-50/50 transition-all font-mono shadow-xs" oninput="handleInactivityPinInput(2, this)" onkeydown="handleInactivityPinKeydown(2, event)" onpaste="handleInactivityPinPaste(event)" />
+            <input type="password" inputmode="numeric" maxlength="1" id="inactivity-pin-3" class="inactivity-pin-cell w-12 h-14 text-center text-xl font-black bg-slate-50 border-2 border-slate-200 rounded-2xl outline-none focus:border-amber-500 focus:bg-amber-50/50 transition-all font-mono shadow-xs" oninput="handleInactivityPinInput(3, this)" onkeydown="handleInactivityPinKeydown(3, event)" onpaste="handleInactivityPinPaste(event)" />
+            <input type="password" inputmode="numeric" maxlength="1" id="inactivity-pin-4" class="inactivity-pin-cell w-12 h-14 text-center text-xl font-black bg-slate-50 border-2 border-slate-200 rounded-2xl outline-none focus:border-amber-500 focus:bg-amber-50/50 transition-all font-mono shadow-xs" oninput="handleInactivityPinInput(4, this)" onkeydown="handleInactivityPinKeydown(4, event)" onpaste="handleInactivityPinPaste(event)" />
           </div>
+          <input type="hidden" id="inactivity-unlock-pin" value="" />
         </div>
         <div id="inactivity-lock-error" class="hidden text-xs text-red-600 font-bold text-center"></div>
       </div>
