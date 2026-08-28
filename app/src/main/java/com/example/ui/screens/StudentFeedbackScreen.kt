@@ -340,3 +340,38 @@ fun StudentFeedbackScreen(
         }
     }
 }
+
+@Composable
+fun InteractiveStarRatingBar(
+    rating: Int,
+    onRatingChanged: (Int) -> Unit,
+    label: String,
+    starSize: androidx.compose.ui.unit.Dp = 24.dp,
+    modifier: Modifier = Modifier
+) {
+    Column(modifier = modifier.fillMaxWidth()) {
+        Text(text = label, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Medium)
+        Spacer(modifier = Modifier.height(4.dp))
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            for (i in 1..5) {
+                IconButton(
+                    onClick = { onRatingChanged(i) },
+                    modifier = Modifier.size(starSize + 8.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Star,
+                        contentDescription = "Rate $i stars",
+                        tint = if (i <= rating) Color(0xFFFFB800) else Color.LightGray,
+                        modifier = Modifier.size(starSize)
+                    )
+                }
+            }
+            Spacer(modifier = Modifier.width(8.dp))
+            Text(
+                text = "$rating/5",
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
+    }
+}
