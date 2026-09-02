@@ -93,6 +93,21 @@ fun AdminDashboardScreen(
     var newlyCreatedVendorCreds by remember { mutableStateOf<Pair<String, String>?>(null) } // Pair(Username, PIN)
     var vendorToEdit by remember { mutableStateOf<User?>(null) }
     var vendorToDelete by remember { mutableStateOf<User?>(null) }
+    var vendorToResetPin by remember { mutableStateOf<User?>(null) }
+    var vendorForMenuManagement by remember { mutableStateOf<User?>(null) }
+
+    // Student & User Management Dialog States
+    var showAddStudentDialog by remember { mutableStateOf(false) }
+    var userToEditProfile by remember { mutableStateOf<User?>(null) }
+    var userToAdjustWallet by remember { mutableStateOf<User?>(null) }
+    var showCampusBonusDialog by remember { mutableStateOf(false) }
+    var userToResetPin by remember { mutableStateOf<User?>(null) }
+    var userToDelete by remember { mutableStateOf<User?>(null) }
+    var orderToRefund by remember { mutableStateOf<Order?>(null) }
+
+    // User Directory Search & Filters
+    var studentSearchQuery by remember { mutableStateOf("") }
+    var studentRoleFilter by remember { mutableStateOf("ALL") } // ALL, STUDENT, VENDOR, ADMIN
 
     // Dialog Input states
     var addUsername by remember { mutableStateOf("") }
@@ -109,6 +124,8 @@ fun AdminDashboardScreen(
     var addPictureUrl by remember { mutableStateOf("") }
     var editLogoUrl by remember { mutableStateOf("") }
     var editPictureUrl by remember { mutableStateOf("") }
+
+    val allFoodItems by viewModel.allFoodItems.collectAsStateWithLifecycle()
 
     var listSelection by remember { mutableIntStateOf(0) } // 0: Manage Vendors, 1: Student Directory
 
@@ -640,7 +657,7 @@ fun AdminDashboardScreen(
 
                                                 Row(
                                                     modifier = Modifier.fillMaxWidth(),
-                                                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                                    horizontalArrangement = Arrangement.spacedBy(6.dp),
                                                     verticalAlignment = Alignment.CenterVertically
                                                 ) {
                                                     Button(
@@ -650,11 +667,25 @@ fun AdminDashboardScreen(
                                                         },
                                                         colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFFF8F00)),
                                                         shape = RoundedCornerShape(8.dp),
-                                                        modifier = Modifier.weight(1.2f)
+                                                        modifier = Modifier.weight(1.1f),
+                                                        contentPadding = PaddingValues(horizontal = 8.dp, vertical = 6.dp)
                                                     ) {
-                                                        Icon(Icons.Default.PlayArrow, contentDescription = null, modifier = Modifier.size(16.dp))
-                                                        Spacer(modifier = Modifier.width(4.dp))
-                                                        Text("Simulate", fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                                                        Icon(Icons.Default.PlayArrow, contentDescription = null, modifier = Modifier.size(14.dp))
+                                                        Spacer(modifier = Modifier.width(2.dp))
+                                                        Text("Simulate", fontSize = 10.sp, fontWeight = FontWeight.Bold)
+                                                    }
+
+                                                    OutlinedButton(
+                                                        onClick = {
+                                                            vendorForMenuManagement = vendor
+                                                        },
+                                                        shape = RoundedCornerShape(8.dp),
+                                                        modifier = Modifier.weight(1f),
+                                                        contentPadding = PaddingValues(horizontal = 6.dp, vertical = 6.dp)
+                                                    ) {
+                                                        Icon(Icons.Default.RestaurantMenu, contentDescription = null, modifier = Modifier.size(13.dp))
+                                                        Spacer(modifier = Modifier.width(2.dp))
+                                                        Text("Menu", fontSize = 10.sp, fontWeight = FontWeight.SemiBold)
                                                     }
 
                                                     OutlinedButton(
@@ -668,19 +699,30 @@ fun AdminDashboardScreen(
                                                             vendorToEdit = vendor
                                                         },
                                                         shape = RoundedCornerShape(8.dp),
-                                                        modifier = Modifier.weight(1.5f)
+                                                        modifier = Modifier.weight(1f),
+                                                        contentPadding = PaddingValues(horizontal = 6.dp, vertical = 6.dp)
                                                     ) {
-                                                        Icon(Icons.Default.Edit, contentDescription = null, modifier = Modifier.size(14.dp))
-                                                        Spacer(modifier = Modifier.width(4.dp))
-                                                        Text("Edit", fontSize = 11.sp)
+                                                        Icon(Icons.Default.Edit, contentDescription = null, modifier = Modifier.size(13.dp))
+                                                        Spacer(modifier = Modifier.width(2.dp))
+                                                        Text("Edit", fontSize = 10.sp)
+                                                    }
+
+                                                    IconButton(
+                                                        onClick = {
+                                                            vendorToResetPin = vendor
+                                                        },
+                                                        modifier = Modifier.size(36.dp)
+                                                    ) {
+                                                        Icon(Icons.Default.LockReset, contentDescription = "Reset PIN", tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(18.dp))
                                                     }
 
                                                     IconButton(
                                                         onClick = {
                                                             vendorToDelete = vendor
-                                                        }
+                                                        },
+                                                        modifier = Modifier.size(36.dp)
                                                     ) {
-                                                        Icon(Icons.Default.Delete, contentDescription = null, tint = MaterialTheme.colorScheme.error)
+                                                        Icon(Icons.Default.Delete, contentDescription = "Delete Vendor", tint = MaterialTheme.colorScheme.error, modifier = Modifier.size(18.dp))
                                                     }
                                                 }
                                             }
@@ -690,50 +732,356 @@ fun AdminDashboardScreen(
                             }
                             }
                             1 -> {
-                            // Students Directory
-                            val students = allUsers.filter { it.role == "STUDENT" }
+                            // Comprehensive Student & Campus User Governance Directory
+                            val filteredUsers = remember(allUsers, studentSearchQuery, studentRoleFilter) {
+                                allUsers.filter { user ->
+                                    val matchesRole = when (studentRoleFilter) {
+                                        "STUDENT" -> user.role == "STUDENT"
+                                        "VENDOR" -> user.role == "VENDOR"
+                                        "ADMIN" -> user.role == "ADMIN"
+                                        else -> true
+                                    }
+                                    val q = studentSearchQuery.trim().lowercase()
+                                    val matchesSearch = q.isEmpty() ||
+                                        user.fullName.lowercase().contains(q) ||
+                                        user.username.lowercase().contains(q) ||
+                                        user.info.lowercase().contains(q) ||
+                                        (user.email?.lowercase()?.contains(q) == true) ||
+                                        (user.telephone?.lowercase()?.contains(q) == true)
+                                    matchesRole && matchesSearch
+                                }
+                            }
+
                             LazyColumn(
                                 state = adminStudentsScrollState,
                                 modifier = Modifier.fillMaxSize(),
                                 contentPadding = PaddingValues(16.dp),
                                 verticalArrangement = Arrangement.spacedBy(12.dp)
                             ) {
-                                if (students.isEmpty()) {
-                                    item {
-                                        Box(modifier = Modifier.fillMaxWidth().height(200.dp), contentAlignment = Alignment.Center) {
-                                            Text("No student accounts enrolled in system.")
-                                        }
-                                    }
-                                } else {
-                                    items(students) { student ->
-                                        Card(
-                                            modifier = Modifier.fillMaxWidth(),
-                                            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
-                                        ) {
+                                // Top Action Banner & Quick Tools
+                                item {
+                                    Card(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.4f)),
+                                        shape = RoundedCornerShape(16.dp),
+                                        border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.2f))
+                                    ) {
+                                        Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                                             Row(
-                                                modifier = Modifier
-                                                    .fillMaxWidth()
-                                                    .padding(16.dp),
+                                                modifier = Modifier.fillMaxWidth(),
                                                 horizontalArrangement = Arrangement.SpaceBetween,
                                                 verticalAlignment = Alignment.CenterVertically
                                             ) {
-                                                Column(modifier = Modifier.weight(1f)) {
-                                                    Text(student.fullName, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleMedium)
-                                                    Text("Matric ID: ${student.info}", fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                                                    Text("Username: ${student.username}", fontSize = 11.sp, color = MaterialTheme.colorScheme.primary)
+                                                Column {
+                                                    Text(
+                                                        "Campus User & Student Governance",
+                                                        fontWeight = FontWeight.Bold,
+                                                        style = MaterialTheme.typography.titleMedium,
+                                                        color = MaterialTheme.colorScheme.primary
+                                                    )
+                                                    Text(
+                                                        "Manage student meal wallets, access PINs, account limits & campus subsidies.",
+                                                        fontSize = 11.sp,
+                                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                                    )
+                                                }
+                                            }
+
+                                            Row(
+                                                modifier = Modifier.fillMaxWidth(),
+                                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                            ) {
+                                                Button(
+                                                    onClick = { showAddStudentDialog = true },
+                                                    modifier = Modifier.weight(1f),
+                                                    shape = RoundedCornerShape(10.dp),
+                                                    contentPadding = PaddingValues(vertical = 10.dp)
+                                                ) {
+                                                    Icon(Icons.Default.PersonAdd, contentDescription = null, modifier = Modifier.size(16.dp))
+                                                    Spacer(modifier = Modifier.width(6.dp))
+                                                    Text("Enroll Student", fontSize = 11.sp, fontWeight = FontWeight.Bold)
                                                 }
 
                                                 Button(
-                                                    onClick = {
-                                                        viewModel.startImpersonation(student)
-                                                        navController.navigate("student_home")
-                                                    },
-                                                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFFF8F00)),
-                                                    shape = RoundedCornerShape(8.dp)
+                                                    onClick = { showCampusBonusDialog = true },
+                                                    modifier = Modifier.weight(1f),
+                                                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF2E7D32)),
+                                                    shape = RoundedCornerShape(10.dp),
+                                                    contentPadding = PaddingValues(vertical = 10.dp)
                                                 ) {
-                                                    Icon(Icons.Default.PlayArrow, contentDescription = null, modifier = Modifier.size(16.dp))
-                                                    Spacer(modifier = Modifier.width(4.dp))
-                                                    Text("Simulate", fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                                                    Icon(Icons.Default.CardGiftcard, contentDescription = null, modifier = Modifier.size(16.dp))
+                                                    Spacer(modifier = Modifier.width(6.dp))
+                                                    Text("Campus Subsidy", fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+
+                                // Search Bar & Filter Chips
+                                item {
+                                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                                        OutlinedTextField(
+                                            value = studentSearchQuery,
+                                            onValueChange = { studentSearchQuery = it },
+                                            placeholder = { Text("Search by name, matric ID, username, email or phone...") },
+                                            leadingIcon = { Icon(Icons.Default.Search, contentDescription = null, modifier = Modifier.size(18.dp)) },
+                                            trailingIcon = {
+                                                if (studentSearchQuery.isNotEmpty()) {
+                                                    IconButton(onClick = { studentSearchQuery = "" }) {
+                                                        Icon(Icons.Default.Clear, contentDescription = "Clear", modifier = Modifier.size(16.dp))
+                                                    }
+                                                }
+                                            },
+                                            modifier = Modifier.fillMaxWidth(),
+                                            shape = RoundedCornerShape(12.dp),
+                                            singleLine = true
+                                        )
+
+                                        Row(
+                                            modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
+                                            horizontalArrangement = Arrangement.spacedBy(6.dp)
+                                        ) {
+                                            FilterChip(
+                                                selected = studentRoleFilter == "ALL",
+                                                onClick = { studentRoleFilter = "ALL" },
+                                                label = { Text("All Users (${allUsers.size})", fontSize = 11.sp) }
+                                            )
+                                            FilterChip(
+                                                selected = studentRoleFilter == "STUDENT",
+                                                onClick = { studentRoleFilter = "STUDENT" },
+                                                label = { Text("Students (${allUsers.count { it.role == "STUDENT" }})", fontSize = 11.sp) }
+                                            )
+                                            FilterChip(
+                                                selected = studentRoleFilter == "VENDOR",
+                                                onClick = { studentRoleFilter = "VENDOR" },
+                                                label = { Text("Vendors (${allUsers.count { it.role == "VENDOR" }})", fontSize = 11.sp) }
+                                            )
+                                            FilterChip(
+                                                selected = studentRoleFilter == "ADMIN",
+                                                onClick = { studentRoleFilter = "ADMIN" },
+                                                label = { Text("Admins (${allUsers.count { it.role == "ADMIN" }})", fontSize = 11.sp) }
+                                            )
+                                        }
+                                    }
+                                }
+
+                                if (filteredUsers.isEmpty()) {
+                                    item {
+                                        Box(
+                                            modifier = Modifier.fillMaxWidth().height(200.dp),
+                                            contentAlignment = Alignment.Center
+                                        ) {
+                                            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                                Icon(Icons.Default.PersonOff, contentDescription = null, modifier = Modifier.size(48.dp), tint = MaterialTheme.colorScheme.outline)
+                                                Spacer(modifier = Modifier.height(8.dp))
+                                                Text("No user accounts found matching your search.", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                            }
+                                        }
+                                    }
+                                } else {
+                                    items(filteredUsers, key = { it.id }) { user ->
+                                        Card(
+                                            modifier = Modifier.fillMaxWidth(),
+                                            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                                            shape = RoundedCornerShape(16.dp),
+                                            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
+                                        ) {
+                                            Column(
+                                                modifier = Modifier.padding(16.dp),
+                                                verticalArrangement = Arrangement.spacedBy(10.dp)
+                                            ) {
+                                                // Top row: Avatar, Name, Badges
+                                                Row(
+                                                    modifier = Modifier.fillMaxWidth(),
+                                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                                    verticalAlignment = Alignment.CenterVertically
+                                                ) {
+                                                    Row(
+                                                        verticalAlignment = Alignment.CenterVertically,
+                                                        horizontalArrangement = Arrangement.spacedBy(10.dp),
+                                                        modifier = Modifier.weight(1f)
+                                                    ) {
+                                                        Box(
+                                                            modifier = Modifier
+                                                                .size(40.dp)
+                                                                .background(
+                                                                    when (user.role) {
+                                                                        "STUDENT" -> MaterialTheme.colorScheme.primaryContainer
+                                                                        "VENDOR" -> Color(0xFFFFE0B2)
+                                                                        else -> MaterialTheme.colorScheme.secondaryContainer
+                                                                    },
+                                                                    shape = CircleShape
+                                                                ),
+                                                            contentAlignment = Alignment.Center
+                                                        ) {
+                                                            Text(
+                                                                user.fullName.take(1).uppercase(),
+                                                                fontWeight = FontWeight.Bold,
+                                                                fontSize = 16.sp,
+                                                                color = when (user.role) {
+                                                                    "STUDENT" -> MaterialTheme.colorScheme.primary
+                                                                    "VENDOR" -> Color(0xFFE65100)
+                                                                    else -> MaterialTheme.colorScheme.secondary
+                                                                }
+                                                            )
+                                                        }
+
+                                                        Column {
+                                                            Text(
+                                                                user.fullName,
+                                                                fontWeight = FontWeight.Bold,
+                                                                style = MaterialTheme.typography.titleMedium
+                                                            )
+                                                            Text(
+                                                                "@${user.username}",
+                                                                fontSize = 11.sp,
+                                                                color = MaterialTheme.colorScheme.primary,
+                                                                fontWeight = FontWeight.SemiBold
+                                                            )
+                                                        }
+                                                    }
+
+                                                    // Status & Role Badges
+                                                    Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                                                        Surface(
+                                                            shape = RoundedCornerShape(6.dp),
+                                                            color = if (user.isOpen) Color(0xFFE8F5E9) else Color(0xFFFFEBEE),
+                                                            border = BorderStroke(1.dp, if (user.isOpen) Color(0xFF4CAF50).copy(alpha = 0.5f) else Color(0xFFF44336).copy(alpha = 0.5f))
+                                                        ) {
+                                                            Text(
+                                                                if (user.isOpen) "Active" else "Suspended",
+                                                                fontSize = 9.sp,
+                                                                fontWeight = FontWeight.Bold,
+                                                                color = if (user.isOpen) Color(0xFF2E7D32) else Color(0xFFC62828),
+                                                                modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                                                            )
+                                                        }
+
+                                                        Surface(
+                                                            shape = RoundedCornerShape(6.dp),
+                                                            color = MaterialTheme.colorScheme.surfaceVariant
+                                                        ) {
+                                                            Text(
+                                                                user.role,
+                                                                fontSize = 9.sp,
+                                                                fontWeight = FontWeight.Bold,
+                                                                modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                                                            )
+                                                        }
+                                                    }
+                                                }
+
+                                                // Middle Row: Info & Smart Balance
+                                                Row(
+                                                    modifier = Modifier.fillMaxWidth(),
+                                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                                    verticalAlignment = Alignment.CenterVertically
+                                                ) {
+                                                    Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                                                        if (user.info.isNotBlank()) {
+                                                            Text(
+                                                                "ID: ${user.info}",
+                                                                fontSize = 11.sp,
+                                                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                                                fontWeight = FontWeight.Medium
+                                                            )
+                                                        }
+                                                        user.email?.let { email ->
+                                                            Text("Email: $email", fontSize = 10.sp, color = MaterialTheme.colorScheme.outline)
+                                                        }
+                                                        user.telephone?.let { tel ->
+                                                            Text("Phone: $tel", fontSize = 10.sp, color = MaterialTheme.colorScheme.outline)
+                                                        }
+                                                    }
+
+                                                    // Smart Wallet Balance Badge
+                                                    Card(
+                                                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.6f)),
+                                                        shape = RoundedCornerShape(10.dp),
+                                                        border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.3f))
+                                                    ) {
+                                                        Column(modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp), horizontalAlignment = Alignment.End) {
+                                                            Text("SMART WALLET", fontSize = 8.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
+                                                            Text(
+                                                                "GH₵ ${"%.2f".format(user.balance)}",
+                                                                fontSize = 15.sp,
+                                                                fontWeight = FontWeight.ExtraBold,
+                                                                color = MaterialTheme.colorScheme.primary
+                                                            )
+                                                        }
+                                                    }
+                                                }
+
+                                                Divider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
+
+                                                // Bottom Action Buttons Row
+                                                Row(
+                                                    modifier = Modifier.fillMaxWidth(),
+                                                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                                                    verticalAlignment = Alignment.CenterVertically
+                                                ) {
+                                                    Button(
+                                                        onClick = { userToAdjustWallet = user },
+                                                        shape = RoundedCornerShape(8.dp),
+                                                        modifier = Modifier.weight(1.2f),
+                                                        contentPadding = PaddingValues(horizontal = 8.dp, vertical = 6.dp)
+                                                    ) {
+                                                        Icon(Icons.Default.AccountBalanceWallet, contentDescription = null, modifier = Modifier.size(13.dp))
+                                                        Spacer(modifier = Modifier.width(4.dp))
+                                                        Text("Adjust Wallet", fontSize = 10.sp, fontWeight = FontWeight.Bold)
+                                                    }
+
+                                                    OutlinedButton(
+                                                        onClick = { userToEditProfile = user },
+                                                        shape = RoundedCornerShape(8.dp),
+                                                        modifier = Modifier.weight(0.8f),
+                                                        contentPadding = PaddingValues(horizontal = 6.dp, vertical = 6.dp)
+                                                    ) {
+                                                        Icon(Icons.Default.Edit, contentDescription = null, modifier = Modifier.size(13.dp))
+                                                        Spacer(modifier = Modifier.width(2.dp))
+                                                        Text("Edit", fontSize = 10.sp)
+                                                    }
+
+                                                    IconButton(
+                                                        onClick = { userToResetPin = user },
+                                                        modifier = Modifier.size(34.dp)
+                                                    ) {
+                                                        Icon(Icons.Default.LockReset, contentDescription = "Reset PIN", tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(16.dp))
+                                                    }
+
+                                                    IconButton(
+                                                        onClick = { viewModel.adminToggleUserStatus(user.id) {} },
+                                                        modifier = Modifier.size(34.dp)
+                                                    ) {
+                                                        Icon(
+                                                            if (user.isOpen) Icons.Default.Block else Icons.Default.CheckCircle,
+                                                            contentDescription = if (user.isOpen) "Suspend" else "Activate",
+                                                            tint = if (user.isOpen) Color(0xFFE65100) else Color(0xFF2E7D32),
+                                                            modifier = Modifier.size(16.dp)
+                                                        )
+                                                    }
+
+                                                    IconButton(
+                                                        onClick = { userToDelete = user },
+                                                        modifier = Modifier.size(34.dp)
+                                                    ) {
+                                                        Icon(Icons.Default.Delete, contentDescription = "Delete", tint = MaterialTheme.colorScheme.error, modifier = Modifier.size(16.dp))
+                                                    }
+
+                                                    IconButton(
+                                                        onClick = {
+                                                            viewModel.startImpersonation(user)
+                                                            if (user.role == "VENDOR") {
+                                                                navController.navigate("vendor_home")
+                                                            } else {
+                                                                navController.navigate("student_home")
+                                                            }
+                                                        },
+                                                        modifier = Modifier.size(34.dp)
+                                                    ) {
+                                                        Icon(Icons.Default.PlayArrow, contentDescription = "Simulate", tint = Color(0xFFFF8F00), modifier = Modifier.size(18.dp))
+                                                    }
                                                 }
                                             }
                                         }
@@ -1264,7 +1612,164 @@ fun AdminDashboardScreen(
                             }
                         }
 
-                        // 3. Emergency Halting Command
+                        // 3. Live Campus Orders Oversight & Override
+                        item {
+                            var orderFilterStatus by remember { mutableStateOf("ALL") }
+                            val filteredLiveOrders = remember(allOrdersSnapshot, orderFilterStatus) {
+                                if (orderFilterStatus == "ALL") allOrdersSnapshot
+                                else allOrdersSnapshot.filter { it.status.uppercase() == orderFilterStatus }
+                            }
+
+                            Card(
+                                modifier = Modifier.fillMaxWidth(),
+                                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                                shape = RoundedCornerShape(16.dp),
+                                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
+                            ) {
+                                Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        horizontalArrangement = Arrangement.SpaceBetween,
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        Column {
+                                            Text("Live Campus Orders Dispatch & Override", fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleSmall, color = MaterialTheme.colorScheme.primary)
+                                            Text("Real-time orders queue with administrative status advance & instant wallet refund overrides.", fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                        }
+                                    }
+
+                                    // Filter chips
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
+                                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                                    ) {
+                                        listOf("ALL", "PENDING", "PREPARING", "READY", "COMPLETED", "CANCELLED").forEach { st ->
+                                            val count = if (st == "ALL") allOrdersSnapshot.size else allOrdersSnapshot.count { it.status.uppercase() == st }
+                                            FilterChip(
+                                                selected = orderFilterStatus == st,
+                                                onClick = { orderFilterStatus = st },
+                                                label = { Text("$st ($count)", fontSize = 10.sp) }
+                                            )
+                                        }
+                                    }
+
+                                    if (filteredLiveOrders.isEmpty()) {
+                                        Box(
+                                            modifier = Modifier.fillMaxWidth().height(100.dp),
+                                            contentAlignment = Alignment.Center
+                                        ) {
+                                            Text("No orders in '$orderFilterStatus' status.", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 11.sp)
+                                        }
+                                    } else {
+                                        filteredLiveOrders.take(15).forEach { order ->
+                                            val vendor = allUsers.find { it.id == order.vendorId }
+                                            val customer = allUsers.find { it.id == order.customerId }
+
+                                            Card(
+                                                modifier = Modifier.fillMaxWidth(),
+                                                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f)),
+                                                shape = RoundedCornerShape(10.dp)
+                                            ) {
+                                                Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                                                    Row(
+                                                        modifier = Modifier.fillMaxWidth(),
+                                                        horizontalArrangement = Arrangement.SpaceBetween,
+                                                        verticalAlignment = Alignment.CenterVertically
+                                                    ) {
+                                                        Column {
+                                                            Text("Order #${order.id} • GH₵ ${"%.2f".format(order.totalPrice)}", fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                                                            Text("Vendor: ${vendor?.fullName ?: "Vendor #${order.vendorId}"} • Student: ${customer?.fullName ?: "Student #${order.customerId}"}", fontSize = 10.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                                        }
+
+                                                        Surface(
+                                                            shape = RoundedCornerShape(6.dp),
+                                                            color = when (order.status.uppercase()) {
+                                                                "PENDING" -> Color(0xFFFFF3E0)
+                                                                "PREPARING" -> Color(0xFFE3F2FD)
+                                                                "READY" -> Color(0xFFE8F5E9)
+                                                                "COMPLETED" -> Color(0xFFF1F8E9)
+                                                                else -> Color(0xFFFFEBEE)
+                                                            }
+                                                        ) {
+                                                            Text(
+                                                                order.status.uppercase(),
+                                                                fontSize = 9.sp,
+                                                                fontWeight = FontWeight.Bold,
+                                                                color = when (order.status.uppercase()) {
+                                                                    "PENDING" -> Color(0xFFE65100)
+                                                                    "PREPARING" -> Color(0xFF1565C0)
+                                                                    "READY" -> Color(0xFF2E7D32)
+                                                                    "COMPLETED" -> Color(0xFF33691E)
+                                                                    else -> Color(0xFFC62828)
+                                                                },
+                                                                modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                                                            )
+                                                        }
+                                                    }
+
+                                                    // Admin Actions on Order
+                                                    Row(
+                                                        modifier = Modifier.fillMaxWidth(),
+                                                        horizontalArrangement = Arrangement.spacedBy(6.dp),
+                                                        verticalAlignment = Alignment.CenterVertically
+                                                    ) {
+                                                        when (order.status.uppercase()) {
+                                                            "PENDING" -> {
+                                                                Button(
+                                                                    onClick = { viewModel.adminAdvanceOrderStatus(order.id, "PREPARING") },
+                                                                    modifier = Modifier.weight(1f),
+                                                                    shape = RoundedCornerShape(6.dp),
+                                                                    contentPadding = PaddingValues(vertical = 4.dp)
+                                                                ) {
+                                                                    Text("Advance to Cooking", fontSize = 10.sp)
+                                                                }
+                                                            }
+                                                            "PREPARING" -> {
+                                                                Button(
+                                                                    onClick = { viewModel.adminAdvanceOrderStatus(order.id, "READY") },
+                                                                    modifier = Modifier.weight(1f),
+                                                                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF2E7D32)),
+                                                                    shape = RoundedCornerShape(6.dp),
+                                                                    contentPadding = PaddingValues(vertical = 4.dp)
+                                                                ) {
+                                                                    Text("Mark Ready for Pickup", fontSize = 10.sp)
+                                                                }
+                                                            }
+                                                            "READY" -> {
+                                                                Button(
+                                                                    onClick = { viewModel.adminAdvanceOrderStatus(order.id, "COMPLETED") },
+                                                                    modifier = Modifier.weight(1f),
+                                                                    shape = RoundedCornerShape(6.dp),
+                                                                    contentPadding = PaddingValues(vertical = 4.dp)
+                                                                ) {
+                                                                    Text("Mark Completed", fontSize = 10.sp)
+                                                                }
+                                                            }
+                                                        }
+
+                                                        if (order.status.uppercase() != "CANCELLED" && order.status.uppercase() != "COMPLETED") {
+                                                            OutlinedButton(
+                                                                onClick = { orderToRefund = order },
+                                                                shape = RoundedCornerShape(6.dp),
+                                                                colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.error),
+                                                                border = BorderStroke(1.dp, MaterialTheme.colorScheme.error.copy(alpha = 0.5f)),
+                                                                contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp)
+                                                            ) {
+                                                                Icon(Icons.Default.Cancel, contentDescription = null, modifier = Modifier.size(12.dp))
+                                                                Spacer(modifier = Modifier.width(4.dp))
+                                                                Text("Cancel & Refund", fontSize = 10.sp)
+                                                            }
+                                                        }
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+
+                        // 4. Emergency Halting Command
                         item {
                             Card(
                                 modifier = Modifier.fillMaxWidth(),
@@ -1808,6 +2313,945 @@ fun AdminDashboardScreen(
                 },
                 dismissButton = {
                     TextButton(onClick = { vendorToDelete = null }) {
+                        Text("Cancel")
+                    }
+                }
+            )
+        }
+
+        // 4. RESET VENDOR PIN DIALOG
+        vendorToResetPin?.let { vendor ->
+            var newPin by remember { mutableStateOf("1234") }
+            var pinError by remember { mutableStateOf<String?>(null) }
+
+            Dialog(onDismissRequest = { vendorToResetPin = null }) {
+                Card(
+                    shape = RoundedCornerShape(18.dp),
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                    modifier = Modifier.fillMaxWidth().padding(12.dp),
+                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
+                ) {
+                    Column(
+                        modifier = Modifier.padding(20.dp),
+                        verticalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Icon(Icons.Default.LockReset, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(24.dp))
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Column {
+                                Text("Reset Vendor Access PIN", fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleMedium)
+                                Text(vendor.fullName, fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            }
+                        }
+
+                        Text("Set a new numerical PIN code for vendor login:", fontSize = 12.sp)
+
+                        OutlinedTextField(
+                            value = newPin,
+                            onValueChange = { if (it.length <= 6) newPin = it },
+                            label = { Text("New PIN Code (4-6 digits)") },
+                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.NumberPassword),
+                            modifier = Modifier.fillMaxWidth(),
+                            singleLine = true
+                        )
+
+                        Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                            OutlinedButton(
+                                onClick = { newPin = "1234" },
+                                shape = RoundedCornerShape(8.dp),
+                                contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp)
+                            ) {
+                                Text("Default: 1234", fontSize = 10.sp)
+                            }
+                            OutlinedButton(
+                                onClick = { newPin = "0000" },
+                                shape = RoundedCornerShape(8.dp),
+                                contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp)
+                            ) {
+                                Text("0000", fontSize = 10.sp)
+                            }
+                            OutlinedButton(
+                                onClick = { newPin = (1000..9999).random().toString() },
+                                shape = RoundedCornerShape(8.dp),
+                                contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp)
+                            ) {
+                                Text("Generate Random", fontSize = 10.sp)
+                            }
+                        }
+
+                        pinError?.let {
+                            Text(it, color = MaterialTheme.colorScheme.error, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                        }
+
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.End,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            TextButton(onClick = { vendorToResetPin = null }) {
+                                Text("Cancel")
+                            }
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Button(
+                                onClick = {
+                                    if (newPin.length < 4) {
+                                        pinError = "PIN must be at least 4 digits"
+                                    } else {
+                                        viewModel.adminResetUserPin(vendor.id, newPin) { success ->
+                                            if (success) {
+                                                vendorToResetPin = null
+                                            } else {
+                                                pinError = "Failed to update PIN."
+                                            }
+                                        }
+                                    }
+                                }
+                            ) {
+                                Text("Update PIN")
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        // 5. VENDOR MENU & DISHES OVERSIGHT MODAL
+        vendorForMenuManagement?.let { vendor ->
+            val vendorDishes = remember(allFoodItems, vendor.id) { allFoodItems.filter { it.vendorId == vendor.id } }
+            var showAddDishSection by remember { mutableStateOf(false) }
+            var newDishName by remember { mutableStateOf("") }
+            var newDishPrice by remember { mutableStateOf("") }
+            var newDishCategory by remember { mutableStateOf("Local Dishes") }
+            var newDishPrepTime by remember { mutableStateOf("10 mins") }
+            var newDishImageUrl by remember { mutableStateOf("https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=300&auto=format&fit=crop&q=60") }
+            var dishError by remember { mutableStateOf<String?>(null) }
+
+            Dialog(onDismissRequest = { vendorForMenuManagement = null }) {
+                Card(
+                    shape = RoundedCornerShape(20.dp),
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                    modifier = Modifier.fillMaxWidth().fillMaxHeight(0.85f).padding(8.dp),
+                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
+                ) {
+                    Column(
+                        modifier = Modifier.padding(16.dp).fillMaxSize(),
+                        verticalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
+                        // Header
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                Icon(Icons.Default.RestaurantMenu, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
+                                Column {
+                                    Text("Menu Oversight: ${vendor.fullName}", fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleMedium)
+                                    Text("${vendorDishes.size} dishes listed in catalog", fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                }
+                            }
+                            IconButton(onClick = { vendorForMenuManagement = null }) {
+                                Icon(Icons.Default.Close, contentDescription = "Close")
+                            }
+                        }
+
+                        // Add Dish Toggle Button
+                        Button(
+                            onClick = { showAddDishSection = !showAddDishSection },
+                            modifier = Modifier.fillMaxWidth(),
+                            shape = RoundedCornerShape(10.dp),
+                            colors = if (showAddDishSection) ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.secondary) else ButtonDefaults.buttonColors()
+                        ) {
+                            Icon(if (showAddDishSection) Icons.Default.Close else Icons.Default.Add, contentDescription = null, modifier = Modifier.size(16.dp))
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text(if (showAddDishSection) "Hide Add Dish Form" else "+ Add Dish to This Stall", fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                        }
+
+                        // Add Dish Form (Expandable)
+                        if (showAddDishSection) {
+                            Card(
+                                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)),
+                                shape = RoundedCornerShape(12.dp)
+                            ) {
+                                Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                                    Text("Add New Dish for ${vendor.fullName}", fontWeight = FontWeight.Bold, fontSize = 12.sp, color = MaterialTheme.colorScheme.primary)
+
+                                    OutlinedTextField(
+                                        value = newDishName,
+                                        onValueChange = { newDishName = it },
+                                        label = { Text("Dish Name *") },
+                                        placeholder = { Text("e.g. Special Jollof with Grilled Tilapia") },
+                                        modifier = Modifier.fillMaxWidth(),
+                                        singleLine = true
+                                    )
+
+                                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                        OutlinedTextField(
+                                            value = newDishPrice,
+                                            onValueChange = { newDishPrice = it },
+                                            label = { Text("Price (GH₵) *") },
+                                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                                            modifier = Modifier.weight(1f),
+                                            singleLine = true
+                                        )
+
+                                        OutlinedTextField(
+                                            value = newDishPrepTime,
+                                            onValueChange = { newDishPrepTime = it },
+                                            label = { Text("Prep Time") },
+                                            modifier = Modifier.weight(1f),
+                                            singleLine = true
+                                        )
+                                    }
+
+                                    OutlinedTextField(
+                                        value = newDishCategory,
+                                        onValueChange = { newDishCategory = it },
+                                        label = { Text("Category") },
+                                        placeholder = { Text("Local Dishes, Continental, Drinks, Snacks") },
+                                        modifier = Modifier.fillMaxWidth(),
+                                        singleLine = true
+                                    )
+
+                                    dishError?.let {
+                                        Text(it, color = MaterialTheme.colorScheme.error, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                                    }
+
+                                    Button(
+                                        onClick = {
+                                            val priceVal = newDishPrice.toDoubleOrNull()
+                                            if (newDishName.isBlank()) {
+                                                dishError = "Dish name cannot be empty."
+                                            } else if (priceVal == null || priceVal <= 0.0) {
+                                                dishError = "Please enter a valid price."
+                                            } else {
+                                                val newFood = FoodItem(
+                                                    id = 0,
+                                                    vendorId = vendor.id,
+                                                    name = newDishName.trim(),
+                                                    price = priceVal,
+                                                    category = newDishCategory.ifBlank { "Local Dishes" },
+                                                    imageUrl = newDishImageUrl,
+                                                    description = "Campus prepared by ${vendor.fullName}",
+                                                    isAvailable = true,
+                                                    initialStock = 100,
+                                                    currentStock = 100,
+                                                    lowStockThreshold = 15,
+                                                    calories = 250,
+                                                    allergens = "None"
+                                                )
+                                                viewModel.addFoodItem(newFood)
+                                                newDishName = ""
+                                                newDishPrice = ""
+                                                dishError = null
+                                                showAddDishSection = false
+                                            }
+                                        },
+                                        modifier = Modifier.fillMaxWidth(),
+                                        shape = RoundedCornerShape(8.dp)
+                                    ) {
+                                        Text("Publish Dish to Vendor Menu", fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                                    }
+                                }
+                            }
+                        }
+
+                        // Dishes List
+                        LazyColumn(
+                            modifier = Modifier.weight(1f),
+                            verticalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            if (vendorDishes.isEmpty()) {
+                                item {
+                                    Box(modifier = Modifier.fillMaxWidth().height(120.dp), contentAlignment = Alignment.Center) {
+                                        Text("No dishes cataloged for this stall yet.", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                    }
+                                }
+                            } else {
+                                items(vendorDishes, key = { it.id }) { dish ->
+                                    Card(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f)),
+                                        shape = RoundedCornerShape(10.dp)
+                                    ) {
+                                        Row(
+                                            modifier = Modifier.fillMaxWidth().padding(10.dp),
+                                            horizontalArrangement = Arrangement.SpaceBetween,
+                                            verticalAlignment = Alignment.CenterVertically
+                                        ) {
+                                            Column(modifier = Modifier.weight(1f)) {
+                                                Text(dish.name, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.bodyMedium)
+                                                Text("GH₵ ${"%.2f".format(dish.price)} • ${dish.category} • Stock: ${dish.currentStock}", fontSize = 11.sp, color = MaterialTheme.colorScheme.primary)
+                                            }
+
+                                            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                                                // Stock toggle button
+                                                TextButton(
+                                                    onClick = {
+                                                        viewModel.updateFoodItem(dish.copy(isAvailable = !dish.isAvailable))
+                                                    },
+                                                    contentPadding = PaddingValues(horizontal = 6.dp, vertical = 2.dp)
+                                                ) {
+                                                    Text(
+                                                        if (dish.isAvailable) "In Stock" else "Sold Out",
+                                                        color = if (dish.isAvailable) Color(0xFF2E7D32) else Color(0xFFC62828),
+                                                        fontSize = 10.sp,
+                                                        fontWeight = FontWeight.Bold
+                                                    )
+                                                }
+
+                                                IconButton(
+                                                    onClick = {
+                                                        viewModel.deleteFoodItem(dish)
+                                                    },
+                                                    modifier = Modifier.size(32.dp)
+                                                ) {
+                                                    Icon(Icons.Default.Delete, contentDescription = "Delete Dish", tint = MaterialTheme.colorScheme.error, modifier = Modifier.size(16.dp))
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        // 6. ENROLL STUDENT DIALOG
+        if (showAddStudentDialog) {
+            var sUsername by remember { mutableStateOf("") }
+            var sPin by remember { mutableStateOf("1234") }
+            var sFullName by remember { mutableStateOf("") }
+            var sMatricId by remember { mutableStateOf("") }
+            var sEmail by remember { mutableStateOf("") }
+            var sPhone by remember { mutableStateOf("") }
+            var sInitialBalance by remember { mutableStateOf("50.00") }
+            var sError by remember { mutableStateOf<String?>(null) }
+
+            Dialog(onDismissRequest = { showAddStudentDialog = false }) {
+                Card(
+                    shape = RoundedCornerShape(20.dp),
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                    modifier = Modifier.fillMaxWidth().padding(8.dp),
+                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
+                ) {
+                    Column(
+                        modifier = Modifier.padding(20.dp).verticalScroll(rememberScrollState()),
+                        verticalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Icon(Icons.Default.PersonAdd, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(24.dp))
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Column {
+                                Text("Enroll New Student Account", fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleMedium)
+                                Text("Creates verified ATU student meal wallet", fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            }
+                        }
+
+                        OutlinedTextField(
+                            value = sFullName,
+                            onValueChange = { name ->
+                                sFullName = name
+                                val clean = name.trim().lowercase().replace(Regex("[^a-z0-9]"), "").take(12)
+                                if (clean.isNotEmpty() && sUsername.isEmpty()) {
+                                    sUsername = clean
+                                }
+                            },
+                            label = { Text("Full Name *") },
+                            placeholder = { Text("e.g. Kwame Mensah") },
+                            modifier = Modifier.fillMaxWidth(),
+                            singleLine = true
+                        )
+
+                        OutlinedTextField(
+                            value = sUsername,
+                            onValueChange = { sUsername = it },
+                            label = { Text("Username *") },
+                            placeholder = { Text("e.g. kwame_m") },
+                            modifier = Modifier.fillMaxWidth(),
+                            singleLine = true
+                        )
+
+                        OutlinedTextField(
+                            value = sMatricId,
+                            onValueChange = { sMatricId = it },
+                            label = { Text("Matric / Index ID") },
+                            placeholder = { Text("e.g. ATU/01/2026/0892") },
+                            modifier = Modifier.fillMaxWidth(),
+                            singleLine = true
+                        )
+
+                        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            OutlinedTextField(
+                                value = sEmail,
+                                onValueChange = { sEmail = it },
+                                label = { Text("Email Address") },
+                                placeholder = { Text("student@atu.edu.gh") },
+                                modifier = Modifier.weight(1f),
+                                singleLine = true
+                            )
+                            OutlinedTextField(
+                                value = sPhone,
+                                onValueChange = { sPhone = it },
+                                label = { Text("Phone") },
+                                placeholder = { Text("0241234567") },
+                                modifier = Modifier.weight(1f),
+                                singleLine = true
+                            )
+                        }
+
+                        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            OutlinedTextField(
+                                value = sPin,
+                                onValueChange = { if (it.length <= 6) sPin = it },
+                                label = { Text("Access PIN *") },
+                                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.NumberPassword),
+                                modifier = Modifier.weight(1f),
+                                singleLine = true
+                            )
+                            OutlinedTextField(
+                                value = sInitialBalance,
+                                onValueChange = { sInitialBalance = it },
+                                label = { Text("Initial Balance (GH₵)") },
+                                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                                modifier = Modifier.weight(1f),
+                                singleLine = true
+                            )
+                        }
+
+                        sError?.let {
+                            Text(it, color = MaterialTheme.colorScheme.error, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                        }
+
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.End,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            TextButton(onClick = { showAddStudentDialog = false }) {
+                                Text("Cancel")
+                            }
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Button(
+                                onClick = {
+                                    if (sFullName.isBlank()) {
+                                        sError = "Full name cannot be empty."
+                                    } else if (sUsername.isBlank()) {
+                                        sError = "Username cannot be empty."
+                                    } else if (sPin.length < 4) {
+                                        sError = "PIN must be at least 4 digits."
+                                    } else {
+                                        val initialBal = sInitialBalance.toDoubleOrNull() ?: 50.0
+                                        viewModel.adminAddStudent(
+                                            username = sUsername.trim(),
+                                            pinCode = sPin.trim(),
+                                            fullName = sFullName.trim(),
+                                            matricId = sMatricId.trim().ifBlank { "ATU-${(1000..9999).random()}" },
+                                            email = sEmail.trim().ifBlank { null },
+                                            phone = sPhone.trim().ifBlank { null },
+                                            initialBalance = initialBal
+                                        ) { success, msg ->
+                                            if (success) {
+                                                showAddStudentDialog = false
+                                            } else {
+                                                sError = msg
+                                            }
+                                        }
+                                    }
+                                }
+                            ) {
+                                Text("Enroll Student")
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        // 7. ADJUST SMART WALLET DIALOG
+        userToAdjustWallet?.let { user ->
+            var isCredit by remember { mutableStateOf(true) }
+            var adjAmount by remember { mutableStateOf("") }
+            var adjReason by remember { mutableStateOf("Directorate Cash Desk Top-Up") }
+            var adjError by remember { mutableStateOf<String?>(null) }
+
+            Dialog(onDismissRequest = { userToAdjustWallet = null }) {
+                Card(
+                    shape = RoundedCornerShape(20.dp),
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                    modifier = Modifier.fillMaxWidth().padding(8.dp),
+                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
+                ) {
+                    Column(
+                        modifier = Modifier.padding(20.dp),
+                        verticalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Icon(Icons.Default.AccountBalanceWallet, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(24.dp))
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Column {
+                                Text("Adjust Smart Wallet Balance", fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleMedium)
+                                Text(user.fullName, fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            }
+                        }
+
+                        // Current Balance Display
+                        Card(
+                            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.4f)),
+                            shape = RoundedCornerShape(10.dp)
+                        ) {
+                            Row(
+                                modifier = Modifier.fillMaxWidth().padding(12.dp),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Text("Current Ledger Balance:", fontSize = 12.sp, fontWeight = FontWeight.Medium)
+                                Text("GH₵ ${"%.2f".format(user.balance)}", fontSize = 16.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
+                            }
+                        }
+
+                        // Credit / Debit selector
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            Button(
+                                onClick = { isCredit = true },
+                                modifier = Modifier.weight(1f),
+                                colors = if (isCredit) ButtonDefaults.buttonColors(containerColor = Color(0xFF2E7D32)) else ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.surfaceVariant, contentColor = MaterialTheme.colorScheme.onSurfaceVariant),
+                                shape = RoundedCornerShape(8.dp)
+                            ) {
+                                Text("+ Credit (Add)", fontWeight = FontWeight.Bold, fontSize = 11.sp)
+                            }
+
+                            Button(
+                                onClick = { isCredit = false },
+                                modifier = Modifier.weight(1f),
+                                colors = if (!isCredit) ButtonDefaults.buttonColors(containerColor = Color(0xFFC62828)) else ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.surfaceVariant, contentColor = MaterialTheme.colorScheme.onSurfaceVariant),
+                                shape = RoundedCornerShape(8.dp)
+                            ) {
+                                Text("- Debit (Deduct)", fontWeight = FontWeight.Bold, fontSize = 11.sp)
+                            }
+                        }
+
+                        OutlinedTextField(
+                            value = adjAmount,
+                            onValueChange = { adjAmount = it },
+                            label = { Text("Adjustment Amount (GH₵) *") },
+                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                            modifier = Modifier.fillMaxWidth(),
+                            singleLine = true
+                        )
+
+                        // Quick Amount Chips
+                        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                            listOf(10, 20, 50, 100).forEach { amt ->
+                                OutlinedButton(
+                                    onClick = { adjAmount = amt.toString() },
+                                    modifier = Modifier.weight(1f),
+                                    shape = RoundedCornerShape(6.dp),
+                                    contentPadding = PaddingValues(horizontal = 4.dp, vertical = 2.dp)
+                                ) {
+                                    Text("+$amt", fontSize = 10.sp, fontWeight = FontWeight.Bold)
+                                }
+                            }
+                        }
+
+                        OutlinedTextField(
+                            value = adjReason,
+                            onValueChange = { adjReason = it },
+                            label = { Text("Mandatory Reason Note *") },
+                            placeholder = { Text("e.g. Physical Cash Deposit, Meal Subsidy Refund") },
+                            modifier = Modifier.fillMaxWidth(),
+                            singleLine = true
+                        )
+
+                        adjError?.let {
+                            Text(it, color = MaterialTheme.colorScheme.error, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                        }
+
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.End,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            TextButton(onClick = { userToAdjustWallet = null }) {
+                                Text("Cancel")
+                            }
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Button(
+                                onClick = {
+                                    val amountVal = adjAmount.toDoubleOrNull()
+                                    if (amountVal == null || amountVal <= 0.0) {
+                                        adjError = "Please enter a valid amount."
+                                    } else if (adjReason.isBlank()) {
+                                        adjError = "Audit reason is required."
+                                    } else {
+                                        viewModel.adminAdjustUserBalance(
+                                            userId = user.id,
+                                            amount = amountVal,
+                                            isCredit = isCredit,
+                                            reason = adjReason.trim()
+                                        ) { success, msg ->
+                                            if (success) {
+                                                userToAdjustWallet = null
+                                            } else {
+                                                adjError = msg
+                                            }
+                                        }
+                                    }
+                                }
+                            ) {
+                                Text("Execute Adjustment")
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        // 8. CAMPUS-WIDE SUBSIDY BONUS DIALOG
+        if (showCampusBonusDialog) {
+            var bonusAmt by remember { mutableStateOf("20.00") }
+            var bonusReason by remember { mutableStateOf("Directorate Campus Meal Subsidy Grant") }
+            var bonusError by remember { mutableStateOf<String?>(null) }
+            val studentCount = remember(allUsers) { allUsers.count { it.role == "STUDENT" } }
+
+            Dialog(onDismissRequest = { showCampusBonusDialog = false }) {
+                Card(
+                    shape = RoundedCornerShape(20.dp),
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                    modifier = Modifier.fillMaxWidth().padding(8.dp),
+                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
+                ) {
+                    Column(
+                        modifier = Modifier.padding(20.dp),
+                        verticalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Icon(Icons.Default.CardGiftcard, contentDescription = null, tint = Color(0xFF2E7D32), modifier = Modifier.size(24.dp))
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Column {
+                                Text("Campus-Wide Meal Subsidy", fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleMedium)
+                                Text("Distribute credit to all $studentCount enrolled students", fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            }
+                        }
+
+                        OutlinedTextField(
+                            value = bonusAmt,
+                            onValueChange = { bonusAmt = it },
+                            label = { Text("Subsidy Amount per Student (GH₵) *") },
+                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                            modifier = Modifier.fillMaxWidth(),
+                            singleLine = true
+                        )
+
+                        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                            listOf(10, 20, 50, 100).forEach { amt ->
+                                OutlinedButton(
+                                    onClick = { bonusAmt = "$amt.00" },
+                                    modifier = Modifier.weight(1f),
+                                    shape = RoundedCornerShape(6.dp),
+                                    contentPadding = PaddingValues(horizontal = 4.dp, vertical = 2.dp)
+                                ) {
+                                    Text("GH₵ $amt", fontSize = 10.sp, fontWeight = FontWeight.Bold)
+                                }
+                            }
+                        }
+
+                        OutlinedTextField(
+                            value = bonusReason,
+                            onValueChange = { bonusReason = it },
+                            label = { Text("Official Memo / Subsidy Note *") },
+                            modifier = Modifier.fillMaxWidth(),
+                            singleLine = true
+                        )
+
+                        bonusError?.let {
+                            Text(it, color = MaterialTheme.colorScheme.error, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                        }
+
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.End,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            TextButton(onClick = { showCampusBonusDialog = false }) {
+                                Text("Cancel")
+                            }
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Button(
+                                onClick = {
+                                    val amountVal = bonusAmt.toDoubleOrNull()
+                                    if (amountVal == null || amountVal <= 0.0) {
+                                        bonusError = "Please enter a valid bonus amount."
+                                    } else if (bonusReason.isBlank()) {
+                                        bonusError = "Official memo is required."
+                                    } else {
+                                        viewModel.adminBonusToAllStudents(amountVal, bonusReason.trim()) { count ->
+                                            showCampusBonusDialog = false
+                                        }
+                                    }
+                                },
+                                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF2E7D32))
+                            ) {
+                                Text("Distribute to All")
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        // 9. EDIT USER PROFILE DIALOG
+        userToEditProfile?.let { user ->
+            var pFullName by remember { mutableStateOf(user.fullName) }
+            var pInfo by remember { mutableStateOf(user.info) }
+            var pEmail by remember { mutableStateOf(user.email ?: "") }
+            var pPhone by remember { mutableStateOf(user.telephone ?: "") }
+            var pError by remember { mutableStateOf<String?>(null) }
+
+            Dialog(onDismissRequest = { userToEditProfile = null }) {
+                Card(
+                    shape = RoundedCornerShape(20.dp),
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                    modifier = Modifier.fillMaxWidth().padding(8.dp),
+                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
+                ) {
+                    Column(
+                        modifier = Modifier.padding(20.dp),
+                        verticalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Icon(Icons.Default.ManageAccounts, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(24.dp))
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Column {
+                                Text("Edit User Profile", fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleMedium)
+                                Text("@${user.username} • ${user.role}", fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            }
+                        }
+
+                        OutlinedTextField(
+                            value = pFullName,
+                            onValueChange = { pFullName = it },
+                            label = { Text("Full Name *") },
+                            modifier = Modifier.fillMaxWidth(),
+                            singleLine = true
+                        )
+
+                        OutlinedTextField(
+                            value = pInfo,
+                            onValueChange = { pInfo = it },
+                            label = { Text(if (user.role == "STUDENT") "Matric / Index ID" else "Location / Specialty") },
+                            modifier = Modifier.fillMaxWidth(),
+                            singleLine = true
+                        )
+
+                        OutlinedTextField(
+                            value = pEmail,
+                            onValueChange = { pEmail = it },
+                            label = { Text("Email Address") },
+                            modifier = Modifier.fillMaxWidth(),
+                            singleLine = true
+                        )
+
+                        OutlinedTextField(
+                            value = pPhone,
+                            onValueChange = { pPhone = it },
+                            label = { Text("Phone Number") },
+                            modifier = Modifier.fillMaxWidth(),
+                            singleLine = true
+                        )
+
+                        pError?.let {
+                            Text(it, color = MaterialTheme.colorScheme.error, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                        }
+
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.End,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            TextButton(onClick = { userToEditProfile = null }) {
+                                Text("Cancel")
+                            }
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Button(
+                                onClick = {
+                                    if (pFullName.isBlank()) {
+                                        pError = "Full name cannot be empty."
+                                    } else {
+                                        viewModel.adminUpdateUserProfile(
+                                            userId = user.id,
+                                            fullName = pFullName.trim(),
+                                            info = pInfo.trim(),
+                                            email = pEmail.trim().ifBlank { null },
+                                            phone = pPhone.trim().ifBlank { null }
+                                        ) { success ->
+                                            if (success) {
+                                                userToEditProfile = null
+                                            } else {
+                                                pError = "Failed to update profile."
+                                            }
+                                        }
+                                    }
+                                }
+                            ) {
+                                Text("Save Changes")
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        // 10. RESET STUDENT / USER PIN DIALOG
+        userToResetPin?.let { user ->
+            var uPin by remember { mutableStateOf("1234") }
+            var uPinError by remember { mutableStateOf<String?>(null) }
+
+            Dialog(onDismissRequest = { userToResetPin = null }) {
+                Card(
+                    shape = RoundedCornerShape(18.dp),
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                    modifier = Modifier.fillMaxWidth().padding(12.dp),
+                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
+                ) {
+                    Column(
+                        modifier = Modifier.padding(20.dp),
+                        verticalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Icon(Icons.Default.LockReset, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(24.dp))
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Column {
+                                Text("Reset Access PIN", fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleMedium)
+                                Text("${user.fullName} (@${user.username})", fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            }
+                        }
+
+                        OutlinedTextField(
+                            value = uPin,
+                            onValueChange = { if (it.length <= 6) uPin = it },
+                            label = { Text("New Access PIN (4-6 digits)") },
+                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.NumberPassword),
+                            modifier = Modifier.fillMaxWidth(),
+                            singleLine = true
+                        )
+
+                        Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                            OutlinedButton(
+                                onClick = { uPin = "1234" },
+                                shape = RoundedCornerShape(8.dp),
+                                contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp)
+                            ) {
+                                Text("Default: 1234", fontSize = 10.sp)
+                            }
+                            OutlinedButton(
+                                onClick = { uPin = (1000..9999).random().toString() },
+                                shape = RoundedCornerShape(8.dp),
+                                contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp)
+                            ) {
+                                Text("Random 4-digit", fontSize = 10.sp)
+                            }
+                        }
+
+                        uPinError?.let {
+                            Text(it, color = MaterialTheme.colorScheme.error, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                        }
+
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.End,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            TextButton(onClick = { userToResetPin = null }) {
+                                Text("Cancel")
+                            }
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Button(
+                                onClick = {
+                                    if (uPin.length < 4) {
+                                        uPinError = "PIN must be at least 4 digits."
+                                    } else {
+                                        viewModel.adminResetUserPin(user.id, uPin.trim()) { success ->
+                                            if (success) {
+                                                userToResetPin = null
+                                            } else {
+                                                uPinError = "Failed to update PIN."
+                                            }
+                                        }
+                                    }
+                                }
+                            ) {
+                                Text("Confirm PIN Reset")
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        // 11. DELETE USER CONFIRMATION DIALOG
+        userToDelete?.let { user ->
+            AlertDialog(
+                onDismissRequest = { userToDelete = null },
+                title = { Text("Delete User Account?") },
+                text = { Text("Are you sure you want to delete ${user.fullName} (@${user.username})? This action is irreversible.") },
+                confirmButton = {
+                    Button(
+                        onClick = {
+                            viewModel.adminDeleteUser(user.id) {
+                                userToDelete = null
+                            }
+                        },
+                        colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error)
+                    ) {
+                        Text("Delete Account")
+                    }
+                },
+                dismissButton = {
+                    TextButton(onClick = { userToDelete = null }) {
+                        Text("Cancel")
+                    }
+                }
+            )
+        }
+
+        // 12. ADMIN CANCEL & REFUND ORDER DIALOG
+        orderToRefund?.let { order ->
+            var refundReason by remember { mutableStateOf("Vendor Unavailability / Out of Stock") }
+
+            AlertDialog(
+                onDismissRequest = { orderToRefund = null },
+                title = { Text("Cancel & Refund Order #${order.id}") },
+                text = {
+                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Text("This will immediately cancel the order and credit GH₵ ${"%.2f".format(order.totalPrice)} back to the student's smart meal wallet.")
+                        OutlinedTextField(
+                            value = refundReason,
+                            onValueChange = { refundReason = it },
+                            label = { Text("Refund Reason Note *") },
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                    }
+                },
+                confirmButton = {
+                    Button(
+                        onClick = {
+                            viewModel.adminCancelAndRefundOrder(order.id, refundReason.trim().ifBlank { "Administrative Refund" }) {
+                                orderToRefund = null
+                            }
+                        },
+                        colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error)
+                    ) {
+                        Text("Cancel & Refund")
+                    }
+                },
+                dismissButton = {
+                    TextButton(onClick = { orderToRefund = null }) {
                         Text("Cancel")
                     }
                 }

@@ -1992,6 +1992,303 @@ class CafeteriaViewModel @Inject constructor(
         }
     }
 
+    // ==========================================
+    // ADMIN USER & STUDENT OVERSIGHT METHODS
+    // ==========================================
+
+    fun adminAddStudent(
+        username: String,
+        pinCode: String,
+        fullName: String,
+        matricId: String,
+        email: String?,
+        phone: String?,
+        initialBalance: Double = 50.0,
+        onResult: (Boolean, String) -> Unit
+    ) {
+        viewModelScope.launch {
+            _isLoading.value = true
+            val registered = repository.registerUser(username, pinCode, "STUDENT", fullName, matricId)
+            if (registered != null) {
+                val updated = registered.copy(
+                    email = email?.ifBlank { null },
+                    telephone = phone?.ifBlank { null },
+                    balance = initialBalance
+                )
+                repository.updateUser(updated)
+                val admin = realAdminUser.value ?: _currentUser.value
+                if (admin != null) {
+                    repository.insertAuditLog(
+                        admin.id,
+                        "STUDENT_REGISTERED",
+                        "Admin registered student '$fullName' ($username, ID: $matricId) with initial smart balance GH₵ ${"%.2f".format(initialBalance)}."
+                    )
+                }
+                _isLoading.value = false
+                onResult(true, "Student registered successfully.")
+            } else {
+                _isLoading.value = false
+                onResult(false, "Username already exists or registration failed.")
+            }
+        }
+    }
+
+    fun adminAdjustUserBalance(
+        userId: Int,
+        amount: Double,
+        isCredit: Boolean,
+        reason: String,
+        onResult: (Boolean, String) -> Unit
+    ) {
+        viewModelScope.launch {
+            _isLoading.value = true
+            val targetUser = repository.userDao.getUserSync(userId)
+            if (targetUser != null) {
+                val delta = if (isCredit) amount else -amount
+                val newBalance = (targetUser.balance + delta).coerceAtLeast(0.0)
+                repository.updateUser(targetUser.copy(balance = newBalance))
+                
+                val ref = "ADM-" + (100000..999999).random()
+                val details = if (isCredit) "Admin Credit: $reason" else "Admin Debit: $reason"
+                val type = if (isCredit) "DEPOSIT" else "ADJUSTMENT"
+                repository.insertWalletTransaction(targetUser.id, type, if (isCredit) amount else -amount, ref, details)
+                
+                val admin = realAdminUser.value ?: _currentUser.value
+                if (admin != null) {
+                    val action = if (isCredit) "WALLET_ADMIN_CREDIT" else "WALLET_ADMIN_DEBIT"
+                    repository.insertAuditLog(
+                        admin.id,
+                        action,
+                        "Admin adjusted ${targetUser.role} '${targetUser.fullName}' wallet by ${if (isCredit) "+" else "-"}GH₵ ${"%.2f".format(amount)}. New balance: GH₵ ${"%.2f".format(newBalance)}. Reason: $reason (Ref: $ref)"
+                    )
+                }
+                _isLoading.value = false
+                onResult(true, "Balance adjusted successfully.")
+            } else {
+                _isLoading.value = false
+                onResult(false, "User not found.")
+            }
+        }
+    }
+
+    fun addFoodItem(foodItem: FoodItem, onResult: ((Boolean) -> Unit)? = null) {
+        viewModelScope.launch {
+            repository.foodItemDao.insertFoodItem(foodItem)
+            val admin = realAdminUser.value ?: _currentUser.value
+            if (admin != null) {
+                repository.insertAuditLog(
+                    admin.id,
+                    "ADMIN_FOOD_ADDED",
+                    "Admin added menu item '${foodItem.name}' (GH₵ ${"%.2f".format(foodItem.price)}) to Vendor #${foodItem.vendorId}."
+                )
+            }
+            onResult?.invoke(true)
+        }
+    }
+
+    fun updateFoodItem(foodItem: FoodItem, onResult: ((Boolean) -> Unit)? = null) {
+        viewModelScope.launch {
+            repository.foodItemDao.updateFoodItem(foodItem)
+            onResult?.invoke(true)
+        }
+    }
+
+    fun deleteFoodItem(foodItem: FoodItem, onResult: ((Boolean) -> Unit)? = null) {
+        viewModelScope.launch {
+            repository.foodItemDao.deleteFoodItem(foodItem)
+            val admin = realAdminUser.value ?: _currentUser.value
+            if (admin != null) {
+                repository.insertAuditLog(
+                    admin.id,
+                    "ADMIN_FOOD_DELETED",
+                    "Admin deleted menu item '${foodItem.name}' (ID: ${foodItem.id}) from Vendor #${foodItem.vendorId}."
+                )
+            }
+            onResult?.invoke(true)
+        }
+    }
+
+    fun adminBonusToAllStudents(bonusAmount: Double, reason: String, onResult: (Int) -> Unit) {
+        viewModelScope.launch {
+            _isLoading.value = true
+            val all = allUsers.value.filter { it.role == "STUDENT" }
+            var count = 0
+            val admin = realAdminUser.value ?: _currentUser.value
+            for (student in all) {
+                val newBal = student.balance + bonusAmount
+                repository.updateUser(student.copy(balance = newBal))
+                val ref = "BONUS-" + (100000..999999).random()
+                repository.insertWalletTransaction(student.id, "DEPOSIT", bonusAmount, ref, "Campus-Wide Subsidy: $reason")
+                count++
+            }
+            if (admin != null) {
+                repository.insertAuditLog(
+                    admin.id,
+                    "CAMPUS_SUBSIDY_DISTRIBUTED",
+                    "Admin distributed GH₵ ${"%.2f".format(bonusAmount)} meal subsidy bonus to $count students. Total: GH₵ ${"%.2f".format(count * bonusAmount)}. Memo: $reason"
+                )
+            }
+            _isLoading.value = false
+            onResult(count)
+        }
+    }
+
+    fun adminResetUserPin(userId: Int, newPin: String, onResult: (Boolean) -> Unit) {
+        viewModelScope.launch {
+            _isLoading.value = true
+            val targetUser = repository.userDao.getUserSync(userId)
+            if (targetUser != null) {
+                val newHash = repository.sha256(newPin)
+                repository.updateUser(targetUser.copy(passwordHash = newHash))
+                val admin = realAdminUser.value ?: _currentUser.value
+                if (admin != null) {
+                    repository.insertAuditLog(
+                        admin.id,
+                        "PIN_RESET",
+                        "Admin reset Access PIN for ${targetUser.role} '${targetUser.fullName}' (${targetUser.username})."
+                    )
+                }
+                _isLoading.value = false
+                onResult(true)
+            } else {
+                _isLoading.value = false
+                onResult(false)
+            }
+        }
+    }
+
+    fun adminDeleteUser(userId: Int, onResult: (Boolean) -> Unit) {
+        viewModelScope.launch {
+            _isLoading.value = true
+            val target = repository.userDao.getUserSync(userId)
+            val name = target?.fullName ?: "User #$userId"
+            val role = target?.role ?: "USER"
+            repository.deleteUser(userId)
+            val admin = realAdminUser.value ?: _currentUser.value
+            if (admin != null) {
+                repository.insertAuditLog(
+                    admin.id,
+                    "USER_DELETED",
+                    "Admin deleted $role account '$name' (ID: $userId)."
+                )
+            }
+            _isLoading.value = false
+            onResult(true)
+        }
+    }
+
+    fun adminUpdateUserProfile(
+        userId: Int,
+        fullName: String,
+        info: String,
+        email: String?,
+        phone: String?,
+        onResult: (Boolean) -> Unit
+    ) {
+        viewModelScope.launch {
+            _isLoading.value = true
+            val target = repository.userDao.getUserSync(userId)
+            if (target != null) {
+                val updated = target.copy(
+                    fullName = fullName,
+                    info = info,
+                    email = email?.ifBlank { null },
+                    telephone = phone?.ifBlank { null }
+                )
+                repository.updateUser(updated)
+                val admin = realAdminUser.value ?: _currentUser.value
+                if (admin != null) {
+                    repository.insertAuditLog(
+                        admin.id,
+                        "USER_PROFILE_UPDATED",
+                        "Admin updated profile details for ${target.role} '$fullName' (${target.username})."
+                    )
+                }
+                _isLoading.value = false
+                onResult(true)
+            } else {
+                _isLoading.value = false
+                onResult(false)
+            }
+        }
+    }
+
+    fun adminToggleUserStatus(userId: Int, onResult: (Boolean) -> Unit) {
+        viewModelScope.launch {
+            _isLoading.value = true
+            val target = repository.userDao.getUserSync(userId)
+            if (target != null) {
+                val newStatus = !target.isOpen
+                val updated = target.copy(isOpen = newStatus)
+                repository.updateUser(updated)
+                val admin = realAdminUser.value ?: _currentUser.value
+                if (admin != null) {
+                    repository.insertAuditLog(
+                        admin.id,
+                        if (newStatus) "USER_ACTIVATED" else "USER_SUSPENDED",
+                        "Admin ${if (newStatus) "activated" else "suspended"} account for ${target.role} '${target.fullName}'."
+                    )
+                }
+                _isLoading.value = false
+                onResult(true)
+            } else {
+                _isLoading.value = false
+                onResult(false)
+            }
+        }
+    }
+
+    fun adminCancelAndRefundOrder(orderId: Int, reason: String, onResult: (Boolean) -> Unit) {
+        viewModelScope.launch {
+            _isLoading.value = true
+            val order = repository.orderDao.getOrderById(orderId)
+            if (order != null) {
+                repository.updateOrderStatus(order.vendorId, orderId, "CANCELLED")
+                val customer = repository.userDao.getUserSync(order.customerId)
+                if (customer != null) {
+                    val refundedBalance = customer.balance + order.totalPrice
+                    repository.updateUser(customer.copy(balance = refundedBalance))
+                    val ref = "REF-" + (100000..999999).random()
+                    repository.insertWalletTransaction(
+                        customer.id,
+                        "REFUND",
+                        order.totalPrice,
+                        ref,
+                        "Admin Refund for Order #$orderId: $reason"
+                    )
+                }
+                val admin = realAdminUser.value ?: _currentUser.value
+                if (admin != null) {
+                    repository.insertAuditLog(
+                        admin.id,
+                        "ORDER_ADMIN_CANCEL_REFUND",
+                        "Admin cancelled Order #$orderId and refunded GH₵ ${"%.2f".format(order.totalPrice)} to customer #${order.customerId}. Reason: $reason"
+                    )
+                }
+                _isLoading.value = false
+                onResult(true)
+            } else {
+                _isLoading.value = false
+                onResult(false)
+            }
+        }
+    }
+
+    fun adminAdvanceOrderStatus(orderId: Int, newStatus: String) {
+        viewModelScope.launch {
+            val order = repository.orderDao.getOrderById(orderId) ?: return@launch
+            repository.updateOrderStatus(order.vendorId, orderId, newStatus)
+            val admin = realAdminUser.value ?: _currentUser.value
+            if (admin != null) {
+                repository.insertAuditLog(
+                    admin.id,
+                    "ORDER_STATUS_OVERRIDE",
+                    "Admin advanced Order #$orderId status from ${order.status} to $newStatus."
+                )
+            }
+        }
+    }
+
     // Student specific actions
     fun rechargeWallet(amount: Double) {
         viewModelScope.launch {
