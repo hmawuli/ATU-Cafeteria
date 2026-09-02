@@ -7285,14 +7285,168 @@ fun StudentDashboardScreen(
                                                     )
                                                     pinConfirmationError?.let {
                                                         Text(
-                                                             text = it,
-                                                             color = MaterialTheme.colorScheme.error,
-                                                             fontSize = 10.sp,
-                                                             fontWeight = FontWeight.Bold,
-                                                             moxœì[]rÛ8~Ï)PªìUëáHœ™rUfÖ–”+–­Šç1‘ „2Hp	Ğ’òË`¯°¯{½Ğ`°€T$™ú!He2µÆC"ş İhtøĞlû4 $A¯Ğ€ûú§cß§ÑÔ‘<†Û×›Ïe³ëùPºW¹G¥^÷xĞ$<O¥ä˜äKiõLWÇÊ<ê2êİZÉÍÓ¨k&‚%åÑE§Ò¥âŠË~Ë¹ÓlV Ú„òÈ„zıOñAc™¤¤ê˜Ã„Â%>•½æÍ…I@GpïÆBß© I„CÒ8B^š$$’ïáÎo®©…ÄAğ‘úè·SÔß÷úWãÆ¡”u=ŠV«‰çœ3‚£e‘Ä,ˆUVƒÇl^q¹ÄŒßVèQÌø\*ÀLTó©"ÓÂÀF£ö“„+TRÆ¬Ç}@&[1,7(Ö‚Àààß ÿs&hxqåÚ¡<hÛõ²…©1ù$Ff
-ô2(eÆİk|*B*D…½FÍó÷Şo»õÇmİ1ûÍGa‡wá½ßŞO“‡g{½¦H‹r¤1ßÇÆ‡Ê˜ë'HF<Iü‘3î£É%$$áï
-S©`$±$×ÓŒ¯€x£YbÆJŠv#Ÿì¾}ü¢Szh/’‡g!O#i~«e2©Ìez¬Ñ»¥'fciœ´ÊOvÆ#RF•¡êP¤‰~)Ò:î 0êœ¼üY«´·NgŒ$ÒxG9¼ãQÏ`í;ò·”%_Ğš¿å˜UÅ©g	Ş-lÓOÉx»†05p{$À)“î™ç©E?ÇLÆÌ‘å&”7Vcèá%4V ©ØŒˆz$æ‚Ê†İĞ’Fjà>	<×r=Îx2òôï89&s»ÑÃìt»|Ğô3q^[pËõ(é>’JF¬7;ÿ‘ĞS­e¶ˆèuùÀè™%¶\Z!çz>«k+ç1Ÿ&8Í]=áœñÒĞNB ~ùĞéLÍáõâÂ=çÌÿÎÖÖØ¹üÒv9KCKp(òş€26ÀŸ>P_Îœ¦{0J=ÌF^Âsr`7—Ô¸í'ú,Ip4…u /]¹"ÆñÏçNÛ2-iÔ(MlgTÕÄÇÊ³ß¾úÄïò$›©›ÙTì,¦š†¾} (¬ÄäÂÃxî`Ï0ôk¹ ‚øİ.c5t•$Ó;~o¿RªÍ)ÏvV].Õf<¡ŸÕjlqõ‘rõs"ï	‰ªI[„£Ó(—”ÿv»ú`“½Ãæö)ÜŠù‡ì¨bòj(ã §£İ»Â„ûsØ};ÚŠïÕÒLF½¿¾ùÏßÿiüÉ=nÀÕ‘ĞÉòfïË4o>ì£ºŞĞvéÎ°w{´œÛÏÓ65Sáh:Ò'/4Lˆ f˜:mææ^‹Ïğ„°ƒ­~%(Ùö½„,vË—Ößfª5£BªíqÖQ!áßvKÿwÿ5Uôô±7ƒã%úñ×j(‡¢Ü	Œğø4üê•’QIÀu*ì~•œÙr[ÊŸ)¬mR’3µ"'¼×aá´«ìûyÓ $`tc—ì()\¾b®®~«ºÑŒÄŒÇt3DT)½ôÍİàhò›_†éU·K®)b)=y4ÜOSe¬´²ª5xÁ~ûKu¾¤ZfË¡¡a *ûuƒYJ„ó³oÑGŞ7ì0oUÙjfÇûósˆì†Ù¬Fô³²Z»X}Hòb·±Û÷´¤9Ä*C½¦„ùö€q§Ü¢h+°÷Di_ëÎÔ»¶i%ÔÖlFmœ%Ï²¬#•ù´—qKæÿZçåt¿]½ãäoŒç:¨ß.]ºW©:îôÀh?öÙ°†‘KpÏ*õ
-Í*\yˆçšå)Œ{¢Ç›Ûˆ/>'/«ÓaêçÙîFd¾Â“Có}ªFª¼öåx²‘ñİRåu…s›<QåB‰¨ò"_øÇáÌ{«üD7’çãï˜<›X_åÎ­Üù…ø“Ú¹UìµŸ˜t¹–3é¯ôë¤ĞKeusçŸP GzE¦ˆÀ×ß“>k=Øó7eÏ‡SÊSk$dÕAu‡AçÇÂÃ‹+äôHÈOUM§â!òŠ6V`ÓÂ|1%C,Ä=Oü›‚ÇU\³3k®ÛSôÙF_ÙOm±µ©s˜Êòd©\É{<0r\¥Œ9Mõ''-·e-Li%ìWÔªJÇî(¹÷'ÌMˆ7ÃÉ4+SãW¯å/(«ûÖœË²ziK ·¾i¹Šş³TjbOwßY×ZÃ¾’#ØTùZF]íÍO‹Ÿ<¾»zçë•ùõğ9?ı„^ÕÕ²ñşûÏüŞö/ûãë+ôº¼/úèMÿrØ‡º×ƒáõèìü²?ªWø_º<„pS5ÎÏ‚4B—\J
-8îH,Sñ>ö±$7 ¢Ğ7N‘ùë®£¿8]Ğ‹%¦‘;ï£b´%V’ÿt=Fcg#•XâÕËÇ^œÆ—£ëQfx[MÕJş¡ı(Q)WÓ´ÚwŸÜ°aÑm7ŠË¯·•VwgÄ»íÒÄc‡†âjiã-¥´öĞ«›Û“<«Wº-q
-S¤šùêEZíS\dœ_Ò;‚tX 1–Şì=›&½ß—MµÁ[ÓCë±+&g7Øn	âÖa@¢ttK€8ñèB’ĞÙ+ú»p¨Ùúk»y-Tg5 yi5ö"+íÁE–‹~”FŞ™¾Áğâh*‚f1TìQqY2æ×Cöœ*”¢İÿ¥ægAÓø¶;ÁŞí4Q-a’™š%£(ƒç•NYA÷ö¯EÌfÓ”W¤åş4İY6†&ºc²™¸Ì(¡wgIïãšô.ä&ë«Aë…#[2
-à­ºˆaíXûÆäÚBŸÀA­œsO}©Ù1¿ºâÿ   ÿÿ œìÉ»
+                                                            text = it,
+                                                            color = MaterialTheme.colorScheme.error,
+                                                            fontSize = 10.sp,
+                                                            fontWeight = FontWeight.Bold,
+                                                            modifier = Modifier.padding(top = 4.dp)
+                                                        )
+                                                    }
+                                                }
+                                            },
+                                            confirmButton = {
+                                                Button(
+                                                    onClick = {
+                                                        if (pinConfirmationInput.isNotEmpty()) {
+                                                            biometricEnabled = true
+                                                            bioPrefs.edit()
+                                                                .putString("biometric_username", currentUser?.email ?: currentUser?.username ?: "")
+                                                                .putString("biometric_pin", pinConfirmationInput)
+                                                                .putBoolean("biometric_enabled", true)
+                                                                .apply()
+                                                            showPinConfirmDialog = false
+                                                            pinConfirmationInput = ""
+                                                            pinConfirmationError = null
+                                                        } else {
+                                                            pinConfirmationError = "Invalid PIN. Please enter your PIN."
+                                                        }
+                                                    }
+                                                ) {
+                                                    Text("Confirm & Enable")
+                                                }
+                                            },
+                                            dismissButton = {
+                                                TextButton(
+                                                    onClick = {
+                                                        showPinConfirmDialog = false
+                                                        pinConfirmationInput = ""
+                                                        pinConfirmationError = null
+                                                    }
+                                                ) {
+                                                    Text("Cancel")
+                                                }
+                                            }
+                                        )
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+}
+
+@Composable
+fun LottieOrderStatusUpdateView(
+    status: String,
+    modifier: Modifier = Modifier
+) {
+    Card(
+        modifier = modifier.padding(vertical = 4.dp),
+        colors = CardDefaults.cardColors(
+            containerColor = when (status) {
+                "COMPLETED", "DELIVERED" -> MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.4f)
+                "READY" -> MaterialTheme.colorScheme.tertiaryContainer.copy(alpha = 0.5f)
+                "PREPARING", "COOKING" -> MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.4f)
+                else -> MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
+            }
+        ),
+        shape = RoundedCornerShape(12.dp)
+    ) {
+        Row(
+            modifier = Modifier.padding(12.dp).fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(10.dp)
+        ) {
+            val infiniteTransition = rememberInfiniteTransition(label = "pulse")
+            val scale by infiniteTransition.animateFloat(
+                initialValue = 0.92f,
+                targetValue = 1.08f,
+                animationSpec = infiniteRepeatable(
+                    animation = tween(900, easing = LinearEasing),
+                    repeatMode = RepeatMode.Reverse
+                ),
+                label = "scale"
+            )
+            Box(
+                modifier = Modifier
+                    .size(36.dp)
+                    .scale(if (status in listOf("PENDING", "PREPARING", "COOKING")) scale else 1f)
+                    .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.15f), CircleShape),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    imageVector = when (status) {
+                        "COMPLETED", "DELIVERED" -> Icons.Default.CheckCircle
+                        "READY" -> Icons.Default.NotificationsActive
+                        "PREPARING", "COOKING" -> Icons.Default.OutdoorGrill
+                        else -> Icons.Default.Schedule
+                    },
+                    contentDescription = status,
+                    tint = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.size(20.dp)
+                )
+            }
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = when (status) {
+                        "COMPLETED", "DELIVERED" -> "Order Delivered & Enjoyed!"
+                        "READY" -> "Order Ready for Pickup at Stall!"
+                        "PREPARING", "COOKING" -> "Kitchen actively preparing your meal"
+                        else -> "Order Confirmed - Queueing"
+                    },
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 12.sp,
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+                Text(
+                    text = "Real-time kitchen broadcast update",
+                    fontSize = 10.sp,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+        }
+    }
+}
+
+@Composable
+fun MenuSkeletonItem(modifier: Modifier = Modifier) {
+    Card(
+        modifier = modifier.fillMaxWidth().padding(vertical = 4.dp),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f)),
+        shape = RoundedCornerShape(12.dp)
+    ) {
+        Row(
+            modifier = Modifier.padding(12.dp).fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            Box(modifier = Modifier.size(64.dp).clip(RoundedCornerShape(8.dp)).background(MaterialTheme.colorScheme.onSurface.copy(alpha = 0.08f)))
+            Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                Box(modifier = Modifier.fillMaxWidth(0.6f).height(14.dp).clip(RoundedCornerShape(4.dp)).background(MaterialTheme.colorScheme.onSurface.copy(alpha = 0.08f)))
+                Box(modifier = Modifier.fillMaxWidth(0.9f).height(10.dp).clip(RoundedCornerShape(4.dp)).background(MaterialTheme.colorScheme.onSurface.copy(alpha = 0.05f)))
+                Box(modifier = Modifier.fillMaxWidth(0.3f).height(12.dp).clip(RoundedCornerShape(4.dp)).background(MaterialTheme.colorScheme.onSurface.copy(alpha = 0.08f)))
+            }
+        }
+    }
+}
+
+@Composable
+fun OrderHistorySkeletonItem(modifier: Modifier = Modifier) {
+    Card(
+        modifier = modifier.fillMaxWidth().padding(vertical = 4.dp),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f)),
+        shape = RoundedCornerShape(12.dp)
+    ) {
+        Column(modifier = Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                Box(modifier = Modifier.width(100.dp).height(14.dp).clip(RoundedCornerShape(4.dp)).background(MaterialTheme.colorScheme.onSurface.copy(alpha = 0.08f)))
+                Box(modifier = Modifier.width(60.dp).height(14.dp).clip(RoundedCornerShape(4.dp)).background(MaterialTheme.colorScheme.onSurface.copy(alpha = 0.08f)))
+            }
+            Box(modifier = Modifier.fillMaxWidth(0.8f).height(10.dp).clip(RoundedCornerShape(4.dp)).background(MaterialTheme.colorScheme.onSurface.copy(alpha = 0.05f)))
+        }
+    }
+}

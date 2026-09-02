@@ -7825,8 +7825,204 @@ fun VendorDashboardScreen(
                                         )
                                     }
                                 }
-      xúÃY€n€6æœS∞^W»Äß.i◊u¡RÃñï÷®Ìz∂õbW#Q6QI‘(*∂[ËÌ.:`OP`Wªﬂı	˙˚©É-Y≤d7^QH$Ú?>í
-BEcuR8Ωs%?õùY52Øs- ùV s—zõcìÖàñÊj65^K2‰œÿ¸ä∏&„}&®E,(s˝6≈6õÖÖmü†UΩ@b"U©i6ÛI≠^eÚ˙-¢\ù»üì˚˜—≈±ÜˆÈ√_ˇ||˜˛”á˜ˇ¢Qß7Ëv.;z=ÔåµgzçıaØ”ovëˆ¢7x1j∂∫˙qM¯Ecé«||mì+p—à:ûë%Ês*åq«Ñ;‘≈ˆ%s%åuS”‹$‹?G]ÍãüaJ%ÃD5±¿j∏˙$ ;∂Ìó~	≠\åIo@Mèôƒ>Gi≤Ä™r≈ë+™Ü-"ß¯*!éxô´/®H>GJ}˜Ωt©à÷Å[z∆œQ/~ÇíIOí¢π¡6¬Ü†7$rh8qàsM∏íu=]fŸ’¢6XKÖÍ,›π@5ô≈Æ>÷€5tÔﬁ÷Z[◊∫ù~·í÷Ïkz∑+◊Vq1Ü4fé´8oíGiÄ›√ã}Cî∫Ía”„î«™È’”fYú‘d8˘»$≤^QSÃR¬ÆÙßÑ°‘láœßoò+∞›‰ªS†+Ä4ı¶é<lêsB‹,˜·z€n⁄tÍ&ú…≥™¡/¬Øb{πi‘≠∂óŒ&™8"–H˜i‹(©4§t°Z–HpÇùz≠Å,¸°”ô‘vπ~Q[Ã6»Kõ»¯‚∞àÌÒ‚°ä•«¶{≥•*®∞Ièò4pÚ(Fç+Eyöá	ärú„kasJCÊÑ∫ÑCÈ0û3¬ê≥##|ˆ8u0/…&,wﬂ¶[Eı°‹V®„¢_Ç±°ÖﬁÁx6@∂¡9 –|Ÿ∞ë®6±p`_Ω_Có˝CB‡ 6!Z¬”ê{óÄ™©ffÓ(«^œ€\îHA|1∆S•F¿›…Î®‹&"ˆ{r-‹≠–%© ˘ÀW„@®·Œ∑v°M|ÉSOÓ††º&Cµ[dèL´r˙®∏∞*Úa1_T@RÎ∫ë∂º⁄îGåwrP)ôö£æÓxb©‘∑É–bãB´2–∏éF@Ö7∆ﬁ–ïx∂¶≤óçºÌÑF_∆‘l-ÛÄùè‡ß˛cét	$=xÚﬂ∞4m≈UÖX¥…YÅ-„BÃ;∑«Økf.ªòOIô}2IÅ)ùèmòÉ{¡Õ'∞¡‡õ’¨ìßg‡d#j˘™>∏Òº¬@‡ä˝AiÖà<NfÉﬂ≈oñqÓ˜ÍÂlµÂX≠Ö ∂ßÇ8~¶CÄ*ä0úÜ
-¢anÊùŸ√©‰D∞∆´™Bu‰NÓæ_TjÆj˛'c›“ò5pK	1lÔ‰å∏∑0}.K[â4G©]MîµÅﬁow˙OkÚ‹Xπ3ÆQΩ•ÇmoÜAı˜ÍC´∏≥™Ü˙†9¨V&dÅ‹Z€Po∂5ÖRæ_\^Íè/–™fõ†‘F?”`•wﬂ,Kä√üaOˆ¸êÆI†"8ƒa$'ÄÅÌÆX,…x˛‰ºÆÌ‰xIÆ*y∆¨Óê∆·‚¡˚îwº!(†o“}YÖ¯iÿ}∏so…©™§íC •<⁄•Zuw!§G©…{KH‹:ïª…^\∆≠ &áAÕbÑï˝%A»ô˛c˚¡Yu9$£J∂wÎΩDÔïdîõXŒ_r¿ùÖ%∑ÎÑõQÔu`s>GIÎ˝ÄÉT,Wãıî≈òŸ«Y›ˆ∞≥è5ÉNcåW¨¿PwÖ>æ˚çôêüPû>‹l¡8ß1•ˆ≠zfÅ}üêÑNAÂ∂—ßG;°ñé7‡Ù8&lÎÆ˘†µºË§—]\lPc_®Ÿußﬁ5“[◊ü‚‘¿3!y·∆1
-mQíΩ£ëFú˙ˆwﬁ≤QzÔèπòxúxÚ≤õ=CÓ•·(éöa$U¢®ƒ≤ÿ˜‘Sç<Ò%¢8õ©–}5˘åp˛xπÑ˝ÎıÑl.øX.{†• /í∆$b_M
-7üôèóFÉ…ÒÇƒwª/ïJ-VãBWèóŒœ<|ÊøøN≤OÚ?Iˇ  ˇˇ &ã/B
+                            }
+                        }
+                    }
+                }
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = { showVendorNotificationsDialog = false },
+                    modifier = Modifier.testTag("close_inventory_alerts_dialog_btn")
+                ) {
+                    Text("Close", fontWeight = FontWeight.Bold)
+                }
+            }
+        )
+    }
+}
+}
+
+@Composable
+fun SimplifiedKitchenTerminalView(
+    incomingOrders: List<com.example.data.Order>,
+    allUsers: List<com.example.data.User>,
+    viewModel: com.example.ui.viewmodel.CafeteriaViewModel,
+    onExitTerminal: () -> Unit
+) {
+    val activeTerminalOrders = remember(incomingOrders) {
+        incomingOrders.filter { it.status != "COMPLETED" && it.status != "DELIVERED" && it.status != "CANCELLED" && it.status != "DECLINED" }
+    }
+
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(MaterialTheme.colorScheme.background)
+            .padding(16.dp)
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Box(
+                    modifier = Modifier
+                        .size(12.dp)
+                        .background(Color(0xFF4CAF50), CircleShape)
+                )
+                Text(
+                    "KITCHEN DISPLAY TERMINAL (KDS)",
+                    fontWeight = FontWeight.Black,
+                    fontSize = 16.sp,
+                    color = MaterialTheme.colorScheme.primary
+                )
+                Surface(
+                    shape = RoundedCornerShape(12.dp),
+                    color = MaterialTheme.colorScheme.primaryContainer
+                ) {
+                    Text(
+                        "${activeTerminalOrders.size} Active Tickets",
+                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp),
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+            }
+            Button(
+                onClick = onExitTerminal,
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = MaterialTheme.colorScheme.surfaceVariant,
+                    contentColor = MaterialTheme.colorScheme.onSurfaceVariant
+                ),
+                shape = RoundedCornerShape(8.dp),
+                modifier = Modifier.testTag("exit_kitchen_terminal_btn")
+            ) {
+                Icon(Icons.Default.Close, contentDescription = "Exit", modifier = Modifier.size(16.dp))
+                Spacer(modifier = Modifier.width(4.dp))
+                Text("Exit Terminal Mode", fontSize = 12.sp, fontWeight = FontWeight.Bold)
+            }
+        }
+
+        Spacer(modifier = Modifier.height(12.dp))
+
+        if (activeTerminalOrders.isEmpty()) {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .weight(1f),
+                contentAlignment = Alignment.Center
+            ) {
+                Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Icon(Icons.Default.OutdoorGrill, contentDescription = null, modifier = Modifier.size(56.dp), tint = MaterialTheme.colorScheme.primary.copy(alpha = 0.5f))
+                    Text("All Caught Up! No pending kitchen orders.", fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                    Text("New incoming cafeteria orders will appear here automatically.", fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+            }
+        } else {
+            LazyColumn(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .weight(1f),
+                verticalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
+                items(activeTerminalOrders) { order ->
+                    val customer = allUsers.find { it.id == order.customerId }
+                    val customerName = customer?.fullName ?: customer?.username ?: "Student #${order.customerId}"
+                    Card(
+                        modifier = Modifier.fillMaxWidth().testTag("terminal_ticket_${order.id}"),
+                        colors = CardDefaults.cardColors(
+                            containerColor = when (order.status) {
+                                "PENDING" -> MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.25f)
+                                "PREPARING", "COOKING" -> MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.35f)
+                                "READY" -> MaterialTheme.colorScheme.tertiaryContainer.copy(alpha = 0.35f)
+                                else -> MaterialTheme.colorScheme.surfaceVariant
+                            }
+                        ),
+                        shape = RoundedCornerShape(12.dp)
+                    ) {
+                        Column(modifier = Modifier.padding(14.dp)) {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Column {
+                                    Text("ORDER #${order.id}", fontWeight = FontWeight.Black, fontSize = 15.sp)
+                                    Text(
+                                        customerName,
+                                        fontSize = 11.sp,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                }
+                                Surface(
+                                    shape = RoundedCornerShape(8.dp),
+                                    color = when (order.status) {
+                                        "PENDING" -> MaterialTheme.colorScheme.error
+                                        "PREPARING", "COOKING" -> MaterialTheme.colorScheme.primary
+                                        "READY" -> MaterialTheme.colorScheme.tertiary
+                                        else -> MaterialTheme.colorScheme.outline
+                                    }
+                                ) {
+                                    Text(
+                                        order.status,
+                                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                                        fontSize = 11.sp,
+                                        fontWeight = FontWeight.ExtraBold,
+                                        color = Color.White
+                                    )
+                                }
+                            }
+
+                            Spacer(modifier = Modifier.height(8.dp))
+                            HorizontalDivider()
+                            Spacer(modifier = Modifier.height(8.dp))
+
+                            Text("ITEMS TO PREPARE:", fontWeight = FontWeight.Bold, fontSize = 10.sp, color = MaterialTheme.colorScheme.primary)
+                            Row(
+                                modifier = Modifier.fillMaxWidth().padding(vertical = 2.dp),
+                                horizontalArrangement = Arrangement.SpaceBetween
+                            ) {
+                                Text("‚Ä¢ ${order.quantity}x ${order.foodName}", fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
+                                Text("GH‚Çµ " + String.format(java.util.Locale.US, "%.2f", order.totalPrice), fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                            }
+
+                            Spacer(modifier = Modifier.height(10.dp))
+
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                if (order.status == "PENDING") {
+                                    Button(
+                                        onClick = { viewModel.updateOrderStatus(order.id, "PREPARING") },
+                                        modifier = Modifier.weight(1f).testTag("terminal_start_prep_${order.id}"),
+                                        colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary)
+                                    ) {
+                                        Text("Start Preparing", fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                                    }
+                                } else if (order.status == "PREPARING" || order.status == "COOKING") {
+                                    Button(
+                                        onClick = { viewModel.updateOrderStatus(order.id, "READY") },
+                                        modifier = Modifier.weight(1f).testTag("terminal_mark_ready_${order.id}"),
+                                        colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.tertiary)
+                                    ) {
+                                        Text("Mark Ready for Pickup", fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                                    }
+                                } else if (order.status == "READY") {
+                                    Button(
+                                        onClick = { viewModel.updateOrderStatus(order.id, "COMPLETED") },
+                                        modifier = Modifier.weight(1f).testTag("terminal_complete_${order.id}"),
+                                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF388E3C))
+                                    ) {
+                                        Text("Complete & Hand Over", fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
