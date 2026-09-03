@@ -2861,6 +2861,67 @@ class CafeteriaViewModel @Inject constructor(
         }
     }
 
+    fun batchUpdateOrdersStatus(
+        orderIds: List<Int>,
+        newStatus: String,
+        estimatedTime: String? = null,
+        onComplete: ((Int) -> Unit)? = null
+    ) {
+        viewModelScope.launch {
+            val vendor = _currentUser.value
+            val currentVendorId = vendor?.id ?: 0
+            var count = 0
+            orderIds.forEach { orderId ->
+                val order = repository.orderDao.getOrderById(orderId)
+                val effectiveVendorId = if (currentVendorId != 0) currentVendorId else (order?.vendorId ?: 0)
+                val customerId = order?.customerId ?: 0
+                repository.updateOrderStatus(effectiveVendorId, orderId, newStatus, estimatedTime)
+                FirestoreOrderTrackingManager.updateOrderStatusInFirestore(orderId, newStatus, effectiveVendorId, customerId, estimatedTime)
+                if (newStatus.equals("READY", ignoreCase = true) || newStatus.equals("READY_FOR_PICKUP", ignoreCase = true)) {
+                    com.example.ui.util.NotificationHelper.sendOrderStatusNotification(
+                        getApplication(),
+                        orderId,
+                        "🍱 Order #$orderId is Ready for Pickup!",
+                        "Your food order status has updated from 'Preparing' to 'Ready for Pickup'. Please collect your meal at the stall."
+                    )
+                }
+                count++
+            }
+            onComplete?.invoke(count)
+        }
+    }
+
+    fun batchAdvanceOrders(orderIds: List<Int>, onComplete: ((Int) -> Unit)? = null) {
+        viewModelScope.launch {
+            val vendor = _currentUser.value
+            val currentVendorId = vendor?.id ?: 0
+            var count = 0
+            orderIds.forEach { orderId ->
+                val order = repository.orderDao.getOrderById(orderId) ?: return@forEach
+                val effectiveVendorId = if (currentVendorId != 0) currentVendorId else order.vendorId
+                val nextStatus = when (order.status.uppercase()) {
+                    "PENDING", "RECEIVED" -> "PREPARING"
+                    "PREPARING", "COOKING" -> "READY"
+                    "READY" -> "DELIVERED"
+                    else -> order.status
+                }
+                val estTime = if (nextStatus == "PREPARING") "10-15 Min" else null
+                repository.updateOrderStatus(effectiveVendorId, orderId, nextStatus, estTime)
+                FirestoreOrderTrackingManager.updateOrderStatusInFirestore(orderId, nextStatus, effectiveVendorId, order.customerId, estTime)
+                if (nextStatus.equals("READY", ignoreCase = true) || nextStatus.equals("READY_FOR_PICKUP", ignoreCase = true)) {
+                    com.example.ui.util.NotificationHelper.sendOrderStatusNotification(
+                        getApplication(),
+                        orderId,
+                        "🍱 Order #$orderId is Ready for Pickup!",
+                        "Your food order status has updated from 'Preparing' to 'Ready for Pickup'. Please collect your meal at the stall."
+                    )
+                }
+                count++
+            }
+            onComplete?.invoke(count)
+        }
+    }
+
     fun simulateAdvanceOrderStatus(orderId: Int) {
         viewModelScope.launch {
             val order = repository.orderDao.getOrderById(orderId) ?: return@launch

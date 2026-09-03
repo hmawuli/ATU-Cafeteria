@@ -1978,6 +1978,16 @@ fun VendorDashboardScreen(
                         }
 
                         item {
+                            val activeVendorId = currentUser?.id ?: 0
+                            KitchenBatchStationCard(
+                                incomingOrders = incomingOrders,
+                                allUsers = allUsers,
+                                viewModel = viewModel,
+                                activeVendorId = activeVendorId
+                            )
+                        }
+
+                        item {
                             Card(
                                 modifier = Modifier
                                     .fillMaxWidth()
@@ -8273,6 +8283,8 @@ fun SimplifiedKitchenTerminalView(
         incomingOrders.filter { it.status != "COMPLETED" && it.status != "DELIVERED" && it.status != "CANCELLED" && it.status != "DECLINED" }
     }
 
+    var terminalModeTab by remember { mutableIntStateOf(0) } // 0: Single Tickets, 1: Dish Batch Station
+
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -8319,11 +8331,35 @@ fun SimplifiedKitchenTerminalView(
             ) {
                 Icon(Icons.Default.Close, contentDescription = "Exit", modifier = Modifier.size(16.dp))
                 Spacer(modifier = Modifier.width(4.dp))
-                Text("Exit Terminal Mode", fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                Text("Exit Terminal", fontSize = 12.sp, fontWeight = FontWeight.Bold)
             }
         }
 
-        Spacer(modifier = Modifier.height(12.dp))
+        Spacer(modifier = Modifier.height(10.dp))
+
+        // Terminal Mode Selector
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            FilterChip(
+                selected = terminalModeTab == 0,
+                onClick = { terminalModeTab = 0 },
+                label = { Text("🎫 Single Tickets (${activeTerminalOrders.size})", fontWeight = FontWeight.Bold, fontSize = 12.sp) },
+                modifier = Modifier.testTag("terminal_tab_tickets")
+            )
+            FilterChip(
+                selected = terminalModeTab == 1,
+                onClick = { terminalModeTab = 1 },
+                label = {
+                    val distinctItemsCount = activeTerminalOrders.map { it.foodName.trim().lowercase() }.distinct().size
+                    Text("🥘 Dish Batch Station ($distinctItemsCount Batches)", fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                },
+                modifier = Modifier.testTag("terminal_tab_batches")
+            )
+        }
+
+        Spacer(modifier = Modifier.height(10.dp))
 
         if (activeTerminalOrders.isEmpty()) {
             Box(
@@ -8338,6 +8374,13 @@ fun SimplifiedKitchenTerminalView(
                     Text("New incoming cafeteria orders will appear here automatically.", fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
             }
+        } else if (terminalModeTab == 1) {
+            // High-Efficiency Dish Batch Mode in Kitchen Terminal
+            KitchenTerminalBatchView(
+                activeOrders = activeTerminalOrders,
+                allUsers = allUsers,
+                viewModel = viewModel
+            )
         } else {
             LazyColumn(
                 modifier = Modifier
@@ -8435,6 +8478,923 @@ fun SimplifiedKitchenTerminalView(
                                         colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF388E3C))
                                     ) {
                                         Text("Complete & Hand Over", fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+/**
+ * High-Efficiency Terminal Batch View for KDS Displays
+ */
+@Composable
+fun KitchenTerminalBatchView(
+    activeOrders: List<com.example.data.Order>,
+    allUsers: List<com.example.data.User>,
+    viewModel: com.example.ui.viewmodel.CafeteriaViewModel
+) {
+    val batches = remember(activeOrders) {
+        activeOrders
+            .groupBy { it.foodName.trim() }
+            .map { (foodName, orders) ->
+                KitchenBatchItemData(
+                    foodName = foodName,
+                    orders = orders,
+                    totalPortions = orders.sumOf { it.quantity },
+                    pendingOrders = orders.filter { it.status.equals("PENDING", true) || it.status.equals("RECEIVED", true) },
+                    preparingOrders = orders.filter { it.status.equals("PREPARING", true) || it.status.equals("COOKING", true) },
+                    readyOrders = orders.filter { it.status.equals("READY", true) },
+                    totalValue = orders.sumOf { it.totalPrice }
+                )
+            }
+            .sortedByDescending { it.totalPortions }
+    }
+
+    var selectedEstTime by remember { mutableStateOf("10-15 Min") }
+
+    LazyColumn(
+        modifier = Modifier.fillMaxSize(),
+        verticalArrangement = Arrangement.spacedBy(12.dp)
+    ) {
+        item {
+            Card(
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.4f)),
+                shape = RoundedCornerShape(12.dp)
+            ) {
+                Row(
+                    modifier = Modifier.fillMaxWidth().padding(12.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Column {
+                        Text("BATCH PREPARATION QUEUE", fontWeight = FontWeight.Black, fontSize = 13.sp, color = MaterialTheme.colorScheme.primary)
+                        val totalPortions = batches.sumOf { it.totalPortions }
+                        Text("$totalPortions Total Portions across ${batches.size} Dishes", fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                        listOf("5m", "10m", "15m", "20m").forEach { t ->
+                            val fullTime = "$t Prep"
+                            FilterChip(
+                                selected = selectedEstTime.startsWith(t),
+                                onClick = { selectedEstTime = "$t Prep" },
+                                label = { Text(t, fontSize = 10.sp, fontWeight = FontWeight.Bold) },
+                                modifier = Modifier.height(28.dp)
+                            )
+                        }
+                    }
+                }
+            }
+        }
+
+        items(batches) { batch ->
+            Card(
+                modifier = Modifier.fillMaxWidth().testTag("terminal_batch_card_${batch.foodName.replace(" ", "_")}"),
+                shape = RoundedCornerShape(16.dp),
+                colors = CardDefaults.cardColors(
+                    containerColor = when {
+                        batch.pendingOrders.isNotEmpty() -> MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.7f)
+                        batch.preparingOrders.isNotEmpty() -> MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.3f)
+                        else -> MaterialTheme.colorScheme.tertiaryContainer.copy(alpha = 0.3f)
+                    }
+                ),
+                border = BorderStroke(1.5.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.3f))
+            ) {
+                Column(modifier = Modifier.padding(16.dp)) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            Surface(
+                                shape = RoundedCornerShape(8.dp),
+                                color = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.size(36.dp)
+                            ) {
+                                Box(contentAlignment = Alignment.Center) {
+                                    Icon(Icons.Default.Restaurant, contentDescription = null, tint = Color.White, modifier = Modifier.size(20.dp))
+                                }
+                            }
+                            Column {
+                                Text(
+                                    batch.foodName,
+                                    fontWeight = FontWeight.Black,
+                                    fontSize = 17.sp,
+                                    color = MaterialTheme.colorScheme.onSurface
+                                )
+                                Text(
+                                    "GH₵ ${String.format(java.util.Locale.US, "%.2f", batch.totalValue)} • ${batch.orders.size} Tickets",
+                                    fontSize = 12.sp,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                        }
+
+                        Surface(
+                            shape = RoundedCornerShape(12.dp),
+                            color = MaterialTheme.colorScheme.primary
+                        ) {
+                            Text(
+                                "🔥 ${batch.totalPortions} PORTIONS",
+                                modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
+                                fontSize = 13.sp,
+                                fontWeight = FontWeight.Black,
+                                color = Color.White
+                            )
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(10.dp))
+
+                    // Status Breakdown Chips
+                    Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                        if (batch.pendingOrders.isNotEmpty()) {
+                            Surface(
+                                shape = RoundedCornerShape(6.dp),
+                                color = MaterialTheme.colorScheme.error.copy(alpha = 0.15f)
+                            ) {
+                                Text(
+                                    "${batch.pendingOrders.sumOf { it.quantity }} Pending",
+                                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp),
+                                    fontSize = 11.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = MaterialTheme.colorScheme.error
+                                )
+                            }
+                        }
+                        if (batch.preparingOrders.isNotEmpty()) {
+                            Surface(
+                                shape = RoundedCornerShape(6.dp),
+                                color = MaterialTheme.colorScheme.primary.copy(alpha = 0.15f)
+                            ) {
+                                Text(
+                                    "${batch.preparingOrders.sumOf { it.quantity }} In Prep / Cooking",
+                                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp),
+                                    fontSize = 11.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = MaterialTheme.colorScheme.primary
+                                )
+                            }
+                        }
+                        if (batch.readyOrders.isNotEmpty()) {
+                            Surface(
+                                shape = RoundedCornerShape(6.dp),
+                                color = Color(0xFF2E7D32).copy(alpha = 0.15f)
+                            ) {
+                                Text(
+                                    "${batch.readyOrders.sumOf { it.quantity }} Ready for Pickup",
+                                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp),
+                                    fontSize = 11.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = Color(0xFF2E7D32)
+                                )
+                            }
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(10.dp))
+
+                    // List of tickets summary in this batch
+                    Text("ORDERS IN BATCH:", fontSize = 10.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    batch.orders.forEach { o ->
+                        val cust = allUsers.find { it.id == o.customerId }
+                        val custName = cust?.fullName ?: "Student #${o.customerId}"
+                        Row(
+                            modifier = Modifier.fillMaxWidth().padding(vertical = 2.dp),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(
+                                "Order #${o.id} • ${o.quantity}x ($custName)",
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.Medium
+                            )
+                            Text(
+                                o.status,
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = when (o.status) {
+                                    "PENDING" -> MaterialTheme.colorScheme.error
+                                    "PREPARING", "COOKING" -> MaterialTheme.colorScheme.primary
+                                    "READY" -> Color(0xFF2E7D32)
+                                    else -> MaterialTheme.colorScheme.outline
+                                }
+                            )
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(12.dp))
+
+                    // One-Touch Batch Action Buttons
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        if (batch.pendingOrders.isNotEmpty()) {
+                            Button(
+                                onClick = {
+                                    val orderIds = batch.pendingOrders.map { it.id }
+                                    viewModel.batchUpdateOrdersStatus(orderIds, "PREPARING", selectedEstTime)
+                                },
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .testTag("batch_start_prep_${batch.foodName.replace(" ", "_")}"),
+                                colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary),
+                                shape = RoundedCornerShape(10.dp)
+                            ) {
+                                Icon(Icons.Default.OutdoorGrill, contentDescription = null, modifier = Modifier.size(16.dp))
+                                Spacer(modifier = Modifier.width(6.dp))
+                                Text(
+                                    "Batch Cook (${batch.pendingOrders.size} Orders)",
+                                    fontSize = 12.sp,
+                                    fontWeight = FontWeight.Bold
+                                )
+                            }
+                        }
+
+                        if (batch.preparingOrders.isNotEmpty()) {
+                            Button(
+                                onClick = {
+                                    val orderIds = batch.preparingOrders.map { it.id }
+                                    viewModel.batchUpdateOrdersStatus(orderIds, "READY")
+                                },
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .testTag("batch_mark_ready_${batch.foodName.replace(" ", "_")}"),
+                                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF2E7D32)),
+                                shape = RoundedCornerShape(10.dp)
+                            ) {
+                                Icon(Icons.Default.CheckCircle, contentDescription = null, modifier = Modifier.size(16.dp))
+                                Spacer(modifier = Modifier.width(6.dp))
+                                Text(
+                                    "Batch Ready (${batch.preparingOrders.size} Orders)",
+                                    fontSize = 12.sp,
+                                    fontWeight = FontWeight.Bold
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+/**
+ * Data Holder for Kitchen Item Batch
+ */
+data class KitchenBatchItemData(
+    val foodName: String,
+    val orders: List<com.example.data.Order>,
+    val totalPortions: Int,
+    val pendingOrders: List<com.example.data.Order>,
+    val preparingOrders: List<com.example.data.Order>,
+    val readyOrders: List<com.example.data.Order>,
+    val totalValue: Double
+)
+
+/**
+ * Dedicated Interactive Kitchen Batch Processing Station Card in Vendor Dashboard
+ */
+@Composable
+fun KitchenBatchStationCard(
+    incomingOrders: List<com.example.data.Order>,
+    allUsers: List<com.example.data.User>,
+    viewModel: com.example.ui.viewmodel.CafeteriaViewModel,
+    activeVendorId: Int
+) {
+    // Filter active kitchen orders for this vendor
+    val activeKitchenOrders = remember(incomingOrders, activeVendorId) {
+        incomingOrders.filter { order ->
+            (activeVendorId == 0 || order.vendorId == activeVendorId) &&
+            (order.status.equals("PENDING", true) ||
+             order.status.equals("RECEIVED", true) ||
+             order.status.equals("PREPARING", true) ||
+             order.status.equals("COOKING", true) ||
+             order.status.equals("READY", true))
+        }
+    }
+
+    var isStationExpanded by remember { mutableStateOf(true) }
+    var batchFilter by remember { mutableStateOf("All Active") } // All Active, Needs Prep, Cooking, Ready
+    var batchSearchQuery by remember { mutableStateOf("") }
+    var selectedTimePreset by remember { mutableStateOf("10-15 Min") }
+    var batchSuccessFeedback by remember { mutableStateOf<String?>(null) }
+    var expandedBatchDish by remember { mutableStateOf<String?>(null) }
+    var selectedOrderIdsInBatch by remember { mutableStateOf(setOf<Int>()) }
+
+    // Clear feedback after delay
+    LaunchedEffect(batchSuccessFeedback) {
+        if (batchSuccessFeedback != null) {
+            delay(3500)
+            batchSuccessFeedback = null
+        }
+    }
+
+    val itemBatches = remember(activeKitchenOrders, batchFilter, batchSearchQuery) {
+        activeKitchenOrders
+            .groupBy { it.foodName.trim() }
+            .map { (foodName, orders) ->
+                KitchenBatchItemData(
+                    foodName = foodName,
+                    orders = orders,
+                    totalPortions = orders.sumOf { it.quantity },
+                    pendingOrders = orders.filter { it.status.equals("PENDING", true) || it.status.equals("RECEIVED", true) },
+                    preparingOrders = orders.filter { it.status.equals("PREPARING", true) || it.status.equals("COOKING", true) },
+                    readyOrders = orders.filter { it.status.equals("READY", true) },
+                    totalValue = orders.sumOf { it.totalPrice }
+                )
+            }
+            .filter { batch ->
+                if (batchSearchQuery.isNotBlank()) {
+                    batch.foodName.contains(batchSearchQuery, ignoreCase = true)
+                } else true
+            }
+            .filter { batch ->
+                when (batchFilter) {
+                    "Needs Prep" -> batch.pendingOrders.isNotEmpty()
+                    "Cooking" -> batch.preparingOrders.isNotEmpty()
+                    "Ready" -> batch.readyOrders.isNotEmpty()
+                    else -> true
+                }
+            }
+            .sortedByDescending { it.totalPortions }
+    }
+
+    val totalActivePortions = remember(activeKitchenOrders) { activeKitchenOrders.sumOf { it.quantity } }
+    val totalPendingPortions = remember(activeKitchenOrders) {
+        activeKitchenOrders.filter { it.status.equals("PENDING", true) || it.status.equals("RECEIVED", true) }.sumOf { it.quantity }
+    }
+    val totalCookingPortions = remember(activeKitchenOrders) {
+        activeKitchenOrders.filter { it.status.equals("PREPARING", true) || it.status.equals("COOKING", true) }.sumOf { it.quantity }
+    }
+
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .testTag("kitchen_batch_station_card"),
+        shape = RoundedCornerShape(16.dp),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.28f)
+        ),
+        border = BorderStroke(1.5.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.35f))
+    ) {
+        Column(modifier = Modifier.padding(16.dp)) {
+            // Header
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Surface(
+                        shape = CircleShape,
+                        color = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.size(36.dp)
+                    ) {
+                        Box(contentAlignment = Alignment.Center) {
+                            Icon(
+                                Icons.Default.OutdoorGrill,
+                                contentDescription = "Batch Cooking",
+                                tint = Color.White,
+                                modifier = Modifier.size(20.dp)
+                            )
+                        }
+                    }
+                    Spacer(modifier = Modifier.width(10.dp))
+                    Column {
+                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                            Text(
+                                "Kitchen Batch Preparation Station",
+                                style = MaterialTheme.typography.titleMedium,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.primary
+                            )
+                            Surface(
+                                shape = RoundedCornerShape(8.dp),
+                                color = MaterialTheme.colorScheme.primary
+                            ) {
+                                Text(
+                                    "$totalActivePortions Portions",
+                                    modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
+                                    fontSize = 10.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = Color.White
+                                )
+                            }
+                        }
+                        Text(
+                            "Batch cook multiple identical dishes simultaneously for maximum speed",
+                            style = MaterialTheme.typography.bodySmall,
+                            fontSize = 11.sp,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                }
+
+                IconButton(
+                    onClick = { isStationExpanded = !isStationExpanded },
+                    modifier = Modifier.testTag("toggle_batch_station_expand")
+                ) {
+                    Icon(
+                        if (isStationExpanded) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
+                        contentDescription = "Toggle Station",
+                        tint = MaterialTheme.colorScheme.primary
+                    )
+                }
+            }
+
+            AnimatedVisibility(visible = isStationExpanded) {
+                Column(
+                    modifier = Modifier.padding(top = 12.dp),
+                    verticalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    // Success feedback toast if any action completed
+                    AnimatedVisibility(visible = batchSuccessFeedback != null) {
+                        batchSuccessFeedback?.let { msg ->
+                            Surface(
+                                shape = RoundedCornerShape(8.dp),
+                                color = Color(0xFF2E7D32).copy(alpha = 0.15f),
+                                border = BorderStroke(1.dp, Color(0xFF2E7D32).copy(alpha = 0.5f)),
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                Row(
+                                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                                ) {
+                                    Icon(Icons.Default.CheckCircle, contentDescription = null, tint = Color(0xFF2E7D32), modifier = Modifier.size(16.dp))
+                                    Text(msg, fontSize = 12.sp, fontWeight = FontWeight.Bold, color = Color(0xFF2E7D32))
+                                }
+                            }
+                        }
+                    }
+
+                    // Quick Stats & Prep Duration Selector
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                            Surface(
+                                shape = RoundedCornerShape(6.dp),
+                                color = MaterialTheme.colorScheme.error.copy(alpha = 0.15f)
+                            ) {
+                                Text(
+                                    "Pending: $totalPendingPortions",
+                                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp),
+                                    fontSize = 10.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = MaterialTheme.colorScheme.error
+                                )
+                            }
+                            Surface(
+                                shape = RoundedCornerShape(6.dp),
+                                color = MaterialTheme.colorScheme.primary.copy(alpha = 0.15f)
+                            ) {
+                                Text(
+                                    "Cooking: $totalCookingPortions",
+                                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp),
+                                    fontSize = 10.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = MaterialTheme.colorScheme.primary
+                                )
+                            }
+                        }
+
+                        // Prep time preset chips
+                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                            Text("Est Prep:", fontSize = 10.sp, fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            listOf("5m", "10m", "15m", "20m").forEach { t ->
+                                val full = "$t Prep"
+                                FilterChip(
+                                    selected = selectedTimePreset.startsWith(t),
+                                    onClick = { selectedTimePreset = full },
+                                    label = { Text(t, fontSize = 9.sp, fontWeight = FontWeight.Bold) },
+                                    modifier = Modifier.height(26.dp)
+                                )
+                            }
+                        }
+                    }
+
+                    // Filter chips & Search
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(6.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        listOf("All Active", "Needs Prep", "Cooking", "Ready").forEach { f ->
+                            FilterChip(
+                                selected = batchFilter == f,
+                                onClick = { batchFilter = f },
+                                label = { Text(f, fontSize = 11.sp, fontWeight = FontWeight.SemiBold) },
+                                modifier = Modifier.height(30.dp)
+                            )
+                        }
+                    }
+
+                    // Search input if multiple batches
+                    if (activeKitchenOrders.map { it.foodName }.distinct().size > 2) {
+                        OutlinedTextField(
+                            value = batchSearchQuery,
+                            onValueChange = { batchSearchQuery = it },
+                            placeholder = { Text("Filter dish batches (e.g. Jollof, Waakye...)", fontSize = 12.sp) },
+                            modifier = Modifier.fillMaxWidth().testTag("batch_search_input"),
+                            singleLine = true,
+                            leadingIcon = { Icon(Icons.Default.Search, contentDescription = null, modifier = Modifier.size(16.dp)) },
+                            trailingIcon = {
+                                if (batchSearchQuery.isNotEmpty()) {
+                                    IconButton(onClick = { batchSearchQuery = "" }) {
+                                        Icon(Icons.Default.Close, contentDescription = "Clear", modifier = Modifier.size(14.dp))
+                                    }
+                                }
+                            }
+                        )
+                    }
+
+                    if (itemBatches.isEmpty()) {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(vertical = 18.dp),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                                Icon(Icons.Default.DoneAll, contentDescription = null, tint = MaterialTheme.colorScheme.primary.copy(alpha = 0.5f), modifier = Modifier.size(32.dp))
+                                Text("No batches in this view.", fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                                Text("Incoming customer orders will automatically group by recipe here.", fontSize = 10.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            }
+                        }
+                    } else {
+                        // Global Quick Action Buttons
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            val allPendingIds = activeKitchenOrders.filter { it.status.equals("PENDING", true) || it.status.equals("RECEIVED", true) }.map { it.id }
+                            if (allPendingIds.isNotEmpty()) {
+                                OutlinedButton(
+                                    onClick = {
+                                        viewModel.batchUpdateOrdersStatus(allPendingIds, "PREPARING", selectedTimePreset) { count ->
+                                            batchSuccessFeedback = "🔥 Batch Started: $count pending orders set to Preparing!"
+                                        }
+                                    },
+                                    modifier = Modifier.weight(1f).testTag("batch_start_all_pending_btn"),
+                                    contentPadding = PaddingValues(horizontal = 6.dp, vertical = 4.dp),
+                                    shape = RoundedCornerShape(8.dp)
+                                ) {
+                                    Icon(Icons.Default.OutdoorGrill, contentDescription = null, modifier = Modifier.size(14.dp), tint = MaterialTheme.colorScheme.primary)
+                                    Spacer(modifier = Modifier.width(4.dp))
+                                    Text("Start All Pending (${allPendingIds.size})", fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                                }
+                            }
+
+                            val allPreparingIds = activeKitchenOrders.filter { it.status.equals("PREPARING", true) || it.status.equals("COOKING", true) }.map { it.id }
+                            if (allPreparingIds.isNotEmpty()) {
+                                Button(
+                                    onClick = {
+                                        viewModel.batchUpdateOrdersStatus(allPreparingIds, "READY") { count ->
+                                            batchSuccessFeedback = "✅ Batch Ready: $count orders marked Ready for Pickup!"
+                                        }
+                                    },
+                                    modifier = Modifier.weight(1f).testTag("batch_mark_all_ready_btn"),
+                                    contentPadding = PaddingValues(horizontal = 6.dp, vertical = 4.dp),
+                                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF2E7D32)),
+                                    shape = RoundedCornerShape(8.dp)
+                                ) {
+                                    Icon(Icons.Default.CheckCircle, contentDescription = null, modifier = Modifier.size(14.dp), tint = Color.White)
+                                    Spacer(modifier = Modifier.width(4.dp))
+                                    Text("Mark All Ready (${allPreparingIds.size})", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = Color.White)
+                                }
+                            }
+                        }
+
+                        // List of Dish Batches
+                        itemBatches.forEach { batch ->
+                            Card(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .testTag("batch_dish_card_${batch.foodName.replace(" ", "_")}"),
+                                shape = RoundedCornerShape(12.dp),
+                                colors = CardDefaults.cardColors(
+                                    containerColor = MaterialTheme.colorScheme.surface
+                                ),
+                                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.25f))
+                            ) {
+                                Column(modifier = Modifier.padding(12.dp)) {
+                                    // Dish row
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        horizontalArrangement = Arrangement.SpaceBetween,
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        Row(
+                                            verticalAlignment = Alignment.CenterVertically,
+                                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                            modifier = Modifier.weight(1f)
+                                        ) {
+                                            Surface(
+                                                shape = RoundedCornerShape(8.dp),
+                                                color = MaterialTheme.colorScheme.primaryContainer,
+                                                modifier = Modifier.size(32.dp)
+                                            ) {
+                                                Box(contentAlignment = Alignment.Center) {
+                                                    Icon(Icons.Default.Restaurant, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(18.dp))
+                                                }
+                                            }
+                                            Column {
+                                                Text(
+                                                    batch.foodName,
+                                                    fontWeight = FontWeight.Bold,
+                                                    fontSize = 14.sp,
+                                                    color = MaterialTheme.colorScheme.onSurface
+                                                )
+                                                Text(
+                                                    "GH₵ ${String.format(java.util.Locale.US, "%.2f", batch.totalValue)} • ${batch.orders.size} Orders",
+                                                    fontSize = 11.sp,
+                                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                                )
+                                            }
+                                        }
+
+                                        // Total Portions Badge
+                                        Surface(
+                                            shape = RoundedCornerShape(8.dp),
+                                            color = MaterialTheme.colorScheme.primary
+                                        ) {
+                                            Text(
+                                                "🍳 ${batch.totalPortions} Portions",
+                                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                                                fontSize = 11.sp,
+                                                fontWeight = FontWeight.ExtraBold,
+                                                color = Color.White
+                                            )
+                                        }
+                                    }
+
+                                    Spacer(modifier = Modifier.height(8.dp))
+
+                                    // Status Pills
+                                    Row(
+                                        horizontalArrangement = Arrangement.spacedBy(6.dp),
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        if (batch.pendingOrders.isNotEmpty()) {
+                                            Surface(
+                                                shape = RoundedCornerShape(4.dp),
+                                                color = MaterialTheme.colorScheme.error.copy(alpha = 0.12f)
+                                            ) {
+                                                Text(
+                                                    "• ${batch.pendingOrders.sumOf { it.quantity }} Pending",
+                                                    modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
+                                                    fontSize = 10.sp,
+                                                    fontWeight = FontWeight.Bold,
+                                                    color = MaterialTheme.colorScheme.error
+                                                )
+                                            }
+                                        }
+                                        if (batch.preparingOrders.isNotEmpty()) {
+                                            Surface(
+                                                shape = RoundedCornerShape(4.dp),
+                                                color = MaterialTheme.colorScheme.primary.copy(alpha = 0.12f)
+                                            ) {
+                                                Text(
+                                                    "• ${batch.preparingOrders.sumOf { it.quantity }} In Prep",
+                                                    modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
+                                                    fontSize = 10.sp,
+                                                    fontWeight = FontWeight.Bold,
+                                                    color = MaterialTheme.colorScheme.primary
+                                                )
+                                            }
+                                        }
+                                        if (batch.readyOrders.isNotEmpty()) {
+                                            Surface(
+                                                shape = RoundedCornerShape(4.dp),
+                                                color = Color(0xFF2E7D32).copy(alpha = 0.12f)
+                                            ) {
+                                                Text(
+                                                    "• ${batch.readyOrders.sumOf { it.quantity }} Ready",
+                                                    modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
+                                                    fontSize = 10.sp,
+                                                    fontWeight = FontWeight.Bold,
+                                                    color = Color(0xFF2E7D32)
+                                                )
+                                            }
+                                        }
+                                    }
+
+                                    Spacer(modifier = Modifier.height(10.dp))
+
+                                    // 1-Click Action Buttons for this item batch
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                                    ) {
+                                        if (batch.pendingOrders.isNotEmpty()) {
+                                            Button(
+                                                onClick = {
+                                                    val ids = batch.pendingOrders.map { it.id }
+                                                    viewModel.batchUpdateOrdersStatus(ids, "PREPARING", selectedTimePreset) {
+                                                        batchSuccessFeedback = "🔥 Batch Cook: ${batch.pendingOrders.size} orders of ${batch.foodName} set to Preparing ($selectedTimePreset)!"
+                                                    }
+                                                },
+                                                modifier = Modifier
+                                                    .weight(1f)
+                                                    .testTag("batch_prep_btn_${batch.foodName.replace(" ", "_")}"),
+                                                colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary),
+                                                contentPadding = PaddingValues(horizontal = 6.dp, vertical = 6.dp),
+                                                shape = RoundedCornerShape(8.dp)
+                                            ) {
+                                                Icon(Icons.Default.OutdoorGrill, contentDescription = null, modifier = Modifier.size(13.dp))
+                                                Spacer(modifier = Modifier.width(4.dp))
+                                                Text(
+                                                    "Batch Prep (${batch.pendingOrders.size})",
+                                                    fontSize = 11.sp,
+                                                    fontWeight = FontWeight.Bold
+                                                )
+                                            }
+                                        }
+
+                                        if (batch.preparingOrders.isNotEmpty()) {
+                                            Button(
+                                                onClick = {
+                                                    val ids = batch.preparingOrders.map { it.id }
+                                                    viewModel.batchUpdateOrdersStatus(ids, "READY") {
+                                                        batchSuccessFeedback = "✅ Batch Ready: ${batch.preparingOrders.size} orders of ${batch.foodName} marked Ready!"
+                                                    }
+                                                },
+                                                modifier = Modifier
+                                                    .weight(1f)
+                                                    .testTag("batch_ready_btn_${batch.foodName.replace(" ", "_")}"),
+                                                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF2E7D32)),
+                                                contentPadding = PaddingValues(horizontal = 6.dp, vertical = 6.dp),
+                                                shape = RoundedCornerShape(8.dp)
+                                            ) {
+                                                Icon(Icons.Default.CheckCircle, contentDescription = null, modifier = Modifier.size(13.dp), tint = Color.White)
+                                                Spacer(modifier = Modifier.width(4.dp))
+                                                Text(
+                                                    "Batch Ready (${batch.preparingOrders.size})",
+                                                    fontSize = 11.sp,
+                                                    fontWeight = FontWeight.Bold,
+                                                    color = Color.White
+                                                )
+                                            }
+                                        }
+
+                                        val isExpanded = expandedBatchDish == batch.foodName
+                                        OutlinedButton(
+                                            onClick = {
+                                                expandedBatchDish = if (isExpanded) null else batch.foodName
+                                            },
+                                            contentPadding = PaddingValues(horizontal = 8.dp, vertical = 6.dp),
+                                            shape = RoundedCornerShape(8.dp),
+                                            modifier = Modifier.testTag("toggle_batch_details_${batch.foodName.replace(" ", "_")}")
+                                        ) {
+                                            Text(
+                                                if (isExpanded) "Hide Orders" else "View ${batch.orders.size} Orders",
+                                                fontSize = 11.sp,
+                                                fontWeight = FontWeight.SemiBold
+                                            )
+                                        }
+                                    }
+
+                                    // Detailed individual orders list for this batch
+                                    AnimatedVisibility(visible = expandedBatchDish == batch.foodName) {
+                                        Column(
+                                            modifier = Modifier
+                                                .fillMaxWidth()
+                                                .padding(top = 10.dp)
+                                                .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f), RoundedCornerShape(8.dp))
+                                                .padding(8.dp),
+                                            verticalArrangement = Arrangement.spacedBy(6.dp)
+                                        ) {
+                                            Text(
+                                                "INDIVIDUAL TICKETS IN THIS BATCH:",
+                                                fontSize = 10.sp,
+                                                fontWeight = FontWeight.ExtraBold,
+                                                color = MaterialTheme.colorScheme.primary
+                                            )
+
+                                            batch.orders.forEach { order ->
+                                                val student = allUsers.find { it.id == order.customerId }
+                                                val sName = student?.fullName ?: student?.username ?: "Student #${order.customerId}"
+                                                val sMatric = student?.student_staff_id ?: student?.info ?: "ATU"
+                                                val isChecked = selectedOrderIdsInBatch.contains(order.id)
+
+                                                Row(
+                                                    modifier = Modifier
+                                                        .fillMaxWidth()
+                                                        .background(MaterialTheme.colorScheme.surface, RoundedCornerShape(6.dp))
+                                                        .padding(horizontal = 8.dp, vertical = 6.dp),
+                                                    verticalAlignment = Alignment.CenterVertically,
+                                                    horizontalArrangement = Arrangement.SpaceBetween
+                                                ) {
+                                                    Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.weight(1f)) {
+                                                        Checkbox(
+                                                            checked = isChecked,
+                                                            onCheckedChange = { checked ->
+                                                                selectedOrderIdsInBatch = if (checked) {
+                                                                    selectedOrderIdsInBatch + order.id
+                                                                } else {
+                                                                    selectedOrderIdsInBatch - order.id
+                                                                }
+                                                            },
+                                                            modifier = Modifier.size(24.dp)
+                                                        )
+                                                        Spacer(modifier = Modifier.width(6.dp))
+                                                        Column {
+                                                            Text("Order #${order.id} • ${order.quantity}x Portion", fontWeight = FontWeight.Bold, fontSize = 11.sp)
+                                                            Text("$sName ($sMatric)", fontSize = 10.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                                        }
+                                                    }
+
+                                                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                                                        Surface(
+                                                            shape = RoundedCornerShape(4.dp),
+                                                            color = when (order.status) {
+                                                                "PENDING" -> MaterialTheme.colorScheme.error.copy(alpha = 0.2f)
+                                                                "PREPARING", "COOKING" -> MaterialTheme.colorScheme.primary.copy(alpha = 0.2f)
+                                                                "READY" -> Color(0xFF2E7D32).copy(alpha = 0.2f)
+                                                                else -> MaterialTheme.colorScheme.outline.copy(alpha = 0.2f)
+                                                            }
+                                                        ) {
+                                                            Text(
+                                                                order.status,
+                                                                modifier = Modifier.padding(horizontal = 4.dp, vertical = 2.dp),
+                                                                fontSize = 9.sp,
+                                                                fontWeight = FontWeight.Bold,
+                                                                color = when (order.status) {
+                                                                    "PENDING" -> MaterialTheme.colorScheme.error
+                                                                    "PREPARING", "COOKING" -> MaterialTheme.colorScheme.primary
+                                                                    "READY" -> Color(0xFF2E7D32)
+                                                                    else -> MaterialTheme.colorScheme.outline
+                                                                }
+                                                            )
+                                                        }
+
+                                                        if (order.status == "PENDING") {
+                                                            IconButton(
+                                                                onClick = { viewModel.updateOrderStatus(order.id, "PREPARING", selectedTimePreset) },
+                                                                modifier = Modifier.size(28.dp)
+                                                            ) {
+                                                                Icon(Icons.Default.OutdoorGrill, contentDescription = "Prep", modifier = Modifier.size(14.dp), tint = MaterialTheme.colorScheme.primary)
+                                                            }
+                                                        } else if (order.status == "PREPARING" || order.status == "COOKING") {
+                                                            IconButton(
+                                                                onClick = { viewModel.updateOrderStatus(order.id, "READY") },
+                                                                modifier = Modifier.size(28.dp)
+                                                            ) {
+                                                                Icon(Icons.Default.CheckCircle, contentDescription = "Ready", modifier = Modifier.size(14.dp), tint = Color(0xFF2E7D32))
+                                                            }
+                                                        }
+                                                    }
+                                                }
+                                            }
+
+                                            // Action on checked subset
+                                            val currentBatchSelectedIds = batch.orders.map { it.id }.filter { selectedOrderIdsInBatch.contains(it) }
+                                            if (currentBatchSelectedIds.isNotEmpty()) {
+                                                Row(
+                                                    modifier = Modifier.fillMaxWidth(),
+                                                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                                                ) {
+                                                    Button(
+                                                        onClick = {
+                                                            viewModel.batchUpdateOrdersStatus(currentBatchSelectedIds, "PREPARING", selectedTimePreset) {
+                                                                selectedOrderIdsInBatch = selectedOrderIdsInBatch - currentBatchSelectedIds.toSet()
+                                                                batchSuccessFeedback = "Started ${currentBatchSelectedIds.size} selected orders of ${batch.foodName}!"
+                                                            }
+                                                        },
+                                                        modifier = Modifier.weight(1f),
+                                                        contentPadding = PaddingValues(4.dp),
+                                                        shape = RoundedCornerShape(6.dp)
+                                                    ) {
+                                                        Text("Start Selected (${currentBatchSelectedIds.size})", fontSize = 10.sp, fontWeight = FontWeight.Bold)
+                                                    }
+
+                                                    Button(
+                                                        onClick = {
+                                                            viewModel.batchUpdateOrdersStatus(currentBatchSelectedIds, "READY") {
+                                                                selectedOrderIdsInBatch = selectedOrderIdsInBatch - currentBatchSelectedIds.toSet()
+                                                                batchSuccessFeedback = "Marked ${currentBatchSelectedIds.size} selected orders Ready!"
+                                                            }
+                                                        },
+                                                        modifier = Modifier.weight(1f),
+                                                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF2E7D32)),
+                                                        contentPadding = PaddingValues(4.dp),
+                                                        shape = RoundedCornerShape(6.dp)
+                                                    ) {
+                                                        Text("Ready Selected (${currentBatchSelectedIds.size})", fontSize = 10.sp, fontWeight = FontWeight.Bold, color = Color.White)
+                                                    }
+                                                }
+                                            }
+                                        }
                                     }
                                 }
                             }

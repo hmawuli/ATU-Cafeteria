@@ -1713,15 +1713,154 @@
                   <th class="p-3">Index / ID No.</th>
                   <th class="p-3">Campus Email</th>
                   <th class="p-3">Wallet Balance</th>
+                  <th class="p-3">Account Status</th>
                   <th class="p-3">Quick Credits</th>
-                  <th class="p-3 text-right">Wallet Governance</th>
+                  <th class="p-3 text-right">Actions & Governance</th>
                 </tr>
               </thead>
               <tbody id="admin-students-table-body" class="divide-y divide-slate-100 text-slate-700 font-medium"></tbody>
             </table>
           </div>
         </div>
-        <!-- 5. Admin Security & Biometrics Governance -->
+
+        <!-- 5. Admin Broadcasts, Campus Operations & System Controls -->
+        <div id="admin-sec-operations" class="space-y-5 hidden">
+          <!-- Broadcasts Hub -->
+          <div class="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm space-y-5">
+            <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-100 pb-4">
+              <div class="flex items-center gap-3">
+                <div class="w-12 h-12 rounded-2xl bg-brand-100 text-brand-700 flex items-center justify-center shadow-xs">
+                  <i data-lucide="megaphone" class="w-6 h-6 text-brand-700"></i>
+                </div>
+                <div>
+                  <h3 class="text-base font-extrabold text-slate-900">Campus Broadcast & Operational Gateway</h3>
+                  <p class="text-xs text-slate-500">Publish live news banners to students, manage campus kitchen modes, and issue mass subsidies.</p>
+                </div>
+              </div>
+              <div class="flex items-center gap-2">
+                <button onclick="openBroadcastModal()" class="px-4 py-2 rounded-xl bg-brand-600 hover:bg-brand-700 text-white text-xs font-bold shadow-xs flex items-center gap-1.5 transition-all">
+                  <i data-lucide="send" class="w-3.5 h-3.5"></i> Compose Broadcast
+                </button>
+                <button onclick="clearCampusBroadcast()" class="px-3.5 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold flex items-center gap-1 transition-all">
+                  <i data-lucide="rotate-ccw" class="w-3.5 h-3.5"></i> Reset Default
+                </button>
+              </div>
+            </div>
+
+            <!-- Active Announcement Preview Card -->
+            <div class="bg-gradient-to-r from-amber-50 to-orange-50 p-4 rounded-2xl border border-amber-200/80 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <div class="flex items-start gap-3">
+                <div class="p-2 rounded-xl bg-amber-200/80 text-amber-900 shrink-0 mt-0.5">
+                  <i data-lucide="radio" class="w-4 h-4 animate-pulse text-amber-800"></i>
+                </div>
+                <div>
+                  <div class="flex items-center gap-2">
+                    <span class="text-[10px] font-black uppercase tracking-wider bg-amber-200 text-amber-900 px-2 py-0.5 rounded-full">Active Banner Ticker</span>
+                    <span class="text-[10px] font-bold text-slate-500">Seen by all student users at top of screen</span>
+                  </div>
+                  <p class="text-xs font-bold text-slate-800 mt-1" id="admin-broadcast-preview-text">Welcome to Accra Technical University Cafeteria — Pre-order now to skip campus meal queues!</p>
+                </div>
+              </div>
+            </div>
+
+            <!-- Operational Modes Grid -->
+            <div class="space-y-3 pt-2">
+              <div class="flex items-center justify-between">
+                <h4 class="text-xs font-extrabold text-slate-700 uppercase tracking-wider">Campus Operational State & Flow Control</h4>
+                <span id="emergency-status-badge" class="text-[10px] font-extrabold text-emerald-700 bg-emerald-50 px-2.5 py-0.5 rounded-full border border-emerald-200">ALL STALLS NORMAL</span>
+              </div>
+              <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+                <!-- Mode 1: Normal Operations -->
+                <div onclick="setSystemOperatingMode('NORMAL')" id="mode-card-normal" class="p-4 rounded-2xl border-2 border-emerald-500 bg-emerald-50/50 cursor-pointer hover:shadow-sm transition-all space-y-1.5">
+                  <div class="flex items-center justify-between">
+                    <span class="text-xs font-bold text-emerald-800 flex items-center gap-1.5">
+                      <i data-lucide="check-circle" class="w-4 h-4 text-emerald-600"></i> Normal Mode
+                    </span>
+                    <span class="w-2.5 h-2.5 rounded-full bg-emerald-500"></span>
+                  </div>
+                  <p class="text-[11px] text-slate-600">Standard operating cadence. All stalls accept walk-in and pre-orders normally.</p>
+                </div>
+
+                <!-- Mode 2: Lunch Rush -->
+                <div onclick="setSystemOperatingMode('RUSH')" id="mode-card-rush" class="p-4 rounded-2xl border border-slate-200 bg-white cursor-pointer hover:border-amber-400 hover:bg-amber-50/30 transition-all space-y-1.5">
+                  <div class="flex items-center justify-between">
+                    <span class="text-xs font-bold text-amber-800 flex items-center gap-1.5">
+                      <i data-lucide="flame" class="w-4 h-4 text-amber-600"></i> Lunch Rush Express
+                    </span>
+                    <span class="w-2.5 h-2.5 rounded-full bg-slate-300"></span>
+                  </div>
+                  <p class="text-[11px] text-slate-600">Fast-tracks batch orders for high-demand items (Jollof, Fried Rice, Banku).</p>
+                </div>
+
+                <!-- Mode 3: Maintenance -->
+                <div onclick="setSystemOperatingMode('MAINTENANCE')" id="mode-card-maintenance" class="p-4 rounded-2xl border border-slate-200 bg-white cursor-pointer hover:border-orange-400 hover:bg-orange-50/30 transition-all space-y-1.5">
+                  <div class="flex items-center justify-between">
+                    <span class="text-xs font-bold text-orange-800 flex items-center gap-1.5">
+                      <i data-lucide="wrench" class="w-4 h-4 text-orange-600"></i> Maintenance Mode
+                    </span>
+                    <span class="w-2.5 h-2.5 rounded-full bg-slate-300"></span>
+                  </div>
+                  <p class="text-[11px] text-slate-600">Notifies users that digital ordering is undergoing scheduled maintenance.</p>
+                </div>
+
+                <!-- Mode 4: Emergency Lockdown -->
+                <div onclick="setSystemOperatingMode('LOCKDOWN')" id="mode-card-lockdown" class="p-4 rounded-2xl border border-slate-200 bg-white cursor-pointer hover:border-red-500 hover:bg-red-50/30 transition-all space-y-1.5">
+                  <div class="flex items-center justify-between">
+                    <span class="text-xs font-bold text-red-800 flex items-center gap-1.5">
+                      <i data-lucide="shield-alert" class="w-4 h-4 text-red-600"></i> Stall Lockdown
+                    </span>
+                    <span class="w-2.5 h-2.5 rounded-full bg-slate-300"></span>
+                  </div>
+                  <p class="text-[11px] text-slate-600">Instantly closes all cafeteria stalls & halts all incoming orders immediately.</p>
+                </div>
+              </div>
+            </div>
+
+            <!-- Administrative System Tools & Diagnostics -->
+            <div class="space-y-3 pt-2">
+              <h4 class="text-xs font-extrabold text-slate-700 uppercase tracking-wider">Campus Financial & Data Master Control Tools</h4>
+              <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+                <button onclick="disburseBonusToAll()" class="p-4 rounded-2xl bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 text-left transition-all space-y-1 group">
+                  <div class="flex items-center justify-between">
+                    <i data-lucide="gift" class="w-5 h-5 text-emerald-600 group-hover:scale-110 transition-transform"></i>
+                    <span class="text-[10px] font-bold bg-emerald-200 text-emerald-900 px-2 py-0.5 rounded-full">+GH₵ 20 Each</span>
+                  </div>
+                  <p class="text-xs font-bold text-emerald-950">Disburse Meal Subsidy</p>
+                  <p class="text-[11px] text-emerald-700">Credits universal GH₵ 20 bonus to all registered student wallets.</p>
+                </button>
+
+                <button onclick="seedAdminSampleOrders()" class="p-4 rounded-2xl bg-blue-50 hover:bg-blue-100 border border-blue-200 text-left transition-all space-y-1 group">
+                  <div class="flex items-center justify-between">
+                    <i data-lucide="plus-circle" class="w-5 h-5 text-blue-600 group-hover:scale-110 transition-transform"></i>
+                    <span class="text-[10px] font-bold bg-blue-200 text-blue-900 px-2 py-0.5 rounded-full">Simulate</span>
+                  </div>
+                  <p class="text-xs font-bold text-blue-950">Seed Demo Orders</p>
+                  <p class="text-[11px] text-blue-700">Creates 3 live student orders across stalls for kitchen testing.</p>
+                </button>
+
+                <button onclick="exportFullSystemBackup()" class="p-4 rounded-2xl bg-slate-50 hover:bg-slate-100 border border-slate-200 text-left transition-all space-y-1 group">
+                  <div class="flex items-center justify-between">
+                    <i data-lucide="download" class="w-5 h-5 text-slate-700 group-hover:scale-110 transition-transform"></i>
+                    <span class="text-[10px] font-bold bg-slate-200 text-slate-800 px-2 py-0.5 rounded-full">JSON</span>
+                  </div>
+                  <p class="text-xs font-bold text-slate-900">Export System Backup</p>
+                  <p class="text-[11px] text-slate-600">Downloads complete database dump of vendors, menu, staff & logs.</p>
+                </button>
+
+                <button onclick="resetDemoEnvironment()" class="p-4 rounded-2xl bg-rose-50 hover:bg-rose-100 border border-rose-200 text-left transition-all space-y-1 group">
+                  <div class="flex items-center justify-between">
+                    <i data-lucide="refresh-cw" class="w-5 h-5 text-rose-600 group-hover:scale-110 transition-transform"></i>
+                    <span class="text-[10px] font-bold bg-rose-200 text-rose-900 px-2 py-0.5 rounded-full">Factory Reset</span>
+                  </div>
+                  <p class="text-xs font-bold text-rose-950">Reset Environment</p>
+                  <p class="text-[11px] text-rose-700">Restores default sample vendors, dishes, staff, and student accounts.</p>
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- 6. Admin Security & Biometrics Governance -->
         <div id="admin-sec-security" class="space-y-5 hidden">
           <div class="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm space-y-6">
             <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-100 pb-4">
@@ -2369,9 +2508,15 @@
           </div>
         </div>
 
-        <div>
-          <label class="block mb-1 text-slate-800">Campus Email Address</label>
-          <input type="email" id="new-student-email" placeholder="e.mensah@atu.edu.gh" class="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-brand-500" />
+        <div class="grid grid-cols-2 gap-3">
+          <div>
+            <label class="block mb-1 text-slate-800">Campus Email</label>
+            <input type="email" id="new-student-email" placeholder="e.mensah@atu.edu.gh" class="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-brand-500" />
+          </div>
+          <div>
+            <label class="block mb-1 text-slate-800">Contact Phone</label>
+            <input type="text" id="new-student-phone" placeholder="+233 24 100 0000" class="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-brand-500 font-mono" />
+          </div>
         </div>
       </div>
 
@@ -2380,6 +2525,72 @@
         <button onclick="saveNewStudent()" class="flex-1 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold shadow-xs flex items-center justify-center gap-1.5 transition-all">
           <i data-lucide="check" class="w-4 h-4"></i>
           <span>Register Student</span>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 3B. Admin Edit Student Account Modal -->
+  <div id="edit-student-modal" class="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm hidden flex items-center justify-center p-4">
+    <div class="bg-white rounded-3xl max-w-md w-full p-6 shadow-2xl space-y-4">
+      <div class="flex items-center justify-between border-b border-slate-100 pb-3">
+        <div class="flex items-center gap-2.5">
+          <div class="w-9 h-9 rounded-xl bg-blue-100 text-blue-700 flex items-center justify-center font-bold">
+            <i data-lucide="user-cog" class="w-5 h-5"></i>
+          </div>
+          <div>
+            <h3 class="text-base font-bold text-slate-900">Update Student Profile</h3>
+            <p class="text-[11px] text-slate-500">Edit student account, contact info & security PIN</p>
+          </div>
+        </div>
+        <button onclick="closeEditStudentModal()" class="w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center text-slate-500 hover:bg-slate-200">
+          <i data-lucide="x" class="w-4 h-4"></i>
+        </button>
+      </div>
+
+      <input type="hidden" id="edit-student-orig-index" value="" />
+
+      <div class="space-y-3.5 text-xs font-semibold text-slate-700">
+        <div>
+          <label class="block mb-1 text-slate-800">Student Full Name <span class="text-red-500">*</span></label>
+          <input type="text" id="edit-student-name" class="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-brand-500 font-bold text-slate-900" />
+        </div>
+
+        <div class="grid grid-cols-2 gap-3">
+          <div>
+            <label class="block mb-1 text-slate-800">Index / ID No. <span class="text-red-500">*</span></label>
+            <input type="text" id="edit-student-index" class="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-brand-500 font-mono font-bold text-slate-800" />
+          </div>
+          <div>
+            <label class="block mb-1 text-slate-800">Contact Phone</label>
+            <input type="text" id="edit-student-phone" class="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-brand-500 font-mono" />
+          </div>
+        </div>
+
+        <div>
+          <label class="block mb-1 text-slate-800">Campus Email Address</label>
+          <input type="email" id="edit-student-email" class="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-brand-500" />
+        </div>
+
+        <!-- Security & PIN Reset Card -->
+        <div class="bg-slate-50 p-3 rounded-2xl border border-slate-200 space-y-2">
+          <div class="flex items-center justify-between">
+            <span class="text-xs font-bold text-slate-800 flex items-center gap-1.5">
+              <i data-lucide="key" class="w-3.5 h-3.5 text-brand-600"></i> Student Security PIN
+            </span>
+            <button type="button" onclick="document.getElementById('edit-student-pin').value='1234'" class="text-[10px] text-brand-700 bg-brand-50 hover:bg-brand-100 border border-brand-200 px-2 py-0.5 rounded-lg font-bold">
+              Reset to 1234
+            </button>
+          </div>
+          <input type="text" id="edit-student-pin" placeholder="PIN code (default: 1234)" class="w-full px-3 py-2 bg-white border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-brand-500 font-mono text-xs" />
+        </div>
+      </div>
+
+      <div class="flex items-center space-x-2 pt-2 border-t border-slate-100">
+        <button onclick="closeEditStudentModal()" class="flex-1 py-2.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-800 text-xs font-bold transition-all">Cancel</button>
+        <button onclick="saveEditStudent()" class="flex-1 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold shadow-xs flex items-center justify-center gap-1.5 transition-all">
+          <i data-lucide="check" class="w-4 h-4"></i>
+          <span>Save Updates</span>
         </button>
       </div>
     </div>
@@ -7516,9 +7727,20 @@ function advanceOrderStatus(orderId, nextStatus) {
                 </div>
               </td>
               <td class="p-3 text-right">
-                <button onclick="openAdminCreditModal('${student.indexNo}')" class="px-3 py-1.5 rounded-xl bg-brand-600 hover:bg-brand-700 text-white font-bold text-xs shadow-xs flex items-center gap-1 ml-auto">
-                  <i data-lucide="sliders" class="w-3.5 h-3.5"></i> Custom Adjust
-                </button>
+                <div class="flex items-center justify-end gap-1.5">
+                  <button onclick="openAdminCreditModal('${student.indexNo}')" class="px-2.5 py-1 rounded-lg bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-200 font-bold text-[11px] flex items-center gap-1 transition-all" title="Credit or deduct student wallet balance">
+                    <i data-lucide="sliders" class="w-3 h-3 text-emerald-700"></i> Adjust
+                  </button>
+                  <button onclick="openEditStudentModal('${student.indexNo}')" class="px-2.5 py-1 rounded-lg bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200 font-bold text-[11px] flex items-center gap-1 transition-all" title="Edit student profile & security PIN">
+                    <i data-lucide="edit-3" class="w-3 h-3"></i> Edit
+                  </button>
+                  <button onclick="quickResetStudentPin('${student.indexNo}')" class="px-2 py-1 rounded-lg bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-200 font-bold text-[10px] flex items-center gap-0.5 transition-all" title="Reset security PIN to default 1234">
+                    <i data-lucide="key" class="w-3 h-3 text-amber-600"></i> 1234
+                  </button>
+                  <button onclick="deleteStudent('${student.indexNo}')" class="p-1.5 rounded-lg bg-slate-100 hover:bg-red-50 text-slate-400 hover:text-red-600 transition-colors" title="Delete student account">
+                    <i data-lucide="trash-2" class="w-3.5 h-3.5"></i>
+                  </button>
+                </div>
               </td>
             </tr>
           `;
@@ -8121,11 +8343,19 @@ function advanceOrderStatus(orderId, nextStatus) {
     function openAddStudentModal() {
       const modal = document.getElementById('admin-student-modal');
       if (!modal) return;
-      document.getElementById('astudent-name').value = '';
-      document.getElementById('astudent-index').value = '';
-      document.getElementById('astudent-email').value = '';
-      document.getElementById('astudent-phone').value = '';
-      document.getElementById('astudent-balance').value = '50.00';
+      
+      const nameInput = document.getElementById('new-student-name') || document.getElementById('astudent-name');
+      const indexInput = document.getElementById('new-student-index') || document.getElementById('astudent-index');
+      const emailInput = document.getElementById('new-student-email') || document.getElementById('astudent-email');
+      const phoneInput = document.getElementById('new-student-phone') || document.getElementById('astudent-phone');
+      const balInput = document.getElementById('new-student-balance') || document.getElementById('astudent-balance');
+
+      if (nameInput) nameInput.value = '';
+      if (indexInput) indexInput.value = '';
+      if (emailInput) emailInput.value = '';
+      if (phoneInput) phoneInput.value = '';
+      if (balInput) balInput.value = '50.00';
+
       modal.classList.remove('hidden');
       modal.classList.add('flex');
       lucide.createIcons();
@@ -8138,11 +8368,17 @@ function advanceOrderStatus(orderId, nextStatus) {
 
     function saveNewStudent(e) {
       if (e) e.preventDefault();
-      const name = document.getElementById('astudent-name').value.trim();
-      const indexNo = document.getElementById('astudent-index').value.trim().toUpperCase();
-      const email = document.getElementById('astudent-email').value.trim().toLowerCase();
-      const phone = document.getElementById('astudent-phone').value.trim();
-      const balance = parseFloat(document.getElementById('astudent-balance').value) || 0;
+      const nameInput = document.getElementById('new-student-name') || document.getElementById('astudent-name');
+      const indexInput = document.getElementById('new-student-index') || document.getElementById('astudent-index');
+      const emailInput = document.getElementById('new-student-email') || document.getElementById('astudent-email');
+      const phoneInput = document.getElementById('new-student-phone') || document.getElementById('astudent-phone');
+      const balInput = document.getElementById('new-student-balance') || document.getElementById('astudent-balance');
+
+      const name = nameInput ? nameInput.value.trim() : '';
+      const indexNo = indexInput ? indexInput.value.trim().toUpperCase() : '';
+      const email = emailInput ? emailInput.value.trim().toLowerCase() : '';
+      const phone = phoneInput ? phoneInput.value.trim() : '';
+      const balance = parseFloat(balInput ? balInput.value : '0') || 0;
 
       if (!name || !indexNo) {
         showToast('Please enter student name and index number.', 'error');
@@ -8361,54 +8597,361 @@ function advanceOrderStatus(orderId, nextStatus) {
       lucide.createIcons();
     }
 
-    function switchAdminTab(tab) {
-      const secVendors = document.getElementById('admin-sec-vendors');
-      const secMenu = document.getElementById('admin-sec-menu');
-      const secWorkers = document.getElementById('admin-sec-workers');
-      const secStudents = document.getElementById('admin-sec-students');
-      const secSecurity = document.getElementById('admin-sec-security');
-      const secLogs = document.getElementById('admin-sec-logs');
+    // 4B. 🎓 STUDENT PROFILE EDITING, PIN RESET & ACCOUNT REMOVAL
+    function openEditStudentModal(indexNo) {
+      const student = registeredStudents.find(s => s.indexNo === indexNo);
+      if (!student) {
+        showToast('Student account not found.', 'error');
+        return;
+      }
 
-      const tabs = ['vendors', 'menu', 'workers', 'students', 'security', 'logs'];
-      tabs.forEach(t => {
-        const btn = document.getElementById(`atab-${t}`);
-        const sec = document.getElementById(`admin-sec-${t}`);
-        if (btn) {
-          if (t === tab) {
-            btn.className = 'px-4 py-2 rounded-xl text-xs font-bold bg-brand-600 text-white shadow-xs flex items-center gap-1.5 whitespace-nowrap transition-all';
-          } else {
-            btn.className = 'px-4 py-2 rounded-xl text-xs font-bold bg-slate-100 text-slate-700 hover:bg-slate-200 flex items-center gap-1.5 whitespace-nowrap transition-all';
-          }
+      const modal = document.getElementById('edit-student-modal');
+      if (!modal) return;
+
+      document.getElementById('edit-student-orig-index').value = student.indexNo;
+      document.getElementById('edit-student-name').value = student.name || '';
+      document.getElementById('edit-student-index').value = student.indexNo || '';
+      document.getElementById('edit-student-phone').value = student.phone || '+233 24 100 0000';
+      document.getElementById('edit-student-email').value = student.email || `${student.indexNo.toLowerCase()}@atu.edu.gh`;
+      document.getElementById('edit-student-pin').value = student.pin || '1234';
+
+      modal.classList.remove('hidden');
+      modal.classList.add('flex');
+      lucide.createIcons();
+    }
+
+    function closeEditStudentModal() {
+      const modal = document.getElementById('edit-student-modal');
+      if (modal) modal.classList.add('hidden');
+    }
+
+    function saveEditStudent() {
+      const origIndex = document.getElementById('edit-student-orig-index').value;
+      const name = document.getElementById('edit-student-name').value.trim();
+      const newIndex = document.getElementById('edit-student-index').value.trim().toUpperCase();
+      const phone = document.getElementById('edit-student-phone').value.trim();
+      const email = document.getElementById('edit-student-email').value.trim().toLowerCase();
+      const pin = document.getElementById('edit-student-pin').value.trim();
+
+      if (!name || !newIndex) {
+        showToast('Student name and index number are required.', 'error');
+        return;
+      }
+
+      const student = registeredStudents.find(s => s.indexNo === origIndex);
+      if (!student) {
+        showToast('Student record not found.', 'error');
+        return;
+      }
+
+      // Check unique index if changed
+      if (newIndex !== origIndex && registeredStudents.some(s => s.indexNo === newIndex)) {
+        showToast(`Index number ${newIndex} is already registered to another student.`, 'error');
+        return;
+      }
+
+      student.name = name;
+      student.indexNo = newIndex;
+      student.phone = phone || '+233 24 100 0000';
+      student.email = email || `${newIndex.toLowerCase()}@atu.edu.gh`;
+      student.pin = pin || '1234';
+
+      try {
+        localStorage.setItem('ATU_REGISTERED_STUDENTS_V1', JSON.stringify(registeredStudents));
+      } catch(e) {}
+
+      // Update active user session if this student is currently logged in
+      if (currentLoggedInUser && (currentLoggedInUser.indexNo === origIndex || currentLoggedInUser.email === origIndex)) {
+        currentLoggedInUser.name = name;
+        currentLoggedInUser.indexNo = newIndex;
+        currentLoggedInUser.phone = student.phone;
+        currentLoggedInUser.email = student.email;
+        currentLoggedInUser.pin = student.pin;
+        saveUserSessionToStorage(currentLoggedInUser);
+        const nameEl = document.getElementById('user-name-display');
+        if (nameEl) nameEl.innerText = name;
+      }
+
+      auditLogs.unshift(`Admin updated profile for student ${name} (${newIndex}). Contact: ${student.phone}, PIN updated.`);
+
+      closeEditStudentModal();
+      renderAdminDashboard();
+      renderAdminAuditLogs();
+      playChime(659.25);
+      showToast(`Student profile '${name}' updated successfully!`, 'success');
+    }
+
+    function quickResetStudentPin(indexNo) {
+      const student = registeredStudents.find(s => s.indexNo === indexNo);
+      if (!student) return;
+      student.pin = '1234';
+      try {
+        localStorage.setItem('ATU_REGISTERED_STUDENTS_V1', JSON.stringify(registeredStudents));
+      } catch(e) {}
+      if (currentLoggedInUser && currentLoggedInUser.indexNo === indexNo) {
+        currentLoggedInUser.pin = '1234';
+        saveUserSessionToStorage(currentLoggedInUser);
+      }
+      auditLogs.unshift(`Admin reset PIN for student ${student.name} (${student.indexNo}) to default 1234.`);
+      renderAdminDashboard();
+      renderAdminAuditLogs();
+      showToast(`Reset PIN for ${student.name} to default: 1234`, 'info');
+      playChime(783.99);
+    }
+
+    function deleteStudent(indexNo) {
+      const student = registeredStudents.find(s => s.indexNo === indexNo);
+      if (!student) return;
+
+      if (!confirm(`Are you sure you want to permanently remove student account '${student.name}' (${student.indexNo}) with wallet balance GH₵ ${(student.walletBalance || 0).toFixed(2)}?`)) {
+        return;
+      }
+
+      registeredStudents = registeredStudents.filter(s => s.indexNo !== indexNo);
+      try {
+        localStorage.setItem('ATU_REGISTERED_STUDENTS_V1', JSON.stringify(registeredStudents));
+      } catch(e) {}
+
+      auditLogs.unshift(`Admin deleted student account: ${student.name} (${student.indexNo}) [Balance at deletion: GH₵ ${(student.walletBalance || 0).toFixed(2)}].`);
+
+      renderAdminDashboard();
+      renderAdminAuditLogs();
+      showToast(`Student account '${student.name}' removed.`, 'warning');
+      playChime(523.25);
+    }
+
+    // ==========================================
+    // 5. 📢 ADMIN CAMPUS OPERATIONS & BROADCASTS
+    // ==========================================
+    let currentSystemOperatingMode = localStorage.getItem('ATU_OPERATING_MODE_V1') || 'NORMAL';
+
+    function renderAdminOperations() {
+      const previewText = document.getElementById('admin-broadcast-preview-text');
+      const announcementEl = document.getElementById('announcement-text');
+      if (previewText && announcementEl) {
+        previewText.innerText = announcementEl.innerText || 'Welcome to Accra Technical University Cafeteria — Pre-order now to skip campus meal queues!';
+      }
+
+      const badge = document.getElementById('emergency-status-badge');
+      if (badge) {
+        if (currentSystemOperatingMode === 'NORMAL') {
+          badge.className = 'text-[10px] font-extrabold text-emerald-700 bg-emerald-50 px-2.5 py-0.5 rounded-full border border-emerald-200';
+          badge.innerText = 'ALL STALLS NORMAL';
+        } else if (currentSystemOperatingMode === 'RUSH') {
+          badge.className = 'text-[10px] font-extrabold text-amber-700 bg-amber-50 px-2.5 py-0.5 rounded-full border border-amber-200';
+          badge.innerText = 'LUNCH RUSH EXPRESS ACTIVE';
+        } else if (currentSystemOperatingMode === 'MAINTENANCE') {
+          badge.className = 'text-[10px] font-extrabold text-orange-700 bg-orange-50 px-2.5 py-0.5 rounded-full border border-orange-200';
+          badge.innerText = 'MAINTENANCE MODE';
+        } else if (currentSystemOperatingMode === 'LOCKDOWN') {
+          badge.className = 'text-[10px] font-extrabold text-red-700 bg-red-50 px-2.5 py-0.5 rounded-full border border-red-200 animate-pulse';
+          badge.innerText = 'EMERGENCY STALL LOCKDOWN';
         }
-        if (sec) {
-          if (t === tab) {
-            sec.classList.remove('hidden');
+      }
+
+      ['normal', 'rush', 'maintenance', 'lockdown'].forEach(m => {
+        const card = document.getElementById(`mode-card-${m}`);
+        if (card) {
+          const isSelected = currentSystemOperatingMode.toLowerCase() === m;
+          if (isSelected) {
+            card.className = 'p-4 rounded-2xl border-2 border-brand-500 bg-brand-50/50 cursor-pointer shadow-sm transition-all space-y-1.5';
           } else {
-            sec.classList.add('hidden');
+            card.className = 'p-4 rounded-2xl border border-slate-200 bg-white cursor-pointer hover:border-slate-300 hover:bg-slate-50/50 transition-all space-y-1.5';
           }
         }
       });
-
-      renderAdminDashboard();
       lucide.createIcons();
     }
-function openBroadcastModal() {
-      document.getElementById('broadcast-modal').classList.remove('hidden');
+
+    function setSystemOperatingMode(mode) {
+      currentSystemOperatingMode = mode;
+      try {
+        localStorage.setItem('ATU_OPERATING_MODE_V1', mode);
+      } catch(e) {}
+
+      let bannerMsg = '';
+      if (mode === 'NORMAL') {
+        bannerMsg = 'Normal operations resumed. All cafeteria food stalls are serving meals!';
+      } else if (mode === 'RUSH') {
+        bannerMsg = '⚡ LUNCH RUSH PRIORITY: Kitchens are batch-processing high demand items (Jollof, Fried Rice, Banku).';
+      } else if (mode === 'MAINTENANCE') {
+        bannerMsg = '🔧 NOTICE: Cafeteria digital systems are undergoing routine maintenance.';
+      } else if (mode === 'LOCKDOWN') {
+        bannerMsg = '⛔ EMERGENCY ADVISORY: Cafeteria stalls are temporarily closed by campus administration.';
+      }
+
+      const announcementEl = document.getElementById('announcement-text');
+      if (announcementEl) announcementEl.innerText = bannerMsg;
+
+      auditLogs.unshift(`Admin switched Campus Operational Mode to '${mode}'. Broadcast updated: "${bannerMsg}"`);
+
+      renderAdminOperations();
+      renderAdminDashboard();
+      renderAdminAuditLogs();
+      showToast(`Campus operating mode set to: ${mode}`, 'info');
+      playChime(659.25);
+    }
+
+    function openBroadcastModal() {
+      const modal = document.getElementById('broadcast-modal');
+      if (modal) {
+        modal.classList.remove('hidden');
+        modal.classList.add('flex');
+        const input = document.getElementById('broadcast-input-text');
+        if (input) {
+          input.value = document.getElementById('announcement-text')?.innerText || '';
+          setTimeout(() => input.focus(), 50);
+        }
+      }
       lucide.createIcons();
     }
 
     function closeBroadcastModal() {
-      document.getElementById('broadcast-modal').classList.add('hidden');
+      const modal = document.getElementById('broadcast-modal');
+      if (modal) modal.classList.add('hidden');
     }
 
     function publishBroadcast() {
-      const msg = document.getElementById('broadcast-input-text').value.trim();
-      if (!msg) return;
-      document.getElementById('announcement-text').innerText = msg;
-      auditLogs.unshift(`Admin broadcast announcement: "${msg}"`);
+      const input = document.getElementById('broadcast-input-text');
+      const msg = input ? input.value.trim() : '';
+      if (!msg) {
+        showToast('Please enter an announcement message.', 'error');
+        return;
+      }
+      const announcementEl = document.getElementById('announcement-text');
+      if (announcementEl) announcementEl.innerText = msg;
+
+      auditLogs.unshift(`Admin published live campus broadcast: "${msg}"`);
+
+      renderAdminOperations();
       renderAdminDashboard();
+      renderAdminAuditLogs();
       closeBroadcastModal();
       showToast('Announcement broadcast live to all campus users!', 'success');
+      playChime(783.99);
+    }
+
+    function clearCampusBroadcast() {
+      const defaultMsg = "Welcome to Accra Technical University Cafeteria — Pre-order now to skip campus meal queues!";
+      const announcementEl = document.getElementById('announcement-text');
+      if (announcementEl) announcementEl.innerText = defaultMsg;
+
+      auditLogs.unshift(`Admin restored default campus broadcast ticker.`);
+      renderAdminOperations();
+      renderAdminDashboard();
+      renderAdminAuditLogs();
+      showToast('Restored default announcement banner.', 'info');
+    }
+
+    function seedAdminSampleOrders() {
+      const sampleOrders = [
+        {
+          id: Date.now() - 120000,
+          vendorId: vendors[0] ? vendors[0].id : 1,
+          vendorName: vendors[0] ? vendors[0].name : "Akwaaba Kitchen",
+          foodId: 1,
+          foodName: "Special Jollof Rice + Grilled Chicken",
+          quantity: 2,
+          unitPrice: 28.00,
+          totalPrice: 56.00,
+          pickupPin: Math.floor(1000 + Math.random() * 9000).toString(),
+          qrCodeToken: "ATU-" + (Date.now() - 120000),
+          status: "PREPARING",
+          time: new Date(Date.now() - 120000).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+          dateStamp: new Date().toLocaleDateString(),
+          customerName: "Ama Serwaa",
+          customerIndex: "01210888B",
+          notes: "Extra shito on the side, well packed",
+          paymentMethod: "SMART_WALLET"
+        },
+        {
+          id: Date.now() - 60000,
+          vendorId: vendors[1] ? vendors[1].id : 2,
+          vendorName: vendors[1] ? vendors[1].name : "Campus Delight",
+          foodId: 4,
+          foodName: "Fried Rice with Chicken",
+          quantity: 1,
+          unitPrice: 30.00,
+          totalPrice: 30.00,
+          pickupPin: Math.floor(1000 + Math.random() * 9000).toString(),
+          qrCodeToken: "ATU-" + (Date.now() - 60000),
+          status: "RECEIVED",
+          time: new Date(Date.now() - 60000).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+          dateStamp: new Date().toLocaleDateString(),
+          customerName: "Kwame Asante",
+          customerIndex: "01210492B",
+          notes: "Spicy",
+          paymentMethod: "SMART_WALLET"
+        }
+      ];
+
+      orders.unshift(...sampleOrders);
+      try {
+        localStorage.setItem('ATU_SAVED_ORDERS_V1', JSON.stringify(orders));
+      } catch(e) {}
+
+      auditLogs.unshift(`Admin seeded 2 live simulated kitchen orders across stalls for dispatch testing.`);
+      renderActiveOrders();
+      renderOrderHistory();
+      renderVendorDashboard();
+      renderAdminDashboard();
+      renderAdminAuditLogs();
+      playChime(659.25);
+      showToast('Seeded 2 live orders successfully!', 'success');
+    }
+
+    function exportFullSystemBackup() {
+      const backupPayload = {
+        application: "ATU Smart Cafeteria System Master Backup",
+        version: "2.4.0",
+        exportedAt: new Date().toISOString(),
+        operatingMode: currentSystemOperatingMode,
+        vendorsCount: vendors.length,
+        menuItemsCount: menuItems.length,
+        workersCount: vendorWorkers.length,
+        studentsCount: registeredStudents.length,
+        ordersCount: orders.length,
+        data: {
+          vendors,
+          menuItems,
+          vendorWorkers,
+          registeredStudents,
+          orders,
+          auditLogs
+        }
+      };
+
+      const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(backupPayload, null, 2));
+      const downloadAnchor = document.createElement('a');
+      downloadAnchor.setAttribute("href", dataStr);
+      downloadAnchor.setAttribute("download", `ATU_System_Backup_${Date.now()}.json`);
+      document.body.appendChild(downloadAnchor);
+      downloadAnchor.click();
+      document.body.removeChild(downloadAnchor);
+
+      auditLogs.unshift(`Admin downloaded master system backup JSON.`);
+      renderAdminAuditLogs();
+      showToast('Complete system backup JSON downloaded!', 'success');
+      playChime(783.99);
+    }
+
+    function resetDemoEnvironment() {
+      if (!confirm("Are you sure you want to reset all demo data (vendors, dishes, staff, students, and orders) to pristine factory defaults?")) {
+        return;
+      }
+
+      localStorage.removeItem('ATU_SAVED_VENDORS_V1');
+      localStorage.removeItem('ATU_SAVED_MENU_ITEMS_V1');
+      localStorage.removeItem('ATU_SAVED_VENDOR_WORKERS_V1');
+      localStorage.removeItem('ATU_REGISTERED_STUDENTS_V1');
+      localStorage.removeItem('ATU_SAVED_ORDERS_V1');
+      localStorage.removeItem('ATU_OPERATING_MODE_V1');
+
+      auditLogs.unshift(`Admin performed full environment reset to default factory data.`);
+      showToast('Environment reset to factory defaults. Reloading...', 'info');
+      setTimeout(() => {
+        window.location.reload();
+      }, 1000);
     }
 
     function exportSalesReport() {
