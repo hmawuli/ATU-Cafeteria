@@ -1572,10 +1572,39 @@
               </button>
             </div>
           </div>
+
+          <!-- Bulk Actions Toolbar for Vendors (Shows when items are selected) -->
+          <div id="admin-vendor-bulk-bar" class="hidden flex-wrap items-center justify-between gap-3 bg-gradient-to-r from-brand-50 via-amber-50 to-slate-50 p-3.5 rounded-2xl border border-brand-200 shadow-xs transition-all">
+            <div class="flex items-center gap-2.5">
+              <span class="w-7 h-7 rounded-xl bg-brand-600 text-white flex items-center justify-center font-black text-xs shadow-xs" id="vendor-selected-badge">0</span>
+              <div>
+                <p class="text-xs font-bold text-slate-800" id="vendor-selected-text">0 vendors selected</p>
+                <p class="text-[10.5px] text-slate-500">Apply batch operational changes or delete selected vendors</p>
+              </div>
+            </div>
+            <div class="flex items-center gap-2 flex-wrap">
+              <button onclick="bulkToggleVendorStatus(true)" class="px-3 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs shadow-xs flex items-center gap-1.5 transition-all">
+                <i data-lucide="check-circle-2" class="w-3.5 h-3.5"></i> Mark Open
+              </button>
+              <button onclick="bulkToggleVendorStatus(false)" class="px-3 py-1.5 rounded-xl bg-slate-700 hover:bg-slate-800 text-white font-bold text-xs shadow-xs flex items-center gap-1.5 transition-all">
+                <i data-lucide="power" class="w-3.5 h-3.5"></i> Mark Closed
+              </button>
+              <button onclick="bulkDeleteVendors()" class="px-3 py-1.5 rounded-xl bg-rose-600 hover:bg-rose-700 text-white font-bold text-xs shadow-xs flex items-center gap-1.5 transition-all">
+                <i data-lucide="trash-2" class="w-3.5 h-3.5"></i> Bulk Delete
+              </button>
+              <button onclick="clearVendorSelection()" class="px-2.5 py-1.5 rounded-xl bg-white hover:bg-slate-100 text-slate-600 border border-slate-200 font-bold text-xs transition-all">
+                Clear
+              </button>
+            </div>
+          </div>
+
           <div class="overflow-x-auto rounded-2xl border border-slate-200">
             <table class="w-full text-left text-xs">
               <thead class="bg-slate-50 text-slate-500 border-b border-slate-200 font-bold">
                 <tr>
+                  <th class="p-3 w-10 text-center">
+                    <input type="checkbox" id="vendor-select-all-cb" onchange="toggleSelectAllVendors(this.checked)" class="w-4 h-4 rounded border-slate-300 text-brand-600 focus:ring-brand-500 cursor-pointer" title="Select all visible vendors" />
+                  </th>
                   <th class="p-3">Vendor / Kitchen Stall</th>
                   <th class="p-3">Location / Stall No.</th>
                   <th class="p-3">Specialty Cuisine</th>
@@ -1617,10 +1646,39 @@
               </button>
             </div>
           </div>
+
+          <!-- Bulk Actions Toolbar for Menu Dishes (Shows when items are selected) -->
+          <div id="admin-menu-bulk-bar" class="hidden flex-wrap items-center justify-between gap-3 bg-gradient-to-r from-brand-50 via-emerald-50 to-slate-50 p-3.5 rounded-2xl border border-emerald-200 shadow-xs transition-all">
+            <div class="flex items-center gap-2.5">
+              <span class="w-7 h-7 rounded-xl bg-emerald-600 text-white flex items-center justify-center font-black text-xs shadow-xs" id="menu-selected-badge">0</span>
+              <div>
+                <p class="text-xs font-bold text-slate-800" id="menu-selected-text">0 dishes selected</p>
+                <p class="text-[10.5px] text-slate-500">Perform bulk stock availability updates or delete items across kitchens</p>
+              </div>
+            </div>
+            <div class="flex items-center gap-2 flex-wrap">
+              <button onclick="bulkToggleMenuStock(true)" class="px-3 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs shadow-xs flex items-center gap-1.5 transition-all">
+                <i data-lucide="check-circle" class="w-3.5 h-3.5"></i> Mark In Stock
+              </button>
+              <button onclick="bulkToggleMenuStock(false)" class="px-3 py-1.5 rounded-xl bg-amber-600 hover:bg-amber-700 text-white font-bold text-xs shadow-xs flex items-center gap-1.5 transition-all">
+                <i data-lucide="x-circle" class="w-3.5 h-3.5"></i> Mark Sold Out
+              </button>
+              <button onclick="bulkDeleteMenuDishes()" class="px-3 py-1.5 rounded-xl bg-rose-600 hover:bg-rose-700 text-white font-bold text-xs shadow-xs flex items-center gap-1.5 transition-all">
+                <i data-lucide="trash-2" class="w-3.5 h-3.5"></i> Bulk Delete
+              </button>
+              <button onclick="clearMenuSelection()" class="px-2.5 py-1.5 rounded-xl bg-white hover:bg-slate-100 text-slate-600 border border-slate-200 font-bold text-xs transition-all">
+                Clear
+              </button>
+            </div>
+          </div>
+
           <div class="overflow-x-auto rounded-2xl border border-slate-200">
             <table class="w-full text-left text-xs">
               <thead class="bg-slate-50 text-slate-500 border-b border-slate-200 font-bold">
                 <tr>
+                  <th class="p-3 w-10 text-center">
+                    <input type="checkbox" id="menu-select-all-cb" onchange="toggleSelectAllMenu(this.checked)" class="w-4 h-4 rounded border-slate-300 text-brand-600 focus:ring-brand-500 cursor-pointer" title="Select all visible menu dishes" />
+                  </th>
                   <th class="p-3">Dish / Item</th>
                   <th class="p-3">Vendor Stall</th>
                   <th class="p-3">Category</th>
@@ -7466,7 +7524,7 @@ function advanceOrderStatus(orderId, nextStatus) {
         if (filteredVendors.length === 0) {
           adminVendorsBody.innerHTML = `
             <tr>
-              <td colspan="8" class="p-8 text-center text-slate-400">
+              <td colspan="9" class="p-8 text-center text-slate-400">
                 <i data-lucide="store" class="w-8 h-8 mx-auto mb-2 text-slate-300"></i>
                 <p class="font-bold text-slate-600">No vendor stalls found matching "${searchVal}"</p>
                 <p class="text-[11px] text-slate-400 mt-0.5">Try a different search keyword or click "Register New Vendor" above.</p>
@@ -7475,6 +7533,7 @@ function advanceOrderStatus(orderId, nextStatus) {
           `;
         } else {
           adminVendorsBody.innerHTML = filteredVendors.map(vendor => {
+            const isSelected = selectedVendorIds.has(vendor.id);
             const terminalIndicator = formatTerminalLastActive(vendor.lastActiveTimestamp);
             const vendorDishesCount = menuItems.filter(m => m.vendorId === vendor.id).length;
             const vendorStaffCount = vendorWorkers.filter(w => w.vendorId === vendor.id).length;
@@ -7485,7 +7544,10 @@ function advanceOrderStatus(orderId, nextStatus) {
               : `<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[9.5px] font-extrabold bg-emerald-100 text-emerald-800 border border-emerald-300" title="Vendor has set customized private credentials."><i data-lucide="shield-check" class="w-2.5 h-2.5 text-emerald-600"></i> Secure Password</span>`;
 
             return `
-            <tr class="hover:bg-slate-50/80 transition-colors">
+            <tr class="hover:bg-slate-50/80 transition-colors ${isSelected ? 'bg-amber-50/40' : ''}">
+              <td class="p-3 text-center">
+                <input type="checkbox" class="vendor-select-cb w-4 h-4 rounded border-slate-300 text-brand-600 focus:ring-brand-500 cursor-pointer" value="${vendor.id}" ${isSelected ? 'checked' : ''} onchange="onVendorCheckboxChange(${vendor.id}, this.checked)" />
+              </td>
               <td class="p-3">
                 <div class="flex items-center gap-2.5">
                   <div class="w-8 h-8 rounded-xl bg-brand-100 text-brand-700 flex items-center justify-center font-bold text-xs shrink-0">
@@ -7538,6 +7600,7 @@ function advanceOrderStatus(orderId, nextStatus) {
           `;
           }).join('');
         }
+        updateVendorBulkBar(filteredVendors);
       }
 
       // 2. 🍲 Render Live Menu Oversight (Admin can Add, Edit, Toggle Stock, or Delete)
@@ -7554,7 +7617,7 @@ function advanceOrderStatus(orderId, nextStatus) {
         if (filteredMenu.length === 0) {
           adminMenuBody.innerHTML = `
             <tr>
-              <td colspan="7" class="p-8 text-center text-slate-400">
+              <td colspan="8" class="p-8 text-center text-slate-400">
                 <i data-lucide="utensils-crossed" class="w-8 h-8 mx-auto mb-2 text-slate-300"></i>
                 <p class="font-bold text-slate-600">No menu dishes found matching filters</p>
                 <p class="text-[11px] text-slate-400 mt-0.5">Click "Add Food Dish" above to register new items for any kitchen stall.</p>
@@ -7563,9 +7626,13 @@ function advanceOrderStatus(orderId, nextStatus) {
           `;
         } else {
           adminMenuBody.innerHTML = filteredMenu.map(dish => {
+            const isSelected = selectedMenuIds.has(dish.id);
             const inStock = dish.inStock !== false;
             return `
-            <tr class="hover:bg-slate-50/80 transition-colors">
+            <tr class="hover:bg-slate-50/80 transition-colors ${isSelected ? 'bg-emerald-50/40' : ''}">
+              <td class="p-3 text-center">
+                <input type="checkbox" class="menu-select-cb w-4 h-4 rounded border-slate-300 text-brand-600 focus:ring-brand-500 cursor-pointer" value="${dish.id}" ${isSelected ? 'checked' : ''} onchange="onMenuCheckboxChange(${dish.id}, this.checked)" />
+              </td>
               <td class="p-3">
                 <div class="flex items-center gap-3">
                   <img src="${dish.image}" alt="${dish.name}" class="w-10 h-10 rounded-xl object-cover border border-slate-200 shrink-0" onerror="this.src='https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=100&q=80'" />
@@ -7605,6 +7672,7 @@ function advanceOrderStatus(orderId, nextStatus) {
           `;
           }).join('');
         }
+        updateMenuBulkBar(filteredMenu);
       }
 
       // 3. 👥 Render Kitchen Workers Oversight
@@ -8217,6 +8285,270 @@ function advanceOrderStatus(orderId, nextStatus) {
         if (typeof renderVendorDashboard === 'function') renderVendorDashboard();
         showToast(`Vendor '${vendor.name}' has been deleted.`, 'warning');
       }
+    }
+
+    // ==========================================
+    // 1B. 📦 BULK SELECTION & BATCH ACTIONS (VENDORS & MENU)
+    // ==========================================
+    let selectedVendorIds = new Set();
+    let selectedMenuIds = new Set();
+
+    function updateVendorBulkBar(visibleVendors = null) {
+      const bulkBar = document.getElementById('admin-vendor-bulk-bar');
+      const badge = document.getElementById('vendor-selected-badge');
+      const text = document.getElementById('vendor-selected-text');
+      const selectAllCb = document.getElementById('vendor-select-all-cb');
+
+      const count = selectedVendorIds.size;
+      if (badge) badge.innerText = count;
+      if (text) text.innerText = `${count} vendor${count === 1 ? '' : 's'} selected`;
+
+      if (bulkBar) {
+        if (count > 0) {
+          bulkBar.classList.remove('hidden');
+          bulkBar.classList.add('flex');
+        } else {
+          bulkBar.classList.add('hidden');
+          bulkBar.classList.remove('flex');
+        }
+      }
+
+      if (selectAllCb) {
+        const vList = visibleVendors || vendors;
+        if (vList.length > 0 && vList.every(v => selectedVendorIds.has(v.id))) {
+          selectAllCb.checked = true;
+          selectAllCb.indeterminate = false;
+        } else if (vList.some(v => selectedVendorIds.has(v.id))) {
+          selectAllCb.checked = false;
+          selectAllCb.indeterminate = true;
+        } else {
+          selectAllCb.checked = false;
+          selectAllCb.indeterminate = false;
+        }
+      }
+      lucide.createIcons();
+    }
+
+    function onVendorCheckboxChange(vendorId, checked) {
+      if (checked) {
+        selectedVendorIds.add(vendorId);
+      } else {
+        selectedVendorIds.delete(vendorId);
+      }
+      renderAdminDashboard();
+    }
+
+    function toggleSelectAllVendors(checked) {
+      const searchVal = (document.getElementById('admin-vendor-search-input')?.value || '').trim().toLowerCase();
+      const filteredVendors = vendors.filter(v => {
+        if (!searchVal) return true;
+        return (v.name && v.name.toLowerCase().includes(searchVal)) ||
+               (v.location && v.location.toLowerCase().includes(searchVal)) ||
+               (v.specialty && v.specialty.toLowerCase().includes(searchVal)) ||
+               (v.phone && v.phone.toLowerCase().includes(searchVal)) ||
+               (v.username && v.username.toLowerCase().includes(searchVal));
+      });
+
+      if (checked) {
+        filteredVendors.forEach(v => selectedVendorIds.add(v.id));
+      } else {
+        filteredVendors.forEach(v => selectedVendorIds.delete(v.id));
+      }
+      renderAdminDashboard();
+    }
+
+    function clearVendorSelection() {
+      selectedVendorIds.clear();
+      renderAdminDashboard();
+    }
+
+    function bulkToggleVendorStatus(isOpen) {
+      if (selectedVendorIds.size === 0) {
+        showToast('No vendors selected.', 'error');
+        return;
+      }
+      const targetVendors = vendors.filter(v => selectedVendorIds.has(v.id));
+      if (targetVendors.length === 0) return;
+
+      targetVendors.forEach(v => {
+        v.isOpen = isOpen;
+        v.lastActiveTimestamp = Date.now();
+      });
+
+      try {
+        localStorage.setItem('ATU_SAVED_VENDORS_V1', JSON.stringify(vendors));
+      } catch(e) {}
+
+      auditLogs.unshift(`Admin bulk updated ${targetVendors.length} vendor stall(s) status to ${isOpen ? 'OPEN' : 'CLOSED'}.`);
+      
+      renderVendorPills();
+      renderAdminDashboard();
+      renderAdminAuditLogs();
+      if (typeof renderMenu === 'function') renderMenu();
+      if (typeof renderVendorDashboard === 'function') renderVendorDashboard();
+
+      showToast(`Set ${targetVendors.length} vendor stall(s) to ${isOpen ? 'OPEN' : 'CLOSED'}!`, 'success');
+      playChime(659.25);
+    }
+
+    function bulkDeleteVendors() {
+      if (selectedVendorIds.size === 0) {
+        showToast('No vendors selected.', 'error');
+        return;
+      }
+      const count = selectedVendorIds.size;
+      if (!confirm(`Are you sure you want to permanently delete the ${count} selected vendor stall(s)? All dishes and kitchen staff belonging to these stalls will also be removed.`)) {
+        return;
+      }
+
+      vendors = vendors.filter(v => !selectedVendorIds.has(v.id));
+      menuItems = menuItems.filter(m => !selectedVendorIds.has(m.vendorId));
+      vendorWorkers = vendorWorkers.filter(w => !selectedVendorIds.has(w.vendorId));
+
+      selectedVendorIds.clear();
+
+      try {
+        localStorage.setItem('ATU_SAVED_VENDORS_V1', JSON.stringify(vendors));
+        localStorage.setItem('ATU_SAVED_MENU_ITEMS_V1', JSON.stringify(menuItems));
+        localStorage.setItem('ATU_SAVED_VENDOR_WORKERS_V1', JSON.stringify(vendorWorkers));
+      } catch(e) {}
+
+      auditLogs.unshift(`Admin bulk deleted ${count} vendor stall(s) with their menus and staff.`);
+      
+      renderVendorPills();
+      renderAdminDashboard();
+      renderAdminAuditLogs();
+      if (typeof renderMenu === 'function') renderMenu();
+      if (typeof renderVendorDashboard === 'function') renderVendorDashboard();
+
+      showToast(`Successfully deleted ${count} vendor stall(s).`, 'warning');
+      playChime(523.25);
+    }
+
+    // ==========================================
+    // MENU BULK OPERATIONS
+    // ==========================================
+    function updateMenuBulkBar(visibleMenu = null) {
+      const bulkBar = document.getElementById('admin-menu-bulk-bar');
+      const badge = document.getElementById('menu-selected-badge');
+      const text = document.getElementById('menu-selected-text');
+      const selectAllCb = document.getElementById('menu-select-all-cb');
+
+      const count = selectedMenuIds.size;
+      if (badge) badge.innerText = count;
+      if (text) text.innerText = `${count} dish${count === 1 ? '' : 'es'} selected`;
+
+      if (bulkBar) {
+        if (count > 0) {
+          bulkBar.classList.remove('hidden');
+          bulkBar.classList.add('flex');
+        } else {
+          bulkBar.classList.add('hidden');
+          bulkBar.classList.remove('flex');
+        }
+      }
+
+      if (selectAllCb) {
+        const mList = visibleMenu || menuItems;
+        if (mList.length > 0 && mList.every(m => selectedMenuIds.has(m.id))) {
+          selectAllCb.checked = true;
+          selectAllCb.indeterminate = false;
+        } else if (mList.some(m => selectedMenuIds.has(m.id))) {
+          selectAllCb.checked = false;
+          selectAllCb.indeterminate = true;
+        } else {
+          selectAllCb.checked = false;
+          selectAllCb.indeterminate = false;
+        }
+      }
+      lucide.createIcons();
+    }
+
+    function onMenuCheckboxChange(dishId, checked) {
+      if (checked) {
+        selectedMenuIds.add(dishId);
+      } else {
+        selectedMenuIds.delete(dishId);
+      }
+      renderAdminDashboard();
+    }
+
+    function toggleSelectAllMenu(checked) {
+      const vendorFilter = document.getElementById('admin-menu-vendor-filter')?.value || 'ALL';
+      const searchVal = (document.getElementById('admin-menu-search-input')?.value || '').trim().toLowerCase();
+
+      const filteredMenu = menuItems.filter(item => {
+        if (vendorFilter !== 'ALL' && item.vendorId != vendorFilter) return false;
+        if (searchVal && !item.name.toLowerCase().includes(searchVal) && !item.category.toLowerCase().includes(searchVal) && !item.vendorName.toLowerCase().includes(searchVal)) return false;
+        return true;
+      });
+
+      if (checked) {
+        filteredMenu.forEach(m => selectedMenuIds.add(m.id));
+      } else {
+        filteredMenu.forEach(m => selectedMenuIds.delete(m.id));
+      }
+      renderAdminDashboard();
+    }
+
+    function clearMenuSelection() {
+      selectedMenuIds.clear();
+      renderAdminDashboard();
+    }
+
+    function bulkToggleMenuStock(inStock) {
+      if (selectedMenuIds.size === 0) {
+        showToast('No dishes selected.', 'error');
+        return;
+      }
+      const targetDishes = menuItems.filter(m => selectedMenuIds.has(m.id));
+      if (targetDishes.length === 0) return;
+
+      targetDishes.forEach(m => {
+        m.inStock = inStock;
+      });
+
+      try {
+        localStorage.setItem('ATU_SAVED_MENU_ITEMS_V1', JSON.stringify(menuItems));
+      } catch(e) {}
+
+      auditLogs.unshift(`Admin bulk updated ${targetDishes.length} menu dish(es) stock status to ${inStock ? 'IN STOCK' : 'SOLD OUT'}.`);
+      
+      renderAdminDashboard();
+      renderAdminAuditLogs();
+      if (typeof renderMenu === 'function') renderMenu();
+      if (typeof renderVendorMenu === 'function') renderVendorMenu();
+
+      showToast(`Marked ${targetDishes.length} dish(es) as ${inStock ? 'In Stock' : 'Sold Out'}!`, 'success');
+      playChime(659.25);
+    }
+
+    function bulkDeleteMenuDishes() {
+      if (selectedMenuIds.size === 0) {
+        showToast('No dishes selected.', 'error');
+        return;
+      }
+      const count = selectedMenuIds.size;
+      if (!confirm(`Are you sure you want to permanently delete the ${count} selected dish(es) from cafeteria menus?`)) {
+        return;
+      }
+
+      menuItems = menuItems.filter(m => !selectedMenuIds.has(m.id));
+      selectedMenuIds.clear();
+
+      try {
+        localStorage.setItem('ATU_SAVED_MENU_ITEMS_V1', JSON.stringify(menuItems));
+      } catch(e) {}
+
+      auditLogs.unshift(`Admin bulk deleted ${count} dish(es) from campus menus.`);
+      
+      renderAdminDashboard();
+      renderAdminAuditLogs();
+      if (typeof renderMenu === 'function') renderMenu();
+      if (typeof renderVendorMenu === 'function') renderVendorMenu();
+
+      showToast(`Successfully deleted ${count} dish(es).`, 'warning');
+      playChime(523.25);
     }
 
     // 2. 🍲 ADMIN MENU MANAGEMENT (WITH TARGET VENDOR DROPDOWN)
