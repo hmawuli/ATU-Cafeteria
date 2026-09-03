@@ -86,6 +86,39 @@
     .reticle-corner {
       transition: all 0.3s ease;
     }
+    /* ⚡ HIGH-CONTRAST OLED THEME FOR VENDOR KITCHEN TERMINAL (Matching VendorHighContrastTheme.kt) */
+    body.vendor-high-contrast {
+      background-color: #000000 !important;
+      color: #FFFFFF !important;
+    }
+    body.vendor-high-contrast #vendor-view {
+      background-color: #000000 !important;
+    }
+    body.vendor-high-contrast #vendor-view .bg-white {
+      background-color: #0a0a0a !important;
+      border-color: #ffb703 !important;
+      color: #ffffff !important;
+    }
+    body.vendor-high-contrast #vendor-view .bg-slate-50 {
+      background-color: #121212 !important;
+      border-color: #333333 !important;
+      color: #ffffff !important;
+    }
+    body.vendor-high-contrast #vendor-view .text-slate-900,
+    body.vendor-high-contrast #vendor-view .text-slate-800,
+    body.vendor-high-contrast #vendor-view .text-slate-700 {
+      color: #ffffff !important;
+    }
+    body.vendor-high-contrast #vendor-view .text-slate-500,
+    body.vendor-high-contrast #vendor-view .text-slate-400 {
+      color: #ffd166 !important;
+    }
+    body.vendor-high-contrast #vendor-view button.bg-brand-600 {
+      background-color: #fb8500 !important;
+      color: #000000 !important;
+      font-weight: 900 !important;
+      border: 2px solid #ffb703 !important;
+    }
     @media print {
       body * { visibility: hidden; }
       #printable-receipt, #printable-receipt * { visibility: visible; }
@@ -538,9 +571,21 @@
               <i data-lucide="wallet-cards" class="w-4 h-4 text-slate-950"></i>
               <span>Upload Wallet (+GH₵)</span>
             </button>
-            <button onclick="refreshStudentMenuData(true)" class="px-3.5 py-2 rounded-xl bg-white/15 hover:bg-white/25 backdrop-blur-md text-white text-xs font-bold flex items-center gap-1.5 transition-all active:scale-95">
+            <button onclick="openCampusIndoorMapModal()" class="px-3.5 py-2 rounded-xl bg-blue-600/90 hover:bg-blue-600 backdrop-blur-md text-white text-xs font-bold flex items-center gap-1.5 transition-all active:scale-95 shadow-xs" title="Interactive 2D Indoor Cafeteria & Vendor Stall Map">
+              <i data-lucide="map-pin" class="w-3.5 h-3.5 text-amber-300"></i>
+              <span>Indoor Map & Stalls</span>
+            </button>
+            <button onclick="openDailyHealthSummaryModal()" class="px-3.5 py-2 rounded-xl bg-emerald-600/90 hover:bg-emerald-600 backdrop-blur-md text-white text-xs font-bold flex items-center gap-1.5 transition-all active:scale-95 shadow-xs" title="View Nutrition & Daily Macro Breakdown">
+              <i data-lucide="heart-pulse" class="w-3.5 h-3.5 text-emerald-200"></i>
+              <span>Daily Health & Macros</span>
+            </button>
+            <button onclick="openOnboardingCarouselModal()" class="px-3.5 py-2 rounded-xl bg-white/15 hover:bg-white/25 backdrop-blur-md text-white text-xs font-bold flex items-center gap-1.5 transition-all active:scale-95">
+              <i data-lucide="compass" class="w-3.5 h-3.5 text-amber-300"></i>
+              <span>Campus Guide</span>
+            </button>
+            <button onclick="refreshStudentMenuData(true)" class="px-3.5 py-2 rounded-xl bg-white/10 hover:bg-white/20 backdrop-blur-md text-white text-xs font-bold flex items-center gap-1.5 transition-all active:scale-95">
               <i data-lucide="refresh-cw" id="btn-refresh-icon" class="w-3.5 h-3.5"></i>
-              <span>Pull / Refresh Stock</span>
+              <span>Pull / Refresh</span>
             </button>
           </div>
           <div class="flex items-center gap-3 pt-1 text-xs text-amber-300 font-bold">
@@ -793,10 +838,16 @@
             </button>
           </div>
 
-          <button onclick="enableVendorDesktopAlerts()" id="btn-vendor-notify" class="px-3 py-1.5 bg-amber-50 hover:bg-amber-100 border border-amber-300 text-amber-900 rounded-xl text-xs font-bold flex items-center gap-1.5 shadow-xs transition-transform active:scale-95">
-            <i data-lucide="bell-ring" class="w-3.5 h-3.5 text-amber-600"></i>
-            <span id="vendor-notify-text">Enable Desktop/Mobile Push Alerts</span>
-          </button>
+          <div class="flex items-center gap-2">
+            <button onclick="toggleVendorHighContrastTheme()" id="vendor-contrast-btn" class="px-3 py-1.5 rounded-xl bg-slate-900 text-amber-300 hover:bg-slate-800 text-xs font-black border border-amber-400/40 shadow-xs flex items-center gap-1.5 transition-all" title="WCAG AAA High-Contrast Kitchen Terminal Theme for Sun & Low-Light">
+              <i data-lucide="sun-medium" class="w-3.5 h-3.5 text-amber-400"></i>
+              <span id="vendor-contrast-label">High-Contrast OLED</span>
+            </button>
+            <button onclick="enableVendorDesktopAlerts()" id="btn-vendor-notify" class="px-3 py-1.5 bg-amber-50 hover:bg-amber-100 border border-amber-300 text-amber-900 rounded-xl text-xs font-bold flex items-center gap-1.5 shadow-xs transition-transform active:scale-95">
+              <i data-lucide="bell-ring" class="w-3.5 h-3.5 text-amber-600"></i>
+              <span id="vendor-notify-text">Push Alerts</span>
+            </button>
+          </div>
         </div>
       </div>
 
@@ -2221,11 +2272,259 @@
     </div>
   </div>
   <!-- end app-shell -->
+
+  <!-- 📱 MOBILE JETPACK COMPOSE-STYLE FLOATING BOTTOM NAVIGATION DOCK -->
+  <div id="mobile-floating-nav-dock" class="fixed bottom-4 left-1/2 -translate-x-1/2 z-40 w-[94%] max-w-md bg-slate-900/90 backdrop-blur-xl border border-white/15 p-1.5 rounded-full shadow-2xl flex items-center justify-between text-white transition-all">
+    <button onclick="mobileNavSwitch('home')" id="dock-btn-home" class="flex-1 py-2 px-1 flex flex-col items-center justify-center rounded-full text-amber-400 bg-white/10 transition-all">
+      <i data-lucide="home" class="w-4 h-4"></i>
+      <span class="text-[9px] font-black tracking-wide mt-0.5">Dining</span>
+    </button>
+    <button onclick="mobileNavSwitch('menu')" id="dock-btn-menu" class="flex-1 py-2 px-1 flex flex-col items-center justify-center rounded-full text-slate-300 hover:text-white transition-all">
+      <i data-lucide="utensils" class="w-4 h-4"></i>
+      <span class="text-[9px] font-bold tracking-wide mt-0.5">Menu</span>
+    </button>
+    <button onclick="mobileNavSwitch('map')" id="dock-btn-map" class="flex-1 py-2 px-1 flex flex-col items-center justify-center rounded-full text-slate-300 hover:text-white transition-all">
+      <i data-lucide="map-pin" class="w-4 h-4"></i>
+      <span class="text-[9px] font-bold tracking-wide mt-0.5">Map</span>
+    </button>
+    <button onclick="mobileNavSwitch('health')" id="dock-btn-health" class="flex-1 py-2 px-1 flex flex-col items-center justify-center rounded-full text-slate-300 hover:text-white transition-all">
+      <i data-lucide="heart-pulse" class="w-4 h-4"></i>
+      <span class="text-[9px] font-bold tracking-wide mt-0.5">Macros</span>
+    </button>
+    <button onclick="mobileNavSwitch('orders')" id="dock-btn-orders" class="flex-1 py-2 px-1 flex flex-col items-center justify-center rounded-full text-slate-300 hover:text-white transition-all relative">
+      <i data-lucide="clipboard-list" class="w-4 h-4"></i>
+      <span class="text-[9px] font-bold tracking-wide mt-0.5">Orders</span>
+      <span id="dock-active-orders-dot" class="hidden absolute top-1.5 right-4 w-2 h-2 bg-emerald-400 rounded-full animate-ping"></span>
+    </button>
+    <button onclick="mobileNavSwitch('wallet')" id="dock-btn-wallet" class="flex-1 py-2 px-1 flex flex-col items-center justify-center rounded-full text-slate-300 hover:text-white transition-all">
+      <i data-lucide="wallet" class="w-4 h-4"></i>
+      <span class="text-[9px] font-bold tracking-wide mt-0.5">Wallet</span>
+    </button>
+  </div>
 </div>
 
   <!-- ========================================================================= -->
   <!-- MODALS & POPUPS                                                           -->
   <!-- ========================================================================= -->
+
+  <!-- 🗺️ 0A. INTERACTIVE INDOOR CAFETERIA MAP & STALL LOCATOR MODAL (Matching CampusMapScreen & CafeteriaIndoorMapVisualizer) -->
+  <div id="indoor-map-modal" class="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-md hidden flex items-center justify-center p-3 sm:p-4">
+    <div class="bg-white rounded-3xl max-w-2xl w-full p-5 sm:p-6 shadow-2xl space-y-4 max-h-[92vh] overflow-y-auto border border-slate-200">
+      <div class="flex items-center justify-between border-b border-slate-100 pb-3">
+        <div class="flex items-center gap-2.5">
+          <div class="w-10 h-10 rounded-2xl bg-blue-100 text-blue-800 flex items-center justify-center font-bold">
+            <i data-lucide="map-pin" class="w-5 h-5 text-blue-700"></i>
+          </div>
+          <div>
+            <h3 class="text-base font-extrabold text-slate-900">ATU Cafeteria Indoor Navigation Map 🗺️</h3>
+            <p class="text-[11px] text-slate-500">Live stall counter positions, estimated walking distances, & wait times</p>
+          </div>
+        </div>
+        <button onclick="closeCampusIndoorMapModal()" class="w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center text-slate-500 hover:bg-slate-200">
+          <i data-lucide="x" class="w-4 h-4"></i>
+        </button>
+      </div>
+
+      <!-- Simulated 2D Floor Plan Canvas -->
+      <div class="relative bg-gradient-to-br from-slate-900 via-slate-800 to-slate-950 rounded-2xl p-4 border border-slate-700 overflow-hidden min-h-[300px] flex flex-col justify-between text-white">
+        <!-- Grid overlay pattern -->
+        <div class="absolute inset-0 bg-[linear-gradient(to_right,#1f2937_1px,transparent_1px),linear-gradient(to_bottom,#1f2937_1px,transparent_1px)] bg-[size:24px_24px] opacity-40"></div>
+
+        <!-- Top Zone Badge -->
+        <div class="relative z-10 flex items-center justify-between">
+          <span class="text-[10px] font-black uppercase tracking-wider bg-white/10 backdrop-blur-md text-amber-300 px-2.5 py-1 rounded-full border border-white/10">
+            ATU Central Food Court • Ground Floor
+          </span>
+          <span class="text-[10px] font-bold text-emerald-400 flex items-center gap-1">
+            <span class="w-2 h-2 rounded-full bg-emerald-400 animate-ping"></span> Live Stalls Open
+          </span>
+        </div>
+
+        <!-- Interactive Stalls Map Canvas Area -->
+        <div class="relative z-10 my-4 h-52 sm:h-60 w-full" id="indoor-map-canvas-container">
+          <!-- Entrance Indicator -->
+          <div class="absolute bottom-1 left-1/2 -translate-x-1/2 bg-white/10 border border-white/20 text-slate-300 px-3 py-1 rounded-full text-[10px] font-bold flex items-center gap-1.5">
+            <i data-lucide="door-open" class="w-3.5 h-3.5 text-amber-400"></i> Main Hall Entrance
+          </div>
+
+          <!-- Stall 1: Akwaaba Kitchen -->
+          <div onclick="selectIndoorStall(201, 'Akwaaba Kitchen', 'Stall #01 - Local Jollof & Waakye', 4)" class="indoor-stall-marker cursor-pointer absolute top-4 left-6 group p-2.5 bg-brand-600/90 hover:bg-brand-500 border border-brand-300 rounded-2xl shadow-lg transition-all hover:scale-105 active:scale-95 text-center w-28">
+            <span class="text-sm">🍲</span>
+            <p class="text-[10px] font-black leading-tight text-white mt-0.5">Akwaaba</p>
+            <span class="text-[8.5px] font-bold text-amber-200">Stall #01 • 4m wait</span>
+          </div>
+
+          <!-- Stall 2: Campus Chillers & Grills -->
+          <div onclick="selectIndoorStall(202, 'Campus Chillers & Grills', 'Stall #02 - Khebab & Fast Bites', 8)" class="indoor-stall-marker cursor-pointer absolute top-4 right-6 group p-2.5 bg-blue-600/90 hover:bg-blue-500 border border-blue-300 rounded-2xl shadow-lg transition-all hover:scale-105 active:scale-95 text-center w-28">
+            <span class="text-sm">🍗</span>
+            <p class="text-[10px] font-black leading-tight text-white mt-0.5">Chillers</p>
+            <span class="text-[8.5px] font-bold text-blue-200">Stall #02 • 8m wait</span>
+          </div>
+
+          <!-- Stall 3: Royal Chop Bar -->
+          <div onclick="selectIndoorStall(203, 'Royal Chop Bar', 'Stall #03 - Fufu & Banku Corner', 6)" class="indoor-stall-marker cursor-pointer absolute top-28 left-8 group p-2.5 bg-emerald-700/90 hover:bg-emerald-600 border border-emerald-300 rounded-2xl shadow-lg transition-all hover:scale-105 active:scale-95 text-center w-28">
+            <span class="text-sm">🥣</span>
+            <p class="text-[10px] font-black leading-tight text-white mt-0.5">Royal Chop</p>
+            <span class="text-[8.5px] font-bold text-emerald-200">Stall #03 • 6m wait</span>
+          </div>
+
+          <!-- Stall 4: Smoothie & Juice Hub -->
+          <div onclick="selectIndoorStall(204, 'Smoothie & Juice Hub', 'Stall #04 - Fresh Drinks & Sobolo', 2)" class="indoor-stall-marker cursor-pointer absolute top-28 right-8 group p-2.5 bg-purple-700/90 hover:bg-purple-600 border border-purple-300 rounded-2xl shadow-lg transition-all hover:scale-105 active:scale-95 text-center w-28">
+            <span class="text-sm">🥤</span>
+            <p class="text-[10px] font-black leading-tight text-white mt-0.5">Juice Hub</p>
+            <span class="text-[8.5px] font-bold text-purple-200">Stall #04 • 2m wait</span>
+          </div>
+
+          <!-- Student Current Location Pin with Pulsing Radar -->
+          <div class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 flex flex-col items-center">
+            <div class="relative flex items-center justify-center">
+              <span class="absolute w-8 h-8 bg-amber-400/30 rounded-full animate-ping"></span>
+              <div class="w-6 h-6 rounded-full bg-amber-400 text-slate-950 flex items-center justify-center font-black text-xs shadow-md border-2 border-white">
+                👤
+              </div>
+            </div>
+            <span class="text-[9px] font-extrabold text-amber-300 bg-slate-900/80 px-2 py-0.5 rounded-md mt-1 border border-white/10">You are here</span>
+          </div>
+        </div>
+
+        <!-- Selected Stall Info Card -->
+        <div id="indoor-stall-detail" class="relative z-10 bg-white/10 backdrop-blur-md rounded-xl p-3 border border-white/15 flex items-center justify-between">
+          <div>
+            <p class="text-xs font-black text-amber-300" id="map-selected-name">Akwaaba Kitchen</p>
+            <p class="text-[10px] text-slate-300" id="map-selected-desc">Stall #01 • Local Dishes • Approx distance: 18 meters (1 min walk)</p>
+          </div>
+          <button onclick="filterVendorFromMap()" class="px-3 py-1.5 rounded-lg bg-amber-400 hover:bg-amber-300 text-slate-950 text-xs font-black transition-all shadow-xs active:scale-95">
+            View Dishes
+          </button>
+        </div>
+      </div>
+
+      <div class="grid grid-cols-3 gap-2 text-center text-xs">
+        <div class="bg-slate-50 p-2.5 rounded-xl border border-slate-100">
+          <p class="text-[10px] text-slate-500 font-bold">Pick-up Speed</p>
+          <p class="text-sm font-black text-emerald-600">Avg 4-8 mins</p>
+        </div>
+        <div class="bg-slate-50 p-2.5 rounded-xl border border-slate-100">
+          <p class="text-[10px] text-slate-500 font-bold">Verification</p>
+          <p class="text-sm font-black text-brand-600">4-Digit PIN / QR</p>
+        </div>
+        <div class="bg-slate-50 p-2.5 rounded-xl border border-slate-100">
+          <p class="text-[10px] text-slate-500 font-bold">Cafeteria Wi-Fi</p>
+          <p class="text-sm font-black text-blue-600">ATU-Student-5G</p>
+        </div>
+      </div>
+
+      <div class="pt-2 border-t border-slate-100 flex justify-end">
+        <button onclick="closeCampusIndoorMapModal()" class="px-5 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold transition-all">
+          Close Map
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 🍏 0B. DAILY HEALTH & NUTRITION MACROS MODAL (Matching DailyHealthSummaryView.kt) -->
+  <div id="health-summary-modal" class="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-md hidden flex items-center justify-center p-3 sm:p-4">
+    <div class="bg-white rounded-3xl max-w-lg w-full p-5 sm:p-6 shadow-2xl space-y-4 max-h-[92vh] overflow-y-auto border border-slate-200">
+      <div class="flex items-center justify-between border-b border-slate-100 pb-3">
+        <div class="flex items-center gap-2.5">
+          <div class="w-10 h-10 rounded-2xl bg-emerald-100 text-emerald-800 flex items-center justify-center font-bold">
+            <i data-lucide="heart-pulse" class="w-5 h-5 text-emerald-700"></i>
+          </div>
+          <div>
+            <h3 class="text-base font-extrabold text-slate-900">Daily Health & Nutrition Summary 🍏</h3>
+            <p class="text-[11px] text-slate-500">Aggregated macros & smart dietary insights based on your meal orders</p>
+          </div>
+        </div>
+        <button onclick="closeDailyHealthSummaryModal()" class="w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center text-slate-500 hover:bg-slate-200">
+          <i data-lucide="x" class="w-4 h-4"></i>
+        </button>
+      </div>
+
+      <!-- Macro Target Card -->
+      <div class="bg-emerald-50/70 border border-emerald-200 rounded-2xl p-4 space-y-3">
+        <div class="flex items-center justify-between">
+          <span class="text-xs font-bold text-emerald-900 uppercase tracking-wide">Daily Calories Progress</span>
+          <span class="text-xs font-black text-emerald-800" id="health-cal-summary">680 / 2,200 kcal</span>
+        </div>
+        <!-- Progress Bar -->
+        <div class="w-full h-3 bg-emerald-200 rounded-full overflow-hidden">
+          <div class="h-full bg-gradient-to-r from-emerald-500 to-teal-600 rounded-full transition-all duration-500" id="health-cal-bar" style="width: 31%;"></div>
+        </div>
+        <p class="text-[10.5px] text-emerald-800 leading-tight">
+          Based on your ATU cafeteria orders today, you have consumed ~<strong>680 kcal</strong>. Balanced energy level for afternoon lectures.
+        </p>
+      </div>
+
+      <!-- Macronutrients Breakdown Grid -->
+      <div class="grid grid-cols-3 gap-3">
+        <div class="bg-slate-50 p-3 rounded-2xl border border-slate-200 text-center">
+          <p class="text-[10px] font-bold text-slate-500 uppercase">Proteins</p>
+          <p class="text-lg font-black text-slate-900 mt-0.5">34g</p>
+          <span class="text-[9px] font-semibold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-100">Optimal</span>
+        </div>
+        <div class="bg-slate-50 p-3 rounded-2xl border border-slate-200 text-center">
+          <p class="text-[10px] font-bold text-slate-500 uppercase">Carbohydrates</p>
+          <p class="text-lg font-black text-slate-900 mt-0.5">85g</p>
+          <span class="text-[9px] font-semibold text-amber-600 bg-amber-50 px-2 py-0.5 rounded-full border border-amber-100">Medium</span>
+        </div>
+        <div class="bg-slate-50 p-3 rounded-2xl border border-slate-200 text-center">
+          <p class="text-[10px] font-bold text-slate-500 uppercase">Healthy Fats</p>
+          <p class="text-lg font-black text-slate-900 mt-0.5">18g</p>
+          <span class="text-[9px] font-semibold text-blue-600 bg-blue-50 px-2 py-0.5 rounded-full border border-blue-100">Within Limit</span>
+        </div>
+      </div>
+
+      <!-- Smart Gemini AI Nutrition Recommendation Card -->
+      <div class="bg-gradient-to-r from-blue-50 via-indigo-50 to-purple-50 p-4 rounded-2xl border border-blue-200/80 space-y-2">
+        <div class="flex items-center gap-2">
+          <i data-lucide="sparkles" class="w-4 h-4 text-indigo-600"></i>
+          <h4 class="text-xs font-black text-indigo-950 uppercase tracking-wide">ATU Smart Cafeteria Advice</h4>
+        </div>
+        <p class="text-xs text-indigo-900 leading-relaxed">
+          Tip: Pair your meal with freshly prepared Sobolo or blended juice from <strong>Smoothie & Juice Hub</strong> for natural antioxidants and hydration during warm afternoon hours.
+        </p>
+      </div>
+
+      <div class="pt-2 border-t border-slate-100 flex justify-end">
+        <button onclick="closeDailyHealthSummaryModal()" class="px-5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold transition-all shadow-xs">
+          Got It, Thanks!
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 🧭 0C. ONBOARDING CAROUSEL MODAL (Matching OnboardingCarouselScreen.kt) -->
+  <div id="onboarding-carousel-modal" class="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-md hidden flex items-center justify-center p-3 sm:p-4">
+    <div class="bg-white rounded-3xl max-w-md w-full p-6 shadow-2xl space-y-5 border border-slate-200 text-center">
+      <div class="flex justify-end">
+        <button onclick="closeOnboardingCarouselModal()" class="w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center text-slate-500 hover:bg-slate-200">
+          <i data-lucide="x" class="w-4 h-4"></i>
+        </button>
+      </div>
+
+      <!-- Carousel Slide Content Area -->
+      <div id="onboarding-slide-container" class="space-y-4">
+        <!-- Dynamic content filled by JS -->
+      </div>
+
+      <!-- Carousel Step Dots -->
+      <div class="flex items-center justify-center gap-2 pt-2" id="onboarding-dots">
+        <span class="w-6 h-2 rounded-full bg-brand-600 transition-all"></span>
+        <span class="w-2 h-2 rounded-full bg-slate-200 transition-all"></span>
+        <span class="w-2 h-2 rounded-full bg-slate-200 transition-all"></span>
+      </div>
+
+      <div class="flex items-center gap-2 pt-2">
+        <button onclick="prevOnboardingSlide()" id="onboarding-prev-btn" class="flex-1 py-2.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold transition-all">
+          Previous
+        </button>
+        <button onclick="nextOnboardingSlide()" id="onboarding-next-btn" class="flex-1 py-2.5 rounded-xl bg-brand-600 hover:bg-brand-700 text-white text-xs font-black shadow-md flex items-center justify-center gap-1.5 transition-all">
+          <span>Next</span>
+          <i data-lucide="arrow-right" class="w-4 h-4"></i>
+        </button>
+      </div>
+    </div>
+  </div>
 
     <!-- 0. 🔐 VENDOR FIRST-TIME LOGIN / UPDATE DEFAULT CREDENTIALS MODAL -->
   <div id="vendor-first-login-modal" class="fixed inset-0 z-50 bg-slate-900/70 backdrop-blur-sm hidden flex items-center justify-center p-4">
@@ -10715,6 +11014,218 @@ function advanceOrderStatus(orderId, nextStatus) {
       showToast(`Credentials updated successfully! You can now sign in with username: ${username}`, 'success');
       playChime(783.99);
       if (typeof renderAdminDashboard === 'function') renderAdminDashboard();
+    }
+
+    // =========================================================================
+    // 📱 MOBILE FEATURES PORTED FROM ANDROID APP
+    // =========================================================================
+
+    // 1. 🗺️ Indoor Cafeteria Map & Stall Locator
+    let selectedMapStallId = 201;
+
+    function openCampusIndoorMapModal() {
+      const modal = document.getElementById('indoor-map-modal');
+      if (modal) {
+        modal.classList.remove('hidden');
+        lucide.createIcons();
+        playChime(659.25);
+      }
+    }
+
+    function closeCampusIndoorMapModal() {
+      const modal = document.getElementById('indoor-map-modal');
+      if (modal) modal.classList.add('hidden');
+    }
+
+    function selectIndoorStall(vendorId, stallName, desc, waitMins) {
+      selectedMapStallId = vendorId;
+      const nameEl = document.getElementById('map-selected-name');
+      const descEl = document.getElementById('map-selected-desc');
+      if (nameEl) nameEl.textContent = stallName;
+      if (descEl) descEl.textContent = `${desc} • Approx wait: ${waitMins} mins • Walk: 1 min`;
+      playChime(784);
+    }
+
+    function filterVendorFromMap() {
+      closeCampusIndoorMapModal();
+      if (typeof filterByVendor === 'function') {
+        filterByVendor(selectedMapStallId);
+      }
+      showToast(`Filtered menu dishes for selected stall!`, 'info');
+    }
+
+    // 2. 🍏 Daily Health & Nutrition Summary
+    function openDailyHealthSummaryModal() {
+      const modal = document.getElementById('health-summary-modal');
+      if (modal) {
+        modal.classList.remove('hidden');
+        lucide.createIcons();
+        playChime(523.25);
+      }
+    }
+
+    function closeDailyHealthSummaryModal() {
+      const modal = document.getElementById('health-summary-modal');
+      if (modal) modal.classList.add('hidden');
+    }
+
+    // 3. 🧭 Onboarding Carousel Slides
+    const onboardingSlides = [
+      {
+        emoji: '🥘',
+        badge: 'Fast Campus Pre-Ordering',
+        title: 'Zero Waiting at Lunch Queues',
+        desc: 'Browse live food menus from all certified ATU Cafeteria vendors. Pre-order your meals before lectures end to skip long counter queues.'
+      },
+      {
+        emoji: '💳',
+        badge: 'Cashless Smart Wallet',
+        title: 'Instant Top-Up & MoMo Integration',
+        desc: 'Deposit funds securely using MTN Mobile Money, Telecel, or card. Pay with a single tap, track 30-day dining velocity, and print official statements.'
+      },
+      {
+        emoji: '🗺️',
+        badge: 'Live Counter Tracking',
+        title: 'Instant 4-Digit PIN & QR Pickup',
+        desc: 'Receive real-time sound and visual alerts when your food is ready. Show your private 4-digit pickup PIN or QR code at the stall counter for express handover.'
+      }
+    ];
+
+    let currentOnboardingIndex = 0;
+
+    function renderOnboardingSlide() {
+      const container = document.getElementById('onboarding-slide-container');
+      const dots = document.getElementById('onboarding-dots');
+      const prevBtn = document.getElementById('onboarding-prev-btn');
+      const nextBtn = document.getElementById('onboarding-next-btn');
+
+      if (!container) return;
+
+      const slide = onboardingSlides[currentOnboardingIndex];
+      container.innerHTML = `
+        <div class="w-20 h-20 rounded-3xl bg-amber-100 flex items-center justify-center text-4xl mx-auto shadow-inner">
+          ${slide.emoji}
+        </div>
+        <span class="text-[10px] font-black uppercase tracking-wider bg-amber-100 text-amber-800 px-3 py-1 rounded-full">
+          ${slide.badge}
+        </span>
+        <h3 class="text-xl font-black text-slate-900 mt-2">${slide.title}</h3>
+        <p class="text-xs text-slate-500 leading-relaxed max-w-sm mx-auto">
+          ${slide.desc}
+        </p>
+      `;
+
+      if (dots) {
+        dots.innerHTML = onboardingSlides.map((_, i) => `
+          <span class="h-2 rounded-full transition-all ${i === currentOnboardingIndex ? 'w-6 bg-brand-600' : 'w-2 bg-slate-200'}"></span>
+        `).join('');
+      }
+
+      if (prevBtn) {
+        prevBtn.disabled = currentOnboardingIndex === 0;
+        prevBtn.style.opacity = currentOnboardingIndex === 0 ? '0.4' : '1';
+      }
+
+      if (nextBtn) {
+        nextBtn.innerHTML = currentOnboardingIndex === onboardingSlides.length - 1
+          ? `<span>Get Started</span> <i data-lucide="check" class="w-4 h-4"></i>`
+          : `<span>Next</span> <i data-lucide="arrow-right" class="w-4 h-4"></i>`;
+      }
+
+      lucide.createIcons();
+    }
+
+    function openOnboardingCarouselModal() {
+      currentOnboardingIndex = 0;
+      renderOnboardingSlide();
+      const modal = document.getElementById('onboarding-carousel-modal');
+      if (modal) {
+        modal.classList.remove('hidden');
+        playChime(698.46);
+      }
+    }
+
+    function closeOnboardingCarouselModal() {
+      const modal = document.getElementById('onboarding-carousel-modal');
+      if (modal) modal.classList.add('hidden');
+    }
+
+    function nextOnboardingSlide() {
+      if (currentOnboardingIndex < onboardingSlides.length - 1) {
+        currentOnboardingIndex++;
+        renderOnboardingSlide();
+        playChime(587.33);
+      } else {
+        closeOnboardingCarouselModal();
+      }
+    }
+
+    function prevOnboardingSlide() {
+      if (currentOnboardingIndex > 0) {
+        currentOnboardingIndex--;
+        renderOnboardingSlide();
+        playChime(440);
+      }
+    }
+
+    // 4. ⚡ High-Contrast Vendor Kitchen Terminal Mode
+    let isVendorHighContrast = false;
+
+    function toggleVendorHighContrastTheme() {
+      isVendorHighContrast = !isVendorHighContrast;
+      const label = document.getElementById('vendor-contrast-label');
+      const btn = document.getElementById('vendor-contrast-btn');
+      
+      if (isVendorHighContrast) {
+        document.body.classList.add('vendor-high-contrast');
+        if (label) label.textContent = 'Normal UI';
+        if (btn) btn.classList.replace('bg-slate-900', 'bg-amber-400');
+        if (btn) btn.classList.replace('text-amber-300', 'text-slate-950');
+        showToast('High-Contrast OLED Kitchen Terminal Theme Enabled (WCAG AAA)', 'info');
+      } else {
+        document.body.classList.remove('vendor-high-contrast');
+        if (label) label.textContent = 'High-Contrast OLED';
+        if (btn) btn.classList.replace('bg-amber-400', 'bg-slate-900');
+        if (btn) btn.classList.replace('text-slate-950', 'text-amber-300');
+        showToast('Returned to standard light mode', 'info');
+      }
+      playChime(523.25);
+    }
+
+    // 5. 📱 Mobile Jetpack Compose-style Floating Navigation Dock
+    function mobileNavSwitch(destination) {
+      // Clear active styles on all dock buttons
+      ['home', 'menu', 'map', 'health', 'orders', 'wallet'].forEach(tab => {
+        const btn = document.getElementById(`dock-btn-${tab}`);
+        if (btn) {
+          btn.classList.remove('text-amber-400', 'bg-white/10');
+          btn.classList.add('text-slate-300');
+        }
+      });
+
+      const activeBtn = document.getElementById(`dock-btn-${destination}`);
+      if (activeBtn) {
+        activeBtn.classList.remove('text-slate-300');
+        activeBtn.classList.add('text-amber-400', 'bg-white/10');
+      }
+
+      playChime(659.25);
+
+      if (destination === 'home') {
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+      } else if (destination === 'menu') {
+        const menuEl = document.getElementById('student-food-catalog');
+        if (menuEl) menuEl.scrollIntoView({ behavior: 'smooth' });
+      } else if (destination === 'map') {
+        openCampusIndoorMapModal();
+      } else if (destination === 'health') {
+        openDailyHealthSummaryModal();
+      } else if (destination === 'orders') {
+        const activeOrderSection = document.getElementById('student-active-orders');
+        if (activeOrderSection) activeOrderSection.scrollIntoView({ behavior: 'smooth' });
+      } else if (destination === 'wallet') {
+        showTopUpModal();
+      }
     }
 
   </script>
