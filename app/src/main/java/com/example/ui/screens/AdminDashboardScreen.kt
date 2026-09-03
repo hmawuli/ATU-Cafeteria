@@ -55,6 +55,13 @@ import com.example.ui.components.StudentTrendsLineChart
 import com.example.ui.components.VendorPerformanceTrendChart
 import com.example.ui.components.WeeklyRevenueTrendLineChart
 import com.example.ui.components.LaravelDailyRevenueTrendChart
+import com.example.ui.components.PopularFoodsAnalyticsSection
+import com.example.ui.components.UserActivityMonitoringDialog
+import com.example.ui.components.CampusUserMonitoringStatsBanner
+import com.example.ui.components.Recharts30DayGrossRevenueChart
+import com.example.ui.util.SnackbarManager
+import androidx.compose.ui.platform.LocalClipboardManager
+import androidx.compose.ui.text.AnnotatedString
 import com.example.ui.viewmodel.CafeteriaViewModel
 
 // ==========================================
@@ -78,6 +85,10 @@ fun AdminDashboardScreen(
     val allUsers by viewModel.allUsers.collectAsStateWithLifecycle()
     val adminInventoryAlerts by viewModel.adminInventoryAlerts.collectAsStateWithLifecycle()
     val promotionalOffers by viewModel.promotionalOffers.collectAsStateWithLifecycle()
+    val allWalletTransactions by viewModel.allWalletTransactions.collectAsStateWithLifecycle()
+    val clipboardManager = LocalClipboardManager.current
+
+    var userToMonitor by remember { mutableStateOf<User?>(null) }
 
     var activeSubTab by remember { mutableIntStateOf(0) } // 0: Compliance Board, 1: AI Advisor, 2: Cyber Logs
 
@@ -124,6 +135,14 @@ fun AdminDashboardScreen(
     var addPictureUrl by remember { mutableStateOf("") }
     var editLogoUrl by remember { mutableStateOf("") }
     var editPictureUrl by remember { mutableStateOf("") }
+
+    // Register New Vendor Stall form states (persisted to localStorage)
+    var regStallName by remember { mutableStateOf("") }
+    var regStallLocation by remember { mutableStateOf("") }
+    var regStallSpecialty by remember { mutableStateOf("") }
+    var regStatusMessage by remember { mutableStateOf<String?>(null) }
+    var regIsSuccess by remember { mutableStateOf(false) }
+    var isRegisterFormExpanded by remember { mutableStateOf(true) }
 
     val allFoodItems by viewModel.allFoodItems.collectAsStateWithLifecycle()
 
@@ -362,6 +381,139 @@ fun AdminDashboardScreen(
                                 contentPadding = PaddingValues(start = 16.dp, end = 16.dp, bottom = 80.dp),
                                 verticalArrangement = Arrangement.spacedBy(12.dp)
                             ) {
+                                item {
+                                    Card(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .testTag("register_new_vendor_card"),
+                                        shape = RoundedCornerShape(16.dp),
+                                        colors = CardDefaults.cardColors(
+                                            containerColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.22f)
+                                        ),
+                                        border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.35f))
+                                    ) {
+                                        Column(modifier = Modifier.padding(16.dp)) {
+                                            Row(
+                                                modifier = Modifier.fillMaxWidth(),
+                                                horizontalArrangement = Arrangement.SpaceBetween,
+                                                verticalAlignment = Alignment.CenterVertically
+                                            ) {
+                                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                                    Icon(
+                                                        Icons.Default.AddBusiness,
+                                                        contentDescription = null,
+                                                        tint = MaterialTheme.colorScheme.primary,
+                                                        modifier = Modifier.size(24.dp)
+                                                    )
+                                                    Spacer(modifier = Modifier.width(8.dp))
+                                                    Column {
+                                                        Text(
+                                                            "Register New Vendor",
+                                                            style = MaterialTheme.typography.titleMedium,
+                                                            fontWeight = FontWeight.Bold,
+                                                            color = MaterialTheme.colorScheme.primary
+                                                        )
+                                                        Text(
+                                                            "Adds stall to vendors list & syncs to localStorage",
+                                                            style = MaterialTheme.typography.bodySmall,
+                                                            fontSize = 11.sp,
+                                                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                                                        )
+                                                    }
+                                                }
+
+                                                IconButton(onClick = { isRegisterFormExpanded = !isRegisterFormExpanded }) {
+                                                    Icon(
+                                                        if (isRegisterFormExpanded) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
+                                                        contentDescription = "Toggle Registration Form",
+                                                        tint = MaterialTheme.colorScheme.primary
+                                                    )
+                                                }
+                                            }
+
+                                            AnimatedVisibility(visible = isRegisterFormExpanded) {
+                                                Column(
+                                                    modifier = Modifier.padding(top = 12.dp),
+                                                    verticalArrangement = Arrangement.spacedBy(10.dp)
+                                                ) {
+                                                    OutlinedTextField(
+                                                        value = regStallName,
+                                                        onValueChange = { regStallName = it },
+                                                        label = { Text("Vendor / Stall Name *") },
+                                                        placeholder = { Text("e.g. Mama Akua Kitchen") },
+                                                        modifier = Modifier.fillMaxWidth().testTag("reg_vendor_name_input"),
+                                                        singleLine = true,
+                                                        leadingIcon = { Icon(Icons.Default.Storefront, contentDescription = null, modifier = Modifier.size(18.dp)) }
+                                                    )
+
+                                                    OutlinedTextField(
+                                                        value = regStallLocation,
+                                                        onValueChange = { regStallLocation = it },
+                                                        label = { Text("Stall Location") },
+                                                        placeholder = { Text("e.g. Food Court Stall #3, Block B") },
+                                                        modifier = Modifier.fillMaxWidth().testTag("reg_vendor_location_input"),
+                                                        singleLine = true,
+                                                        leadingIcon = { Icon(Icons.Default.Place, contentDescription = null, modifier = Modifier.size(18.dp)) }
+                                                    )
+
+                                                    OutlinedTextField(
+                                                        value = regStallSpecialty,
+                                                        onValueChange = { regStallSpecialty = it },
+                                                        label = { Text("Culinary Specialty") },
+                                                        placeholder = { Text("e.g. Traditional Jollof, Waakye & Plantain") },
+                                                        modifier = Modifier.fillMaxWidth().testTag("reg_vendor_specialty_input"),
+                                                        singleLine = true,
+                                                        leadingIcon = { Icon(Icons.Default.Restaurant, contentDescription = null, modifier = Modifier.size(18.dp)) }
+                                                    )
+
+                                                    regStatusMessage?.let { msg ->
+                                                        Text(
+                                                            text = msg,
+                                                            color = if (regIsSuccess) Color(0xFF2E7D32) else MaterialTheme.colorScheme.error,
+                                                            style = MaterialTheme.typography.bodySmall,
+                                                            fontWeight = FontWeight.SemiBold
+                                                        )
+                                                    }
+
+                                                    Row(
+                                                        modifier = Modifier.fillMaxWidth(),
+                                                        horizontalArrangement = Arrangement.End,
+                                                        verticalAlignment = Alignment.CenterVertically
+                                                    ) {
+                                                        Button(
+                                                            onClick = {
+                                                                if (regStallName.isBlank()) {
+                                                                    regStatusMessage = "Please enter the vendor stall name."
+                                                                    regIsSuccess = false
+                                                                } else {
+                                                                    viewModel.registerNewVendor(
+                                                                        name = regStallName,
+                                                                        location = regStallLocation,
+                                                                        specialty = regStallSpecialty
+                                                                    ) { success, message ->
+                                                                        regIsSuccess = success
+                                                                        regStatusMessage = message
+                                                                        if (success) {
+                                                                            regStallName = ""
+                                                                            regStallLocation = ""
+                                                                            regStallSpecialty = ""
+                                                                        }
+                                                                    }
+                                                                }
+                                                            },
+                                                            modifier = Modifier.testTag("reg_vendor_submit_button")
+                                                        ) {
+                                                            Icon(Icons.Default.AddBusiness, contentDescription = null, modifier = Modifier.size(16.dp))
+                                                            Spacer(modifier = Modifier.width(6.dp))
+                                                            Text("Register Vendor Stall")
+                                                        }
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+
                                 if (allVendors.isEmpty()) {
                                     item {
                                         Box(modifier = Modifier.fillMaxWidth().height(200.dp), contentAlignment = Alignment.Center) {
@@ -699,30 +851,42 @@ fun AdminDashboardScreen(
                                                             vendorToEdit = vendor
                                                         },
                                                         shape = RoundedCornerShape(8.dp),
-                                                        modifier = Modifier.weight(1f),
+                                                        modifier = Modifier
+                                                            .weight(1f)
+                                                            .testTag("edit_vendor_button_${vendor.id}"),
                                                         contentPadding = PaddingValues(horizontal = 6.dp, vertical = 6.dp)
                                                     ) {
-                                                        Icon(Icons.Default.Edit, contentDescription = null, modifier = Modifier.size(13.dp))
+                                                        Icon(Icons.Default.Edit, contentDescription = "Edit Vendor", modifier = Modifier.size(13.dp))
                                                         Spacer(modifier = Modifier.width(2.dp))
-                                                        Text("Edit", fontSize = 10.sp)
+                                                        Text("Edit", fontSize = 10.sp, fontWeight = FontWeight.SemiBold)
+                                                    }
+
+                                                    OutlinedButton(
+                                                        onClick = {
+                                                            vendorToDelete = vendor
+                                                        },
+                                                        shape = RoundedCornerShape(8.dp),
+                                                        modifier = Modifier
+                                                            .weight(1f)
+                                                            .testTag("delete_vendor_button_${vendor.id}"),
+                                                        colors = ButtonDefaults.outlinedButtonColors(
+                                                            contentColor = MaterialTheme.colorScheme.error
+                                                        ),
+                                                        border = BorderStroke(1.dp, MaterialTheme.colorScheme.error.copy(alpha = 0.5f)),
+                                                        contentPadding = PaddingValues(horizontal = 6.dp, vertical = 6.dp)
+                                                    ) {
+                                                        Icon(Icons.Default.Delete, contentDescription = "Delete Vendor", tint = MaterialTheme.colorScheme.error, modifier = Modifier.size(13.dp))
+                                                        Spacer(modifier = Modifier.width(2.dp))
+                                                        Text("Delete", fontSize = 10.sp, fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.error)
                                                     }
 
                                                     IconButton(
                                                         onClick = {
                                                             vendorToResetPin = vendor
                                                         },
-                                                        modifier = Modifier.size(36.dp)
+                                                        modifier = Modifier.size(32.dp)
                                                     ) {
-                                                        Icon(Icons.Default.LockReset, contentDescription = "Reset PIN", tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(18.dp))
-                                                    }
-
-                                                    IconButton(
-                                                        onClick = {
-                                                            vendorToDelete = vendor
-                                                        },
-                                                        modifier = Modifier.size(36.dp)
-                                                    ) {
-                                                        Icon(Icons.Default.Delete, contentDescription = "Delete Vendor", tint = MaterialTheme.colorScheme.error, modifier = Modifier.size(18.dp))
+                                                        Icon(Icons.Default.LockReset, contentDescription = "Reset PIN", tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(16.dp))
                                                     }
                                                 }
                                             }
@@ -816,6 +980,14 @@ fun AdminDashboardScreen(
                                             }
                                         }
                                     }
+                                }
+
+                                // Live Campus User Telemetry Banner
+                                item {
+                                    CampusUserMonitoringStatsBanner(
+                                        allUsers = allUsers,
+                                        allOrders = allOrdersSnapshot
+                                    )
                                 }
 
                                 // Search Bar & Filter Chips
@@ -1021,22 +1193,33 @@ fun AdminDashboardScreen(
                                                     horizontalArrangement = Arrangement.spacedBy(6.dp),
                                                     verticalAlignment = Alignment.CenterVertically
                                                 ) {
+                                                    FilledTonalButton(
+                                                        onClick = { userToMonitor = user },
+                                                        shape = RoundedCornerShape(8.dp),
+                                                        modifier = Modifier.weight(1.1f),
+                                                        contentPadding = PaddingValues(horizontal = 6.dp, vertical = 6.dp)
+                                                    ) {
+                                                        Icon(Icons.Default.Visibility, contentDescription = null, modifier = Modifier.size(13.dp))
+                                                        Spacer(modifier = Modifier.width(3.dp))
+                                                        Text("Monitor", fontSize = 10.sp, fontWeight = FontWeight.Bold)
+                                                    }
+
                                                     Button(
                                                         onClick = { userToAdjustWallet = user },
                                                         shape = RoundedCornerShape(8.dp),
-                                                        modifier = Modifier.weight(1.2f),
-                                                        contentPadding = PaddingValues(horizontal = 8.dp, vertical = 6.dp)
+                                                        modifier = Modifier.weight(1.1f),
+                                                        contentPadding = PaddingValues(horizontal = 6.dp, vertical = 6.dp)
                                                     ) {
                                                         Icon(Icons.Default.AccountBalanceWallet, contentDescription = null, modifier = Modifier.size(13.dp))
-                                                        Spacer(modifier = Modifier.width(4.dp))
-                                                        Text("Adjust Wallet", fontSize = 10.sp, fontWeight = FontWeight.Bold)
+                                                        Spacer(modifier = Modifier.width(3.dp))
+                                                        Text("Wallet", fontSize = 10.sp, fontWeight = FontWeight.Bold)
                                                     }
 
                                                     OutlinedButton(
                                                         onClick = { userToEditProfile = user },
                                                         shape = RoundedCornerShape(8.dp),
                                                         modifier = Modifier.weight(0.8f),
-                                                        contentPadding = PaddingValues(horizontal = 6.dp, vertical = 6.dp)
+                                                        contentPadding = PaddingValues(horizontal = 4.dp, vertical = 6.dp)
                                                     ) {
                                                         Icon(Icons.Default.Edit, contentDescription = null, modifier = Modifier.size(13.dp))
                                                         Spacer(modifier = Modifier.width(2.dp))
@@ -1109,6 +1292,25 @@ fun AdminDashboardScreen(
                             .verticalScroll(adminAiScrollState),
                         verticalArrangement = Arrangement.spacedBy(16.dp)
                     ) {
+                        // 1. Popular Foods & Student Consumption Analytics Leaderboard
+                        PopularFoodsAnalyticsSection(
+                            allOrders = allOrdersSnapshot,
+                            allFoodItems = allFoodItems,
+                            allVendors = allVendors,
+                            modifier = Modifier.fillMaxWidth()
+                        )
+
+                        Spacer(modifier = Modifier.height(8.dp))
+
+                        // 2. 30-Day Daily Gross Revenue Growth Line Chart (Recharts)
+                        Recharts30DayGrossRevenueChart(
+                            orders = allOrdersSnapshot,
+                            modifier = Modifier.fillMaxWidth()
+                        )
+
+                        Spacer(modifier = Modifier.height(8.dp))
+
+                        // 3. Weekly Vendor Order Trends & Peak Traffic Hours
                         Text(
                             "Weekly Vendor Order Trends & Peak Cafeteria Traffic Hours",
                             style = MaterialTheme.typography.titleMedium,
@@ -1344,12 +1546,30 @@ fun AdminDashboardScreen(
 
                         // 1. Escrow Overview card
                         item {
+                            val totalStudentLedger = remember(allUsers) { allUsers.filter { it.role == "STUDENT" }.sumOf { it.balance } }
+                            val totalPurchasesGross = remember(allOrdersSnapshot) { allOrdersSnapshot.filter { it.status == "COMPLETED" }.sumOf { it.totalPrice } }
+                            val totalActivePipeline = remember(allOrdersSnapshot) { allOrdersSnapshot.filter { it.status in listOf("PENDING", "PREPARING", "READY") }.sumOf { it.totalPrice } }
+                            val studentsCount = remember(allUsers) { allUsers.count { it.role == "STUDENT" } }
+                            val vendorsCount = remember(allUsers) { allUsers.count { it.role == "VENDOR" } }
+
                             Card(
                                 modifier = Modifier.fillMaxWidth(),
                                 colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
                             ) {
                                 Column(modifier = Modifier.padding(16.dp)) {
-                                    Text("Global Escrow Balance Ledger", fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleSmall)
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        horizontalArrangement = Arrangement.SpaceBetween,
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        Text("Global Escrow Balance Ledger", fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleSmall)
+                                        Surface(
+                                            color = MaterialTheme.colorScheme.primaryContainer,
+                                            shape = RoundedCornerShape(4.dp)
+                                        ) {
+                                            Text("LIVE AUDIT", fontSize = 9.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary, modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp))
+                                        }
+                                    }
                                     Spacer(modifier = Modifier.height(12.dp))
 
                                     Row(
@@ -1357,13 +1577,31 @@ fun AdminDashboardScreen(
                                         horizontalArrangement = Arrangement.SpaceBetween
                                     ) {
                                         Column {
-                                            Text("AGGREGATE ESCROW SUM", fontSize = 10.sp, fontWeight = FontWeight.SemiBold)
-                                            Text("GH₵ 42,950.00", fontSize = 20.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
+                                            Text("STUDENT WALLET RESERVES", fontSize = 10.sp, fontWeight = FontWeight.SemiBold)
+                                            Text("GH₵ ${"%.2f".format(totalStudentLedger)}", fontSize = 20.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
                                         }
 
+                                        Column(horizontalAlignment = Alignment.End) {
+                                            Text("ACTIVE STALLS & STUDENTS", fontSize = 10.sp, fontWeight = FontWeight.SemiBold)
+                                            Text("$studentsCount Students • $vendorsCount Stalls", fontSize = 14.sp, fontWeight = FontWeight.Bold)
+                                        }
+                                    }
+
+                                    Spacer(modifier = Modifier.height(8.dp))
+                                    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
+                                    Spacer(modifier = Modifier.height(8.dp))
+
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        horizontalArrangement = Arrangement.SpaceBetween
+                                    ) {
                                         Column {
-                                            Text("TOTAL ATU STUDENTS", fontSize = 10.sp, fontWeight = FontWeight.SemiBold)
-                                            Text("1,452 Members", fontSize = 18.sp, fontWeight = FontWeight.Bold)
+                                            Text("TOTAL GROSS SETTLED", fontSize = 9.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                            Text("GH₵ ${"%.2f".format(totalPurchasesGross)}", fontSize = 13.sp, fontWeight = FontWeight.Bold, color = Color(0xFF2E7D32))
+                                        }
+                                        Column(horizontalAlignment = Alignment.End) {
+                                            Text("IN-FLIGHT ESCROW", fontSize = 9.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                            Text("GH₵ ${"%.2f".format(totalActivePipeline)}", fontSize = 13.sp, fontWeight = FontWeight.Bold, color = Color(0xFFE65100))
                                         }
                                     }
 
@@ -1612,12 +1850,30 @@ fun AdminDashboardScreen(
                             }
                         }
 
-                        // 3. Live Campus Orders Oversight & Override
+                        // 3. Live Campus Purchases & Orders Oversight & Override
                         item {
                             var orderFilterStatus by remember { mutableStateOf("ALL") }
-                            val filteredLiveOrders = remember(allOrdersSnapshot, orderFilterStatus) {
-                                if (orderFilterStatus == "ALL") allOrdersSnapshot
-                                else allOrdersSnapshot.filter { it.status.uppercase() == orderFilterStatus }
+                            var purchaseSearchQuery by remember { mutableStateOf("") }
+                            var showAllPurchases by remember { mutableStateOf(false) }
+
+                            val filteredLiveOrders = remember(allOrdersSnapshot, orderFilterStatus, purchaseSearchQuery, allUsers) {
+                                allOrdersSnapshot.filter { order ->
+                                    val statusMatch = if (orderFilterStatus == "ALL") true else order.status.equals(orderFilterStatus, ignoreCase = true)
+                                    val vendor = allUsers.find { it.id == order.vendorId }
+                                    val customer = allUsers.find { it.id == order.customerId }
+                                    val queryMatch = purchaseSearchQuery.isBlank() ||
+                                            order.id.toString().contains(purchaseSearchQuery.trim()) ||
+                                            order.foodName.contains(purchaseSearchQuery.trim(), ignoreCase = true) ||
+                                            (customer?.fullName?.contains(purchaseSearchQuery.trim(), ignoreCase = true) == true) ||
+                                            (vendor?.fullName?.contains(purchaseSearchQuery.trim(), ignoreCase = true) == true) ||
+                                            order.pickupPin.contains(purchaseSearchQuery.trim())
+
+                                    statusMatch && queryMatch
+                                }
+                            }
+
+                            val filteredPurchasesGross = remember(filteredLiveOrders) {
+                                filteredLiveOrders.sumOf { it.totalPrice }
                             }
 
                             Card(
@@ -1632,11 +1888,38 @@ fun AdminDashboardScreen(
                                         horizontalArrangement = Arrangement.SpaceBetween,
                                         verticalAlignment = Alignment.CenterVertically
                                     ) {
-                                        Column {
-                                            Text("Live Campus Orders Dispatch & Override", fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleSmall, color = MaterialTheme.colorScheme.primary)
-                                            Text("Real-time orders queue with administrative status advance & instant wallet refund overrides.", fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                        Column(modifier = Modifier.weight(1f)) {
+                                            Text("Campus Purchases & Orders Oversight", fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleSmall, color = MaterialTheme.colorScheme.primary)
+                                            Text("Real-time oversight of all purchases, money flow, and administrative order status overrides.", fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                        }
+                                        Surface(
+                                            color = MaterialTheme.colorScheme.primaryContainer,
+                                            shape = RoundedCornerShape(8.dp)
+                                        ) {
+                                            Column(modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp), horizontalAlignment = Alignment.End) {
+                                                Text("FILTERED SUM", fontSize = 8.sp, fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.onPrimaryContainer)
+                                                Text("GH₵ ${"%.2f".format(filteredPurchasesGross)}", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
+                                            }
                                         }
                                     }
+
+                                    // Search Bar
+                                    OutlinedTextField(
+                                        value = purchaseSearchQuery,
+                                        onValueChange = { purchaseSearchQuery = it },
+                                        placeholder = { Text("Search by Order #, Dish, Student, or Vendor...", fontSize = 11.sp) },
+                                        leadingIcon = { Icon(Icons.Default.Search, contentDescription = null, modifier = Modifier.size(16.dp)) },
+                                        trailingIcon = {
+                                            if (purchaseSearchQuery.isNotEmpty()) {
+                                                IconButton(onClick = { purchaseSearchQuery = "" }, modifier = Modifier.size(20.dp)) {
+                                                    Icon(Icons.Default.Close, contentDescription = "Clear", modifier = Modifier.size(14.dp))
+                                                }
+                                            }
+                                        },
+                                        modifier = Modifier.fillMaxWidth(),
+                                        singleLine = true,
+                                        shape = RoundedCornerShape(10.dp)
+                                    )
 
                                     // Filter chips
                                     Row(
@@ -1658,10 +1941,11 @@ fun AdminDashboardScreen(
                                             modifier = Modifier.fillMaxWidth().height(100.dp),
                                             contentAlignment = Alignment.Center
                                         ) {
-                                            Text("No orders in '$orderFilterStatus' status.", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 11.sp)
+                                            Text("No orders match '$orderFilterStatus' and query '$purchaseSearchQuery'.", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 11.sp)
                                         }
                                     } else {
-                                        filteredLiveOrders.take(15).forEach { order ->
+                                        val displayOrders = if (showAllPurchases) filteredLiveOrders else filteredLiveOrders.take(15)
+                                        displayOrders.forEach { order ->
                                             val vendor = allUsers.find { it.id == order.vendorId }
                                             val customer = allUsers.find { it.id == order.customerId }
 
@@ -1676,9 +1960,10 @@ fun AdminDashboardScreen(
                                                         horizontalArrangement = Arrangement.SpaceBetween,
                                                         verticalAlignment = Alignment.CenterVertically
                                                     ) {
-                                                        Column {
-                                                            Text("Order #${order.id} • GH₵ ${"%.2f".format(order.totalPrice)}", fontWeight = FontWeight.Bold, fontSize = 12.sp)
-                                                            Text("Vendor: ${vendor?.fullName ?: "Vendor #${order.vendorId}"} • Student: ${customer?.fullName ?: "Student #${order.customerId}"}", fontSize = 10.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                                        Column(modifier = Modifier.weight(1f)) {
+                                                            Text("Order #${order.id} • ${order.foodName} (x${order.quantity})", fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                                                            Text("GH₵ ${"%.2f".format(order.totalPrice)} • Stall: ${vendor?.fullName ?: "Vendor #${order.vendorId}"} • Student: ${customer?.fullName ?: "Student #${order.customerId}"}", fontSize = 10.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                                            Text("PIN: ${order.pickupPin} • Time: ${java.text.SimpleDateFormat("hh:mm a, dd MMM", java.util.Locale.getDefault()).format(java.util.Date(order.orderTimestamp))}", fontSize = 9.sp, color = MaterialTheme.colorScheme.primary)
                                                         }
 
                                                         Surface(
@@ -1762,6 +2047,20 @@ fun AdminDashboardScreen(
                                                         }
                                                     }
                                                 }
+                                            }
+                                        }
+
+                                        if (filteredLiveOrders.size > 15) {
+                                            TextButton(
+                                                onClick = { showAllPurchases = !showAllPurchases },
+                                                modifier = Modifier.fillMaxWidth()
+                                            ) {
+                                                Text(
+                                                    if (showAllPurchases) "Show Recent 15 Purchases"
+                                                    else "View All ${filteredLiveOrders.size} Purchases",
+                                                    fontWeight = FontWeight.Bold,
+                                                    fontSize = 11.sp
+                                                )
                                             }
                                         }
                                     }
@@ -1939,19 +2238,29 @@ fun AdminDashboardScreen(
                                             color = MaterialTheme.colorScheme.primary
                                         )
                                     }
-                                    TextButton(
-                                        onClick = {
-                                            if (addFullName.isNotBlank()) {
-                                                val clean = addFullName.trim().lowercase().replace(Regex("[^a-z0-9]"), "_").take(18)
-                                                addUsername = "vendor_$clean"
-                                            } else {
-                                                addUsername = "vendor_${System.currentTimeMillis() % 10000}"
-                                            }
-                                            addPinCode = "1234"
-                                        },
-                                        contentPadding = PaddingValues(horizontal = 8.dp, vertical = 2.dp)
-                                    ) {
-                                        Text("Reset Defaults", fontSize = 10.sp, fontWeight = FontWeight.Bold)
+                                    Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                                        TextButton(
+                                            onClick = {
+                                                addPinCode = (1000..9999).random().toString()
+                                            },
+                                            contentPadding = PaddingValues(horizontal = 6.dp, vertical = 2.dp)
+                                        ) {
+                                            Text("🎲 Random PIN", fontSize = 10.sp, fontWeight = FontWeight.Bold)
+                                        }
+                                        TextButton(
+                                            onClick = {
+                                                if (addFullName.isNotBlank()) {
+                                                    val clean = addFullName.trim().lowercase().replace(Regex("[^a-z0-9]"), "_").take(18)
+                                                    addUsername = "vendor_$clean"
+                                                } else {
+                                                    addUsername = "vendor_${System.currentTimeMillis() % 10000}"
+                                                }
+                                                addPinCode = "1234"
+                                            },
+                                            contentPadding = PaddingValues(horizontal = 6.dp, vertical = 2.dp)
+                                        ) {
+                                            Text("Reset", fontSize = 10.sp, fontWeight = FontWeight.Bold)
+                                        }
                                     }
                                 }
 
@@ -2142,6 +2451,21 @@ fun AdminDashboardScreen(
                                 }
                             }
                         }
+
+                        // Copy Credentials Action Button
+                        OutlinedButton(
+                            onClick = {
+                                clipboardManager.setText(AnnotatedString("Username: ${creds.first}\nPIN/Password: ${creds.second}"))
+                                SnackbarManager.showMessage("Credentials copied to clipboard!")
+                            },
+                            modifier = Modifier.fillMaxWidth(),
+                            shape = RoundedCornerShape(8.dp)
+                        ) {
+                            Icon(Icons.Default.ContentCopy, contentDescription = null, modifier = Modifier.size(14.dp))
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text("Copy Login Credentials", fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                        }
+
                         Text(
                             "💡 The vendor can log in immediately and customize their credentials anytime from their Vendor Profile.",
                             fontSize = 11.sp,
@@ -2153,6 +2477,22 @@ fun AdminDashboardScreen(
                 confirmButton = {
                     Button(onClick = { newlyCreatedVendorCreds = null }) {
                         Text("Done")
+                    }
+                },
+                dismissButton = {
+                    FilledTonalButton(
+                        onClick = {
+                            val vUser = allVendors.find { it.username == creds.first }
+                            if (vUser != null) {
+                                viewModel.startImpersonation(vUser)
+                                navController.navigate("vendor_home")
+                            }
+                            newlyCreatedVendorCreds = null
+                        }
+                    ) {
+                        Icon(Icons.Default.PlayArrow, contentDescription = null, modifier = Modifier.size(14.dp))
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text("Test Login", fontSize = 11.sp)
                     }
                 }
             )
@@ -2425,6 +2765,7 @@ fun AdminDashboardScreen(
             var newDishPrepTime by remember { mutableStateOf("10 mins") }
             var newDishImageUrl by remember { mutableStateOf("https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=300&auto=format&fit=crop&q=60") }
             var dishError by remember { mutableStateOf<String?>(null) }
+            var dishToEdit by remember { mutableStateOf<FoodItem?>(null) }
 
             Dialog(onDismissRequest = { vendorForMenuManagement = null }) {
                 Card(
@@ -2602,6 +2943,15 @@ fun AdminDashboardScreen(
 
                                                 IconButton(
                                                     onClick = {
+                                                        dishToEdit = dish
+                                                    },
+                                                    modifier = Modifier.size(32.dp)
+                                                ) {
+                                                    Icon(Icons.Default.Edit, contentDescription = "Edit Dish", tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(16.dp))
+                                                }
+
+                                                IconButton(
+                                                    onClick = {
                                                         viewModel.deleteFoodItem(dish)
                                                     },
                                                     modifier = Modifier.size(32.dp)
@@ -2613,6 +2963,106 @@ fun AdminDashboardScreen(
                                     }
                                 }
                             }
+                        }
+
+                        // Dish Edit Modal
+                        dishToEdit?.let { currentDish ->
+                            var editDishName by remember(currentDish) { mutableStateOf(currentDish.name) }
+                            var editDishPrice by remember(currentDish) { mutableStateOf(currentDish.price.toString()) }
+                            var editDishCategory by remember(currentDish) { mutableStateOf(currentDish.category) }
+                            var editDishStock by remember(currentDish) { mutableStateOf(currentDish.currentStock.toString()) }
+                            var editDishDesc by remember(currentDish) { mutableStateOf(currentDish.description) }
+                            var editDishErr by remember { mutableStateOf<String?>(null) }
+
+                            AlertDialog(
+                                onDismissRequest = { dishToEdit = null },
+                                title = {
+                                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                                        Icon(Icons.Default.Edit, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
+                                        Text("Edit Menu Item", fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleMedium)
+                                    }
+                                },
+                                text = {
+                                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                                        OutlinedTextField(
+                                            value = editDishName,
+                                            onValueChange = { editDishName = it },
+                                            label = { Text("Dish Name *") },
+                                            modifier = Modifier.fillMaxWidth(),
+                                            singleLine = true
+                                        )
+                                        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                            OutlinedTextField(
+                                                value = editDishPrice,
+                                                onValueChange = { editDishPrice = it },
+                                                label = { Text("Price (GH₵) *") },
+                                                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                                                modifier = Modifier.weight(1f),
+                                                singleLine = true
+                                            )
+                                            OutlinedTextField(
+                                                value = editDishStock,
+                                                onValueChange = { editDishStock = it },
+                                                label = { Text("Current Stock *") },
+                                                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                                                modifier = Modifier.weight(1f),
+                                                singleLine = true
+                                            )
+                                        }
+                                        OutlinedTextField(
+                                            value = editDishCategory,
+                                            onValueChange = { editDishCategory = it },
+                                            label = { Text("Category") },
+                                            modifier = Modifier.fillMaxWidth(),
+                                            singleLine = true
+                                        )
+                                        OutlinedTextField(
+                                            value = editDishDesc,
+                                            onValueChange = { editDishDesc = it },
+                                            label = { Text("Description") },
+                                            modifier = Modifier.fillMaxWidth(),
+                                            maxLines = 2
+                                        )
+                                        editDishErr?.let {
+                                            Text(it, color = MaterialTheme.colorScheme.error, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                                        }
+                                    }
+                                },
+                                confirmButton = {
+                                    Button(
+                                        onClick = {
+                                            val p = editDishPrice.toDoubleOrNull()
+                                            val s = editDishStock.toIntOrNull()
+                                            if (editDishName.isBlank()) {
+                                                editDishErr = "Dish name cannot be blank."
+                                            } else if (p == null || p <= 0) {
+                                                editDishErr = "Enter a valid positive price."
+                                            } else if (s == null || s < 0) {
+                                                editDishErr = "Enter a valid stock quantity."
+                                            } else {
+                                                viewModel.updateFoodItem(
+                                                    currentDish.copy(
+                                                        name = editDishName.trim(),
+                                                        price = p,
+                                                        currentStock = s,
+                                                        isAvailable = s > 0,
+                                                        category = editDishCategory.ifBlank { currentDish.category },
+                                                        description = editDishDesc.ifBlank { currentDish.description }
+                                                    )
+                                                )
+                                                dishToEdit = null
+                                            }
+                                        }
+                                    ) {
+                                        Text("Save Changes")
+                                    }
+                                },
+                                dismissButton = {
+                                    TextButton(onClick = { dishToEdit = null }) {
+                                        Text("Cancel")
+                                    }
+                                }
+                            )
                         }
                     }
                 }
@@ -3255,6 +3705,22 @@ fun AdminDashboardScreen(
                         Text("Cancel")
                     }
                 }
+            )
+        }
+
+        // 12. USER ACTIVITY & BEHAVIOR MONITORING DIALOG
+        userToMonitor?.let { user ->
+            UserActivityMonitoringDialog(
+                user = user,
+                allOrders = allOrdersSnapshot,
+                allWalletTransactions = allWalletTransactions,
+                allFoodItems = allFoodItems,
+                allVendors = allVendors,
+                viewModel = viewModel,
+                navController = navController,
+                onDismiss = { userToMonitor = null },
+                onAdjustWallet = { userToAdjustWallet = it },
+                onResetPin = { userToResetPin = it }
             )
         }
     }

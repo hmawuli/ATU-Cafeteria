@@ -1152,6 +1152,47 @@ fun VendorDashboardScreen(
                         filteredOrders.filter { it.status == "PENDING" }
                     }
 
+                    // Sum of totalPrice for all 'DELIVERED' orders specifically associated with the currently active vendor's ID for the current day
+                    val vendorDeliveredOrdersToday = remember(incomingOrders, currentUser) {
+                        val cal = java.util.Calendar.getInstance().apply {
+                            set(java.util.Calendar.HOUR_OF_DAY, 0)
+                            set(java.util.Calendar.MINUTE, 0)
+                            set(java.util.Calendar.SECOND, 0)
+                            set(java.util.Calendar.MILLISECOND, 0)
+                        }
+                        val startOfToday = cal.timeInMillis
+                        val activeVendorId = currentUser?.id ?: 0
+                        incomingOrders.filter { order ->
+                            order.vendorId == activeVendorId &&
+                            order.orderTimestamp >= startOfToday &&
+                            (order.status.equals("DELIVERED", ignoreCase = true) || order.status.equals("COMPLETED", ignoreCase = true))
+                        }
+                    }
+                    val vendorDeliveredRevenueToday = remember(vendorDeliveredOrdersToday) {
+                        vendorDeliveredOrdersToday.sumOf { it.totalPrice }
+                    }
+
+                    // Dedicated Order Tracking table state for current vendor's pending work
+                    var orderTrackingStatusFilter by remember { mutableStateOf("All Pending") }
+                    val vendorAssignedOrders = remember(incomingOrders, currentUser) {
+                        val activeVendorId = currentUser?.id ?: 0
+                        incomingOrders.filter { it.vendorId == activeVendorId }
+                    }
+                    val trackedPendingOrders = remember(vendorAssignedOrders, orderTrackingStatusFilter) {
+                        vendorAssignedOrders.filter { order ->
+                            when (orderTrackingStatusFilter) {
+                                "Received" -> order.status.equals("PENDING", ignoreCase = true) || order.status.equals("RECEIVED", ignoreCase = true)
+                                "Preparing" -> order.status.equals("PREPARING", ignoreCase = true) || order.status.equals("COOKING", ignoreCase = true)
+                                "Ready" -> order.status.equals("READY", ignoreCase = true)
+                                else -> order.status.equals("PENDING", ignoreCase = true) ||
+                                        order.status.equals("RECEIVED", ignoreCase = true) ||
+                                        order.status.equals("PREPARING", ignoreCase = true) ||
+                                        order.status.equals("COOKING", ignoreCase = true) ||
+                                        order.status.equals("READY", ignoreCase = true)
+                            }
+                        }.sortedByDescending { it.orderTimestamp }
+                    }
+
                     LazyColumn(
                         state = ordersScrollState,
                         modifier = Modifier.fillMaxSize(),
@@ -1393,17 +1434,18 @@ fun VendorDashboardScreen(
                             }
                         }
                         item {
+                            // Dedicated Revenue Metric Card for active vendor's delivered orders today
                             Card(
                                 modifier = Modifier
                                     .fillMaxWidth()
                                     .padding(bottom = 4.dp)
-                                    .testTag("daily_revenue_tracker_card"),
+                                    .testTag("revenue_metric_card"),
                                 colors = CardDefaults.cardColors(
-                                    containerColor = MaterialTheme.colorScheme.tertiaryContainer.copy(alpha = 0.15f)
+                                    containerColor = MaterialTheme.colorScheme.tertiaryContainer.copy(alpha = 0.18f)
                                 ),
                                 border = androidx.compose.foundation.BorderStroke(
                                     1.dp,
-                                    MaterialTheme.colorScheme.tertiary.copy(alpha = 0.3f)
+                                    MaterialTheme.colorScheme.tertiary.copy(alpha = 0.35f)
                                 ),
                                 shape = RoundedCornerShape(16.dp)
                             ) {
@@ -1416,68 +1458,76 @@ fun VendorDashboardScreen(
                                         Row(verticalAlignment = Alignment.CenterVertically) {
                                             Icon(
                                                 imageVector = Icons.Default.Payments,
-                                                contentDescription = "Revenue Tracker Icon",
+                                                contentDescription = "Revenue Icon",
                                                 tint = MaterialTheme.colorScheme.tertiary,
-                                                modifier = Modifier.size(20.dp)
+                                                modifier = Modifier.size(22.dp)
                                             )
                                             Spacer(modifier = Modifier.width(8.dp))
-                                            Text(
-                                                text = "Today's Revenue Tracker",
-                                                style = MaterialTheme.typography.titleSmall,
-                                                fontWeight = FontWeight.Bold,
-                                                color = MaterialTheme.colorScheme.onTertiaryContainer
-                                            )
+                                            Column {
+                                                Text(
+                                                    text = "Revenue",
+                                                    style = MaterialTheme.typography.titleMedium,
+                                                    fontWeight = FontWeight.ExtraBold,
+                                                    color = MaterialTheme.colorScheme.onTertiaryContainer
+                                                )
+                                                Text(
+                                                    text = "Today's Delivered Earnings (Vendor #${currentUser?.id ?: 0})",
+                                                    style = MaterialTheme.typography.bodySmall,
+                                                    fontSize = 11.sp,
+                                                    color = MaterialTheme.colorScheme.onTertiaryContainer.copy(alpha = 0.75f)
+                                                )
+                                            }
                                         }
 
-                                        // Completed count badge
+                                        // Delivered count badge
                                         Box(
                                             modifier = Modifier
                                                 .background(
                                                     MaterialTheme.colorScheme.tertiary,
-                                                    RoundedCornerShape(4.dp)
+                                                    RoundedCornerShape(6.dp)
                                                 )
-                                                .padding(horizontal = 6.dp, vertical = 2.dp)
+                                                .padding(horizontal = 8.dp, vertical = 4.dp)
                                         ) {
                                             Text(
-                                                text = "${todayCompletedOrders.size} COMPLETED",
+                                                text = "${vendorDeliveredOrdersToday.size} DELIVERED",
                                                 color = MaterialTheme.colorScheme.onTertiary,
-                                                fontSize = 9.sp,
+                                                fontSize = 10.sp,
                                                 fontWeight = FontWeight.Bold,
-                                                modifier = Modifier.testTag("completed_orders_count")
+                                                modifier = Modifier.testTag("delivered_orders_count")
                                             )
                                         }
                                     }
 
                                     Spacer(modifier = Modifier.height(12.dp))
 
-                                    // Main Earnings Metric
+                                    // Main Earnings Metric: Sum of totalPrice for all DELIVERED orders for this vendor today
                                     Row(
                                         modifier = Modifier.fillMaxWidth(),
                                         verticalAlignment = Alignment.CenterVertically
                                     ) {
                                         Column(modifier = Modifier.weight(1f)) {
                                             Text(
-                                                text = "GH₵ ${"%.2f".format(todayTotalEarnings)}",
+                                                text = "GH₵ ${"%.2f".format(vendorDeliveredRevenueToday)}",
                                                 style = MaterialTheme.typography.headlineMedium,
                                                 fontWeight = FontWeight.ExtraBold,
                                                 color = MaterialTheme.colorScheme.onTertiaryContainer,
                                                 modifier = Modifier.testTag("today_earnings_text")
                                             )
                                             Text(
-                                                text = "Immediate financial feedback from completed orders",
+                                                text = "Calculated sum of totalPrice for all DELIVERED orders today",
                                                 style = MaterialTheme.typography.bodySmall,
-                                                color = MaterialTheme.colorScheme.onTertiaryContainer.copy(alpha = 0.7f),
+                                                color = MaterialTheme.colorScheme.onTertiaryContainer.copy(alpha = 0.75f),
                                                 fontSize = 11.sp
                                             )
                                         }
 
-                                        // Trend Graphic or Icon
+                                        // Trend Graphic / Visual Badge
                                         Box(
                                             modifier = Modifier
-                                                .size(40.dp)
+                                                .size(42.dp)
                                                 .background(
-                                                    MaterialTheme.colorScheme.tertiary.copy(alpha = 0.1f),
-                                                    RoundedCornerShape(8.dp)
+                                                    MaterialTheme.colorScheme.tertiary.copy(alpha = 0.15f),
+                                                    RoundedCornerShape(10.dp)
                                                 ),
                                             contentAlignment = Alignment.Center
                                         ) {
@@ -1485,41 +1535,41 @@ fun VendorDashboardScreen(
                                                 imageVector = Icons.Default.TrendingUp,
                                                 contentDescription = "Trend up",
                                                 tint = MaterialTheme.colorScheme.tertiary,
-                                                modifier = Modifier.size(22.dp)
+                                                modifier = Modifier.size(24.dp)
                                             )
                                         }
                                     }
 
                                     Spacer(modifier = Modifier.height(12.dp))
                                     androidx.compose.material3.HorizontalDivider(
-                                        color = MaterialTheme.colorScheme.tertiary.copy(alpha = 0.15f),
+                                        color = MaterialTheme.colorScheme.tertiary.copy(alpha = 0.2f),
                                         thickness = 1.dp
                                     )
                                     Spacer(modifier = Modifier.height(8.dp))
 
-                                    // Inner secondary metrics layout
+                                    // Secondary summary metrics
                                     Row(
                                         modifier = Modifier.fillMaxWidth(),
                                         horizontalArrangement = Arrangement.spacedBy(8.dp)
                                     ) {
-                                        // Average ticket size info
                                         Card(
                                             modifier = Modifier.weight(1f),
                                             colors = CardDefaults.cardColors(
-                                                containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.4f)
+                                                containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.5f)
                                             ),
                                             shape = RoundedCornerShape(8.dp)
                                         ) {
                                             Column(modifier = Modifier.padding(8.dp)) {
                                                 Text(
-                                                    text = "Average Value",
+                                                    text = "Average Ticket",
                                                     style = MaterialTheme.typography.bodySmall,
                                                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                                                     fontSize = 10.sp
                                                 )
                                                 Spacer(modifier = Modifier.height(2.dp))
+                                                val avgTicket = if (vendorDeliveredOrdersToday.isNotEmpty()) vendorDeliveredRevenueToday / vendorDeliveredOrdersToday.size else 0.0
                                                 Text(
-                                                    text = "GH₵ ${"%.2f".format(avgOrderValue)}",
+                                                    text = "GH₵ ${"%.2f".format(avgTicket)}",
                                                     style = MaterialTheme.typography.titleSmall,
                                                     fontWeight = FontWeight.Bold,
                                                     color = MaterialTheme.colorScheme.onSurface,
@@ -1528,17 +1578,16 @@ fun VendorDashboardScreen(
                                             }
                                         }
 
-                                        // Uncompleted/Active orders info
                                         Card(
                                             modifier = Modifier.weight(1f),
                                             colors = CardDefaults.cardColors(
-                                                containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.4f)
+                                                containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.5f)
                                             ),
                                             shape = RoundedCornerShape(8.dp)
                                         ) {
                                             Column(modifier = Modifier.padding(8.dp)) {
                                                 Text(
-                                                    text = "Sales Pipeline",
+                                                    text = "Pending Pipeline",
                                                     style = MaterialTheme.typography.bodySmall,
                                                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                                                     fontSize = 10.sp
@@ -1551,6 +1600,376 @@ fun VendorDashboardScreen(
                                                     color = MaterialTheme.colorScheme.primary,
                                                     fontSize = 11.sp
                                                 )
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+
+                        item {
+                            // Dedicated Order Tracking Table for currently active vendor
+                            Card(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(bottom = 4.dp)
+                                    .testTag("order_tracking_table"),
+                                colors = CardDefaults.cardColors(
+                                    containerColor = MaterialTheme.colorScheme.surface
+                                ),
+                                border = androidx.compose.foundation.BorderStroke(
+                                    1.dp,
+                                    MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.6f)
+                                ),
+                                shape = RoundedCornerShape(16.dp),
+                                elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+                            ) {
+                                Column(modifier = Modifier.padding(16.dp)) {
+                                    // Header
+                                    val totalPendingCount = vendorAssignedOrders.count {
+                                        it.status == "PENDING" || it.status == "RECEIVED" ||
+                                        it.status == "PREPARING" || it.status == "COOKING" ||
+                                        it.status == "READY"
+                                    }
+
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.SpaceBetween
+                                    ) {
+                                        Row(verticalAlignment = Alignment.CenterVertically) {
+                                            Icon(
+                                                imageVector = Icons.Default.PendingActions,
+                                                contentDescription = "Order Tracking Icon",
+                                                tint = MaterialTheme.colorScheme.primary,
+                                                modifier = Modifier.size(22.dp)
+                                            )
+                                            Spacer(modifier = Modifier.width(8.dp))
+                                            Column {
+                                                Text(
+                                                    text = "Order Tracking",
+                                                    style = MaterialTheme.typography.titleMedium,
+                                                    fontWeight = FontWeight.Bold,
+                                                    color = MaterialTheme.colorScheme.onSurface
+                                                )
+                                                Text(
+                                                    text = "Assigned to ${currentUser?.fullName ?: "Current Vendor"} (ID: ${currentUser?.id ?: 0})",
+                                                    style = MaterialTheme.typography.bodySmall,
+                                                    fontSize = 11.sp,
+                                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                                )
+                                            }
+                                        }
+
+                                        Box(
+                                            modifier = Modifier
+                                                .background(
+                                                    if (totalPendingCount > 0) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceVariant,
+                                                    RoundedCornerShape(8.dp)
+                                                )
+                                                .padding(horizontal = 8.dp, vertical = 4.dp)
+                                        ) {
+                                            Text(
+                                                text = "$totalPendingCount PENDING",
+                                                style = MaterialTheme.typography.labelSmall,
+                                                fontWeight = FontWeight.Bold,
+                                                color = if (totalPendingCount > 0) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurfaceVariant
+                                            )
+                                        }
+                                    }
+
+                                    Spacer(modifier = Modifier.height(12.dp))
+
+                                    // Filter by Status: Received, Preparing, Ready, All Pending
+                                    val receivedCount = vendorAssignedOrders.count { it.status == "PENDING" || it.status == "RECEIVED" }
+                                    val preparingCount = vendorAssignedOrders.count { it.status == "PREPARING" || it.status == "COOKING" }
+                                    val readyCount = vendorAssignedOrders.count { it.status == "READY" }
+
+                                    Text(
+                                        text = "Filter Pending Work by Status:",
+                                        style = MaterialTheme.typography.labelMedium,
+                                        fontWeight = FontWeight.SemiBold,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                    Spacer(modifier = Modifier.height(6.dp))
+
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                                    ) {
+                                        FilterChip(
+                                            selected = orderTrackingStatusFilter == "Received",
+                                            onClick = { orderTrackingStatusFilter = "Received" },
+                                            label = { Text("Received ($receivedCount)") },
+                                            modifier = Modifier.testTag("order_tracking_filter_received")
+                                        )
+                                        FilterChip(
+                                            selected = orderTrackingStatusFilter == "Preparing",
+                                            onClick = { orderTrackingStatusFilter = "Preparing" },
+                                            label = { Text("Preparing ($preparingCount)") },
+                                            modifier = Modifier.testTag("order_tracking_filter_preparing")
+                                        )
+                                        FilterChip(
+                                            selected = orderTrackingStatusFilter == "Ready",
+                                            onClick = { orderTrackingStatusFilter = "Ready" },
+                                            label = { Text("Ready ($readyCount)") },
+                                            modifier = Modifier.testTag("order_tracking_filter_ready")
+                                        )
+                                        FilterChip(
+                                            selected = orderTrackingStatusFilter == "All Pending",
+                                            onClick = { orderTrackingStatusFilter = "All Pending" },
+                                            label = { Text("All ($totalPendingCount)") },
+                                            modifier = Modifier.testTag("order_tracking_filter_all")
+                                        )
+                                    }
+
+                                    Spacer(modifier = Modifier.height(12.dp))
+
+                                    // Table Content
+                                    if (trackedPendingOrders.isEmpty()) {
+                                        Box(
+                                            modifier = Modifier
+                                                .fillMaxWidth()
+                                                .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f), RoundedCornerShape(8.dp))
+                                                .padding(20.dp),
+                                            contentAlignment = Alignment.Center
+                                        ) {
+                                            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                                Icon(
+                                                    imageVector = Icons.Default.CheckCircle,
+                                                    contentDescription = null,
+                                                    tint = MaterialTheme.colorScheme.primary,
+                                                    modifier = Modifier.size(30.dp)
+                                                )
+                                                Spacer(modifier = Modifier.height(6.dp))
+                                                Text(
+                                                    text = "No orders currently under '$orderTrackingStatusFilter'",
+                                                    style = MaterialTheme.typography.bodyMedium,
+                                                    fontWeight = FontWeight.Medium,
+                                                    color = MaterialTheme.colorScheme.onSurface
+                                                )
+                                                Text(
+                                                    text = "All assigned pending work is up to date!",
+                                                    style = MaterialTheme.typography.bodySmall,
+                                                    fontSize = 11.sp,
+                                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                                )
+                                            }
+                                        }
+                                    } else {
+                                        // Table Header
+                                        Row(
+                                            modifier = Modifier
+                                                .fillMaxWidth()
+                                                .background(
+                                                    MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.7f),
+                                                    RoundedCornerShape(topStart = 8.dp, topEnd = 8.dp)
+                                                )
+                                                .padding(horizontal = 8.dp, vertical = 8.dp),
+                                            verticalAlignment = Alignment.CenterVertically
+                                        ) {
+                                            Text(
+                                                text = "Order",
+                                                style = MaterialTheme.typography.labelSmall,
+                                                fontWeight = FontWeight.Bold,
+                                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                                modifier = Modifier.weight(0.9f)
+                                            )
+                                            Text(
+                                                text = "Customer",
+                                                style = MaterialTheme.typography.labelSmall,
+                                                fontWeight = FontWeight.Bold,
+                                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                                modifier = Modifier.weight(1.3f)
+                                            )
+                                            Text(
+                                                text = "Dish & Qty",
+                                                style = MaterialTheme.typography.labelSmall,
+                                                fontWeight = FontWeight.Bold,
+                                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                                modifier = Modifier.weight(1.6f)
+                                            )
+                                            Text(
+                                                text = "Total",
+                                                style = MaterialTheme.typography.labelSmall,
+                                                fontWeight = FontWeight.Bold,
+                                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                                modifier = Modifier.weight(1.0f)
+                                            )
+                                            Text(
+                                                text = "Status",
+                                                style = MaterialTheme.typography.labelSmall,
+                                                fontWeight = FontWeight.Bold,
+                                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                                modifier = Modifier.weight(1.1f)
+                                            )
+                                            Text(
+                                                text = "Action",
+                                                style = MaterialTheme.typography.labelSmall,
+                                                fontWeight = FontWeight.Bold,
+                                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                                modifier = Modifier.weight(1.2f)
+                                            )
+                                        }
+
+                                        // Table Rows
+                                        trackedPendingOrders.forEachIndexed { index, order ->
+                                            val customerUser = allUsers.find { it.id == order.customerId }
+                                            val customerName = customerUser?.fullName?.ifBlank { null }
+                                                ?: customerUser?.username
+                                                ?: "Student #${order.customerId}"
+
+                                            val statusDisplay = when (order.status) {
+                                                "PENDING", "RECEIVED" -> "Received"
+                                                "PREPARING", "COOKING" -> "Preparing"
+                                                "READY" -> "Ready"
+                                                else -> order.status
+                                            }
+                                            val statusBg = when (order.status) {
+                                                "PENDING", "RECEIVED" -> MaterialTheme.colorScheme.primaryContainer
+                                                "PREPARING", "COOKING" -> MaterialTheme.colorScheme.tertiaryContainer
+                                                "READY" -> Color(0xFFC8E6C9)
+                                                else -> MaterialTheme.colorScheme.surfaceVariant
+                                            }
+                                            val statusFg = when (order.status) {
+                                                "PENDING", "RECEIVED" -> MaterialTheme.colorScheme.onPrimaryContainer
+                                                "PREPARING", "COOKING" -> MaterialTheme.colorScheme.onTertiaryContainer
+                                                "READY" -> Color(0xFF1B5E20)
+                                                else -> MaterialTheme.colorScheme.onSurfaceVariant
+                                            }
+
+                                            androidx.compose.material3.HorizontalDivider(
+                                                thickness = 0.5.dp,
+                                                color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f)
+                                            )
+
+                                            Row(
+                                                modifier = Modifier
+                                                    .fillMaxWidth()
+                                                    .background(
+                                                        if (index % 2 == 1) MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.15f)
+                                                        else MaterialTheme.colorScheme.surface
+                                                    )
+                                                    .padding(horizontal = 8.dp, vertical = 8.dp)
+                                                    .testTag("order_tracking_row_${order.id}"),
+                                                verticalAlignment = Alignment.CenterVertically
+                                            ) {
+                                                // Order #
+                                                Column(modifier = Modifier.weight(0.9f)) {
+                                                    Text(
+                                                        text = "#${order.id}",
+                                                        fontWeight = FontWeight.Bold,
+                                                        fontSize = 11.sp,
+                                                        color = MaterialTheme.colorScheme.primary
+                                                    )
+                                                    Text(
+                                                        text = java.text.SimpleDateFormat("HH:mm", java.util.Locale.getDefault()).format(java.util.Date(order.orderTimestamp)),
+                                                        fontSize = 9.sp,
+                                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                                    )
+                                                }
+
+                                                // Customer
+                                                Column(modifier = Modifier.weight(1.3f)) {
+                                                    Text(
+                                                        text = customerName,
+                                                        fontWeight = FontWeight.Medium,
+                                                        fontSize = 10.sp,
+                                                        maxLines = 1,
+                                                        color = MaterialTheme.colorScheme.onSurface
+                                                    )
+                                                    customerUser?.student_staff_id?.let { matric ->
+                                                        Text(
+                                                            text = matric,
+                                                            fontSize = 9.sp,
+                                                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                                                        )
+                                                    }
+                                                }
+
+                                                // Item & Qty
+                                                Column(modifier = Modifier.weight(1.6f)) {
+                                                    Text(
+                                                        text = "${order.foodName} ×${order.quantity}",
+                                                        fontWeight = FontWeight.SemiBold,
+                                                        fontSize = 10.sp,
+                                                        maxLines = 2,
+                                                        color = MaterialTheme.colorScheme.onSurface
+                                                    )
+                                                }
+
+                                                // Total
+                                                Column(modifier = Modifier.weight(1.0f)) {
+                                                    Text(
+                                                        text = "GH₵ ${"%.2f".format(order.totalPrice)}",
+                                                        fontWeight = FontWeight.Bold,
+                                                        fontSize = 10.sp,
+                                                        color = MaterialTheme.colorScheme.onSurface
+                                                    )
+                                                }
+
+                                                // Status Badge
+                                                Box(
+                                                    modifier = Modifier
+                                                        .weight(1.1f)
+                                                        .clip(RoundedCornerShape(4.dp))
+                                                        .background(statusBg)
+                                                        .padding(horizontal = 4.dp, vertical = 2.dp),
+                                                    contentAlignment = Alignment.Center
+                                                ) {
+                                                    Text(
+                                                        text = statusDisplay,
+                                                        fontSize = 9.sp,
+                                                        fontWeight = FontWeight.Bold,
+                                                        color = statusFg
+                                                    )
+                                                }
+
+                                                // Action
+                                                Box(
+                                                    modifier = Modifier.weight(1.2f).padding(start = 2.dp),
+                                                    contentAlignment = Alignment.Center
+                                                ) {
+                                                    when (order.status) {
+                                                        "PENDING", "RECEIVED" -> {
+                                                            Button(
+                                                                onClick = { viewModel.updateOrderStatus(order.id, "PREPARING") },
+                                                                contentPadding = PaddingValues(horizontal = 4.dp, vertical = 2.dp),
+                                                                modifier = Modifier.height(26.dp)
+                                                            ) {
+                                                                Text("Prep", fontSize = 9.sp, fontWeight = FontWeight.Bold)
+                                                            }
+                                                        }
+                                                        "PREPARING", "COOKING" -> {
+                                                            FilledTonalButton(
+                                                                onClick = { viewModel.updateOrderStatus(order.id, "READY") },
+                                                                contentPadding = PaddingValues(horizontal = 4.dp, vertical = 2.dp),
+                                                                modifier = Modifier.height(26.dp)
+                                                            ) {
+                                                                Text("Ready", fontSize = 9.sp, fontWeight = FontWeight.Bold)
+                                                            }
+                                                        }
+                                                        "READY" -> {
+                                                            Button(
+                                                                onClick = {
+                                                                    verifyTargetOrder = order
+                                                                },
+                                                                contentPadding = PaddingValues(horizontal = 4.dp, vertical = 2.dp),
+                                                                modifier = Modifier.height(26.dp),
+                                                                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF2E7D32))
+                                                            ) {
+                                                                Text("Deliver", fontSize = 9.sp, fontWeight = FontWeight.Bold, color = Color.White)
+                                                            }
+                                                        }
+                                                        else -> {
+                                                            Text(
+                                                                text = "Done",
+                                                                fontSize = 9.sp,
+                                                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                                                            )
+                                                        }
+                                                    }
+                                                }
                                             }
                                         }
                                     }

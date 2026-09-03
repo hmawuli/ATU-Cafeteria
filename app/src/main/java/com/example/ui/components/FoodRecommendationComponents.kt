@@ -324,15 +324,17 @@ fun FoodRecommendationSection(
                 }
             },
             confirmButton = {
+                val inStock = recItem.foodItem.currentStock > 0 && recItem.foodItem.isAvailable
                 Button(
                     onClick = {
                         onAddToCart(recItem.foodItem)
                         showExplanationDialog = null
-                    }
+                    },
+                    enabled = inStock
                 ) {
-                    Icon(Icons.Default.AddShoppingCart, null, modifier = Modifier.size(16.dp))
+                    Icon(if (inStock) Icons.Default.AddShoppingCart else Icons.Default.RemoveShoppingCart, null, modifier = Modifier.size(16.dp))
                     Spacer(Modifier.width(6.dp))
-                    Text("Add to Cart")
+                    Text(if (inStock) "Add to Cart" else "Out of Stock")
                 }
             },
             dismissButton = {
@@ -353,6 +355,7 @@ fun RecommendationCard(
     modifier: Modifier = Modifier
 ) {
     val food = recommendedItem.foodItem
+    val inStock = food.currentStock > 0 && food.isAvailable
 
     Card(
         modifier = modifier
@@ -361,9 +364,9 @@ fun RecommendationCard(
             .testTag("recommended_card_${food.id}"),
         shape = RoundedCornerShape(20.dp),
         colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surface
+            containerColor = if (inStock) MaterialTheme.colorScheme.surface else MaterialTheme.colorScheme.surface.copy(alpha = 0.7f)
         ),
-        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+        elevation = CardDefaults.cardElevation(defaultElevation = if (inStock) 2.dp else 0.dp)
     ) {
         Column(
             modifier = Modifier.fillMaxWidth()
@@ -380,6 +383,28 @@ fun RecommendationCard(
                     contentScale = ContentScale.Crop,
                     modifier = Modifier.fillMaxSize()
                 )
+
+                if (!inStock) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .background(Color.Black.copy(alpha = 0.55f)),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Surface(
+                            color = MaterialTheme.colorScheme.error,
+                            shape = RoundedCornerShape(4.dp)
+                        ) {
+                            Text(
+                                text = "OUT OF STOCK",
+                                fontSize = 9.sp,
+                                fontWeight = FontWeight.Black,
+                                color = MaterialTheme.colorScheme.onError,
+                                modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                            )
+                        }
+                    }
+                }
 
                 // Match Score Pill (Top Left)
                 Surface(
@@ -460,7 +485,7 @@ fun RecommendationCard(
                     fontSize = 14.sp,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
-                    color = MaterialTheme.colorScheme.onSurface
+                    color = if (inStock) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
                 )
 
                 Text(
@@ -498,7 +523,7 @@ fun RecommendationCard(
                             text = "GH₵ ${"%.2f".format(food.price)}",
                             fontWeight = FontWeight.Black,
                             fontSize = 14.sp,
-                            color = MaterialTheme.colorScheme.primary
+                            color = if (inStock) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outline
                         )
                         if (food.calories > 0) {
                             Text(
@@ -511,16 +536,18 @@ fun RecommendationCard(
 
                     FilledIconButton(
                         onClick = onAddToCart,
+                        enabled = inStock,
                         modifier = Modifier
                             .size(34.dp)
                             .testTag("add_recommended_to_cart_${food.id}"),
                         colors = IconButtonDefaults.filledIconButtonColors(
-                            containerColor = MaterialTheme.colorScheme.primary
+                            containerColor = MaterialTheme.colorScheme.primary,
+                            disabledContainerColor = MaterialTheme.colorScheme.surfaceVariant
                         )
                     ) {
                         Icon(
-                            imageVector = Icons.Default.AddShoppingCart,
-                            contentDescription = "Add to Cart",
+                            imageVector = if (inStock) Icons.Default.AddShoppingCart else Icons.Default.RemoveShoppingCart,
+                            contentDescription = if (inStock) "Add to Cart" else "Out of Stock",
                             modifier = Modifier.size(16.dp)
                         )
                     }

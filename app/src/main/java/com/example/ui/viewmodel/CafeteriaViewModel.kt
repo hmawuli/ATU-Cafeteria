@@ -336,6 +336,10 @@ class CafeteriaViewModel @Inject constructor(
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 0)
 
     fun addToCart(foodItem: FoodItem, qty: Int = 1) {
+        if (foodItem.currentStock <= 0 || !foodItem.isAvailable) {
+            com.example.ui.util.SnackbarManager.showMessage("'${foodItem.name}' is currently out of stock.")
+            return
+        }
         val currentList = _cart.value.toMutableList()
         val index = currentList.indexOfFirst { it.foodItem.id == foodItem.id }
         if (index != -1) {
@@ -466,6 +470,9 @@ class CafeteriaViewModel @Inject constructor(
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
     val auditLogs: StateFlow<List<AuditLog>> = repository.auditLogs
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
+    val allWalletTransactions: StateFlow<List<WalletTransaction>> = repository.allWalletTransactions
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
     val userWalletTransactions: StateFlow<List<WalletTransaction>> = _currentUser
@@ -693,6 +700,11 @@ class CafeteriaViewModel @Inject constructor(
     init {
         userSessionRepo.addAuthStateListener(authStateListener)
         FirestoreVendorStatusManager.startRealtimeStatusListener()
+        try {
+            com.example.worker.KitchenOrderQueueNotificationWorker.schedulePeriodicCheck(getApplication())
+        } catch (e: Exception) {
+            Log.w("CafeteriaViewModel", "Could not schedule kitchen notification worker", e)
+        }
         FirestoreOrderTrackingManager.startRealtimeOrderTrackingListener { orderId, newStatus, estTime ->
             viewModelScope.launch {
                 repository.updateOrderStatus(0, orderId, newStatus, estTime)
@@ -1865,6 +1877,7 @@ class CafeteriaViewModel @Inject constructor(
             }
             val updatedUser = user.copy(passwordHash = updatedHash)
             repository.updateUser(updatedUser)
+            updateVendorInLocalStorage(user.id, user.fullName, user.info)
             _isLoading.value = false
             val admin = realAdminUser.value ?: _currentUser.value
             if (admin != null) {
@@ -1983,6 +1996,7 @@ class CafeteriaViewModel @Inject constructor(
         viewModelScope.launch {
             _isLoading.value = true
             repository.deleteUser(userId)
+            removeVendorFromLocalStorage(userId)
             _isLoading.value = false
             val admin = realAdminUser.value ?: _currentUser.value
             if (admin != null) {
@@ -1990,6 +2004,160 @@ class CafeteriaViewModel @Inject constructor(
             }
             onResult(true)
         }
+    }
+
+    // ==========================================
+    // VENDOR STALL REGISTRATION & LOCALSTORAGE
+    // ==========================================
+
+    private fun getLocalStoragePrefs() =
+        getApplication<Application>().getSharedPreferences("localStorage", Context.MODE_PRIVATE)
+
+    fun registerNewVendor(
+        name: String,
+        location: String,
+        specialty: String,
+        onResult: (Boolean, String?) -> Unit = { _, _ -> }
+    ) {
+        viewModelScope.launch {
+            val trimmedName = name.trim()
+            val trimmedLocation = location.trim()
+            val trimmedSpecialty = specialty.trim()
+
+            if (trimmedName.isBlank()) {
+                onResult(false, "Vendor stall name cannot be empty.")
+                return@launch
+            }
+
+            _isLoading.value = true
+            val baseUsername = trimmedName.lowercase().replace(Regex("[^a-z0-9]"), "").ifEmpty { "vendor" }
+            var candidate = baseUsername
+            var counter = 1
+            val currentUsers = allUsers.value
+            while (currentUsers.any { it.username.equals(candidate, ignoreCase = true) }) {
+                candidate = "$baseUsername$counter"
+                counter++
+            }
+            val defaultPin = "1234"
+            val infoStr = StringBuilder().apply {
+                if (trimmedLocation.isNotBlank()) append(trimmedLocation)
+                if (trimmedSpecialty.isNotBlank()) {
+                    if (isNotEmpty()) append(" • ")
+                    append("Specialty: $trimmedSpecialty")
+                }
+            }.toString().ifBlank { "ATU Cafeteria Vendor Stall" }
+
+            val registered = repository.registerUser(
+                username = candidate,
+                pinCode = defaultPin,
+                role = "VENDOR",
+                fullName = trimmedName,
+                info = infoStr
+            )
+
+            if (registered != null) {
+                // Persist new vendor stall record into localStorage "vendors" array
+                addVendorToLocalStorage(
+                    id = registered.id,
+                    name = registered.fullName,
+                    location = trimmedLocation,
+                    specialty = trimmedSpecialty
+                )
+
+                val admin = realAdminUser.value ?: _currentUser.value
+                if (admin != null) {
+                    repository.insertAuditLog(
+                        admin.id,
+                        "VENDOR_REGISTERED",
+                        "Stall '${registered.fullName}' registered (Location: '$trimmedLocation', Specialty: '$trimmedSpecialty')."
+                    )
+                }
+                _isLoading.value = false
+                onResult(true, "Stall '${registered.fullName}' successfully registered with login: $candidate (PIN: $defaultPin)")
+            } else {
+                _isLoading.value = false
+                onResult(false, "Failed to register vendor stall. Please try again.")
+            }
+        }
+    }
+
+    fun addVendorToLocalStorage(id: Int, name: String, location: String, specialty: String) {
+        try {
+            val prefs = getLocalStoragePrefs()
+            val existingJson = prefs.getString("vendors", "[]") ?: "[]"
+            val jsonArray = org.json.JSONArray(existingJson)
+            val newVendorObj = org.json.JSONObject().apply {
+                put("id", id)
+                put("name", name)
+                put("location", location)
+                put("specialty", specialty)
+                put("createdAt", System.currentTimeMillis())
+            }
+            jsonArray.put(newVendorObj)
+            prefs.edit().putString("vendors", jsonArray.toString()).apply()
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
+    }
+
+    fun removeVendorFromLocalStorage(id: Int) {
+        try {
+            val prefs = getLocalStoragePrefs()
+            val existingJson = prefs.getString("vendors", "[]") ?: "[]"
+            val jsonArray = org.json.JSONArray(existingJson)
+            val updatedArray = org.json.JSONArray()
+            for (i in 0 until jsonArray.length()) {
+                val obj = jsonArray.optJSONObject(i)
+                if (obj != null && obj.optInt("id") != id) {
+                    updatedArray.put(obj)
+                }
+            }
+            prefs.edit().putString("vendors", updatedArray.toString()).apply()
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
+    }
+
+    fun updateVendorInLocalStorage(id: Int, name: String, info: String) {
+        try {
+            val prefs = getLocalStoragePrefs()
+            val existingJson = prefs.getString("vendors", "[]") ?: "[]"
+            val jsonArray = org.json.JSONArray(existingJson)
+            val updatedArray = org.json.JSONArray()
+            var matched = false
+            for (i in 0 until jsonArray.length()) {
+                val obj = jsonArray.optJSONObject(i)
+                if (obj != null && obj.optInt("id") == id) {
+                    val updatedObj = org.json.JSONObject().apply {
+                        put("id", id)
+                        put("name", name)
+                        put("location", info)
+                        put("specialty", obj.optString("specialty", ""))
+                        put("updatedAt", System.currentTimeMillis())
+                    }
+                    updatedArray.put(updatedObj)
+                    matched = true
+                } else if (obj != null) {
+                    updatedArray.put(obj)
+                }
+            }
+            if (!matched) {
+                val newObj = org.json.JSONObject().apply {
+                    put("id", id)
+                    put("name", name)
+                    put("location", info)
+                    put("specialty", "")
+                }
+                updatedArray.put(newObj)
+            }
+            prefs.edit().putString("vendors", updatedArray.toString()).apply()
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
+    }
+
+    fun getLocalStorageVendors(): String {
+        return getLocalStoragePrefs().getString("vendors", "[]") ?: "[]"
     }
 
     // ==========================================

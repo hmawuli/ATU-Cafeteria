@@ -263,6 +263,14 @@ fun DailyMenuScreen(
                         items(filteredItems, key = { it.id }) { foodItem ->
                             DailyFoodItemCard(
                                 foodItem = foodItem,
+                                onAddToTray = {
+                                    if (foodItem.currentStock > 0 && foodItem.isAvailable) {
+                                        viewModel.addToCart(foodItem, 1)
+                                        android.widget.Toast.makeText(context, "Added '${foodItem.name}' to tray!", android.widget.Toast.LENGTH_SHORT).show()
+                                    } else {
+                                        android.widget.Toast.makeText(context, "'${foodItem.name}' is currently out of stock.", android.widget.Toast.LENGTH_SHORT).show()
+                                    }
+                                },
                                 onClick = {
                                     onFoodClick?.invoke(foodItem) ?: run {
                                         navController.navigate("student_home")
@@ -401,21 +409,24 @@ fun LottieMenuEmptyState(
 }
 
 /**
- * Clean Material 3 Card displaying a food item with stock, price, and category.
+ * Clean Material 3 Card displaying a food item with stock, price, category, and automatic Out of Stock tray handling.
  */
 @Composable
 fun DailyFoodItemCard(
     foodItem: FoodItem,
     onClick: () -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    onAddToTray: (() -> Unit)? = null
 ) {
+    val inStock = foodItem.currentStock > 0 && foodItem.isAvailable
+
     ElevatedCard(
         onClick = onClick,
         shape = RoundedCornerShape(16.dp),
         colors = CardDefaults.elevatedCardColors(
-            containerColor = MaterialTheme.colorScheme.surface
+            containerColor = if (inStock) MaterialTheme.colorScheme.surface else MaterialTheme.colorScheme.surface.copy(alpha = 0.65f)
         ),
-        elevation = CardDefaults.elevatedCardElevation(defaultElevation = 2.dp),
+        elevation = CardDefaults.elevatedCardElevation(defaultElevation = if (inStock) 2.dp else 0.dp),
         modifier = modifier
             .fillMaxWidth()
             .testTag("daily_food_item_card_${foodItem.id}")
@@ -429,7 +440,7 @@ fun DailyFoodItemCard(
             // Food Image / Thumbnail
             Box(
                 modifier = Modifier
-                    .size(80.dp)
+                    .size(84.dp)
                     .clip(RoundedCornerShape(12.dp))
                     .background(MaterialTheme.colorScheme.surfaceVariant)
             ) {
@@ -444,11 +455,34 @@ fun DailyFoodItemCard(
                     Icon(
                         imageVector = Icons.Default.Fastfood,
                         contentDescription = foodItem.name,
-                        tint = MaterialTheme.colorScheme.primary,
+                        tint = if (inStock) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outline,
                         modifier = Modifier
                             .size(36.dp)
                             .align(Alignment.Center)
                     )
+                }
+
+                // Overlay tag if out of stock
+                if (!inStock) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .background(Color.Black.copy(alpha = 0.55f)),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Surface(
+                            color = MaterialTheme.colorScheme.error,
+                            shape = RoundedCornerShape(4.dp)
+                        ) {
+                            Text(
+                                text = "OUT OF STOCK",
+                                fontSize = 8.sp,
+                                fontWeight = FontWeight.Black,
+                                color = MaterialTheme.colorScheme.onError,
+                                modifier = Modifier.padding(horizontal = 4.dp, vertical = 2.dp)
+                            )
+                        }
+                    }
                 }
             }
 
@@ -469,13 +503,14 @@ fun DailyFoodItemCard(
                         fontWeight = FontWeight.Bold,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
+                        color = if (inStock) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f),
                         modifier = Modifier.weight(1f)
                     )
                     Text(
                         text = "GH₵ ${"%.2f".format(foodItem.price)}",
                         style = MaterialTheme.typography.titleMedium,
                         fontWeight = FontWeight.ExtraBold,
-                        color = MaterialTheme.colorScheme.primary
+                        color = if (inStock) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outline
                     )
                 }
 
@@ -492,34 +527,81 @@ fun DailyFoodItemCard(
 
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    modifier = Modifier.fillMaxWidth()
                 ) {
-                    // Category Badge
-                    Surface(
-                        shape = RoundedCornerShape(6.dp),
-                        color = MaterialTheme.colorScheme.secondaryContainer
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(6.dp)
                     ) {
-                        Text(
-                            text = foodItem.category,
-                            style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.onSecondaryContainer,
-                            modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
-                        )
+                        // Category Badge
+                        Surface(
+                            shape = RoundedCornerShape(6.dp),
+                            color = MaterialTheme.colorScheme.secondaryContainer
+                        ) {
+                            Text(
+                                text = foodItem.category,
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.onSecondaryContainer,
+                                modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                            )
+                        }
+
+                        // Stock Badge (in stock count vs Out of Stock)
+                        Surface(
+                            shape = RoundedCornerShape(6.dp),
+                            color = if (inStock) Color(0xFF2E7D32).copy(alpha = 0.15f) else MaterialTheme.colorScheme.errorContainer
+                        ) {
+                            Row(
+                                modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(3.dp)
+                            ) {
+                                if (!inStock) {
+                                    Icon(
+                                        imageVector = Icons.Default.Block,
+                                        contentDescription = "Out of Stock",
+                                        tint = MaterialTheme.colorScheme.error,
+                                        modifier = Modifier.size(11.dp)
+                                    )
+                                }
+                                Text(
+                                    text = if (inStock) "${foodItem.currentStock} in stock" else "Out of Stock",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = if (inStock) Color(0xFF2E7D32) else MaterialTheme.colorScheme.onErrorContainer,
+                                    fontWeight = FontWeight.Bold
+                                )
+                            }
+                        }
                     }
 
-                    // Stock availability
-                    val inStock = foodItem.currentStock > 0 && foodItem.isAvailable
-                    Surface(
-                        shape = RoundedCornerShape(6.dp),
-                        color = if (inStock) Color(0xFF2E7D32).copy(alpha = 0.15f) else MaterialTheme.colorScheme.errorContainer
-                    ) {
-                        Text(
-                            text = if (inStock) "${foodItem.currentStock} left" else "Sold Out",
-                            style = MaterialTheme.typography.labelSmall,
-                            color = if (inStock) Color(0xFF2E7D32) else MaterialTheme.colorScheme.onErrorContainer,
-                            fontWeight = FontWeight.SemiBold,
-                            modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
-                        )
+                    // Add to Tray Button (Disabled automatically when stock reaches zero)
+                    if (onAddToTray != null) {
+                        Button(
+                            onClick = onAddToTray,
+                            enabled = inStock,
+                            shape = RoundedCornerShape(8.dp),
+                            contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp),
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = MaterialTheme.colorScheme.primary,
+                                disabledContainerColor = MaterialTheme.colorScheme.surfaceVariant
+                            ),
+                            modifier = Modifier
+                                .height(32.dp)
+                                .testTag("add_to_tray_btn_${foodItem.id}")
+                        ) {
+                            Icon(
+                                imageVector = if (inStock) Icons.Default.AddShoppingCart else Icons.Default.RemoveShoppingCart,
+                                contentDescription = if (inStock) "Add to Tray" else "Out of Stock",
+                                modifier = Modifier.size(14.dp)
+                            )
+                            Spacer(Modifier.width(4.dp))
+                            Text(
+                                text = if (inStock) "Add to Tray" else "Out of Stock",
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
                     }
                 }
             }
