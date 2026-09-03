@@ -1282,68 +1282,211 @@
     <section id="admin-view" class="hidden space-y-6">
       
       <!-- Admin Hub Top Header & Action Controls -->
-      <div class="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm space-y-5">
-        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-          <div>
-            <h2 class="text-xl font-extrabold text-slate-900 flex items-center gap-2">
-              <i data-lucide="shield-check" class="w-6 h-6 text-brand-600"></i>
-              ATU Cafeteria Administration & Oversight Hub
+      <div class="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm space-y-6">
+        <div class="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+          <div class="space-y-1">
+            <div class="flex items-center gap-2">
+              <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[10px] font-extrabold bg-brand-50 text-brand-700 border border-brand-200">
+                <span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+                <span>EXECUTIVE COMMAND CENTER</span>
+              </span>
+              <span class="text-xs text-slate-400 font-mono hidden sm:inline">• Live Campus Telemetry</span>
+            </div>
+            <h2 class="text-2xl font-black text-slate-900 tracking-tight flex items-center gap-2.5">
+              <span class="p-2 rounded-2xl bg-brand-600 text-white shadow-md shadow-brand-600/20">
+                <i data-lucide="shield-check" class="w-6 h-6"></i>
+              </span>
+              <span>ATU Cafeteria Administration & Oversight Hub</span>
             </h2>
-            <p class="text-xs text-slate-500 mt-1">Admin registers vendors and maintains full live oversight over menus, kitchen workers, profile updates, and audit trails.</p>
+            <p class="text-xs text-slate-500 max-w-2xl">
+              Centralized university administrative terminal to register & manage vendor kitchen stalls, oversee gross revenue in real time, analyze campus demand curves, and make data-driven operational decisions.
+            </p>
           </div>
 
+          <!-- Quick Action Buttons -->
           <div class="flex flex-wrap items-center gap-2">
-            <button onclick="openAddVendorModal()" class="px-4 py-2 rounded-xl bg-brand-600 hover:bg-brand-700 text-white text-xs font-bold shadow-xs flex items-center gap-1.5 transition-all">
-              <i data-lucide="store" class="w-4 h-4 text-amber-300"></i> Register New Vendor
+            <button onclick="openAddVendorModal()" class="px-4 py-2.5 rounded-xl bg-brand-600 hover:bg-brand-700 text-white text-xs font-black shadow-md shadow-brand-600/20 flex items-center gap-2 transition-all hover:scale-[1.02]">
+              <i data-lucide="store" class="w-4 h-4 text-amber-300"></i>
+              <span>Register New Vendor</span>
             </button>
-            <button onclick="openBroadcastModal()" class="px-3.5 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-800 text-xs font-bold flex items-center gap-1.5 transition-all">
-              <i data-lucide="megaphone" class="w-4 h-4 text-brand-600"></i> Broadcast Notice
+            <button onclick="switchAdminTab('operations')" class="px-3.5 py-2.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-800 text-xs font-bold flex items-center gap-1.5 transition-all">
+              <i data-lucide="megaphone" class="w-4 h-4 text-brand-600"></i>
+              <span>Broadcast Notice</span>
             </button>
-            <button onclick="exportSalesReport()" class="px-3.5 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-800 text-xs font-bold flex items-center gap-1.5 transition-all">
-              <i data-lucide="download" class="w-4 h-4 text-emerald-600"></i> Export CSV
+            <button onclick="exportSalesReport()" class="px-3.5 py-2.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-800 text-xs font-bold flex items-center gap-1.5 transition-all">
+              <i data-lucide="file-spreadsheet" class="w-4 h-4 text-emerald-600"></i>
+              <span>Financial Ledger</span>
             </button>
-            <button onclick="exportOrderQueueJson()" class="px-3.5 py-2 rounded-xl bg-brand-50 hover:bg-brand-100 text-brand-700 border border-brand-200 text-xs font-bold flex items-center gap-1.5 transition-all shadow-xs" title="Export entire order queue as JSON for secondary analytics">
-              <i data-lucide="file-json" class="w-4 h-4 text-brand-600"></i> Export Queue JSON
+            <button onclick="exportOrderQueueJson()" class="px-3.5 py-2.5 rounded-xl bg-brand-50 hover:bg-brand-100 text-brand-700 border border-brand-200 text-xs font-bold flex items-center gap-1.5 transition-all shadow-xs" title="Export entire order queue as JSON for secondary analytics">
+              <i data-lucide="file-json" class="w-4 h-4 text-brand-600"></i>
+              <span>Export JSON</span>
             </button>
           </div>
         </div>
 
-        <!-- 4 Key Financial & Performance KPIs -->
-        <div class="grid grid-cols-2 sm:grid-cols-4 gap-4">
-          <div class="bg-slate-50 p-4 rounded-2xl border border-slate-200">
-            <div class="flex items-center justify-between text-slate-500">
-              <p class="text-xs font-semibold">Total Campus Orders</p>
-              <i data-lucide="shopping-bag" class="w-4 h-4 text-slate-400"></i>
+        <!-- 5 Key Financial & Performance KPIs -->
+        <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3.5 pt-1">
+          <!-- 1. Gross Merchandise Value -->
+          <div class="bg-gradient-to-br from-brand-50/70 via-white to-amber-50/50 p-4 rounded-2xl border border-brand-200/80 shadow-xs flex flex-col justify-between">
+            <div class="flex items-center justify-between text-brand-700">
+              <span class="text-[11px] font-extrabold uppercase tracking-wider">Gross Revenue (GMV)</span>
+              <span class="p-1.5 rounded-lg bg-brand-100/80 text-brand-700"><i data-lucide="circle-dollar-sign" class="w-4 h-4"></i></span>
             </div>
-            <p class="text-2xl font-extrabold text-slate-900 mt-1" id="kpi-orders-count">38</p>
-            <p class="text-[11px] text-emerald-600 font-semibold mt-1">↑ 100% digital fulfillment</p>
-          </div>
-          
-          <div class="bg-slate-50 p-4 rounded-2xl border border-slate-200">
-            <div class="flex items-center justify-between text-slate-500">
-              <p class="text-xs font-semibold">Gross Sales Volume</p>
-              <i data-lucide="circle-dollar-sign" class="w-4 h-4 text-brand-600"></i>
+            <div class="mt-2">
+              <p class="text-2xl font-black text-brand-700 font-mono tracking-tight">GH₵ <span id="kpi-sales-sum">1,280.00</span></p>
+              <div class="flex items-center gap-1 text-[10.5px] text-emerald-600 font-bold mt-1">
+                <i data-lucide="trending-up" class="w-3.5 h-3.5"></i>
+                <span>+18.4% this semester</span>
+              </div>
             </div>
-            <p class="text-2xl font-extrabold text-brand-600 mt-1">GH₵ <span id="kpi-sales-sum">1,280.00</span></p>
-            <p class="text-[11px] text-slate-500 mt-1">Settled in GHS</p>
           </div>
 
-          <div class="bg-slate-50 p-4 rounded-2xl border border-slate-200">
+          <!-- 2. Vendor Direct Settlements -->
+          <div class="bg-slate-50/90 p-4 rounded-2xl border border-slate-200 flex flex-col justify-between">
             <div class="flex items-center justify-between text-slate-500">
-              <p class="text-xs font-semibold">Active Vendors</p>
-              <i data-lucide="store" class="w-4 h-4 text-amber-500"></i>
+              <span class="text-[11px] font-bold uppercase tracking-wider">Vendor Escrow (97.5%)</span>
+              <span class="p-1.5 rounded-lg bg-emerald-100 text-emerald-700"><i data-lucide="wallet" class="w-4 h-4"></i></span>
             </div>
-            <p class="text-2xl font-extrabold text-amber-500 mt-1" id="kpi-vendors-count">3</p>
-            <p class="text-[11px] text-slate-500 mt-1">Authorized Kitchen Stalls</p>
+            <div class="mt-2">
+              <p class="text-2xl font-extrabold text-slate-900 font-mono tracking-tight">GH₵ <span id="kpi-vendor-settlement">1,248.00</span></p>
+              <p class="text-[10.5px] text-slate-500 font-semibold mt-1">Direct Kitchen Payouts</p>
+            </div>
           </div>
 
-          <div class="bg-slate-50 p-4 rounded-2xl border border-slate-200">
+          <!-- 3. University Maintenance & Platform Fee -->
+          <div class="bg-slate-50/90 p-4 rounded-2xl border border-slate-200 flex flex-col justify-between">
             <div class="flex items-center justify-between text-slate-500">
-              <p class="text-xs font-semibold">Total Kitchen Workers</p>
-              <i data-lucide="users" class="w-4 h-4 text-blue-600"></i>
+              <span class="text-[11px] font-bold uppercase tracking-wider">Platform Reserve (2.5%)</span>
+              <span class="p-1.5 rounded-lg bg-indigo-100 text-indigo-700"><i data-lucide="piggy-bank" class="w-4 h-4"></i></span>
             </div>
-            <p class="text-2xl font-extrabold text-slate-900 mt-1" id="kpi-workers-count">5</p>
-            <p class="text-[11px] text-blue-600 font-semibold mt-1">Across all stalls</p>
+            <div class="mt-2">
+              <p class="text-2xl font-extrabold text-indigo-700 font-mono tracking-tight">GH₵ <span id="kpi-tech-fee">32.00</span></p>
+              <p class="text-[10.5px] text-slate-500 font-semibold mt-1">ATU Maintenance Fund</p>
+            </div>
+          </div>
+
+          <!-- 4. Total Orders & Volume -->
+          <div class="bg-slate-50/90 p-4 rounded-2xl border border-slate-200 flex flex-col justify-between">
+            <div class="flex items-center justify-between text-slate-500">
+              <span class="text-[11px] font-bold uppercase tracking-wider">Total Campus Orders</span>
+              <span class="p-1.5 rounded-lg bg-blue-100 text-blue-700"><i data-lucide="shopping-bag" class="w-4 h-4"></i></span>
+            </div>
+            <div class="mt-2">
+              <p class="text-2xl font-extrabold text-slate-900 font-mono tracking-tight" id="kpi-orders-count">38</p>
+              <p class="text-[10.5px] text-emerald-600 font-bold mt-1">↑ 100% digital fulfillment</p>
+            </div>
+          </div>
+
+          <!-- 5. Active Kitchen Stalls -->
+          <div class="bg-slate-50/90 p-4 rounded-2xl border border-slate-200 flex flex-col justify-between col-span-2 sm:col-span-1">
+            <div class="flex items-center justify-between text-slate-500">
+              <span class="text-[11px] font-bold uppercase tracking-wider">Active Stalls / Staff</span>
+              <span class="p-1.5 rounded-lg bg-amber-100 text-amber-700"><i data-lucide="store" class="w-4 h-4"></i></span>
+            </div>
+            <div class="mt-2">
+              <div class="flex items-baseline gap-1.5">
+                <span class="text-2xl font-extrabold text-amber-600 font-mono tracking-tight" id="kpi-vendors-count">3</span>
+                <span class="text-xs text-slate-500 font-semibold">Stalls (<span id="kpi-workers-count">5</span> Staff)</span>
+              </div>
+              <p class="text-[10.5px] text-slate-500 font-semibold mt-1">Avg Basket: <span class="font-bold text-slate-800" id="kpi-avg-order">GH₵ 33.68</span></p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 🧠 EXECUTIVE AI DECISION ENGINE & STRATEGIC ADVISORY (Make Decisions with Analytics Data) -->
+      <div class="bg-gradient-to-br from-slate-900 via-slate-850 to-slate-900 text-white p-6 rounded-3xl border border-slate-800 shadow-xl space-y-5">
+        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <div class="flex items-center gap-3">
+            <div class="w-10 h-10 rounded-2xl bg-gradient-to-tr from-amber-400 to-brand-500 text-slate-950 flex items-center justify-center font-black shadow-md shadow-brand-500/20">
+              <i data-lucide="brain-circuit" class="w-5 h-5"></i>
+            </div>
+            <div>
+              <div class="flex items-center gap-2">
+                <h3 class="text-base font-black text-white tracking-wide">Campus Operational Decision Engine</h3>
+                <span class="text-[9.5px] font-extrabold uppercase bg-amber-400/20 text-amber-300 border border-amber-400/30 px-2 py-0.5 rounded-full">Automated Advisory</span>
+              </div>
+              <p class="text-xs text-slate-300 mt-0.5">Real-time analytical recommendations powered by cafeteria throughput, queue telemetry, and hourly purchase cycles.</p>
+            </div>
+          </div>
+          <button onclick="refreshAdminAiDecisions()" class="px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-bold flex items-center gap-1.5 transition-all self-start sm:self-auto border border-slate-700">
+            <i data-lucide="refresh-cw" class="w-3.5 h-3.5 text-brand-400"></i>
+            <span>Re-compute Advice</span>
+          </button>
+        </div>
+
+        <!-- 4 Actionable Decision Cards Grid -->
+        <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
+          <!-- Decision 1: Off-Peak Flash Subsidy -->
+          <div class="bg-slate-800/80 border border-slate-700/80 hover:border-amber-400/40 p-4 rounded-2xl flex flex-col justify-between space-y-3 transition-all">
+            <div class="space-y-1.5">
+              <div class="flex items-center justify-between">
+                <span class="text-[10px] font-extrabold uppercase px-2 py-0.5 rounded-md bg-amber-500/20 text-amber-300 border border-amber-500/30">Revenue Stimulus</span>
+                <span class="text-[11px] text-slate-400 font-mono">14:00 - 16:30</span>
+              </div>
+              <h4 class="text-xs font-black text-white">Afternoon Off-Peak Discount</h4>
+              <p class="text-[11.5px] text-slate-300 leading-relaxed">
+                Order velocity drops by 64% after 2:00 PM. Inject a 10% flash voucher to boost student off-peak dining and increase vendor revenue.
+              </p>
+            </div>
+            <button onclick="executeAdminDecision('OFF_PEAK_DISCOUNT')" id="btn-decision-offpeak" class="w-full py-2 px-3 rounded-xl bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-600 hover:to-amber-700 text-slate-950 font-black text-xs flex items-center justify-center gap-1.5 shadow-sm transition-all">
+              <i data-lucide="zap" class="w-3.5 h-3.5"></i>
+              <span>Deploy 10% Flash Voucher</span>
+            </button>
+          </div>
+
+          <!-- Decision 2: Lunch Rush Surge & Kitchen Balancer -->
+          <div class="bg-slate-800/80 border border-slate-700/80 hover:border-brand-400/40 p-4 rounded-2xl flex flex-col justify-between space-y-3 transition-all">
+            <div class="space-y-1.5">
+              <div class="flex items-center justify-between">
+                <span class="text-[10px] font-extrabold uppercase px-2 py-0.5 rounded-md bg-orange-500/20 text-orange-300 border border-orange-500/30">Queue Balancer</span>
+                <span class="text-[11px] text-slate-400 font-mono">11:30 - 13:45</span>
+              </div>
+              <h4 class="text-xs font-black text-white">Activate Lunch Rush Mode</h4>
+              <p class="text-[11.5px] text-slate-300 leading-relaxed">
+                Peak rush window detected. Alert all vendor kitchens to prioritize high-speed batch dishes (Jollof, Fried Rice, Banku) to maintain queue SLA under 4 mins.
+              </p>
+            </div>
+            <button onclick="executeAdminDecision('LUNCH_RUSH_MODE')" id="btn-decision-rush" class="w-full py-2 px-3 rounded-xl bg-gradient-to-r from-brand-500 to-brand-600 hover:from-brand-600 hover:to-brand-700 text-white font-black text-xs flex items-center justify-center gap-1.5 shadow-sm transition-all">
+              <i data-lucide="flame" class="w-3.5 h-3.5 text-amber-300"></i>
+              <span>Activate Lunch Rush Alert</span>
+            </button>
+          </div>
+
+          <!-- Decision 3: High-Demand Inventory Replenishment -->
+          <div class="bg-slate-800/80 border border-slate-700/80 hover:border-emerald-400/40 p-4 rounded-2xl flex flex-col justify-between space-y-3 transition-all">
+            <div class="space-y-1.5">
+              <div class="flex items-center justify-between">
+                <span class="text-[10px] font-extrabold uppercase px-2 py-0.5 rounded-md bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">Stock Optimization</span>
+                <span class="text-[11px] text-slate-400 font-mono">Top 3 Dishes</span>
+              </div>
+              <h4 class="text-xs font-black text-white">Replenish Fast-Moving Items</h4>
+              <p class="text-[11.5px] text-slate-300 leading-relaxed">
+                Jollof & Waakye account for 72% of total order sales. Notify vendor kitchens to prep extra portions and maintain fresh protein sides.
+              </p>
+            </div>
+            <button onclick="executeAdminDecision('STOCK_REPLENISH_ALERT')" id="btn-decision-stock" class="w-full py-2 px-3 rounded-xl bg-gradient-to-r from-emerald-600 to-emerald-700 hover:from-emerald-700 hover:to-emerald-800 text-white font-black text-xs flex items-center justify-center gap-1.5 shadow-sm transition-all">
+              <i data-lucide="bell-ring" class="w-3.5 h-3.5"></i>
+              <span>Alert Stalls to Prep Batches</span>
+            </button>
+          </div>
+
+          <!-- Decision 4: Biometric Security & SLA Policy -->
+          <div class="bg-slate-800/80 border border-slate-700/80 hover:border-blue-400/40 p-4 rounded-2xl flex flex-col justify-between space-y-3 transition-all">
+            <div class="space-y-1.5">
+              <div class="flex items-center justify-between">
+                <span class="text-[10px] font-extrabold uppercase px-2 py-0.5 rounded-md bg-blue-500/20 text-blue-300 border border-blue-500/30">Terminal SLA</span>
+                <span class="text-[11px] text-slate-400 font-mono">Security Check</span>
+              </div>
+              <h4 class="text-xs font-black text-white">Enforce Verification SLA</h4>
+              <p class="text-[11.5px] text-slate-300 leading-relaxed">
+                Verify vendor terminal online latency and ensure kitchen staff verify pickup 4-digit PINs & biometric passes before handing meals to students.
+              </p>
+            </div>
+            <button onclick="executeAdminDecision('ENFORCE_SECURITY_POLICY')" id="btn-decision-security" class="w-full py-2 px-3 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-700 hover:from-blue-700 hover:to-indigo-800 text-white font-black text-xs flex items-center justify-center gap-1.5 shadow-sm transition-all">
+              <i data-lucide="shield-check" class="w-3.5 h-3.5"></i>
+              <span>Enforce Biometric Policy</span>
+            </button>
           </div>
         </div>
       </div>
@@ -1358,10 +1501,10 @@
               </span>
               <div>
                 <h3 class="text-base font-extrabold text-slate-900 flex items-center gap-2">
-                  <span>Campus Analytics & Kitchen Efficiency Engine</span>
-                  <span class="text-[10px] font-extrabold bg-brand-100 text-brand-700 px-2.5 py-0.5 rounded-full uppercase tracking-wider">Recharts Engine</span>
+                  <span>Campus Analytics & Financial Intelligence</span>
+                  <span class="text-[10px] font-extrabold bg-brand-100 text-brand-700 px-2.5 py-0.5 rounded-full uppercase tracking-wider">Live Visualizer</span>
                 </h3>
-                <p class="text-xs text-slate-500 mt-0.5">Real-time interactive Bar & Donut chart analytics monitoring daily sales volume, peak lunch rush windows, and live kitchen order statuses.</p>
+                <p class="text-xs text-slate-500 mt-0.5">Real-time interactive Bar, Hourly Rush & Status Donut charts monitoring gross sales, rush periods, and stall performance.</p>
               </div>
             </div>
           </div>
@@ -1377,7 +1520,7 @@
             </button>
             <button id="btn-chart-vendor" onclick="switchRechartsMetric('VENDOR_COMP')" class="px-3.5 py-1.5 rounded-xl text-xs font-bold text-slate-600 hover:text-slate-900 flex items-center gap-1.5 transition-all">
               <i data-lucide="store" class="w-3.5 h-3.5 text-emerald-600"></i>
-              <span>Vendor Performance</span>
+              <span>Vendor Leaderboard</span>
             </button>
           </div>
         </div>
@@ -7339,6 +7482,9 @@ function advanceOrderStatus(orderId, nextStatus) {
       // KPI Counters
       const kpiOrders = document.getElementById('kpi-orders-count');
       const kpiSales = document.getElementById('kpi-sales-sum');
+      const kpiVendorSettlement = document.getElementById('kpi-vendor-settlement');
+      const kpiTechFee = document.getElementById('kpi-tech-fee');
+      const kpiAvgOrder = document.getElementById('kpi-avg-order');
       const kpiVendors = document.getElementById('kpi-vendors-count');
       const kpiWorkers = document.getElementById('kpi-workers-count');
       const adminVendorsBody = document.getElementById('admin-vendors-table-body');
@@ -7351,12 +7497,19 @@ function advanceOrderStatus(orderId, nextStatus) {
       const adminLogs = document.getElementById('admin-audit-logs');
       const adminLogsCount = document.getElementById('admin-audit-count-badge');
 
-      // Top KPI ribbon
-      if (kpiOrders) kpiOrders.innerText = orders.length + 36;
-      if (kpiSales) {
-        const sales = orders.reduce((acc, o) => acc + (o.totalPrice || 0), 1280.00);
-        kpiSales.innerText = sales.toFixed(2);
+      // Top Financial & Operational KPI ribbon
+      const totalOrdersCount = orders.length + 36;
+      if (kpiOrders) kpiOrders.innerText = totalOrdersCount;
+      
+      const sales = orders.reduce((acc, o) => acc + (o.totalPrice || 0), 1280.00);
+      if (kpiSales) kpiSales.innerText = sales.toFixed(2);
+      if (kpiVendorSettlement) kpiVendorSettlement.innerText = (sales * 0.975).toFixed(2);
+      if (kpiTechFee) kpiTechFee.innerText = (sales * 0.025).toFixed(2);
+      if (kpiAvgOrder) {
+        const avg = totalOrdersCount > 0 ? (sales / totalOrdersCount) : 0;
+        kpiAvgOrder.innerText = `GH₵ ${avg.toFixed(2)}`;
       }
+
       if (kpiVendors) kpiVendors.innerText = vendors.length;
       if (kpiWorkers) kpiWorkers.innerText = vendorWorkers.length;
       if (adminMenuCount) adminMenuCount.innerText = `${menuItems.length} Dishes`;
@@ -7368,6 +7521,14 @@ function advanceOrderStatus(orderId, nextStatus) {
       const activeKitchenCount = orders.filter(o => o.status === 'RECEIVED' || o.status === 'PREPARING' || o.status === 'READY' || o.status === 'OUT_FOR_DELIVERY').length;
       const atabOrdersBadge = document.getElementById('atab-orders-badge');
       if (atabOrdersBadge) atabOrdersBadge.innerText = activeKitchenCount;
+
+      // Sync Recharts & Donut visualizers
+      if (typeof renderAdminRecharts === 'function') {
+        renderAdminRecharts(currentAdminChartMetric || 'DAILY_SALES');
+      }
+      if (typeof renderAdminDonutChart === 'function') {
+        renderAdminDonutChart();
+      }
 
       // Sync Vendor Dropdowns for Orders, Menu & Workers Filters & Modals
       populateAdminVendorDropdowns();
@@ -9577,10 +9738,393 @@ function advanceOrderStatus(orderId, nextStatus) {
       if (currentRole === 'ADMIN') { renderAdminRecharts(); renderAdminDonutChart(); }
     });
 
+    // =========================================================================
+    // 📊 EXECUTIVE ADMIN RECHARTS ENGINE & STRATEGIC AI DECISION LOGIC
+    // =========================================================================
+    let currentAdminChartMetric = 'DAILY_SALES';
+
+    function switchRechartsMetric(metricType) {
+      currentAdminChartMetric = metricType;
+      
+      const btnDaily = document.getElementById('btn-chart-daily');
+      const btnHourly = document.getElementById('btn-chart-hourly');
+      const btnVendor = document.getElementById('btn-chart-vendor');
+
+      const activeClasses = ['bg-white', 'text-slate-900', 'shadow-xs'];
+      const inactiveClasses = ['text-slate-600', 'hover:text-slate-900'];
+
+      if (btnDaily) {
+        if (metricType === 'DAILY_SALES') {
+          btnDaily.classList.add(...activeClasses);
+          btnDaily.classList.remove(...inactiveClasses);
+        } else {
+          btnDaily.classList.remove(...activeClasses);
+          btnDaily.classList.add(...inactiveClasses);
+        }
+      }
+
+      if (btnHourly) {
+        if (metricType === 'PEAK_HOURS') {
+          btnHourly.classList.add(...activeClasses);
+          btnHourly.classList.remove(...inactiveClasses);
+        } else {
+          btnHourly.classList.remove(...activeClasses);
+          btnHourly.classList.add(...inactiveClasses);
+        }
+      }
+
+      if (btnVendor) {
+        if (metricType === 'VENDOR_COMP') {
+          btnVendor.classList.add(...activeClasses);
+          btnVendor.classList.remove(...inactiveClasses);
+        } else {
+          btnVendor.classList.remove(...activeClasses);
+          btnVendor.classList.add(...inactiveClasses);
+        }
+      }
+
+      renderAdminRecharts(metricType);
+      playChime(587.33);
+    }
+
+    function renderAdminRecharts(metricType) {
+      const type = metricType || currentAdminChartMetric || 'DAILY_SALES';
+      const root = document.getElementById('admin-recharts-root');
+      const chipsRoot = document.getElementById('recharts-metric-chips');
+      const subtitleEl = document.getElementById('bar-chart-subtitle');
+      if (!root) return;
+
+      const totalGross = orders.reduce((sum, o) => sum + (o.totalPrice || 0), 1280.00);
+
+      if (type === 'DAILY_SALES') {
+        if (subtitleEl) subtitleEl.innerText = 'Daily Sales Volume & Order Velocity (Past 7 Days)';
+        
+        // 7 Days Data
+        const days = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Today'];
+        const salesData = [168.00, 195.50, 210.00, 184.00, 248.50, 134.00, (totalGross * 0.22)];
+        const ordersData = [5, 6, 7, 6, 8, 4, Math.max(orders.length, 6)];
+
+        if (chipsRoot) {
+          chipsRoot.innerHTML = `
+            <div class="bg-brand-50/70 border border-brand-200/80 p-3 rounded-xl">
+              <p class="text-[10px] font-bold text-brand-700 uppercase">7-Day Campus Volume</p>
+              <p class="text-base font-black text-brand-700 font-mono mt-0.5">GH₵ ${(salesData.reduce((a,b)=>a+b, 0)).toFixed(2)}</p>
+            </div>
+            <div class="bg-slate-50 border border-slate-200 p-3 rounded-xl">
+              <p class="text-[10px] font-bold text-slate-500 uppercase">Daily Average</p>
+              <p class="text-base font-bold text-slate-800 font-mono mt-0.5">GH₵ ${(salesData.reduce((a,b)=>a+b, 0) / 7).toFixed(2)}</p>
+            </div>
+            <div class="bg-slate-50 border border-slate-200 p-3 rounded-xl">
+              <p class="text-[10px] font-bold text-slate-500 uppercase">Peak Sales Day</p>
+              <p class="text-base font-bold text-emerald-600 font-mono mt-0.5">Friday (GH₵ 248.50)</p>
+            </div>
+            <div class="bg-slate-50 border border-slate-200 p-3 rounded-xl">
+              <p class="text-[10px] font-bold text-slate-500 uppercase">Fulfillment SLA</p>
+              <p class="text-base font-bold text-blue-600 font-mono mt-0.5">3.8 mins / order</p>
+            </div>
+          `;
+        }
+
+        const maxSales = Math.max(...salesData) * 1.15;
+        const svgHeight = 220;
+        const svgWidth = 560;
+
+        let barsSvg = '';
+        const barWidth = 32;
+        const groupGap = svgWidth / days.length;
+
+        days.forEach((day, idx) => {
+          const sVal = salesData[idx];
+          const oVal = ordersData[idx];
+          const barH = (sVal / maxSales) * 140;
+          const x = (idx * groupGap) + 24;
+          const y = svgHeight - 35 - barH;
+
+          barsSvg += `
+            <g class="transition-all duration-300 hover:opacity-90 cursor-pointer">
+              <title>${day}: GH₵ ${sVal.toFixed(2)} (${oVal} orders)</title>
+              <!-- Bar -->
+              <rect x="${x}" y="${y}" width="${barWidth}" height="${barH}" rx="6" fill="url(#brandGradient)" />
+              <!-- Sales Top Label -->
+              <text x="${x + barWidth/2}" y="${y - 6}" font-size="10" font-weight="800" fill="#c2410c" text-anchor="middle" font-family="monospace">GH₵${Math.round(sVal)}</text>
+              <!-- Day X-Label -->
+              <text x="${x + barWidth/2}" y="${svgHeight - 14}" font-size="11" font-weight="700" fill="#475569" text-anchor="middle">${day}</text>
+              <!-- Order Count Badge -->
+              <circle cx="${x + barWidth/2}" cy="${y + 16}" r="9" fill="#0284c7" opacity="0.95" />
+              <text x="${x + barWidth/2}" y="${y + 19.5}" font-size="9" font-weight="900" fill="#ffffff" text-anchor="middle">${oVal}</text>
+            </g>
+          `;
+        });
+
+        root.innerHTML = `
+          <svg viewBox="0 0 ${svgWidth} ${svgHeight}" class="w-full h-full max-h-[260px] overflow-visible">
+            <defs>
+              <linearGradient id="brandGradient" x1="0%" y1="0%" x2="0%" y2="100%">
+                <stop offset="0%" stop-color="#ea580c" />
+                <stop offset="100%" stop-color="#f97316" />
+              </linearGradient>
+            </defs>
+            <!-- Grid Lines -->
+            <line x1="15" y1="40" x2="${svgWidth - 15}" y2="40" stroke="#e2e8f0" stroke-dasharray="4 4" />
+            <line x1="15" y1="95" x2="${svgWidth - 15}" y2="95" stroke="#e2e8f0" stroke-dasharray="4 4" />
+            <line x1="15" y1="150" x2="${svgWidth - 15}" y2="150" stroke="#e2e8f0" stroke-dasharray="4 4" />
+            <line x1="15" y1="${svgHeight - 35}" x2="${svgWidth - 15}" y2="${svgHeight - 35}" stroke="#cbd5e1" stroke-width="1.5" />
+            
+            ${barsSvg}
+          </svg>
+        `;
+
+      } else if (type === 'PEAK_HOURS') {
+        if (subtitleEl) subtitleEl.innerText = 'Hourly Ordering Heatmap & Lunch Rush Demand (08:00 - 18:00)';
+
+        const hours = ['08:00', '09:00', '10:00', '11:00', '12:00', '13:00', '14:00', '15:00', '16:00', '17:00', '18:00'];
+        const hourOrders = [3, 4, 6, 12, 28, 24, 9, 6, 8, 11, 5];
+
+        if (chipsRoot) {
+          chipsRoot.innerHTML = `
+            <div class="bg-orange-50 border border-orange-200 p-3 rounded-xl">
+              <p class="text-[10px] font-bold text-orange-700 uppercase">Peak Rush Window</p>
+              <p class="text-base font-black text-orange-700 font-mono mt-0.5">12:00 PM - 1:45 PM</p>
+            </div>
+            <div class="bg-slate-50 border border-slate-200 p-3 rounded-xl">
+              <p class="text-[10px] font-bold text-slate-500 uppercase">Max Hourly Velocity</p>
+              <p class="text-base font-bold text-slate-800 font-mono mt-0.5">28 Orders / hr</p>
+            </div>
+            <div class="bg-slate-50 border border-slate-200 p-3 rounded-xl">
+              <p class="text-[10px] font-bold text-slate-500 uppercase">Lunch Rush Share</p>
+              <p class="text-base font-bold text-brand-600 font-mono mt-0.5">62.8% of daily meals</p>
+            </div>
+            <div class="bg-slate-50 border border-slate-200 p-3 rounded-xl">
+              <p class="text-[10px] font-bold text-slate-500 uppercase">Afternoon Dip</p>
+              <p class="text-base font-bold text-amber-600 font-mono mt-0.5">2:30 PM - 4:30 PM</p>
+            </div>
+          `;
+        }
+
+        const maxHour = Math.max(...hourOrders) * 1.15;
+        const svgHeight = 220;
+        const svgWidth = 560;
+        const barW = 24;
+        const gap = svgWidth / hours.length;
+
+        let hourSvg = '';
+        hours.forEach((hr, idx) => {
+          const val = hourOrders[idx];
+          const isPeak = idx === 4 || idx === 5; // 12:00 and 13:00
+          const h = (val / maxHour) * 140;
+          const x = (idx * gap) + 14;
+          const y = svgHeight - 35 - h;
+          const fillColor = isPeak ? 'url(#rushGradient)' : '#38bdf8';
+
+          hourSvg += `
+            <g class="transition-all duration-300 hover:opacity-90 cursor-pointer">
+              <title>${hr}: ${val} orders</title>
+              <rect x="${x}" y="${y}" width="${barW}" height="${h}" rx="5" fill="${fillColor}" />
+              <text x="${x + barW/2}" y="${y - 5}" font-size="9.5" font-weight="800" fill="${isPeak ? '#c2410c' : '#0369a1'}" text-anchor="middle">${val}</text>
+              <text x="${x + barW/2}" y="${svgHeight - 15}" font-size="9" font-weight="700" fill="#64748b" text-anchor="middle">${hr.split(':')[0]}:00</text>
+            </g>
+          `;
+        });
+
+        root.innerHTML = `
+          <svg viewBox="0 0 ${svgWidth} ${svgHeight}" class="w-full h-full max-h-[260px] overflow-visible">
+            <defs>
+              <linearGradient id="rushGradient" x1="0%" y1="0%" x2="0%" y2="100%">
+                <stop offset="0%" stop-color="#ea580c" />
+                <stop offset="100%" stop-color="#e11d48" />
+              </linearGradient>
+            </defs>
+            <line x1="15" y1="40" x2="${svgWidth - 15}" y2="40" stroke="#e2e8f0" stroke-dasharray="4 4" />
+            <line x1="15" y1="95" x2="${svgWidth - 15}" y2="95" stroke="#e2e8f0" stroke-dasharray="4 4" />
+            <line x1="15" y1="150" x2="${svgWidth - 15}" y2="150" stroke="#e2e8f0" stroke-dasharray="4 4" />
+            <line x1="15" y1="${svgHeight - 35}" x2="${svgWidth - 15}" y2="${svgHeight - 35}" stroke="#cbd5e1" stroke-width="1.5" />
+            ${hourSvg}
+          </svg>
+        `;
+
+      } else if (type === 'VENDOR_COMP') {
+        if (subtitleEl) subtitleEl.innerText = 'Vendor Revenue Leaderboard & Stall Market Share';
+
+        const vendorStats = vendors.map((v, i) => {
+          const vOrders = orders.filter(o => o.vendorId === v.id);
+          const baseRev = (i === 0 ? 680 : (i === 1 ? 420 : 180));
+          const actualRev = vOrders.reduce((acc, o) => acc + (o.totalPrice || 0), baseRev);
+          return {
+            id: v.id,
+            name: v.name,
+            rev: actualRev,
+            orders: Math.max(vOrders.length, (i === 0 ? 18 : (i === 1 ? 12 : 8))),
+            dishes: menuItems.filter(m => m.vendorId === v.id).length
+          };
+        }).sort((a,b) => b.rev - a.rev);
+
+        const sumRev = vendorStats.reduce((s, v) => s + v.rev, 0) || 1;
+        const topVendor = vendorStats[0] || { name: 'Akwaaba Kitchen', rev: 680 };
+
+        if (chipsRoot) {
+          chipsRoot.innerHTML = `
+            <div class="bg-emerald-50 border border-emerald-200 p-3 rounded-xl">
+              <p class="text-[10px] font-bold text-emerald-700 uppercase">Top Performing Stall</p>
+              <p class="text-base font-black text-emerald-700 font-mono mt-0.5">${topVendor.name}</p>
+            </div>
+            <div class="bg-slate-50 border border-slate-200 p-3 rounded-xl">
+              <p class="text-[10px] font-bold text-slate-500 uppercase">Top Stall GMV</p>
+              <p class="text-base font-bold text-slate-800 font-mono mt-0.5">GH₵ ${topVendor.rev.toFixed(2)}</p>
+            </div>
+            <div class="bg-slate-50 border border-slate-200 p-3 rounded-xl">
+              <p class="text-[10px] font-bold text-slate-500 uppercase">Market Dominance</p>
+              <p class="text-base font-bold text-brand-600 font-mono mt-0.5">${((topVendor.rev / sumRev)*100).toFixed(1)}% share</p>
+            </div>
+            <div class="bg-slate-50 border border-slate-200 p-3 rounded-xl">
+              <p class="text-[10px] font-bold text-slate-500 uppercase">Total Active Stalls</p>
+              <p class="text-base font-bold text-indigo-600 font-mono mt-0.5">${vendors.length} Kitchens</p>
+            </div>
+          `;
+        }
+
+        root.innerHTML = `
+          <div class="w-full space-y-3.5 py-1">
+            ${vendorStats.map((vs, idx) => {
+              const pct = Math.round((vs.rev / sumRev) * 100);
+              const rankColor = idx === 0 ? 'bg-amber-400 text-slate-950 font-black' : (idx === 1 ? 'bg-slate-200 text-slate-800' : 'bg-amber-700/30 text-amber-900');
+              return `
+                <div class="space-y-1.5">
+                  <div class="flex items-center justify-between text-xs">
+                    <div class="flex items-center gap-2">
+                      <span class="w-5 h-5 rounded-full ${rankColor} text-[10px] flex items-center justify-center font-bold">#${idx+1}</span>
+                      <span class="font-bold text-slate-900">${vs.name}</span>
+                      <span class="text-[10.5px] text-slate-400 font-normal">(${vs.dishes} menu items, ${vs.orders} orders)</span>
+                    </div>
+                    <div class="flex items-center gap-2">
+                      <span class="font-black text-brand-700 font-mono">GH₵ ${vs.rev.toFixed(2)}</span>
+                      <span class="text-[10px] font-bold bg-slate-100 text-slate-700 px-2 py-0.5 rounded-full">${pct}%</span>
+                    </div>
+                  </div>
+                  <div class="w-full bg-slate-200 rounded-full h-2.5 overflow-hidden">
+                    <div class="bg-gradient-to-r from-brand-500 to-amber-500 h-2.5 rounded-full transition-all duration-500" style="width: ${pct}%"></div>
+                  </div>
+                </div>
+              `;
+            }).join('')}
+          </div>
+        `;
+      }
+
+      lucide.createIcons();
+    }
+
+    function renderAdminDonutChart() {
+      const donutRoot = document.getElementById('admin-recharts-donut-root');
+      const legendRoot = document.getElementById('donut-status-legend');
+      if (!donutRoot) return;
+
+      const receivedCount = orders.filter(o => o.status === 'RECEIVED').length || 1;
+      const cookingCount = orders.filter(o => o.status === 'PREPARING').length || 2;
+      const readyCount = orders.filter(o => o.status === 'READY' || o.status === 'OUT_FOR_DELIVERY').length || 3;
+      const doneCount = orders.filter(o => o.status === 'DELIVERED').length || (orders.length + 30);
+      const total = receivedCount + cookingCount + readyCount + doneCount;
+
+      const pReceived = (receivedCount / total) * 100;
+      const pCooking = (cookingCount / total) * 100;
+      const pReady = (readyCount / total) * 100;
+      const pDone = (doneCount / total) * 100;
+
+      // SVG Donut calculation
+      const r = 38;
+      const circ = 2 * Math.PI * r; // ~238.76
+
+      const dDone = (pDone / 100) * circ;
+      const dReady = (pReady / 100) * circ;
+      const dCooking = (pCooking / 100) * circ;
+      const dReceived = (pReceived / 100) * circ;
+
+      const oDone = 0;
+      const oReady = -dDone;
+      const oCooking = -(dDone + dReady);
+      const oReceived = -(dDone + dReady + dCooking);
+
+      donutRoot.innerHTML = `
+        <div class="relative flex items-center justify-center">
+          <svg viewBox="0 0 100 100" class="w-40 h-40 transform -rotate-90">
+            <!-- Background ring -->
+            <circle cx="50" cy="50" r="${r}" fill="transparent" stroke="#f1f5f9" stroke-width="14" />
+            <!-- Delivered (Slate/Blue) -->
+            <circle cx="50" cy="50" r="${r}" fill="transparent" stroke="#64748b" stroke-width="14" stroke-dasharray="${dDone} ${circ}" stroke-dashoffset="${oDone}" class="transition-all duration-700" />
+            <!-- Ready (Emerald) -->
+            <circle cx="50" cy="50" r="${r}" fill="transparent" stroke="#10b981" stroke-width="14" stroke-dasharray="${dReady} ${circ}" stroke-dashoffset="${oReady}" class="transition-all duration-700" />
+            <!-- Cooking (Orange) -->
+            <circle cx="50" cy="50" r="${r}" fill="transparent" stroke="#f97316" stroke-width="14" stroke-dasharray="${dCooking} ${circ}" stroke-dashoffset="${oCooking}" class="transition-all duration-700" />
+            <!-- Received (Amber) -->
+            <circle cx="50" cy="50" r="${r}" fill="transparent" stroke="#f59e0b" stroke-width="14" stroke-dasharray="${dReceived} ${circ}" stroke-dashoffset="${oReceived}" class="transition-all duration-700" />
+          </svg>
+          <div class="absolute inset-0 flex flex-col items-center justify-center text-center">
+            <span class="text-xl font-black text-slate-900 leading-tight">${total}</span>
+            <span class="text-[9.5px] font-bold text-slate-400 uppercase tracking-tight">Total Orders</span>
+          </div>
+        </div>
+      `;
+
+      if (legendRoot) {
+        legendRoot.innerHTML = `
+          <div class="flex items-center gap-1.5 p-1.5 rounded-lg bg-amber-50 border border-amber-200">
+            <span class="w-2.5 h-2.5 rounded-full bg-amber-500"></span>
+            <span class="font-bold text-amber-900">Received (${receivedCount})</span>
+          </div>
+          <div class="flex items-center gap-1.5 p-1.5 rounded-lg bg-orange-50 border border-orange-200">
+            <span class="w-2.5 h-2.5 rounded-full bg-orange-500"></span>
+            <span class="font-bold text-orange-900">Cooking (${cookingCount})</span>
+          </div>
+          <div class="flex items-center gap-1.5 p-1.5 rounded-lg bg-emerald-50 border border-emerald-200">
+            <span class="w-2.5 h-2.5 rounded-full bg-emerald-500"></span>
+            <span class="font-bold text-emerald-900">Ready (${readyCount})</span>
+          </div>
+          <div class="flex items-center gap-1.5 p-1.5 rounded-lg bg-slate-100 border border-slate-200">
+            <span class="w-2.5 h-2.5 rounded-full bg-slate-500"></span>
+            <span class="font-bold text-slate-700">Delivered (${doneCount})</span>
+          </div>
+        `;
+      }
+    }
 
     // =========================================================================
-    // 📈 30-DAY WALLET TRENDS & PERSONAL FINANCIAL MANAGEMENT (HIGH-PRECISION CHART)
+    // 🧠 EXECUTIVE DECISION EXECUTION ENGINE
     // =========================================================================
+    function executeAdminDecision(actionKey) {
+      if (actionKey === 'OFF_PEAK_DISCOUNT') {
+        const annEl = document.getElementById('announcement-text');
+        const promoMsg = '⚡ FLASH VOUCHER: 10% Off-Peak Discount activated campus-wide! Order ahead before 4:30 PM.';
+        if (annEl) annEl.innerText = promoMsg;
+        auditLogs.unshift('Admin AI Decision: Deployed 10% Off-Peak meal voucher and updated campus announcement.');
+        showToast('10% Off-Peak Flash Voucher deployed to all student accounts & banner updated!', 'success');
+        playChime(783.99);
+
+      } else if (actionKey === 'LUNCH_RUSH_MODE') {
+        const annEl = document.getElementById('announcement-text');
+        const rushMsg = '🔥 LUNCH RUSH ACTIVE: Kitchen stalls are express-batching Jollof, Waakye & Fried Rice! Ready in 3-5 mins.';
+        if (annEl) annEl.innerText = rushMsg;
+        auditLogs.unshift('Admin AI Decision: Activated Lunch Rush Express Mode across vendor kitchen terminals.');
+        showToast('Lunch Rush Mode engaged! Vendor terminals notified for express batch processing.', 'success');
+        playChime(659.25);
+
+      } else if (actionKey === 'STOCK_REPLENISH_ALERT') {
+        auditLogs.unshift('Admin AI Decision: Dispatched High-Demand Batch Stock Replenishment Alert to all food stalls.');
+        showToast('Stock Replenishment Directives dispatched to kitchen stalls (Jollof, Waakye, Fried Rice)!', 'success');
+        playChime(523.25);
+
+      } else if (actionKey === 'ENFORCE_SECURITY_POLICY') {
+        auditLogs.unshift('Admin AI Decision: Enforced Biometric Pass & 4-Digit Pickup PIN compliance on all vendor terminals.');
+        showToast('Security Policy Enforced: Biometric Pass & 4-Digit Pickup PIN verification mandatory at all counters!', 'success');
+        playChime(659.25);
+      }
+
+      renderAdminOperations();
+      renderAdminAuditLogs();
+    }
+
+    function refreshAdminAiDecisions() {
+      showToast('Operational decision advisory re-calculated with real-time telemetry.', 'info');
+      playChime(587.33);
+    }
     function renderStudentWalletTrendChart() {
       const container = document.getElementById('student-wallet-line-chart-container');
       if (!container) return;
