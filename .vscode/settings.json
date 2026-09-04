@@ -1,0 +1,39 @@
+{
+  "files.watcherExclude": {
+    "**/.git/objects/**": true,
+    "**/.git/subtree-cache/**": true,
+    "**/.dart_tool/**": true,
+    "**/build/**": true,
+    "**/.gradle/**": true,
+    "**/android/.gradle/**": true,
+    "**/node_modules/**": true,
+    "**/vendor/**": true,
+    "**/storage/framework/cache/**": true,
+    "**/storage/framework/sessions/**": true,
+    "**/storage/framework/views/**": true
+  },
+  "search.exclude": {
+    "**/.git/**": true,
+    "**/.dart_tool/**": true,
+    "**/build/**": true,
+    "**/.gradle/**": true,
+    "**/android/.gradle/**": true,
+    "**/node_modules/**": true,
+    "**/vendor/**": true,
+    "**/storage/framework/cache/**": true,
+    "**/storage/framework/sessions/**": true,
+    "**/storage/framework/views/**": true
+  },
+  "files.exclude": {
+    "**/.dart_tool": true,
+    "**/.gradle": true,
+    "**/build": true,
+    "**/node_modules": true,
+    "**/vendor": true
+  },
+  "java.autobuild.enabled": false,
+  "java.import.gradle.enabled": false,
+  "java.maxConcurrentBuilds": 1,
+  "java.jdt.ls.vmargs": "-Xmx384m -Xms128m -XX:MaxMetaspaceSize=192m -Dfile.encoding=UTF-8",
+  "dart.analysisServerMemoryLimit": 512
+}
