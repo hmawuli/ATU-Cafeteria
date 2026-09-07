@@ -3,137 +3,105 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
-use App\Models\User;
 use App\Models\AuditLog;
-use App\Services\JwtService;
+use App\Models\User;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Validator;
 
 class StudentAuthController extends Controller
 {
-    /**
-     * Register a new student in the system.
-     */
     public function register(Request $request)
     {
         $validator = Validator::make($request->all(), [
-            'username' => 'required|string|max:255',
-            'pin' => 'required|string|min:4', // Pre-hashed SHA-256 PIN from android
+            'username' => 'required|string|max:255|unique:users,username',
+            'pin' => 'required|string|min:4|max:128',
             'fullName' => 'required|string|max:255',
-            'studentId' => 'required|string|max:255', // Maps to 'info' field
+            'studentId' => 'required|string|max:255|unique:users,student_staff_id',
         ]);
 
         if ($validator->fails()) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Student registration input validation failed.',
-                'errors' => $validator->errors()
-            ], 400);
+            return response()->json(['success' => false, 'message' => 'Student registration validation failed.', 'errors' => $validator->errors()], 422);
         }
 
-        // Check if username already exists
-        $existing = User::where('username', $request->input('username'))->first();
-        if ($existing) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Username already exists.'
-            ], 400);
-        }
-
-        // Create the student user inside a transaction
         $user = DB::transaction(function () use ($request) {
-            $createdUser = User::create([
+            $created = User::create([
                 'username' => $request->input('username'),
-                'password' => $request->input('pin'), // Stored pre-hashed
+                'password' => Hash::make($request->input('pin')),
                 'role' => 'STUDENT',
                 'fullName' => $request->input('fullName'),
+                'student_staff_id' => $request->input('studentId'),
                 'info' => $request->input('studentId'),
             ]);
 
-            // Register Audit Log
             AuditLog::create([
-                'user_id' => $createdUser->id,
+                'user_id' => $created->id,
                 'timestamp' => time() * 1000,
                 'action' => 'STUDENT_REGISTRATION',
-                'details' => "Registered student {$createdUser->fullName} (ID: {$createdUser->info}) via Student API.",
+                'details' => "Registered student {$created->fullName}.",
             ]);
 
-            return $createdUser;
+            return $created;
         });
 
-        // Generate Laravel Sanctum token
-        $token = $user->createToken('student_token', ['student'])->plainTextToken;
-        $response = $user->toArray();
-        $response['token'] = $token;
-
-        return response()->json([
-            'success' => true,
-            'message' => 'Student registered successfully.',
-            'user' => $response
-        ], 201)->header('X-Auth-Token', $token);
+        return $this->issueToken($user, 'Student registered successfully.', 201);
     }
 
-    /**
-     * Authenticate a student user and return a Sanctum access token.
-     */
     public function login(Request $request)
     {
         $validator = Validator::make($request->all(), [
-            'username' => 'required|string',
-            'pin' => 'required|string', // Pre-hashed SHA-256 PIN
+            'username' => 'required|string|max:255',
+            'pin' => 'required|string|max:128',
         ]);
 
         if ($validator->fails()) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Both username and pin are required.'
-            ], 400);
+            return response()->json(['success' => false, 'message' => 'Username and PIN are required.', 'errors' => $validator->errors()], 422);
         }
 
-        $user = User::where('username', $request->input('username'))->first();
-
-        // Enforce student role and valid credentials
-        if (!$user || $user->role !== 'STUDENT') {
-            return response()->json([
-                'success' => false,
-                'message' => 'Invalid student credentials or unauthorized role.'
-            ], 401);
+        $user = User::where('username', $request->input('username'))->where('role', 'STUDENT')->first();
+        if (!$user || !$this->verifyAndUpgradePassword($user, $request->input('pin'))) {
+            return response()->json(['success' => false, 'message' => 'Invalid student credentials.'], 401);
         }
 
-        // Compare direct PIN (Pre-hashed from clients)
-        if ($user->password === $request->input('pin')) {
-            // Register Audit Log
-            AuditLog::create([
-                'user_id' => $user->id,
-                'timestamp' => time() * 1000,
-                'action' => 'STUDENT_AUTHENTICATION',
-                'details' => "Student {$user->fullName} logged in successfully via Sanctum.",
-            ]);
-
-            // Generate Laravel Sanctum token
-            $token = $user->createToken('student_token', ['student'])->plainTextToken;
-            $responseData = $user->toArray();
-            $responseData['token'] = $token;
-
-            return response()->json([
-                'success' => true,
-                'message' => 'Student logged in successfully.',
-                'user' => $responseData
-            ], 200)->header('X-Auth-Token', $token);
-        }
-
-        // Record failed login attempt
         AuditLog::create([
             'user_id' => $user->id,
             'timestamp' => time() * 1000,
-            'action' => 'STUDENT_AUTH_FAILURE',
-            'details' => "Failed student login attempt with wrong PIN.",
+            'action' => 'STUDENT_AUTHENTICATION',
+            'details' => 'Successful student authentication.',
         ]);
 
+        return $this->issueToken($user, 'Student logged in successfully.', 200);
+    }
+
+    private function verifyAndUpgradePassword(User $user, string $pin): bool
+    {
+        if (Hash::check($pin, (string) $user->password)) {
+            if (Hash::needsRehash((string) $user->password)) {
+                $user->password = Hash::make($pin);
+                $user->save();
+            }
+            return true;
+        }
+
+        $legacyHash = hash('sha256', $pin);
+        if (hash_equals((string) $user->password, $legacyHash)) {
+            $user->password = Hash::make($pin);
+            $user->save();
+            return true;
+        }
+
+        return false;
+    }
+
+    private function issueToken(User $user, string $message, int $status)
+    {
+        $token = $user->createToken('atu_cafeteria_student_token', ['student'])->plainTextToken;
         return response()->json([
-            'success' => false,
-            'message' => 'Invalid Pin-Code hash.'
-        ], 401);
+            'success' => true,
+            'message' => $message,
+            'user' => $user,
+            'token' => $token,
+        ], $status)->header('X-Auth-Token', $token);
     }
 }
