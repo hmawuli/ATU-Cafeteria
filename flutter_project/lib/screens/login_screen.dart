@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 import '../providers/auth_provider.dart';
 import 'student_dashboard_screen.dart';
 import 'vendor_dashboard_screen.dart';
+import 'admin_dashboard.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({Key? key}) : super(key: key);
@@ -26,16 +27,24 @@ class _LoginScreenState extends State<LoginScreen> {
     if (!mounted) return;
 
     if (success && auth.currentUser != null) {
-      if (auth.currentUser!.role == 'VENDOR') {
-        Navigator.pushReplacement(
-          context,
-          MaterialPageRoute(builder: (_) => const VendorDashboardScreen()),
-        );
-      } else {
-        Navigator.pushReplacement(
-          context,
-          MaterialPageRoute(builder: (_) => const StudentDashboardScreen()),
-        );
+      switch (auth.currentUser!.role.toUpperCase()) {
+        case 'ADMIN':
+          Navigator.pushReplacement(
+            context,
+            MaterialPageRoute(builder: (_) => const AdminDashboardScreen()),
+          );
+          break;
+        case 'VENDOR':
+          Navigator.pushReplacement(
+            context,
+            MaterialPageRoute(builder: (_) => const VendorDashboardScreen()),
+          );
+          break;
+        default:
+          Navigator.pushReplacement(
+            context,
+            MaterialPageRoute(builder: (_) => const StudentDashboardScreen()),
+          );
       }
     } else {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -71,16 +80,9 @@ class _LoginScreenState extends State<LoginScreen> {
                     children: [
                       const Icon(Icons.restaurant_menu, size: 64, color: Colors.deepOrange),
                       const SizedBox(height: 12),
-                      const Text(
-                        'ATU Cafeteria',
-                        style: TextStyle(fontSize: 26, fontWeight: FontWeight.bold),
-                      ),
-                      const Text(
-                        'Smart Campus Food Ordering',
-                        style: TextStyle(color: Colors.grey, fontSize: 14),
-                      ),
+                      const Text('ATU Cafeteria', style: TextStyle(fontSize: 26, fontWeight: FontWeight.bold)),
+                      const Text('Smart Campus Food Ordering', style: TextStyle(color: Colors.grey, fontSize: 14)),
                       const SizedBox(height: 24),
-                      // Role Selector Chips
                       Row(
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: ['STUDENT', 'VENDOR', 'ADMIN'].map((role) {
@@ -90,12 +92,10 @@ class _LoginScreenState extends State<LoginScreen> {
                             child: ChoiceChip(
                               label: Text(role),
                               selected: isSelected,
-                              onSelected: (_) {
-                                setState(() {
-                                  _selectedRole = role;
-                                  _usernameController.text = role.toLowerCase();
-                                });
-                              },
+                              onSelected: (_) => setState(() {
+                                _selectedRole = role;
+                                _usernameController.text = role.toLowerCase();
+                              }),
                             ),
                           );
                         }).toList(),
