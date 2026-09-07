@@ -5,70 +5,40 @@ import '../services/api_service.dart';
 class AuthProvider with ChangeNotifier {
   User? _currentUser;
   bool _isLoading = false;
+  String? _errorMessage;
 
   User? get currentUser => _currentUser;
   bool get isLoading => _isLoading;
-  bool get isAuthenticated => _currentUser != null;
+  bool get isAuthenticated => _currentUser != null && ApiService.authToken != null;
+  String? get errorMessage => _errorMessage;
 
-  Future<bool> login(String username, String password) async {
+  /// All authentication decisions come from the backend.
+  /// There is deliberately no local/demo login fallback because a local role
+  /// flag must never be able to grant STUDENT, VENDOR, or ADMIN privileges.
+  Future<bool> login(String username, String pin) async {
     _isLoading = true;
+    _errorMessage = null;
     notifyListeners();
 
-    // 1. Try Remote API
-    final result = await ApiService.login(username, password);
-    if (result['success'] == true && result['user'] != null) {
-      _currentUser = result['user'];
+    final result = await ApiService.login(username, pin);
+    if (result['success'] == true && result['user'] is User && ApiService.authToken != null) {
+      _currentUser = result['user'] as User;
       _isLoading = false;
       notifyListeners();
       return true;
     }
 
-    // 2. Local Fallback for offline demo
-    final normalized = username.trim().toLowerCase();
-    if (normalized == 'student' || normalized.contains('student')) {
-      _currentUser = User(
-        id: 101,
-        username: username,
-        fullName: 'Campus Student',
-        role: 'STUDENT',
-        balance: 150.00,
-        studentStaffId: 'ATU-2026-889',
-        telephone: '+233 24 123 4567',
-      );
-      _isLoading = false;
-      notifyListeners();
-      return true;
-    } else if (normalized == 'vendor' || normalized.contains('vendor') || normalized == 'kitchen') {
-      _currentUser = User(
-        id: 201,
-        username: username,
-        fullName: 'Akwaaba Kitchen',
-        role: 'VENDOR',
-        isOpen: true,
-      );
-      _isLoading = false;
-      notifyListeners();
-      return true;
-    } else if (normalized == 'admin') {
-      _currentUser = User(
-        id: 301,
-        username: username,
-        fullName: 'Cafeteria Manager',
-        role: 'ADMIN',
-      );
-      _isLoading = false;
-      notifyListeners();
-      return true;
-    }
-
+    _currentUser = null;
+    _errorMessage = result['message'] as String? ?? 'Authentication failed.';
     _isLoading = false;
     notifyListeners();
     return false;
   }
 
-  void logout() {
+  Future<void> logout() async {
+    await ApiService.logout();
     _currentUser = null;
-    ApiService.authToken = null;
+    _errorMessage = null;
     notifyListeners();
   }
 }
