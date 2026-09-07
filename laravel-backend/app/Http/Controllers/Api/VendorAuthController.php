@@ -3,137 +3,104 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
-use App\Models\User;
 use App\Models\AuditLog;
-use App\Services\JwtService;
+use App\Models\User;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Validator;
 
 class VendorAuthController extends Controller
 {
-    /**
-     * Register a new vendor in the system.
-     */
     public function register(Request $request)
     {
         $validator = Validator::make($request->all(), [
-            'username' => 'required|string|max:255',
-            'pin' => 'required|string|min:4', // Pre-hashed SHA-256 PIN from android
-            'fullName' => 'required|string|max:255', // Represents Brand name
-            'boothDescription' => 'required|string|max:255', // Maps to 'info' field (e.g., "Booth 3 / Indomie Center")
+            'username' => 'required|string|max:255|unique:users,username',
+            'pin' => 'required|string|min:4|max:128',
+            'fullName' => 'required|string|max:255',
+            'boothDescription' => 'required|string|max:255',
         ]);
 
         if ($validator->fails()) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Vendor registration input validation failed.',
-                'errors' => $validator->errors()
-            ], 400);
+            return response()->json(['success' => false, 'message' => 'Vendor registration validation failed.', 'errors' => $validator->errors()], 422);
         }
 
-        // Check if username already exists
-        $existing = User::where('username', $request->input('username'))->first();
-        if ($existing) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Username already exists.'
-            ], 400);
-        }
-
-        // Create the vendor user inside a transaction
         $user = DB::transaction(function () use ($request) {
-            $createdUser = User::create([
+            $created = User::create([
                 'username' => $request->input('username'),
-                'password' => $request->input('pin'), // Stored pre-hashed
+                'password' => Hash::make($request->input('pin')),
                 'role' => 'VENDOR',
                 'fullName' => $request->input('fullName'),
                 'info' => $request->input('boothDescription'),
             ]);
 
-            // Register Audit Log
             AuditLog::create([
-                'user_id' => $createdUser->id,
+                'user_id' => $created->id,
                 'timestamp' => time() * 1000,
                 'action' => 'VENDOR_REGISTRATION',
-                'details' => "Registered vendor brand {$createdUser->fullName} at {$createdUser->info} via Vendor API.",
+                'details' => "Registered vendor brand {$created->fullName}.",
             ]);
 
-            return $createdUser;
+            return $created;
         });
 
-        // Generate Laravel Sanctum token
-        $token = $user->createToken('vendor_token', ['vendor'])->plainTextToken;
-        $response = $user->toArray();
-        $response['token'] = $token;
-
-        return response()->json([
-            'success' => true,
-            'message' => 'Vendor brand registered successfully.',
-            'user' => $response
-        ], 201)->header('X-Auth-Token', $token);
+        return $this->issueToken($user, 'Vendor registered successfully.', 201);
     }
 
-    /**
-     * Authenticate a vendor and return a Sanctum access token.
-     */
     public function login(Request $request)
     {
         $validator = Validator::make($request->all(), [
-            'username' => 'required|string',
-            'pin' => 'required|string', // Pre-hashed SHA-256 PIN
+            'username' => 'required|string|max:255',
+            'pin' => 'required|string|max:128',
         ]);
 
         if ($validator->fails()) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Both username and pin are required.'
-            ], 400);
+            return response()->json(['success' => false, 'message' => 'Username and PIN are required.', 'errors' => $validator->errors()], 422);
         }
 
-        $user = User::where('username', $request->input('username'))->first();
-
-        // Enforce vendor role and valid credentials
-        if (!$user || $user->role !== 'VENDOR') {
-            return response()->json([
-                'success' => false,
-                'message' => 'Invalid vendor credentials or unauthorized role.'
-            ], 401);
+        $user = User::where('username', $request->input('username'))->where('role', 'VENDOR')->first();
+        if (!$user || !$this->verifyAndUpgradePassword($user, $request->input('pin'))) {
+            return response()->json(['success' => false, 'message' => 'Invalid vendor credentials.'], 401);
         }
 
-        // Compare direct PIN (Pre-hashed from clients)
-        if ($user->password === $request->input('pin')) {
-            // Register Audit Log
-            AuditLog::create([
-                'user_id' => $user->id,
-                'timestamp' => time() * 1000,
-                'action' => 'VENDOR_AUTHENTICATION',
-                'details' => "Vendor {$user->fullName} logged in successfully via Sanctum.",
-            ]);
-
-            // Generate Laravel Sanctum token
-            $token = $user->createToken('vendor_token', ['vendor'])->plainTextToken;
-            $responseData = $user->toArray();
-            $responseData['token'] = $token;
-
-            return response()->json([
-                'success' => true,
-                'message' => 'Vendor logged in successfully.',
-                'user' => $responseData
-            ], 200)->header('X-Auth-Token', $token);
-        }
-
-        // Record failed login attempt
         AuditLog::create([
             'user_id' => $user->id,
             'timestamp' => time() * 1000,
-            'action' => 'VENDOR_AUTH_FAILURE',
-            'details' => "Failed vendor login attempt with wrong PIN.",
+            'action' => 'VENDOR_AUTHENTICATION',
+            'details' => 'Successful vendor authentication.',
         ]);
 
+        return $this->issueToken($user, 'Vendor logged in successfully.', 200);
+    }
+
+    private function verifyAndUpgradePassword(User $user, string $pin): bool
+    {
+        if (Hash::check($pin, (string) $user->password)) {
+            if (Hash::needsRehash((string) $user->password)) {
+                $user->password = Hash::make($pin);
+                $user->save();
+            }
+            return true;
+        }
+
+        $legacyHash = hash('sha256', $pin);
+        if (hash_equals((string) $user->password, $legacyHash)) {
+            $user->password = Hash::make($pin);
+            $user->save();
+            return true;
+        }
+
+        return false;
+    }
+
+    private function issueToken(User $user, string $message, int $status)
+    {
+        $token = $user->createToken('atu_cafeteria_vendor_token', ['vendor'])->plainTextToken;
         return response()->json([
-            'success' => false,
-            'message' => 'Invalid Pin-Code hash.'
-        ], 401);
+            'success' => true,
+            'message' => $message,
+            'user' => $user,
+            'token' => $token,
+        ], $status)->header('X-Auth-Token', $token);
     }
 }
