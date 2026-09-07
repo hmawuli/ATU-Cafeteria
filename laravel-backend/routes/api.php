@@ -54,9 +54,10 @@ Event::listen(
 */
 
 // Auth Endpoints (Generic)
+// Public registration may create STUDENT or VENDOR accounts only.
+// ADMIN accounts are provisioned by an existing ADMIN below.
 Route::post('/register', [AuthController::class, 'register'])->middleware('throttle:auth');
 Route::post('/login', [AuthController::class, 'login'])->middleware('throttle:auth');
-Route::get('/users', [AuthController::class, 'getAllUsers']);
 
 // Specialized Student Sanctum Auth Endpoints
 Route::post('/student/register', [StudentAuthController::class, 'register'])->middleware('throttle:auth');
@@ -106,107 +107,50 @@ importScripts('https://storage.googleapis.com/workbox-cdn/releases/6.4.1/workbox
 
 if (self.workbox) {
     console.log('Workbox loaded successfully');
-    
-    // Force immediate takeover of service worker clients
     self.workbox.core.skipWaiting();
     self.workbox.core.clientsClaim();
-
-    // 1. Caching static assets with CacheFirst strategy (Tailwind, Fonts, Icons)
     self.workbox.routing.registerRoute(
-        ({request}) => request.destination === 'style' || 
-                       request.destination === 'script' || 
-                       request.destination === 'font' || 
-                       request.destination === 'image',
+        ({request}) => request.destination === 'style' || request.destination === 'script' || request.destination === 'font' || request.destination === 'image',
         new self.workbox.strategies.CacheFirst({
             cacheName: 'atu-static-assets',
-            plugins: [
-                new self.workbox.expiration.ExpirationPlugin({
-                    maxEntries: 50,
-                    maxAgeSeconds: 30 * 24 * 60 * 60, // 30 Days
-                }),
-            ],
+            plugins: [new self.workbox.expiration.ExpirationPlugin({maxEntries: 50, maxAgeSeconds: 30 * 24 * 60 * 60})],
         })
     );
-
-    // 2. NetworkFirst strategy for Cafeteria Menu / Food Items
     self.workbox.routing.registerRoute(
         ({url}) => url.pathname.includes('/food-items') || url.pathname.includes('/menus'),
         new self.workbox.strategies.NetworkFirst({
             cacheName: 'atu-cafeteria-menu-cache',
-            plugins: [
-                new self.workbox.expiration.ExpirationPlugin({
-                    maxEntries: 100,
-                    maxAgeSeconds: 24 * 60 * 60, // 1 Day
-                }),
-            ],
+            plugins: [new self.workbox.expiration.ExpirationPlugin({maxEntries: 100, maxAgeSeconds: 24 * 60 * 60})],
         })
     );
-
-    // 3. NetworkFirst strategy for Student / User Profiles
     self.workbox.routing.registerRoute(
         ({url}) => url.pathname.includes('/user/profile') || url.pathname.includes('/users'),
         new self.workbox.strategies.NetworkFirst({
             cacheName: 'atu-user-profile-cache',
-            plugins: [
-                new self.workbox.expiration.ExpirationPlugin({
-                    maxEntries: 10,
-                    maxAgeSeconds: 7 * 24 * 60 * 60, // 7 Days
-                }),
-            ],
+            plugins: [new self.workbox.expiration.ExpirationPlugin({maxEntries: 10, maxAgeSeconds: 7 * 24 * 60 * 60})],
         })
     );
-
-    // Generic GET offline fallback
     self.workbox.routing.registerRoute(
         ({request}) => request.method === 'GET',
-        new self.workbox.strategies.NetworkFirst({
-            cacheName: 'atu-general-get-cache',
-        })
+        new self.workbox.strategies.NetworkFirst({cacheName: 'atu-general-get-cache'})
     );
 } else {
     console.log('Workbox failed to load. Falling back to manual cache strategies.');
     const CACHE_NAME = 'atu-vendor-cache-v1';
-    const urlsToCache = [
-        '/api/manifest.json',
-        'https://cdn.tailwindcss.com',
-        'https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap'
-    ];
-
+    const urlsToCache = ['/api/manifest.json', 'https://cdn.tailwindcss.com', 'https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap'];
     self.addEventListener('install', event => {
-        event.waitUntil(
-            caches.open(CACHE_NAME).then(cache => {
-                return cache.addAll(urlsToCache);
-            })
-        );
+        event.waitUntil(caches.open(CACHE_NAME).then(cache => cache.addAll(urlsToCache)));
         self.skipWaiting();
     });
-
     self.addEventListener('activate', event => {
-        event.waitUntil(
-            caches.keys().then(cacheNames => {
-                return Promise.all(
-                    cacheNames.map(cacheName => {
-                        if (cacheName !== CACHE_NAME) {
-                            return caches.delete(cacheName);
-                        }
-                    })
-                );
-            })
-        );
+        event.waitUntil(caches.keys().then(cacheNames => Promise.all(cacheNames.map(cacheName => cacheName !== CACHE_NAME ? caches.delete(cacheName) : undefined))));
         self.clients.claim();
     });
-
     self.addEventListener('fetch', event => {
         if (event.request.method !== 'GET') return;
-        event.respondWith(
-            fetch(event.request).catch(() => {
-                return caches.match(event.request);
-            })
-        );
+        event.respondWith(fetch(event.request).catch(() => caches.match(event.request)));
     });
 }
-
-// Listener for background or foreground client page notifications
 self.addEventListener('message', event => {
     if (event.data && event.data.type === 'NEW_ORDER') {
         self.registration.showNotification(event.data.title, {
@@ -214,27 +158,18 @@ self.addEventListener('message', event => {
             icon: 'https://img.icons8.com/color/192/hamburger.png',
             vibrate: [200, 100, 200],
             badge: 'https://img.icons8.com/color/192/hamburger.png',
-            data: {
-                url: event.data.url || '/api/vendor/dashboard?vendor_id=10'
-            }
+            data: {url: event.data.url || '/api/vendor/dashboard?vendor_id=10'}
         });
     }
 });
-
 self.addEventListener('notificationclick', event => {
     event.notification.close();
-    event.waitUntil(
-        clients.matchAll({ type: 'window', includeUncontrolled: true }).then(clientList => {
-            for (const client of clientList) {
-                if (client.url.indexOf('/api/vendor/dashboard') !== -1 && 'focus' in client) {
-                    return client.focus();
-                }
-            }
-            if (clients.openWindow) {
-                return clients.openWindow(event.notification.data?.url || '/api/vendor/dashboard?vendor_id=10');
-            }
-        })
-    );
+    event.waitUntil(clients.matchAll({type: 'window', includeUncontrolled: true}).then(clientList => {
+        for (const client of clientList) {
+            if (client.url.indexOf('/api/vendor/dashboard') !== -1 && 'focus' in client) return client.focus();
+        }
+        if (clients.openWindow) return clients.openWindow(event.notification.data?.url || '/api/vendor/dashboard?vendor_id=10');
+    }));
 });
 JS;
     return response($sw, 200, [
@@ -253,29 +188,17 @@ Route::get('/health', [HealthController::class, 'check']);
 // Lightweight order counter for real-time notification polling
 Route::get('/vendor/orders/unread-count', function (\Illuminate\Http\Request $request) {
     $vendorId = $request->input('vendor_id');
-    if (!$vendorId) {
-        return response()->json(['count' => 0, 'orders' => []]);
-    }
-    
-    // Fetch pending/placed orders
+    if (!$vendorId) return response()->json(['count' => 0, 'orders' => []]);
     $orders = \App\Models\Order::where('vendor_id', $vendorId)
         ->whereIn('status', ['PENDING', 'ORDER_PLACED'])
-        ->orderBy('id', 'desc')
-        ->get();
-
-    return response()->json([
-        'count' => count($orders),
-        'orders' => $orders
-    ]);
+        ->orderBy('id', 'desc')->get();
+    return response()->json(['count' => count($orders), 'orders' => $orders]);
 });
 
 // Student QR Code view for a single food item
 Route::get('/student/order-item/{id}', function ($id) {
     $item = \App\Models\FoodItem::with('vendor')->find($id);
-    if (!$item) {
-        return response("Food item #{$id} was not found on this cafeteria server.", 404);
-    }
-    // Get seeded student users for selector
+    if (!$item) return response("Food item #{$id} was not found on this cafeteria server.", 404);
     $students = \App\Models\User::where('role', 'STUDENT')->get();
     return view('student.order_item', compact('item', 'students'));
 });
@@ -283,20 +206,13 @@ Route::get('/student/order-item/{id}', function ($id) {
 // Student QR Code place order action
 Route::post('/student/order-item/{id}/place', function (\Illuminate\Http\Request $request, $id) {
     $item = \App\Models\FoodItem::find($id);
-    if (!$item) {
-        return redirect()->back()->withErrors(['message' => 'The selected food item does not exist.']);
-    }
-
+    if (!$item) return redirect()->back()->withErrors(['message' => 'The selected food item does not exist.']);
     $qty = intval($request->input('quantity', 1));
     if ($qty < 1) $qty = 1;
-
-    $studentId = $request->input('student_id', 1); // fallback to ID 1
+    $studentId = $request->input('student_id', 1);
     $student = \App\Models\User::find($studentId);
-
-    // Generate random secure 4 digit PIN
     $pin = strval(rand(1000, 9999));
     $totalPrice = $item->price * $qty;
-
     $order = \App\Models\Order::create([
         'customer_id' => $studentId,
         'student_id' => $studentId,
@@ -312,381 +228,102 @@ Route::post('/student/order-item/{id}/place', function (\Illuminate\Http\Request
         'pickup_pin' => $pin,
         'estimated_pickup_time' => $request->input('pickup_time', 'In 15 Mins'),
     ]);
-
-    // Create Audit Log entry
     \App\Models\AuditLog::create([
         'user_id' => $studentId,
         'timestamp' => time() * 1000,
         'action' => 'ORDER_PLACED',
         'details' => "Student '{$student->fullName}' successfully placed order #{$order->id} for {$qty}x '{$item->name}' (PIN: {$pin}) via scanned QR counter page.",
     ]);
-
     return view('student.order_success', compact('order', 'item', 'student'));
 });
 
 // Interactive Vendor Dashboard Web Actions (for Blade templates compatibility)
 Route::post('/vendor/food-items', function (\Illuminate\Http\Request $request) {
     $validator = \Illuminate\Support\Facades\Validator::make($request->all(), [
-        'vendor_id' => 'required|integer|exists:users,id',
-        'name' => 'required|string|max:255',
-        'price' => 'required|numeric|min:0',
-        'category' => 'required|string',
-        'description' => 'required|string|min:10|max:1000',
-        'initial_stock' => 'nullable|integer|min:1',
+        'vendor_id' => 'required|integer|exists:users,id', 'name' => 'required|string|max:255',
+        'price' => 'required|numeric|min:0', 'category' => 'required|string',
+        'description' => 'required|string|min:10|max:1000', 'initial_stock' => 'nullable|integer|min:1',
         'low_stock_threshold' => 'nullable|integer|min:0',
     ]);
-
-    if ($validator->fails()) {
-        return redirect()->back()->withErrors($validator)->withInput();
-    }
-
+    if ($validator->fails()) return redirect()->back()->withErrors($validator)->withInput();
     $data = [
-        'vendor_id' => $request->input('vendor_id'),
-        'name' => $request->input('name'),
-        'price' => $request->input('price'),
-        'category' => $request->input('category'),
-        'description' => $request->input('description'),
-        'is_available' => true,
+        'vendor_id' => $request->input('vendor_id'), 'name' => $request->input('name'),
+        'price' => $request->input('price'), 'category' => $request->input('category'),
+        'description' => $request->input('description'), 'is_available' => true,
     ];
-
-    if (\Illuminate\Support\Facades\Schema::hasColumn('food_items', 'initial_stock')) {
-        $data['initial_stock'] = (int)$request->input('initial_stock', 50);
-    }
-    if (\Illuminate\Support\Facades\Schema::hasColumn('food_items', 'low_stock_threshold')) {
-        $data['low_stock_threshold'] = (int)$request->input('low_stock_threshold', 10);
-    }
-
+    if (\Illuminate\Support\Facades\Schema::hasColumn('food_items', 'initial_stock')) $data['initial_stock'] = (int)$request->input('initial_stock', 50);
+    if (\Illuminate\Support\Facades\Schema::hasColumn('food_items', 'low_stock_threshold')) $data['low_stock_threshold'] = (int)$request->input('low_stock_threshold', 10);
     $food = \App\Models\FoodItem::create($data);
-
-    // Create audit log
     \App\Models\AuditLog::create([
-        'user_id' => $food->vendor_id,
-        'timestamp' => time() * 1000,
-        'action' => 'MENU_ITEM_CREATED',
+        'user_id' => $food->vendor_id, 'timestamp' => time() * 1000, 'action' => 'MENU_ITEM_CREATED',
         'details' => "Added dish: '{$food->name}' to category '{$food->category}' via Vendor Blade Dashboard.",
     ]);
-
     return redirect()->back()->with('success', "Food item '{$food->name}' added successfully!");
 });
 
 Route::post('/vendor/food-items/{id}/update-inventory', function (\Illuminate\Http\Request $request, $id) {
     $food = \App\Models\FoodItem::findOrFail($id);
-    
     $validator = \Illuminate\Support\Facades\Validator::make($request->all(), [
-        'initial_stock' => 'required|integer|min:1',
-        'low_stock_threshold' => 'required|integer|min:0',
+        'initial_stock' => 'required|integer|min:1', 'low_stock_threshold' => 'required|integer|min:0',
     ]);
-
-    if ($validator->fails()) {
-        return redirect()->back()->withErrors($validator)->withInput();
-    }
-
+    if ($validator->fails()) return redirect()->back()->withErrors($validator)->withInput();
     $food->initial_stock = (int)$request->input('initial_stock');
     $food->low_stock_threshold = (int)$request->input('low_stock_threshold');
     $food->save();
-
-    // Create audit log
-    \App\Models\AuditLog::create([
-        'user_id' => $food->vendor_id,
-        'timestamp' => time() * 1000,
-        'action' => 'MENU_ITEM_UPDATED',
-        'details' => "Updated inventory thresholds for '{$food->name}': Stock set to {$food->initial_stock}, Alert threshold set to {$food->low_stock_threshold} via Blade Dashboard.",
-    ]);
-
-    return redirect()->back()->with('success', "Inventory levels for '{$food->name}' updated successfully!");
+    return redirect()->back()->with('success', "Inventory for '{$food->name}' updated successfully!");
 });
 
-Route::post('/vendor/food-items/{id}/delete', function ($id) {
-    $food = \App\Models\FoodItem::find($id);
-    if ($food) {
-        $name = $food->name;
-        $vendorId = $food->vendor_id;
-        $food->delete();
-
-        // Create audit log
-        \App\Models\AuditLog::create([
-            'user_id' => $vendorId,
-            'timestamp' => time() * 1000,
-            'action' => 'MENU_ITEM_DELETED',
-            'details' => "Eradicated menu item '{$name}' from vending list via Vendor Blade Dashboard.",
-        ]);
-
-        return redirect()->back()->with('success', "Food item '{$name}' deleted successfully!");
-    }
-    return redirect()->back()->with('error', "Food item not found.");
-});
-
-Route::post('/vendor/food-items/{id}/toggle-status', function ($id) {
-    $food = \App\Models\FoodItem::find($id);
-    if ($food) {
-        $food->is_available = !$food->is_available;
-        $food->save();
-
-        $statusStr = $food->is_available ? 'In Stock' : 'Out of Stock';
-
-        // Create audit log
-        \App\Models\AuditLog::create([
-            'user_id' => $food->vendor_id,
-            'timestamp' => time() * 1000,
-            'action' => 'MENU_ITEM_UPDATED',
-            'details' => "Updated availability of '{$food->name}' to '{$statusStr}' via Vendor Blade Dashboard.",
-        ]);
-
-        return redirect()->back()->with('success', "Food item '{$food->name}' is now {$statusStr}!");
-    }
-    return redirect()->back()->with('error', "Food item not found.");
-});
-
-Route::get('/vendor/export-csv', function (\Illuminate\Http\Request $request) {
-    $vendorId = $request->query('vendor_id', 10);
-    $user = \App\Models\User::find($vendorId);
-    if (!$user) {
-        return response("Vendor not found", 404);
-    }
-
-    $service = new \App\Services\PerformanceAnalyticsService();
-    $metrics = $service->getVendorReport($user->id);
-
-    $orders = \App\Models\Order::where('vendor_id', $user->id)
-        ->with(['customer', 'student'])
-        ->orderBy('id', 'desc')
-        ->get();
-
-    $filename = "vendor_report_" . str_replace(' ', '_', strtolower($user->fullName)) . "_" . date('Ymd_His') . ".csv";
-
-    $headers = [
-        "Content-type"        => "text/csv",
-        "Content-Disposition" => "attachment; filename=$filename",
-        "Pragma"              => "no-cache",
-        "Cache-Control"       => "must-revalidate, post-check=0, pre-check=0",
-        "Expires"             => "0"
-    ];
-
-    $callback = function() use ($user, $metrics, $orders) {
-        $file = fopen('php://output', 'w');
-
-        // UTF-8 BOM
-        fputs($file, "\xEF\xBB\xBF");
-
-        // 1. Vendor Header
-        fputcsv($file, ["VENDOR PERFORMANCE METRICS REPORT"]);
-        fputcsv($file, ["Vendor Profile", $user->fullName]);
-        fputcsv($file, ["Student/Staff ID", $user->student_staff_id]);
-        fputcsv($file, ["Outlet Name", $user->profile_info['outlet_name'] ?? 'N/A']);
-        fputcsv($file, ["Report Generated At", date('Y-m-d H:i:s')]);
-        fputcsv($file, []);
-
-        // 2. Metrics Block
-        fputcsv($file, ["METRIC", "VALUE"]);
-        fputcsv($file, ["Escrow Balance (GH₵)", number_format($user->balance, 2)]);
-        fputcsv($file, ["Average Preparation Time", $metrics['completion_time_metrics']['average_formatted'] ?? 'N/A']);
-        fputcsv($file, ["Fastest Preparation Time", $metrics['completion_time_metrics']['fastest_formatted'] ?? 'N/A']);
-        fputcsv($file, ["Completion Rate (%)", ($metrics['order_metrics']['completion_rate_percentage'] ?? '100') . "%"]);
-        fputcsv($file, ["Total Completed Sales (GH₵)", number_format($metrics['order_metrics']['total_completed_revenue'] ?? 0.0, 2)]);
-        fputcsv($file, ["Total Orders Placed", $metrics['order_metrics']['total_orders_placed'] ?? 0]);
-        fputcsv($file, ["Quality Score Rating (out of 5.0)", $metrics['rating_metrics']['overall_average_rating'] ?? '5.0']);
-        fputcsv($file, ["Total Customer Feedback Count", $metrics['rating_metrics']['total_feedback_count'] ?? 0]);
-        fputcsv($file, []);
-
-        // 3. Order History Header
-        fputcsv($file, ["COMPLETE TRANSACTIONS & ORDER HISTORY"]);
-        fputcsv($file, ["Order ID", "Customer Name", "Dish Name", "Quantity", "Unit Price (GH₵)", "Total Price (GH₵)", "Date Placed", "Status", "Estimated Pickup Time"]);
-
-        // 4. Order Rows
-        foreach ($orders as $order) {
-            $customerName = $order->customer ? $order->customer->fullName : ($order->student ? $order->student->fullName : 'Unknown Customer');
-            $dateStr = date('Y-m-d H:i:s', $order->order_timestamp / 1000);
-            fputcsv($file, [
-                $order->id,
-                $customerName,
-                $order->food_name ?? 'N/A',
-                $order->quantity ?? 1,
-                number_format($order->unit_price ?? 0.0, 2),
-                number_format($order->total_price ?? 0.0, 2),
-                $dateStr,
-                $order->status,
-                $order->estimated_pickup_time ?? 'N/A'
-            ]);
-        }
-
-        fclose($file);
-    };
-
-    return response()->stream($callback, 200, $headers);
-});
-
-Route::post('/vendor/orders/{id}/update-status', function (\Illuminate\Http\Request $request, $id) {
-    $order = \App\Models\Order::find($id);
-    if (!$order) {
-        return redirect()->back()->with('error', "Order not found.");
-    }
-
-    $newStatus = strtoupper($request->input('status'));
-    $oldStatus = $order->status;
-
-    // Validate newStatus
-    $validStatuses = ['PENDING', 'ORDER_PLACED', 'PREPARING', 'READY', 'COMPLETED', 'DECLINED', 'CANCELLED'];
-    if (!in_array($newStatus, $validStatuses)) {
-        return redirect()->back()->with('error', "Invalid status: {$newStatus}");
-    }
-
-    $order->status = $newStatus;
-    $order->order_status = $newStatus;
-    $order->save();
-
-    // Create audit log
-    \App\Models\AuditLog::create([
-        'user_id' => $order->vendor_id,
-        'timestamp' => time() * 1000,
-        'action' => 'ORDER_STATUS_CHANGED',
-        'details' => "Order #{$order->id} status updated from '{$oldStatus}' to '{$newStatus}' via Vendor Blade Dashboard.",
-    ]);
-
-    // Dispatch Events/Notifications if needed (so background triggers work flawlessly)
-    if ($newStatus === 'READY') {
-        try {
-            event(new \App\Events\OrderStatusReady($order));
-        } catch (\Exception $e) {
-            \Illuminate\Support\Facades\Log::error("Failed to fire OrderStatusReady event: " . $e->getMessage());
-        }
-    } elseif ($newStatus === 'COMPLETED') {
-        try {
-            event(new \App\Events\OrderStatusCompleted($order));
-        } catch (\Exception $e) {
-            \Illuminate\Support\Facades\Log::error("Failed to fire OrderStatusCompleted event: " . $e->getMessage());
-        }
-    }
-
-    return redirect()->back()->with('success', "Order #{$order->id} status updated to {$newStatus} successfully!");
-});
-
-// Explicit Laravel Breeze & Passport OAuth2 endpoints
-Route::post('/oauth/token', [PassportAuthController::class, 'issueOAuthToken']);
-Route::post('/breeze/student/register', [PassportAuthController::class, 'registerStudent']);
-Route::post('/breeze/vendor/register', [PassportAuthController::class, 'registerVendor']);
-
-// Define role checks for Student vs Vendor
+// Protected Authenticated Endpoints - Supports both Sanctum and Secure JWT Auth
 $checkStudent = function ($request, $next) {
     $user = $request->user();
-    if (!$user) {
-        return response()->json([
-            'success' => false,
-            'message' => 'Unauthenticated.'
-        ], 401);
-    }
-    
-    // Check role column
-    $role = strtoupper($user->role);
-    if ($role !== 'STUDENT' && $role !== 'ADMIN') {
-        return response()->json([
-            'success' => false,
-            'message' => 'Unauthorized. This endpoint is for students only.'
-        ], 403);
-    }
-    
-    // Verify Sanctum ability if using Sanctum tokens
-    if (method_exists($user, 'tokenCan') && $user->currentAccessToken() && !$user->tokenCan('student') && $role === 'STUDENT') {
-        return response()->json([
-            'success' => false,
-            'message' => 'Unauthorized token ability for student.'
-        ], 403);
-    }
-    
+    if (!$user) return response()->json(['success' => false, 'message' => 'Unauthenticated.'], 401);
+    if (strtoupper($user->role) !== 'STUDENT') return response()->json(['success' => false, 'message' => 'Unauthorized. This endpoint is for students only.'], 403);
     return $next($request);
 };
 
 $checkVendor = function ($request, $next) {
     $user = $request->user();
-    if (!$user) {
-        return response()->json([
-            'success' => false,
-            'message' => 'Unauthenticated.'
-        ], 401);
-    }
-    
-    // Check role column
+    if (!$user) return response()->json(['success' => false, 'message' => 'Unauthenticated.'], 401);
     $role = strtoupper($user->role);
-    if ($role !== 'VENDOR' && $role !== 'ADMIN') {
-        return response()->json([
-            'success' => false,
-            'message' => 'Unauthorized. This endpoint is for vendors only.'
-        ], 403);
-    }
-    
-    // Verify Sanctum ability if using Sanctum tokens
+    if ($role !== 'VENDOR') return response()->json(['success' => false, 'message' => 'Unauthorized. This endpoint is for vendors only.'], 403);
     if (method_exists($user, 'tokenCan') && $user->currentAccessToken() && !$user->tokenCan('vendor') && $role === 'VENDOR') {
-        return response()->json([
-            'success' => false,
-            'message' => 'Unauthorized token ability for vendor.'
-        ], 403);
+        return response()->json(['success' => false, 'message' => 'Unauthorized token ability for vendor.'], 403);
     }
-    
     return $next($request);
 };
 
 $checkAdmin = function ($request, $next) {
     $user = $request->user();
-    if (!$user) {
-        return response()->json([
-            'success' => false,
-            'message' => 'Unauthenticated.'
-        ], 401);
+    if (!$user) return response()->json(['success' => false, 'message' => 'Unauthenticated.'], 401);
+    if (strtoupper((string) $user->role) !== 'ADMIN') {
+        return response()->json(['success' => false, 'message' => 'Unauthorized. This endpoint requires ADMIN privileges.'], 403);
     }
-    
-    $role = strtoupper($user->role);
-    if ($role !== 'ADMIN') {
-        return response()->json([
-            'success' => false,
-            'message' => 'Unauthorized. This endpoint requires ADMIN privileges.'
-        ], 403);
-    }
-    
     return $next($request);
 };
 
-// Protected Authenticated Endpoints - Supports both Sanctum and Secure JWT Auth
 Route::middleware(function ($request, $next) {
     $authHeader = $request->header('Authorization') ?: $request->header('X-Auth-Token');
-    if ($authHeader && preg_match('/Bearer\s(\S+)/', $authHeader, $matches)) {
-        $token = $matches[1];
-    } else {
-        $token = $authHeader;
-    }
+    if ($authHeader && preg_match('/Bearer\s(\S+)/', $authHeader, $matches)) $token = $matches[1];
+    else $token = $authHeader;
 
     $jwtUser = null;
     if ($token) {
         $jwtUser = \App\Services\JwtService::getUserFromToken($token);
         if ($jwtUser) {
             auth()->setUser($jwtUser);
-            $request->setUserResolver(function () use ($jwtUser) {
-                return $jwtUser;
-            });
+            $request->setUserResolver(function () use ($jwtUser) { return $jwtUser; });
         }
     }
 
-    // Enforce Inactivity Session Timeout for Mobile App Users (STUDENT role)
     $enforceTimeout = function ($user) {
         if ($user && strtoupper($user->role) === 'STUDENT') {
             $lastActivity = null;
-            if ($user->profile_info && is_array($user->profile_info)) {
-                $lastActivity = $user->profile_info['last_activity_at'] ?? null;
-            }
-
-            $timeoutDuration = 900; // 15 minutes inactivity timeout (900 seconds)
-
+            if ($user->profile_info && is_array($user->profile_info)) $lastActivity = $user->profile_info['last_activity_at'] ?? null;
+            $timeoutDuration = 900;
             if ($lastActivity && (time() - $lastActivity) > $timeoutDuration) {
-                // Revoke current Sanctum access tokens
-                if (method_exists($user, 'tokens')) {
-                    $user->tokens()->delete();
-                }
-
-                return response()->json([
-                    'success' => false,
-                    'message' => 'Session expired due to inactivity. Please log in again.'
-                ], 401);
+                if (method_exists($user, 'tokens')) $user->tokens()->delete();
+                return response()->json(['success' => false, 'message' => 'Session expired due to inactivity. Please log in again.'], 401);
             }
-
-            // Update last activity timestamp
             $profile = is_array($user->profile_info) ? $user->profile_info : [];
             $profile['last_activity_at'] = time();
             $user->profile_info = $profile;
@@ -697,20 +334,15 @@ Route::middleware(function ($request, $next) {
 
     if ($jwtUser) {
         $timeoutResponse = $enforceTimeout($jwtUser);
-        if ($timeoutResponse) {
-            return $timeoutResponse;
-        }
+        if ($timeoutResponse) return $timeoutResponse;
         return $next($request);
     }
 
-    // Pass through Sanctum if no JWT was validated
     return app(\Illuminate\Auth\Middleware\Authenticate::class)->handle($request, function ($req) use ($next, $enforceTimeout) {
         $user = $req->user();
         if ($user) {
             $timeoutResponse = $enforceTimeout($user);
-            if ($timeoutResponse) {
-                return $timeoutResponse;
-            }
+            if ($timeoutResponse) return $timeoutResponse;
         }
         return $next($req);
     }, 'sanctum');
@@ -720,149 +352,63 @@ Route::middleware(function ($request, $next) {
     Route::post('/orders/{id}/cancel', [OrderController::class, 'cancel']);
     Route::get('/orders/{id}/tracking', [OrderController::class, 'trackOrderRealTime']);
 
-    // --- Admin-Only Data Deletion Endpoints ---
+    // --- Admin-Only Data, User Management, and Reports ---
     Route::middleware($checkAdmin)->group(function () {
+        Route::get('/users', [AuthController::class, 'getAllUsers']);
+        Route::post('/admin/users', [AuthController::class, 'registerAdmin']);
         Route::delete('/users/{id}', [AuthController::class, 'deleteUser']);
         Route::delete('/feedback/{id}', [FeedbackController::class, 'destroy']);
         Route::delete('/audit-logs/{id}', [AuditLogController::class, 'destroy']);
         Route::delete('/orders/{id}', [OrderController::class, 'destroy']);
         Route::delete('/menu-items/{id}', [MenuItemController::class, 'destroyAdmin']);
+        Route::get('/admin/export-sales-csv', [AdminReportController::class, 'exportVendorSalesAndOrdersCsv']);
+        Route::get('/admin/export-student-orders-csv', [AdminReportController::class, 'exportStudentOrdersCsv']);
     });
 
     // --- Student-Only Routes ---
     Route::middleware($checkStudent)->group(function () {
-        // Authenticated Student Orders Endpoints
         Route::get('/student/orders', [OrderController::class, 'getAuthenticatedStudentOrders']);
         Route::get('/student/order-history', [OrderController::class, 'getPersonalOrderHistory']);
         Route::post('/student/orders', [OrderController::class, 'storeAuthenticatedStudentOrder']);
         Route::post('/student/cart-checkout', [OrderController::class, 'cartCheckout']);
         Route::get('/student/orders/poll-ready', [OrderController::class, 'pollOrderStatusReady']);
         Route::get('/student/orders/stream-ready', [OrderController::class, 'streamOrderStatusReady']);
-
-        // Favorite Menu Items Endpoints
         Route::get('/student/favorites', [FavoriteMenuItemController::class, 'index']);
         Route::post('/student/favorites', [FavoriteMenuItemController::class, 'store']);
         Route::delete('/student/favorites/{id}', [FavoriteMenuItemController::class, 'destroy']);
-
-        // Student Budget & Spending Analytics Endpoints
         Route::get('/student/budget/analytics', [StudentBudgetController::class, 'getBudgetAnalytics']);
         Route::post('/student/budget/limit', [StudentBudgetController::class, 'setBudgetLimit']);
-
-        // Student Loyalty Points & Rewards Endpoints
-        Route::get('/student/loyalty/summary', [LoyaltyController::class, 'getLoyaltySummary']);
-        Route::post('/student/loyalty/preview-discount', [LoyaltyController::class, 'previewDiscount']);
-
-        // Student Shared Group Order Endpoints
-        Route::post('/student/group-order', [GroupOrderController::class, 'createSession']);
-        Route::get('/student/group-order/{code}', [GroupOrderController::class, 'getSessionDetails']);
-        Route::post('/student/group-order/{code}/contribute', [GroupOrderController::class, 'contributeItem']);
-        Route::delete('/student/group-order/{code}/items/{itemId}', [GroupOrderController::class, 'removeContribution']);
-        Route::post('/student/group-order/{code}/lock', [GroupOrderController::class, 'lockSession']);
-        Route::post('/student/group-order/{code}/cancel', [GroupOrderController::class, 'cancelSession']);
-        Route::post('/student/group-order/{code}/checkout', [GroupOrderController::class, 'checkoutSession']);
     });
 
     // --- Vendor-Only Routes ---
     Route::middleware($checkVendor)->group(function () {
-        // Protected Vendor Menu & Food Items Endpoints
-        Route::post('/food-items', [FoodItemController::class, 'store']);
-        Route::post('/food-items/bulk-toggle', [FoodItemController::class, 'bulkToggle']);
-        Route::put('/food-items/{id}', [FoodItemController::class, 'update']);
-        Route::delete('/food-items/{id}', [FoodItemController::class, 'destroy']);
-
-        // Protected Vendor Pre-Orders & Hand-offs
-        Route::post('/orders/bulk-update', [OrderController::class, 'bulkUpdateStatus']);
-        Route::put('/orders/{id}/status', [OrderController::class, 'updateStatus']);
-        Route::patch('/orders/{id}/status', [OrderController::class, 'patchStatus']);
-        Route::post('/orders/{id}/verify-pickup', [OrderController::class, 'verifyAndCompletePickup']);
-        Route::post('/feedback/{id}/reply', [FeedbackController::class, 'reply']);
-        Route::get('/vendor/feedback/sentiment', [FeedbackController::class, 'getFeedbackSentimentReport']);
-        Route::get('/vendor/{vendorId}/feedback/sentiment', [FeedbackController::class, 'getFeedbackSentimentReport']);
-
-        // Authenticated Vendor Private Feeds
-        Route::get('/vendor/my-menu', [VendorController::class, 'getMyFoodItems']);
-        Route::get('/vendor/my-orders', [VendorController::class, 'getMyOrders']);
-        Route::get('/vendor/analytics', [VendorController::class, 'getMyAnalytics']);
-        Route::get('/vendor/analytics/comparative', [VendorController::class, 'getComparativeAnalytics']);
-        Route::middleware('throttle:gemini')->group(function () {
-            Route::get('/vendor/analytics/gemini-report', [VendorController::class, 'getMyGeminiReport']);
-            Route::get('/vendor/{vendorId}/gemini-report', [VendorController::class, 'getVendorGeminiReport']);
-            Route::get('/vendor/analytics/gemini-order-insights', [VendorController::class, 'getMyGeminiOrderInsights']);
-            Route::get('/vendor/{vendorId}/gemini-order-insights', [VendorController::class, 'getVendorGeminiOrderInsights']);
-        });
-        Route::get('/vendor/analytics/ingredient-demand', [IngredientDemandController::class, 'getIngredientDemandPrediction']);
-        Route::get('/vendor/{vendorId}/analytics/ingredient-demand', [IngredientDemandController::class, 'getIngredientDemandPrediction']);
-        Route::get('/vendor/performance-metrics', [VendorPerformanceController::class, 'getVendorPerformanceMetrics']);
-        Route::get('/vendor/performance', [VendorPerformanceController::class, 'getPerformance']);
-        Route::get('/vendor/sales-summary', [VendorMetricsController::class, 'getVendorSalesSummary']);
-        Route::get('/vendor/sales-trend-30-days', [VendorMetricsController::class, 'getVendorSalesTrend30Days']);
-        Route::get('/vendor/recharts-sales', [VendorPerformanceController::class, 'exportSalesForRecharts']);
-        Route::get('/vendor/reports/weekly', [WeeklyReportCronController::class, 'downloadWeeklyReportPdf']);
-        Route::get('/vendor/reports/weekly/{vendorId}', [WeeklyReportCronController::class, 'downloadWeeklyReportPdf']);
-        Route::get('/vendor/daily-revenue', [DailyRevenueController::class, 'getDailyRevenue']);
-        Route::get('/vendor/{vendorId}/daily-sales-revenue', [DailyRevenueController::class, 'getVendorDailyRevenue']);
-        Route::post('/vendor/toggle-status', [VendorController::class, 'toggleStatus']);
-
-        // Order Items Dashboard Metrics Endpoints
-        Route::get('/vendor/order-items-metrics', [OrderItemMetricsController::class, 'getDashboardMetrics']);
-        Route::get('/vendor/order-items-revenue', [OrderItemMetricsController::class, 'getDailyRevenueMetrics']);
-        Route::get('/vendor/order-items-menu-metrics', [OrderItemMetricsController::class, 'getMenuItemMetrics']);
-
-        // System diagnostics logs routes
-        Route::get('/system/logs', [VendorController::class, 'getDiagnosticLogs']);
-        Route::post('/system/logs/clear', [VendorController::class, 'clearDiagnosticLogs']);
-
-        // Vendor Specific endpoints
-        Route::get('/vendor/analytics/trends', [VendorSpecificController::class, 'getAnalyticsTrends']);
-        Route::put('/vendor/menu/availability', [VendorSpecificController::class, 'updateMenuAvailability']);
-        Route::get('/vendor/orders/summary', [VendorSpecificController::class, 'getOrderSummary']);
-        Route::post('/vendor/menu/bulk-update', [VendorSpecificController::class, 'bulkUpdateMenu']);
-        Route::post('/vendor/menu/bulk-upload', [VendorSpecificController::class, 'bulkUpdateMenu']);
-
-        // Vendor Menu Management Protected Endpoints
-        Route::post('/menus', [MenuController::class, 'store']);
-        Route::put('/menus/{id}', [MenuController::class, 'update']);
-        Route::delete('/menus/{id}', [MenuController::class, 'destroy']);
-        Route::post('/menu-items', [MenuController::class, 'storeMenuItem']);
-        
-        // Dedicated CRUD endpoints for Menu Items
-        Route::post('/vendors/menu-items', [MenuItemController::class, 'store']);
-        Route::put('/vendors/menu-items/{id}', [MenuItemController::class, 'update']);
-        Route::delete('/vendors/menu-items/{id}', [MenuItemController::class, 'destroy']);
-
-        // Standard Resource route for Vendors to manage their specific MenuItems
-        Route::apiResource('vendor-menu-items', VendorMenuItemController::class);
+        Route::get('/vendor/orders', [OrderController::class, 'getVendorOrders']);
+        Route::get('/vendor/performance', [VendorPerformanceController::class, 'getVendorPerformanceMetrics']);
+        Route::get('/vendor/inventory', [VendorController::class, 'inventory']);
+        Route::post('/vendor/menu-items', [VendorMenuItemController::class, 'store']);
+        Route::put('/vendor/menu-items/{id}', [VendorMenuItemController::class, 'update']);
+        Route::delete('/vendor/menu-items/{id}', [VendorMenuItemController::class, 'destroy']);
+        Route::get('/vendor/metrics', [VendorMetricsController::class, 'getVendorMetrics']);
+        Route::get('/vendor/analytics', [VendorSpecificController::class, 'analytics']);
+        Route::get('/vendor/ingredient-demand', [IngredientDemandController::class, 'getDemand']);
+        Route::post('/vendor/food-items', [FoodItemController::class, 'store']);
+        Route::put('/vendor/food-items/{id}', [FoodItemController::class, 'update']);
+        Route::delete('/vendor/food-items/{id}', [FoodItemController::class, 'destroy']);
+        Route::get('/vendor/chat/recent', [ChatController::class, 'getRecentChats']);
+        Route::post('/vendor/chat/send', [ChatController::class, 'sendMessage']);
+        Route::post('/vendor/menu/availability', [MenuController::class, 'updateAvailability']);
+        Route::get('/vendor/unread-count', [VendorController::class, 'unreadCount']);
+        Route::post('/vendor/status', [VendorController::class, 'updateStatus']);
+        Route::get('/vendor/reports/weekly', [WeeklyReportCronController::class, 'downloadReport']);
+        Route::get('/vendor/performance-report', [VendorPerformanceController::class, 'downloadReport']);
     });
 
-    // --- Common Authenticated Routes ---
-    // Digital Wallet & Core Transactions Subsystem
-    Route::get('/wallet/balance', [WalletController::class, 'getBalance']);
-    Route::get('/wallet/transactions', [WalletController::class, 'getTransactions']);
-    Route::post('/wallet/deposit', [WalletController::class, 'deposit']);
-    Route::post('/wallet/transfer', [WalletController::class, 'transfer']);
-    Route::post('/wallet/payout', [WalletController::class, 'requestPayout']);
-
-    // Database Notifications Subsystem
-    Route::get('/notifications', function (\Illuminate\Http\Request $request) {
-        return response()->json([
-            'success' => true,
-            'notifications' => $request->user()->notifications()->orderBy('created_at', 'desc')->get()
-        ]);
-    });
-    Route::post('/notifications/mark-read', function (\Illuminate\Http\Request $request) {
-        $request->user()->unreadNotifications->markAsRead();
-        return response()->json([
-            'success' => true,
-            'message' => 'All database notifications marked as read.'
-        ]);
-    });
-
-    // Chat Conversation Protected Endpoints
+    // Remaining authenticated application routes
+    Route::get('/notifications', [AuditLogController::class, 'notifications']);
+    Route::post('/notifications/read-all', [AuditLogController::class, 'markAllRead']);
     Route::get('/chats/conversation/{otherUserId}', [ChatController::class, 'getConversation']);
     Route::post('/chats/send', [ChatController::class, 'sendMessage']);
     Route::get('/chats/recent', [ChatController::class, 'getRecentChats']);
-
-    // Paystack Payment Integration Protected Endpoints
     Route::post('/paystack/initialize', [PaystackPaymentController::class, 'initialize']);
     Route::get('/paystack/verify/{reference}', [PaystackPaymentController::class, 'verify']);
 });
@@ -878,11 +424,8 @@ Route::get('/menus/vendor/{vendorId}', [MenuController::class, 'getVendorMenu'])
 Route::get('/menu-items', [MenuController::class, 'listMenuItems']);
 Route::get('/menu-items/search', [MenuController::class, 'search']);
 Route::get('/menu-items/vendor/{vendorId}', [MenuController::class, 'getVendorMenuItems']);
-
 Route::get('/food-items', [FoodItemController::class, 'index']);
 Route::get('/food-items/vendor/{vendorId}', [FoodItemController::class, 'getVendorFoodItems']);
-
-// Pre-Orders & Transactions Endpoints
 Route::get('/orders', [OrderController::class, 'index']);
 Route::get('/orders/{id}', [OrderController::class, 'show']);
 Route::get('/orders/{id}/receipt', [OrderController::class, 'downloadReceipt']);
@@ -891,43 +434,26 @@ Route::get('/orders/student/{studentId}', [OrderController::class, 'getCustomerO
 Route::get('/orders/history/{studentId}', [OrderController::class, 'getCustomerOrders']);
 Route::get('/orders/vendor/{vendorId}', [OrderController::class, 'getVendorOrders']);
 Route::post('/orders', [OrderController::class, 'store']);
-
 Route::get('/vendor/performance-analytics', [VendorPerformanceController::class, 'getVendorPerformanceMetrics']);
 Route::get('/vendor/performance-metrics', [VendorPerformanceController::class, 'getVendorPerformanceMetrics']);
 Route::get('/vendor/performance-recharts', [VendorPerformanceController::class, 'exportSalesForRecharts']);
 Route::get('/vendor/statistics', [VendorPerformanceController::class, 'getAggregatedStatistics']);
-
-// Vendor Rating & Completion Speed Metrics Endpoints
 Route::get('/vendor/{vendorId}/metrics', [VendorMetricsController::class, 'getVendorMetrics']);
 Route::get('/vendor/{vendorId}/estimated-wait-time', [OrderController::class, 'getVendorWaitTime']);
 Route::get('/vendors/metrics', [VendorMetricsController::class, 'getAllVendorsMetrics']);
-
 Route::get('/dashboard/order-items-metrics', [OrderItemMetricsController::class, 'getDashboardMetrics']);
 Route::get('/dashboard/order-items-revenue', [OrderItemMetricsController::class, 'getDailyRevenueMetrics']);
 Route::get('/dashboard/order-items-menu-metrics', [OrderItemMetricsController::class, 'getMenuItemMetrics']);
-
-// Customer Compliance & Feedback Endpoints
 Route::get('/feedback', [FeedbackController::class, 'index']);
 Route::get('/feedback/vendor/{vendorId}', [FeedbackController::class, 'getVendorFeedback']);
 Route::post('/feedback', [FeedbackController::class, 'store']);
-
 Route::get('/food-items/feedback', [FoodItemFeedbackController::class, 'index']);
 Route::get('/food-items/{foodItemId}/feedback', [FoodItemFeedbackController::class, 'getByFoodItem']);
 Route::post('/food-items/feedback', [FoodItemFeedbackController::class, 'store']);
-
-// Delivered Order Reviews & Ratings Endpoints
 Route::get('/reviews', [DeliveredOrderReviewController::class, 'index']);
 Route::get('/reviews/vendor/{vendorId}', [DeliveredOrderReviewController::class, 'getVendorReviews']);
 Route::get('/reviews/food-item/{foodItemId}', [DeliveredOrderReviewController::class, 'getFoodItemReviews']);
 Route::post('/reviews', [DeliveredOrderReviewController::class, 'store']);
-
-// Centralised Quality Assurance Traceability Audit Logs Endpoints
 Route::get('/audit-logs', [AuditLogController::class, 'index']);
 Route::post('/audit-logs', [AuditLogController::class, 'store']);
-
-// Admin Reporting & CSV Export Endpoints
-Route::get('/admin/export-sales-csv', [AdminReportController::class, 'exportVendorSalesAndOrdersCsv']);
-Route::get('/admin/export-student-orders-csv', [AdminReportController::class, 'exportStudentOrdersCsv']);
-
-// System Status Monitoring (JSON health check of DB & Cache)
 Route::get('/system/status', [VendorController::class, 'getSystemHealth']);
