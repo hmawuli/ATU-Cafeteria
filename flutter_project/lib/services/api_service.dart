@@ -5,7 +5,7 @@ import '../models/food_item.dart';
 import '../models/order.dart';
 
 class ApiService {
-  static String baseUrl = 'http://10.0.2.2:8000/api/'; // Change to your server URL or IP
+  static String baseUrl = 'http://10.0.2.2:8000/api/';
   static String? authToken;
 
   static Map<String, String> get _headers => {
@@ -14,28 +14,41 @@ class ApiService {
         if (authToken != null) 'Authorization': 'Bearer $authToken',
       };
 
-  // 1. Authentication
-  static Future<Map<String, dynamic>> login(String username, String password) async {
+  /// Authenticate against the Laravel API.
+  /// The PIN is sent only over the configured transport and is hashed server-side.
+  static Future<Map<String, dynamic>> login(String username, String pin) async {
     try {
       final response = await http.post(
         Uri.parse('${baseUrl}login'),
         headers: _headers,
-        body: jsonEncode({'username': username, 'password': password}),
+        body: jsonEncode({'username': username.trim(), 'pin': pin}),
       );
-      if (response.statusCode == 200) {
-        final data = jsonDecode(response.body);
-        if (data['token'] != null) {
-          authToken = data['token'];
-        }
-        return {'success': true, 'user': User.fromJson(data['user'])};
+
+      final data = jsonDecode(response.body) as Map<String, dynamic>;
+      if (response.statusCode == 200 && data['success'] == true && data['token'] != null && data['user'] != null) {
+        authToken = data['token'] as String;
+        return {'success': true, 'user': User.fromJson(data['user'] as Map<String, dynamic>)};
       }
-      return {'success': false, 'message': 'Invalid credentials'};
+
+      return {
+        'success': false,
+        'message': data['message'] ?? 'Authentication failed.',
+      };
     } catch (e) {
-      return {'success': false, 'message': e.toString()};
+      return {'success': false, 'message': 'Unable to reach authentication server.'};
     }
   }
 
-  // 2. Fetch Food Items
+  static Future<void> logout() async {
+    try {
+      if (authToken != null) {
+        await http.post(Uri.parse('${baseUrl}logout'), headers: _headers);
+      }
+    } finally {
+      authToken = null;
+    }
+  }
+
   static Future<List<FoodItem>> getFoodItems() async {
     try {
       final response = await http.get(Uri.parse('${baseUrl}food-items'), headers: _headers);
@@ -43,13 +56,10 @@ class ApiService {
         final List<dynamic> data = jsonDecode(response.body);
         return data.map((item) => FoodItem.fromJson(item)).toList();
       }
-    } catch (e) {
-      // Fallback
-    }
+    } catch (_) {}
     return [];
   }
 
-  // 3. Place Order
   static Future<Order?> placeOrder({
     required int customerId,
     required int vendorId,
@@ -73,53 +83,37 @@ class ApiService {
         'points_to_redeem': pointsToRedeem,
         'estimated_pickup_time': estimatedPickupTime,
       };
-
-      final response = await http.post(
-        Uri.parse('${baseUrl}orders'),
-        headers: _headers,
-        body: jsonEncode(body),
-      );
-
+      final response = await http.post(Uri.parse('${baseUrl}orders'), headers: _headers, body: jsonEncode(body));
       if (response.statusCode == 200 || response.statusCode == 201) {
         final data = jsonDecode(response.body);
         return Order.fromJson(data['order'] ?? data);
       }
-    } catch (e) {
-      // Fallback
-    }
+    } catch (_) {}
     return null;
   }
 
-  // 4. Update Order Status
   static Future<bool> updateOrderStatus(int vendorId, int orderId, String newStatus, {String? estimatedTime}) async {
     try {
       final response = await http.put(
         Uri.parse('${baseUrl}vendor/$vendorId/orders/$orderId/status'),
         headers: _headers,
-        body: jsonEncode({
-          'status': newStatus,
-          'estimated_pickup_time': estimatedTime,
-        }),
+        body: jsonEncode({'status': newStatus, 'estimated_pickup_time': estimatedTime}),
       );
       return response.statusCode == 200;
-    } catch (e) {
+    } catch (_) {
       return false;
     }
   }
 
-  // 5. Verify Pickup PIN
   static Future<bool> verifyPickup(int vendorId, String pin) async {
     try {
       final response = await http.post(
         Uri.parse('${baseUrl}vendor/orders/verify-pickup'),
         headers: _headers,
-        body: jsonEncode({
-          'vendor_id': vendorId,
-          'pickup_pin': pin,
-        }),
+        body: jsonEncode({'vendor_id': vendorId, 'pickup_pin': pin}),
       );
       return response.statusCode == 200;
-    } catch (e) {
+    } catch (_) {
       return false;
     }
   }
