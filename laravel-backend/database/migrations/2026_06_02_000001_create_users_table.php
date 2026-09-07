@@ -14,7 +14,7 @@ return new class extends Migration
         Schema::create('users', function (Blueprint $table) {
             $table->id();
             $table->string('username')->unique();
-            $table->string('password'); // Represents SHA-256 string for PIN codes
+            $table->string('password'); // Laravel adaptive password hash (bcrypt/argon configuration).
             $table->string('role');     // STUDENT, VENDOR, ADMIN
             $table->string('fullName');
             $table->string('student_staff_id')->nullable()->unique(); // ATU Student or Staff unique identifier registration ID
