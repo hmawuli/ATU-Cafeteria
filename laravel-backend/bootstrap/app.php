@@ -27,24 +27,19 @@ return Application::configure(basePath: dirname(__DIR__))
             'api/*',
         ]);
 
-        // Configure API group specific middleware
         $middleware->api(append: [
             'throttle:api',
         ]);
-        
-        // Add CORS support
+
+        // Explicit authorization alias. Authentication itself is Sanctum.
+        $middleware->alias([
+            'admin' => \App\Http\Middleware\AdminMiddleware::class,
+        ]);
+
         $middleware->append(\Illuminate\Http\Middleware\HandleCors::class);
-
-        // Security headers middleware
         $middleware->append(\App\Http\Middleware\SecureHeadersMiddleware::class);
-
-        // Request performance logging middleware
         $middleware->append(\App\Http\Middleware\RequestPerformanceLogMiddleware::class);
-
-        // System error database logger middleware
         $middleware->append(\App\Http\Middleware\SystemErrorLoggerMiddleware::class);
-
-        // Audit and sanitize incoming order requests middleware
         $middleware->append(\App\Http\Middleware\AuditAndSanitizeOrderMiddleware::class);
     })
     ->withExceptions(function (Exceptions $exceptions) {
