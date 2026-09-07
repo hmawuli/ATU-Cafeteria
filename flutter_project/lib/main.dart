@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 import 'providers/auth_provider.dart';
 import 'providers/cafeteria_provider.dart';
 import 'screens/login_screen.dart';
+import 'viewmodel/cafeteria_provider.dart' as admin_data;
 
 void main() {
   runApp(const ATUCafeteriaApp());
@@ -17,6 +18,8 @@ class ATUCafeteriaApp extends StatelessWidget {
       providers: [
         ChangeNotifierProvider(create: (_) => AuthProvider()),
         ChangeNotifierProvider(create: (_) => CafeteriaProvider()),
+        // Admin dashboard uses the richer local/remote data provider.
+        ChangeNotifierProvider(create: (_) => admin_data.CafeteriaProvider()),
       ],
       child: MaterialApp(
         title: 'ATU Cafeteria',
