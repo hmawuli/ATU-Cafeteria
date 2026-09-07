@@ -3,92 +3,77 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
-use App\Models\User;
 use App\Models\AuditLog;
-use App\Services\JwtService;
+use App\Models\User;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Validator;
-
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Validator;
 
 class AuthController extends Controller
 {
     /**
-     * Register a new user in the cafeteria system.
-     *
-     * ADMIN is intentionally excluded from public registration.
-     * Administrator accounts must be created by an existing ADMIN.
+     * Public registration. ADMIN can never be self-assigned here.
      */
     public function register(Request $request)
     {
         $validator = Validator::make($request->all(), [
-            'username' => 'required|string|max:255',
-            'pin' => 'required|string|min:4', // Pre-hashed SHA-256 PIN from android
+            'username' => 'required|string|max:255|unique:users,username',
+            'pin' => 'required|string|min:4|max:128',
             'role' => 'required|string|in:STUDENT,VENDOR',
             'fullName' => 'required|string|max:255',
-            'info' => 'nullable|string',
+            'info' => 'nullable|string|max:1000',
         ]);
 
         if ($validator->fails()) {
             return response()->json([
                 'success' => false,
                 'message' => 'Input validation failed.',
-                'errors' => $validator->errors()
-            ], 400);
+                'errors' => $validator->errors(),
+            ], 422);
         }
 
-        // Check if username already exists
-        $existing = User::where('username', $request->input('username'))->first();
-        if ($existing) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Username already exists.'
-            ], 400);
-        }
-
-        // Create safety rollback boundary for registration
         $user = DB::transaction(function () use ($request) {
-            $createdUser = User::create([
+            $created = User::create([
                 'username' => $request->input('username'),
-                'password' => $request->input('pin'), // Stored pre-hashed
+                'password' => Hash::make($request->input('pin')),
                 'role' => strtoupper($request->input('role')),
                 'fullName' => $request->input('fullName'),
-                'info' => $request->input('info') ?? '',
+                'info' => $request->input('info', ''),
             ]);
 
-            // Register Audit Log
             AuditLog::create([
-                'user_id' => $createdUser->id,
+                'user_id' => $created->id,
                 'timestamp' => time() * 1000,
                 'action' => 'USER_REGISTRATION',
-                'details' => "Registered {$createdUser->fullName} as {$createdUser->role} via Laravel API.",
+                'details' => "Registered {$created->fullName} as {$created->role}.",
             ]);
 
-            return $createdUser;
+            return $created;
         });
 
-        // Generate JWT access token
-        $token = JwtService::generateToken($user);
-        $response = $user->toArray();
-        $response['token'] = $token;
-
-        return response()->json($response, 201)->header('X-Auth-Token', $token);
+        return $this->tokenResponse($user, 'Registration successful.', 201);
     }
 
     /**
-     * Create an administrator account.
-     *
-     * This endpoint must only be called by an already authenticated ADMIN.
-     * Public registration can never self-assign the ADMIN role.
+     * Create an administrator. The route is protected by Sanctum + admin middleware.
      */
     public function registerAdmin(Request $request)
     {
+        $creator = $request->user();
+        if (!$creator || strtoupper((string) $creator->role) !== 'ADMIN') {
+            return response()->json([
+                'success' => false,
+                'message' => 'Forbidden. Only an authenticated ADMIN can create administrators.',
+            ], 403);
+        }
+
         $validator = Validator::make($request->all(), [
             'username' => 'required|string|max:255|unique:users,username',
-            'pin' => 'required|string|min:4',
+            'pin' => 'required|string|min:4|max:128',
             'fullName' => 'required|string|max:255',
             'student_staff_id' => 'nullable|string|max:255|unique:users,student_staff_id',
-            'info' => 'nullable|string',
+            'info' => 'nullable|string|max:1000',
         ]);
 
         if ($validator->fails()) {
@@ -99,29 +84,21 @@ class AuthController extends Controller
             ], 422);
         }
 
-        $creator = $request->user();
-        if (!$creator || strtoupper((string) $creator->role) !== 'ADMIN') {
-            return response()->json([
-                'success' => false,
-                'message' => 'Unauthorized. Only an existing ADMIN can create another administrator.',
-            ], 403);
-        }
-
         $admin = DB::transaction(function () use ($request, $creator) {
             $created = User::create([
                 'username' => $request->input('username'),
-                'password' => $request->input('pin'),
+                'password' => Hash::make($request->input('pin')),
                 'role' => 'ADMIN',
                 'fullName' => $request->input('fullName'),
                 'student_staff_id' => $request->input('student_staff_id'),
-                'info' => $request->input('info') ?? 'ATU Cafeteria Administration',
+                'info' => $request->input('info', 'ATU Cafeteria Administration'),
             ]);
 
             AuditLog::create([
                 'user_id' => $creator->id,
                 'timestamp' => time() * 1000,
                 'action' => 'ADMIN_ACCOUNT_CREATED',
-                'details' => "Administrator {$created->fullName} (ID {$created->id}) created by ADMIN {$creator->fullName}.",
+                'details' => "Administrator account {$created->username} (ID {$created->id}) created by ADMIN {$creator->username}.",
             ]);
 
             return $created;
@@ -130,136 +107,158 @@ class AuthController extends Controller
         return response()->json([
             'success' => true,
             'message' => 'Administrator account created successfully.',
-            'user' => $admin->toArray(),
+            'user' => $admin,
         ], 201);
     }
 
     /**
-     * Authenticate and return the user profile.
+     * Authenticate with the raw PIN over HTTPS. Laravel hashes it server-side.
+     * A legacy SHA-256 value is accepted once and upgraded to a modern password hash.
      */
     public function login(Request $request)
     {
         $validator = Validator::make($request->all(), [
-            'username' => 'required|string',
-            'pin' => 'required|string', // Pre-hashed SHA-256 PIN
+            'username' => 'required|string|max:255',
+            'pin' => 'required|string|max:128',
         ]);
 
         if ($validator->fails()) {
             return response()->json([
                 'success' => false,
-                'message' => 'Both username and pin are required.'
-            ], 400);
+                'message' => 'Username and PIN are required.',
+                'errors' => $validator->errors(),
+            ], 422);
         }
 
         $user = User::where('username', $request->input('username'))->first();
+        if (!$user || !$this->verifyAndUpgradePassword($user, $request->input('pin'))) {
+            if ($user) {
+                AuditLog::create([
+                    'user_id' => $user->id,
+                    'timestamp' => time() * 1000,
+                    'action' => 'AUTH_FAILURE',
+                    'details' => 'Failed authentication attempt.',
+                ]);
+            }
 
-        if (!$user) {
             return response()->json([
                 'success' => false,
-                'message' => 'Invalid Username or Pass-PIN.'
+                'message' => 'Invalid username or PIN.',
             ], 401);
         }
 
-        // Compares directly. Since the android client hashes the raw pin with SHA-256,
-        // we store and compare the pre-hashed SHA-256 strings directly for absolute simplicity.
-        if ($user->password === $request->input('pin')) {
-            // Register Audit Log
-            AuditLog::create([
-                'user_id' => $user->id,
-                'timestamp' => time() * 1000,
-                'action' => 'USER_AUTHENTICATION',
-                'details' => "Successfully logged in via Laravel API.",
-            ]);
-
-            // Secure JWT token issue
-            $token = JwtService::generateToken($user);
-            $responseData = $user->toArray();
-            $responseData['token'] = $token;
-
-            return response()->json($responseData, 200)->header('X-Auth-Token', $token);
-        }
-
-        // Record failed login attempt
         AuditLog::create([
             'user_id' => $user->id,
             'timestamp' => time() * 1000,
-            'action' => 'AUTH_FAILURE',
-            'details' => "Failed login attempt with wrong PIN on Laravel API.",
+            'action' => 'USER_AUTHENTICATION',
+            'details' => 'Successful authentication.',
         ]);
 
-        return response()->json([
-            'success' => false,
-            'message' => 'Invalid Username or Pass-PIN.'
-        ], 401);
+        return $this->tokenResponse($user, 'Login successful.', 200);
     }
 
-    /**
-     * Retrieve all users. Route is ADMIN-only.
-     */
-    public function getAllUsers()
+    private function verifyAndUpgradePassword(User $user, string $pin): bool
     {
-        $users = User::all();
-        return response()->json($users, 200);
-    }
-
-    /**
-     * Delete user by ID. Route is ADMIN-only.
-     */
-    public function deleteUser($id)
-    {
-        $user = User::find($id);
-        if (!$user) {
-            return response()->json([
-                'success' => false,
-                'message' => 'User not found.'
-            ], 404);
+        if (Hash::check($pin, (string) $user->password)) {
+            if (Hash::needsRehash((string) $user->password)) {
+                $user->password = Hash::make($pin);
+                $user->save();
+            }
+            return true;
         }
 
-        $fullName = $user->fullName;
-        $user->delete();
+        // One-time migration path for accounts created by the old SHA-256 scheme.
+        $legacyHash = hash('sha256', $pin);
+        if (hash_equals((string) $user->password, $legacyHash)) {
+            $user->password = Hash::make($pin);
+            $user->save();
+            return true;
+        }
+
+        return false;
+    }
+
+    private function tokenResponse(User $user, string $message, int $status)
+    {
+        $ability = match (strtoupper((string) $user->role)) {
+            'ADMIN' => 'admin',
+            'VENDOR' => 'vendor',
+            default => 'student',
+        };
+
+        $token = $user->createToken('atu_cafeteria_'.$ability.'_token', [$ability])->plainTextToken;
 
         return response()->json([
             'success' => true,
-            'message' => "User '{$fullName}' has been erased successfully."
-        ], 200);
+            'message' => $message,
+            'user' => $user,
+            'token' => $token,
+        ], $status)->header('X-Auth-Token', $token);
     }
 
-    /**
-     * Terminate session and revoke Sanctum access tokens.
-     */
+    public function getAllUsers(Request $request)
+    {
+        return response()->json([
+            'success' => true,
+            'users' => User::orderBy('role')->orderBy('id')->get(),
+        ]);
+    }
+
+    public function deleteUser(Request $request, $id)
+    {
+        $admin = $request->user();
+        $user = User::find($id);
+
+        if (!$user) {
+            return response()->json(['success' => false, 'message' => 'User not found.'], 404);
+        }
+
+        if ($admin && $admin->id === $user->id) {
+            return response()->json(['success' => false, 'message' => 'An administrator cannot delete their own active account.'], 422);
+        }
+
+        $fullName = $user->fullName;
+        DB::transaction(function () use ($user, $admin, $fullName) {
+            $user->tokens()->delete();
+            $user->delete();
+            AuditLog::create([
+                'user_id' => $admin->id,
+                'timestamp' => time() * 1000,
+                'action' => 'ADMIN_USER_DELETED',
+                'details' => "Administrator deleted user '{$fullName}'.",
+            ]);
+        });
+
+        return response()->json(['success' => true, 'message' => "User '{$fullName}' deleted successfully."]);
+    }
+
     public function logout(Request $request)
     {
         $user = $request->user();
-        if ($user) {
-            try {
-                if (method_exists($user, 'currentAccessToken') && $user->currentAccessToken()) {
-                    $user->currentAccessToken()->delete();
-                }
-            } catch (\Exception $e) {
-                // Ignore exception if using stateless JWT
-            }
-            return response()->json([
-                'success' => true,
-                'message' => 'Secure Token invalidated successfully.'
-            ], 200);
+        if (!$user) {
+            return response()->json(['success' => false, 'message' => 'Unauthenticated.'], 401);
         }
-        return response()->json([
-            'success' => false,
-            'message' => 'No active authenticated session.'
-        ], 401);
+
+        $token = method_exists($user, 'currentAccessToken') ? $user->currentAccessToken() : null;
+        if ($token) {
+            $token->delete();
+        }
+
+        AuditLog::create([
+            'user_id' => $user->id,
+            'timestamp' => time() * 1000,
+            'action' => 'USER_LOGOUT',
+            'details' => 'User logged out and current access token was revoked.',
+        ]);
+
+        return response()->json(['success' => true, 'message' => 'Logged out successfully.']);
     }
 
-    /**
-     * Update the authenticated user's profile info.
-     */
     public function updateProfile(Request $request)
     {
-        $user = auth()->user();
+        $user = $request->user();
         if (!$user) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Unauthorized or no active session found.'
-            ], 401);
+            return response()->json(['success' => false, 'message' => 'Unauthenticated.'], 401);
         }
 
         $validator = Validator::make($request->all(), [
@@ -270,61 +269,31 @@ class AuthController extends Controller
             'department' => 'nullable|string|max:255',
             'program_of_study' => 'nullable|string|max:255',
             'payment_methods' => 'nullable|array',
-            'info' => 'nullable|string',
+            'info' => 'nullable|string|max:1000',
         ]);
 
         if ($validator->fails()) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Profile validation failed.',
-                'errors' => $validator->errors()
-            ], 400);
+            return response()->json(['success' => false, 'message' => 'Profile validation failed.', 'errors' => $validator->errors()], 422);
         }
 
-        // Fetch user with write-safety
-        $dbUser = User::find($user->id);
-        if (!$dbUser) {
-            return response()->json([
-                'success' => false,
-                'message' => 'User not found in system.'
-            ], 404);
-        }
+        if ($request->has('fullName')) $user->fullName = $request->input('fullName');
+        if ($request->has('student_staff_id')) $user->student_staff_id = $request->input('student_staff_id');
+        if ($request->has('info')) $user->info = $request->input('info');
 
-        if ($request->has('fullName')) {
-            $dbUser->fullName = $request->input('fullName');
+        $profile = is_array($user->profile_info) ? $user->profile_info : [];
+        foreach (['phone_number', 'email', 'department', 'program_of_study', 'payment_methods'] as $key) {
+            if ($request->has($key)) $profile[$key] = $request->input($key);
         }
-        if ($request->has('student_staff_id')) {
-            $dbUser->student_staff_id = $request->input('student_staff_id');
-        }
-        if ($request->has('info')) {
-            $dbUser->info = $request->input('info');
-        }
+        $user->profile_info = $profile;
+        $user->save();
 
-        // Merge existing profile_info with the incoming values
-        $currentProfileInfo = is_array($dbUser->profile_info) ? $dbUser->profile_info : [];
-
-        $profileKeys = ['phone_number', 'email', 'department', 'program_of_study', 'payment_methods'];
-        foreach ($profileKeys as $key) {
-            if ($request->has($key)) {
-                $currentProfileInfo[$key] = $request->input($key);
-            }
-        }
-
-        $dbUser->profile_info = $currentProfileInfo;
-        $dbUser->save();
-
-        // Create audit log for profile update
         AuditLog::create([
-            'user_id' => $dbUser->id,
+            'user_id' => $user->id,
             'timestamp' => time() * 1000,
             'action' => 'PROFILE_UPDATE',
-            'details' => "Updated profile information for user: {$dbUser->username}",
+            'details' => "Updated profile information for {$user->username}.",
         ]);
 
-        return response()->json([
-            'success' => true,
-            'message' => 'Profile updated successfully.',
-            'user' => $dbUser
-        ], 200);
+        return response()->json(['success' => true, 'message' => 'Profile updated successfully.', 'user' => $user]);
     }
 }
