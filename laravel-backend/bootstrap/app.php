@@ -15,6 +15,10 @@ return Application::configure(basePath: dirname(__DIR__))
             Route::middleware('api')
                 ->prefix('api/v1')
                 ->group(__DIR__.'/../routes/api.php');
+
+            // Keep administrator endpoints in a small, auditable route file.
+            Route::middleware('api')
+                ->group(__DIR__.'/../routes/admin.php');
         }
     )
     ->withMiddleware(function (Middleware $middleware) {
