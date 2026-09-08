@@ -12,30 +12,18 @@ return Application::configure(basePath: dirname(__DIR__))
         commands: __DIR__.'/../routes/console.php',
         health: '/up',
         then: function () {
-            Route::middleware('api')
-                ->prefix('api/v1')
-                ->group(__DIR__.'/../routes/api.php');
-
-            // Keep administrator endpoints in a small, auditable route file.
-            Route::middleware('api')
-                ->group(__DIR__.'/../routes/admin.php');
+            Route::middleware('api')->prefix('api/v1')->group(__DIR__.'/../routes/api.php');
+            Route::middleware('api')->group(__DIR__.'/../routes/admin.php');
+            Route::middleware('api')->group(__DIR__.'/../routes/vendor_staff.php');
         }
     )
     ->withMiddleware(function (Middleware $middleware) {
-        // Disable CSRF verification for API endpoints
-        $middleware->validateCsrfTokens(except: [
-            'api/*',
-        ]);
-
-        $middleware->api(append: [
-            'throttle:api',
-        ]);
-
-        // Explicit authorization alias. Authentication itself is Sanctum.
+        $middleware->validateCsrfTokens(except: ['api/*']);
+        $middleware->api(append: ['throttle:api']);
         $middleware->alias([
             'admin' => \App\Http\Middleware\AdminMiddleware::class,
+            'vendor' => \App\Http\Middleware\VendorMiddleware::class,
         ]);
-
         $middleware->append(\Illuminate\Http\Middleware\HandleCors::class);
         $middleware->append(\App\Http\Middleware\SecureHeadersMiddleware::class);
         $middleware->append(\App\Http\Middleware\RequestPerformanceLogMiddleware::class);
