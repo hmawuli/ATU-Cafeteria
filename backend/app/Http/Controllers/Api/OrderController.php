@@ -523,6 +523,25 @@ class OrderController extends Controller
         $oldStatus = $order->status;
         $newStatus = $request->input('status');
 
+        // Enforce the order lifecycle on the server; clients cannot skip arbitrary states.
+        $allowedTransitions = [
+            'PENDING' => ['ORDER_PLACED', 'PREPARING', 'DECLINED', 'CANCELLED'],
+            'ORDER_PLACED' => ['PREPARING', 'DECLINED', 'CANCELLED'],
+            'PREPARING' => ['READY', 'CANCELLED'],
+            'READY' => ['OUT_FOR_DELIVERY', 'COMPLETED'],
+            'OUT_FOR_DELIVERY' => ['COMPLETED'],
+            'DELIVERED' => ['COMPLETED'],
+            'COMPLETED' => [],
+            'DECLINED' => [],
+            'CANCELLED' => [],
+        ];
+        if ($role !== 'ADMIN' && !in_array($newStatus, $allowedTransitions[$oldStatus] ?? [], true)) {
+            return response()->json([
+                'success' => false,
+                'message' => "Invalid order transition from {$oldStatus} to {$newStatus}.",
+            ], 409);
+        }
+
         $updatedOrder = DB::transaction(function () use ($order, $request, $vendorId, $oldStatus, $newStatus) {
             $order->status = $newStatus;
             $order->order_status = $newStatus;
