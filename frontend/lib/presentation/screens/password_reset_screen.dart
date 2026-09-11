@@ -10,7 +10,7 @@ class PasswordResetScreen extends StatefulWidget {
 }
 
 class _PasswordResetScreenState extends State<PasswordResetScreen> {
-  final TextEditingController _usernameController = TextEditingController();
+  final TextEditingController _emailController = TextEditingController();
   final TextEditingController _codeController = TextEditingController();
   final TextEditingController _passwordController = TextEditingController();
   bool _sent = false;
@@ -28,7 +28,7 @@ class _PasswordResetScreenState extends State<PasswordResetScreen> {
     final username = _usernameController.text.trim();
     if (username.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Enter your username or student ID.')),
+        const SnackBar(content: Text('Enter the email address associated with your account.')),
       );
       return;
     }
@@ -57,16 +57,16 @@ class _PasswordResetScreenState extends State<PasswordResetScreen> {
     final code = _codeController.text.trim();
     final password = _passwordController.text;
 
-    if (code.length != 6 || password.length < 4) {
+    if (code.length != 6 || password.length < 8) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Enter a valid 6-digit code and a password/PIN of at least 4 characters.')),
+        const SnackBar(content: Text('Enter a valid 6-digit code and a at least 8 characters.')),
       );
       return;
     }
 
     setState(() => _loading = true);
     final provider = context.read<CafeteriaProvider>();
-    final ok = await provider.resetPassword(username, code, password);
+    final ok = await provider.resetPassword(email, code, password);
     if (!mounted) return;
     setState(() => _loading = false);
 
@@ -107,7 +107,7 @@ class _PasswordResetScreenState extends State<PasswordResetScreen> {
                       controller: _usernameController,
                       enabled: !_sent,
                       decoration: const InputDecoration(
-                        labelText: 'Username / Student ID',
+                        labelText: 'Email address',
                         border: OutlineInputBorder(),
                       ),
                     ),
@@ -127,7 +127,7 @@ class _PasswordResetScreenState extends State<PasswordResetScreen> {
                         controller: _passwordController,
                         obscureText: true,
                         decoration: const InputDecoration(
-                          labelText: 'New password / PIN',
+                          labelText: 'New password',
                           border: OutlineInputBorder(),
                         ),
                       ),
