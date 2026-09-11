@@ -221,8 +221,8 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
           final u = v['user'] ?? {};
           return ListTile(
             leading: const CircleAvatar(child: Icon(Icons.storefront_rounded)),
-            title: Text('\${v['store_name'] ?? v['name'] ?? 'Vendor'}'),
-            subtitle: Text('\${u['fullName'] ?? ''} • \${v['operational_status'] ?? 'UNKNOWN'}'),
+            title: Text('${v['store_name'] ?? v['name'] ?? 'Vendor'}'),
+            subtitle: Text('${u['fullName'] ?? ''} • ${v['operational_status'] ?? 'UNKNOWN'}'),
             trailing: PopupMenuButton<String>(
               onSelected: (x) => s.changeVendorStatus(v['id'], x),
               itemBuilder: (_) => const [
