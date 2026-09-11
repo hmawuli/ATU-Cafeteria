@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../providers/cart_provider.dart';
+import '../../core/network/api_client.dart';
 
 class CheckoutScreen extends StatefulWidget {
   const CheckoutScreen({super.key});
@@ -9,6 +10,8 @@ class CheckoutScreen extends StatefulWidget {
 class _CheckoutScreenState extends State<CheckoutScreen> {
   String _method = 'Wallet';
   bool _submitting = false;
+  final ApiClient _api = ApiClient();
+  @override void dispose() { _api.close(); super.dispose(); }
   @override Widget build(BuildContext context) {
     final cart = context.watch<CartProvider>();
     final total = cart.subtotal;
@@ -56,7 +59,24 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
       actions:[TextButton(onPressed:()=>Navigator.pop(ctx,false),child:const Text('Review')),FilledButton(onPressed:()=>Navigator.pop(ctx,true),child:const Text('Confirm'))],
     ));
     if(ok==true && mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content:Text('Order submission is ready for the connected payment/order service.')));
+      setState(()=>_submitting=true);
+      try {
+        final result = await _api.post('/student/cart-checkout', body: {'items': cart.toCheckoutPayload()});
+        if (!mounted) return;
+        context.read<CartProvider>().clear();
+        await showDialog<void>(context: context, builder: (ctx) => AlertDialog(
+          title: const Text('Order placed successfully'),
+          content: Text(result is Map && result['message'] != null ? result['message'].toString() : 'Your order has been sent to the cafeteria.'),
+          actions: [FilledButton(onPressed: () => Navigator.pop(ctx), child: const Text('Done'))],
+        ));
+        if (mounted) Navigator.pop(context);
+      } on ApiException catch (e) {
+        if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.message)));
+      } catch (_) {
+        if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Unable to place the order. Please try again.')));
+      } finally {
+        if (mounted) setState(()=>_submitting=false);
+      }
     }
   }
 }
