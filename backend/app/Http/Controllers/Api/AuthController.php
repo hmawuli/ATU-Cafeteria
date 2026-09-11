@@ -75,39 +75,59 @@ class AuthController extends Controller
     public function register(Request $request)
     {
         $validator = Validator::make($request->all(), [
-            'username' => 'required|string|max:255|unique:users,username',
-            'pin' => 'required|string|min:4|max:128',
+            'email' => 'required|email|max:255',
+            'password' => 'required|string|min:8|max:128',
             'role' => 'required|string|in:STUDENT,VENDOR',
             'fullName' => 'required|string|max:255',
             'info' => 'nullable|string|max:1000',
-            'email' => 'nullable|email|max:255',
         ]);
 
         if ($validator->fails()) {
-            return response()->json(['success' => false, 'message' => 'Validation failed.', 'errors' => $validator->errors()], 422);
+            return response()->json([
+                'success' => false,
+                'message' => 'Please provide a valid name, email address, password, and account type.',
+                'errors' => $validator->errors(),
+            ], 422);
         }
 
-        $user = DB::transaction(function () use ($request) {
+        $email = strtolower(trim($request->input('email')));
+        if (User::where('username', $email)
+            ->orWhereRaw("JSON_UNQUOTE(JSON_EXTRACT(profile_info, '$.email')) = ?", [$email])
+            ->exists()) {
+            return response()->json([
+                'success' => false,
+                'message' => 'An account with this email address already exists.',
+            ], 409);
+        }
+
+        $user = DB::transaction(function () use ($request, $email) {
             $user = User::create([
-                'username' => trim($request->input('username')),
-                'password' => Hash::make($request->input('pin')),
+                'username' => $email,
+                'password' => Hash::make($request->input('password')),
                 'role' => strtoupper($request->input('role')),
                 'fullName' => trim($request->input('fullName')),
-                'info' => $request->input('info') ?? '',
-                'profile_info' => array_filter(['email' => $request->input('email')], fn ($value) => filled($value)),
+                'info' => trim((string) $request->input('info', '')),
+                'profile_info' => ['email' => $email],
+                'account_status' => 'ACTIVE',
             ]);
+
             AuditLog::create([
-                'user_id' => $user->id, 'timestamp' => time() * 1000,
+                'user_id' => $user->id,
+                'timestamp' => time() * 1000,
                 'action' => 'USER_REGISTRATION',
                 'details' => "Registered {$user->fullName} as {$user->role} via Laravel API.",
             ]);
+
             return $user;
         });
 
-        $token = $user->createToken(strtolower($user->role).'_token', [strtolower($user->role)])->plainTextToken;
+        $token = $user->createToken(strtolower($user->role) . '_token', [strtolower($user->role)])->plainTextToken;
+
         return response()->json([
-            'success' => true, 'message' => 'Account created successfully.',
-            'user' => $user, 'token' => $token,
+            'success' => true,
+            'message' => 'Account created successfully.',
+            'user' => $user,
+            'token' => $token,
         ], 201)->header('X-Auth-Token', $token);
     }
 
