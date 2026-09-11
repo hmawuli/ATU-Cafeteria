@@ -138,12 +138,11 @@ class _RegisterScreenState extends State<RegisterScreen> {
                         validator: (value) {
                           final email = value?.trim() ?? '';
                           if (email.isEmpty) return 'Enter your email address.';
-                          if (!RegExp(r'^[^@\s]+@[^@\s]+\.[^@\s]+).hasMatch(email)) {
+                          if (!RegExp(r'^[^@\\s]+@[^@\\s]+\\.[^@\\s]+$').hasMatch(email)) {
                             return 'Enter a valid email address.';
                           }
                           return null;
                         },
-                      ),
                       const SizedBox(height: 16),
                       TextFormField(
                         controller: _passwordController,
@@ -163,7 +162,6 @@ class _RegisterScreenState extends State<RegisterScreen> {
                         validator: (value) =>
                             value == null || value.length < 8 ? 'Use at least 8 characters.' : null,
                       ),
-                      const SizedBox(height: 16),
                       const SizedBox(height: 16),
                       TextFormField(
                         controller: _infoController,
