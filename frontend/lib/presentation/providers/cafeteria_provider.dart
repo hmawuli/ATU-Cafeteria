@@ -531,10 +531,10 @@ class CafeteriaProvider extends ChangeNotifier {
     return false;
   }
 
-  Future<bool> requestPasswordReset(String username) async {
+  Future<bool> requestPasswordReset(String email) async {
     try {
       await _authRequest(
-          'POST', 'password/forgot', {'username': username.trim()});
+          'POST', 'password/forgot', {'email': email.trim().toLowerCase()});
       return true;
     } catch (e) {
       _loginError = e.toString();
@@ -543,10 +543,10 @@ class CafeteriaProvider extends ChangeNotifier {
     }
   }
 
-  Future<bool> resetPassword(String username, String code, String pin) async {
+  Future<bool> resetPassword(String email, String code, String password) async {
     try {
       await _authRequest('POST', 'password/reset',
-          {'username': username.trim(), 'code': code.trim(), 'pin': pin});
+          {'email': email.trim().toLowerCase(), 'code': code.trim(), 'password': password});
       return true;
     } catch (e) {
       _loginError = e.toString();
@@ -1666,9 +1666,8 @@ PREDICTIVE RECONSTRUCTIONS & NEXT STEPS:
           ..set(HttpHeaders.contentTypeHeader, 'application/json')
           ..set(HttpHeaders.acceptHeader, 'application/json');
         request.add(utf8.encode(json.encode({
-          'username': normalizedEmail,
-          'pin': password,
           'email': normalizedEmail,
+          'password': password,
         })));
 
         final response = await request.close();
