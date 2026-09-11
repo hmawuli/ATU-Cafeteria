@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 import 'package:intl/intl.dart';
 import 'package:atu_cafeteria/domain/models/models.dart' as models;
 import 'package:atu_cafeteria/presentation/providers/cafeteria_provider.dart';
+import 'package:atu_cafeteria/presentation/widgets/professional_widgets.dart';
 
 class StudentDashboardScreen extends StatefulWidget {
   const StudentDashboardScreen({super.key});
@@ -14,6 +15,8 @@ class StudentDashboardScreen extends StatefulWidget {
 class _StudentDashboardScreenState extends State<StudentDashboardScreen> {
   int _activeTab = 0; // 0: Browse Food, 1: Track Orders, 2: Smart Wallet & ID
   String _selectedCategory = 'All';
+  final _searchController = TextEditingController();
+  String _searchQuery = '';
 
   final List<String> _categories = [
     'All',
@@ -116,9 +119,24 @@ class _StudentDashboardScreenState extends State<StudentDashboardScreen> {
     if (_selectedCategory != 'All') {
       list = list.where((item) => item.category == _selectedCategory).toList();
     }
+    if (_searchQuery.isNotEmpty) {
+      final q = _searchQuery.toLowerCase();
+      list = list.where((item) => item.name.toLowerCase().contains(q) || item.description.toLowerCase().contains(q) || item.category.toLowerCase().contains(q)).toList();
+    }
 
     return Column(
       children: [
+        Padding(
+          padding: const EdgeInsets.fromLTRB(12, 14, 12, 4),
+          child: Row(children: [
+            Expanded(child: Text('Good food, right on campus.', style: Theme.of(context).textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.w900))),
+            IconButton(onPressed: () => provider.refreshAllData(), icon: const Icon(Icons.refresh_rounded), tooltip: 'Refresh'),
+          ]),
+        ),
+        Padding(
+          padding: const EdgeInsets.fromLTRB(12, 8, 12, 4),
+          child: AppSearchField(controller: _searchController, hint: 'Search meals, categories...', onChanged: (v) => setState(() => _searchQuery = v.trim())),
+        ),
         // Announcement bar
         Container(
           width: double.infinity,
@@ -270,8 +288,7 @@ class _StudentDashboardScreenState extends State<StudentDashboardScreen> {
         // Food Grid / List
         Expanded(
           child: list.isEmpty
-              ? const Center(
-                  child: Text("No meals available in this category."))
+              ? AppEmptyState(icon: Icons.restaurant_rounded, title: "No meals found", message: _searchQuery.isEmpty ? "There are no meals available in this category right now." : "Try another meal name or category.")
               : ListView.builder(
                   padding: const EdgeInsets.all(12),
                   itemCount: list.length,
