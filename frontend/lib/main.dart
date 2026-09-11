@@ -34,6 +34,8 @@ class ATUCafeteriaApp extends StatelessWidget {
         title: 'ATU Cafeteria',
         debugShowCheckedModeBanner: false,
         theme: AppTheme.light(),
+        darkTheme: AppTheme.dark(),
+        themeMode: ThemeMode.system,
         home: const AuthGate(),
         routes: {
           '/login': (_) => const LoginScreen(),
