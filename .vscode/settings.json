@@ -1,0 +1,17 @@
+{
+  "search.exclude": {
+    "**/.dart_tool": true,
+    "**/build": true,
+    "**/.gradle": true,
+    "**/vendor": true,
+    "**/.git": true,
+    "**/node_modules": true
+  },
+  "files.watcherExclude": {
+    "**/.dart_tool/**": true,
+    "**/build/**": true,
+    "**/.gradle/**": true,
+    "**/vendor/**": true,
+    "**/node_modules/**": true
+  }
+}

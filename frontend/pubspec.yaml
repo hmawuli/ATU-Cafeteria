@@ -1,0 +1,29 @@
+name: atu_cafeteria
+description: ATU Cafeteria Food Ordering & Real-Time Live Order Tracking Application
+publish_to: 'none'
+version: 1.1.0+2
+
+environment:
+  sdk: '>=3.0.0 <4.0.0'
+
+dependencies:
+  flutter:
+    sdk: flutter
+  provider: ^6.1.1
+  http: ^1.2.0
+  intl: ^0.19.0
+  path: ^1.9.0
+  sqflite: ^2.3.3+1
+  qr_flutter: ^4.1.0
+  flutter_secure_storage: ^9.2.2
+
+# Keep the Flutter client lean on low-memory development machines.
+# Removed heavy/unused UI packages. The client uses native Flutter widgets and SQLite.
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^3.0.0
+
+flutter:
+  uses-material-design: true
