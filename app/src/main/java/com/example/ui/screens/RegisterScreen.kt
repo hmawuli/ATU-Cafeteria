@@ -1,0 +1,338 @@
+package com.example.ui.screens
+import com.example.ui.util.generatePdfReceipt
+
+import androidx.compose.animation.*
+import androidx.compose.animation.core.*
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ExitToApp
+import androidx.compose.material.icons.filled.*
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.input.PasswordVisualTransformation
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import androidx.compose.ui.window.Dialog
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.delay
+import androidx.navigation.NavController
+import com.example.data.*
+import com.example.ui.components.D3DashboardChart
+import com.example.ui.components.RechartsDashboardChart
+import com.example.ui.components.RechartsFeedbackDashboardChart
+import com.example.ui.components.ChartJsVendorPerformanceChart
+import com.example.ui.components.InventoryTrackingHub
+import com.example.ui.components.DailyRevenueBarChart
+import com.example.ui.components.RadarFeedbackChart
+import com.example.ui.components.StudentTrendsLineChart
+import com.example.ui.components.VendorPerformanceTrendChart
+import com.example.ui.components.WeeklyRevenueTrendLineChart
+import com.example.ui.components.LaravelDailyRevenueTrendChart
+import com.example.ui.viewmodel.CafeteriaViewModel
+
+// ==========================================
+// 1. APP AUTHENTICATION SCREEN
+// ==========================================
+
+@OptIn(ExperimentalMaterial3Api::class)
+
+
+@Composable
+fun RegisterScreen(
+    viewModel: CafeteriaViewModel,
+    navController: NavController,
+    modifier: Modifier = Modifier
+) {
+    var username by remember { mutableStateOf("") }
+    var pinCode by remember { mutableStateOf("") }
+    var fullName by remember { mutableStateOf("") }
+    var info by remember { mutableStateOf("") }
+    var userCategory by remember { mutableStateOf("STUDENT") } // "STUDENT" or "GUEST"
+    var role by remember { mutableStateOf("STUDENT") }
+
+    val regSuccess by viewModel.registrationSuccess.collectAsStateWithLifecycle()
+    val loginError by viewModel.loginError.collectAsStateWithLifecycle()
+    val isLoading by viewModel.isLoading.collectAsStateWithLifecycle()
+
+    Scaffold(
+        topBar = {
+            TopAppBar(
+                title = { Text("ENROLL PORTAL", fontWeight = FontWeight.Bold) },
+                navigationIcon = {
+                    IconButton(onClick = { navController.popBackStack() }) {
+                        Icon(Icons.Default.ArrowBack, contentDescription = "Back")
+                    }
+                }
+            )
+        }
+    ) { innerPadding ->
+        Column(
+            modifier = modifier
+                .fillMaxSize()
+                .padding(innerPadding)
+                .background(MaterialTheme.colorScheme.background)
+                .padding(24.dp)
+                .verticalScroll(rememberScrollState()),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.Top
+        ) {
+            Text(
+                if (userCategory == "GUEST") "Create Visitor Account" else "Create Student Account",
+                style = MaterialTheme.typography.headlineSmall,
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.primary
+            )
+            Text(
+                if (userCategory == "GUEST") 
+                    "Visiting Accra Technical University? Register for instant food ordering with MoMo/Card wallet" 
+                else 
+                    "Create your account to order meals, track deliveries, and manage your campus cafeteria wallet",
+                style = MaterialTheme.typography.bodySmall,
+                textAlign = TextAlign.Center,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(top = 4.dp, bottom = 16.dp)
+            )
+
+            // Account Type Selector Tabs (Student vs Visitor)
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(bottom = 16.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                FilterChip(
+                    selected = userCategory == "STUDENT",
+                    onClick = { userCategory = "STUDENT" },
+                    label = { Text("ATU Student", fontWeight = FontWeight.Bold) },
+                    leadingIcon = {
+                        Icon(Icons.Default.School, contentDescription = null, modifier = Modifier.size(16.dp))
+                    },
+                    modifier = Modifier.weight(1f)
+                )
+                FilterChip(
+                    selected = userCategory == "GUEST",
+                    onClick = { userCategory = "GUEST" },
+                    label = { Text("Guest / Visitor", fontWeight = FontWeight.Bold) },
+                    leadingIcon = {
+                        Icon(Icons.Default.PersonOutline, contentDescription = null, modifier = Modifier.size(16.dp))
+                    },
+                    modifier = Modifier.weight(1f)
+                )
+            }
+
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(16.dp),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
+            ) {
+                Column(modifier = Modifier.padding(20.dp)) {
+                    Text("Account Details", fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleMedium)
+                    Spacer(modifier = Modifier.height(16.dp))
+
+                    OutlinedTextField(
+                        value = fullName,
+                        onValueChange = { fullName = it },
+                        label = { Text("Full Name") },
+                        placeholder = { Text(if (userCategory == "GUEST") "e.g. Visitor Kwesi" else "e.g. Mawuli Hormeku") },
+                        modifier = Modifier.fillMaxWidth(),
+                        singleLine = true
+                    )
+
+                    Spacer(modifier = Modifier.height(12.dp))
+
+                    if (userCategory == "STUDENT") {
+                        OutlinedTextField(
+                            value = info,
+                            onValueChange = { info = it },
+                            label = { Text("Student Index / Matric ID Number") },
+                            placeholder = { Text("e.g., 01210492B or ATU-2024-X45") },
+                            modifier = Modifier.fillMaxWidth(),
+                            singleLine = true
+                        )
+                    } else {
+                        OutlinedTextField(
+                            value = info,
+                            onValueChange = { info = it },
+                            label = { Text("Phone / National ID / Pass (Optional)") },
+                            placeholder = { Text("e.g., 0244123456 or leave blank") },
+                            modifier = Modifier.fillMaxWidth(),
+                            singleLine = true
+                        )
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Text(
+                            "✨ No student ID needed! A digital visitor dining pass will be generated automatically.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.primary,
+                            fontSize = 11.sp
+                        )
+                    }
+
+                    Spacer(modifier = Modifier.height(12.dp))
+
+                    OutlinedTextField(
+                        value = username,
+                        onValueChange = { username = it },
+                        label = { Text("Email or Username") },
+                        placeholder = { Text(if (userCategory == "GUEST") "e.g. visitor@gmail.com or kwame" else "e.g. student@atu.edu.gh") },
+                        modifier = Modifier.fillMaxWidth(),
+                        singleLine = true
+                    )
+
+                    Spacer(modifier = Modifier.height(12.dp))
+
+                    var isPinVisible by remember { mutableStateOf(false) }
+
+                    OutlinedTextField(
+                        value = pinCode,
+                        onValueChange = { pinCode = it },
+                        label = { Text("4-Digit Access PIN or Password") },
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
+                        visualTransformation = if (isPinVisible) androidx.compose.ui.text.input.VisualTransformation.None else PasswordVisualTransformation(),
+                        trailingIcon = {
+                            IconButton(onClick = { isPinVisible = !isPinVisible }) {
+                                Icon(
+                                    if (isPinVisible) Icons.Default.VisibilityOff else Icons.Default.Visibility,
+                                    contentDescription = if (isPinVisible) "Hide PIN" else "Show PIN"
+                                )
+                            }
+                        },
+                        modifier = Modifier.fillMaxWidth(),
+                        singleLine = true
+                    )
+
+                    loginError?.let {
+                        Spacer(modifier = Modifier.height(12.dp))
+                        Text(it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.Bold)
+                    }
+
+                    if (regSuccess) {
+                        Spacer(modifier = Modifier.height(14.dp))
+                        Card(
+                            colors = CardDefaults.cardColors(containerColor = Color(0xFFE8F5E9)),
+                            modifier = Modifier.fillMaxWidth(),
+                            shape = RoundedCornerShape(12.dp)
+                        ) {
+                            Column(modifier = Modifier.padding(14.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Icon(Icons.Default.CheckCircle, contentDescription = null, tint = Color(0xFF2E7D32), modifier = Modifier.size(20.dp))
+                                    Spacer(modifier = Modifier.width(8.dp))
+                                    Text(
+                                        "Account Created Successfully!",
+                                        color = Color(0xFF2E7D32),
+                                        fontWeight = FontWeight.Bold,
+                                        fontSize = 14.sp
+                                    )
+                                }
+                                Spacer(modifier = Modifier.height(6.dp))
+                                Text(
+                                    if (userCategory == "GUEST")
+                                        "Your visitor pass is ready with GH₵ 150.00 starting cafeteria balance."
+                                    else
+                                        "Your profile has been enlisted with GH₵ 150.00 starting wallet credit.",
+                                    color = Color(0xFF1B5E20),
+                                    fontSize = 12.sp,
+                                    textAlign = TextAlign.Center
+                                )
+                                Spacer(modifier = Modifier.height(10.dp))
+                                Button(
+                                    onClick = { navController.popBackStack() },
+                                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF2E7D32)),
+                                    shape = RoundedCornerShape(8.dp),
+                                    modifier = Modifier.fillMaxWidth()
+                                ) {
+                                    Text("Proceed to Login Now", color = Color.White, fontWeight = FontWeight.Bold)
+                                }
+                            }
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(20.dp))
+
+                    if (isLoading) {
+                        CircularProgressIndicator(modifier = Modifier.align(Alignment.CenterHorizontally))
+                    } else if (!regSuccess) {
+                        Button(
+                            onClick = {
+                                val generatedId = if (info.isBlank()) {
+                                    if (userCategory == "GUEST") "GUEST-${(1000..9999).random()}" else "01210${(100..999).random()}B"
+                                } else info
+
+                                viewModel.registerUser(
+                                    username = username.trim().lowercase(),
+                                    pinCode = pinCode,
+                                    role = role,
+                                    fullName = fullName,
+                                    info = generatedId
+                                )
+                            },
+                            modifier = Modifier.fillMaxWidth(),
+                            shape = RoundedCornerShape(8.dp)
+                        ) {
+                            Text(if (userCategory == "GUEST") "Create Visitor Account" else "Enlist New Profile", fontWeight = FontWeight.Bold)
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(12.dp))
+
+                    TextButton(
+                        onClick = { navController.popBackStack() },
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Text("Already have an account? Sign in here", color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.SemiBold)
+                    }
+                }
+            }
+        }
+    }
+}
+
+data class ScheduledMeal(
+    val id: Int,
+    val foodItem: FoodItem,
+    val quantity: Int,
+    val targetTime: String,
+    val dateLabel: String,
+    val specs: String,
+    val isPaid: Boolean,
+    val barcodeSeed: String
+)
+
+fun getNutritionalProfile(food: FoodItem): Triple<Float, Float, Float> {
+    val nameLower = food.name.lowercase()
+    return when {
+        nameLower.contains("rice") || nameLower.contains("jollof") || nameLower.contains("waakye") -> Triple(18f, 112f, 12f)
+        nameLower.contains("fufu") || nameLower.contains("soup") || nameLower.contains("banku") -> Triple(22f, 125f, 14f)
+        nameLower.contains("egg") || nameLower.contains("oat") || nameLower.contains("breakfast") || nameLower.contains("bread") -> Triple(14f, 45f, 10f)
+        nameLower.contains("chicken") || nameLower.contains("meat") || nameLower.contains("fish") -> Triple(32f, 15f, 11f)
+        food.category == "Drinks" -> Triple(0f, 38f, 0f)
+        food.category == "Snacks" -> Triple(8f, 50f, 15f)
+        else -> Triple(12f, 75f, 10f)
+    }
+}

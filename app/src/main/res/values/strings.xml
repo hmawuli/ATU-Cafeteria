@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">ATU Cafeteria</string>
+    <string name="settings_title">Centralized Cafeteria Settings</string>
+    <string name="language_selection">Application Language</string>
+    <string name="language_english">English (🇬🇧)</string>
+    <string name="language_french">French (Français 🇫🇷)</string>
+    <string name="check_for_updates">Check for Updates</string>
+    <string name="in_app_update_title">In-App Update Status</string>
+    <string name="app_up_to_date">Your app is running the latest version.</string>
+    <string name="offline_mode_active">Offline Mode Active</string>
+    <string name="online_mode_active">Online Mode Active</string>
+    <string name="add_to_cart">Add to Cart</string>
+    <string name="place_order">Place Order</string>
+    <string name="order_history">Order History</string>
+</resources>
