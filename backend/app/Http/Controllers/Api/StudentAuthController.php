@@ -18,17 +18,15 @@ class StudentAuthController extends Controller
     public function register(Request $request)
     {
         $validator = Validator::make($request->all(), [
-            'username' => 'required|string|max:255',
-            'pin' => 'required|string|min:4|max:128',
+            'email' => 'required|email|max:255',
+            'password' => 'required|string|min:8|max:128',
             'fullName' => 'required|string|max:255',
-            'email' => 'nullable|email|max:255',
-            'studentId' => 'required|string|max:255', // Maps to 'info' field
         ]);
 
         if ($validator->fails()) {
             return response()->json([
                 'success' => false,
-                'message' => 'Student registration input validation failed.',
+                'message' => 'Please provide a valid email address, password, and full name.',
                 'errors' => $validator->errors()
             ], 400);
         }
@@ -45,8 +43,8 @@ class StudentAuthController extends Controller
         // Create the student user inside a transaction
         $user = DB::transaction(function () use ($request) {
             $createdUser = User::create([
-                'username' => $request->input('username'),
-                'password' => Hash::make($request->input('pin')),
+                'username' => strtolower(trim($request->input('email'))),
+                'password' => Hash::make($request->input('password')),
                 'role' => 'STUDENT',
                 'fullName' => $request->input('fullName'),
                 'info' => $request->input('studentId'),
@@ -82,18 +80,21 @@ class StudentAuthController extends Controller
     public function login(Request $request)
     {
         $validator = Validator::make($request->all(), [
-            'username' => 'required|string',
-            'pin' => 'required|string|min:4|max:128',
+            'email' => 'required|email|max:255',
+            'password' => 'required|string|min:8|max:128',
         ]);
 
         if ($validator->fails()) {
             return response()->json([
                 'success' => false,
-                'message' => 'Both username and pin are required.'
+                'message' => 'Email address and password are required.'
             ], 400);
         }
 
-        $user = User::where('username', $request->input('username'))->first();
+        $email = strtolower(trim($request->input('email')));
+        $user = User::where('username', $email)
+            ->orWhereRaw("JSON_UNQUOTE(JSON_EXTRACT(profile_info, '$.email')) = ?", [$email])
+            ->first();
 
         // Enforce student role and valid credentials
         if (!$user || $user->role !== 'STUDENT') {
@@ -104,8 +105,8 @@ class StudentAuthController extends Controller
         }
 
         // Compare direct PIN (Pre-hashed from clients)
-        if (Hash::check($request->input('pin'), (string) $user->password) || Hash::check(hash('sha256', $request->input('pin')), (string) $user->password) || hash_equals((string) $user->password, hash('sha256', $request->input('pin')))) {
-            if (!Hash::check($request->input('pin'), (string) $user->password)) { $user->password = Hash::make($request->input('pin')); $user->saveQuietly(); }
+        if (Hash::check($request->input('password'), (string) $user->password)) {
+            
             // Register Audit Log
             AuditLog::create([
                 'user_id' => $user->id,
@@ -131,12 +132,12 @@ class StudentAuthController extends Controller
             'user_id' => $user->id,
             'timestamp' => time() * 1000,
             'action' => 'STUDENT_AUTH_FAILURE',
-            'details' => "Failed student login attempt with wrong PIN.",
+            'details' => 'Failed student login attempt with invalid password.',
         ]);
 
         return response()->json([
             'success' => false,
-            'message' => 'Invalid Pin-Code hash.'
+            'message' => 'Invalid credentials.'
         ], 401);
     }
 }
