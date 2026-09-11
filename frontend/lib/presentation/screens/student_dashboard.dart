@@ -304,92 +304,13 @@ class _StudentDashboardScreenState extends State<StudentDashboardScreen> {
                           info: 'Registered Chef'),
                     );
 
-                    return Card(
-                      shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12)),
-                      clipBehavior: Clip.antiAlias,
-                      child: Padding(
-                        padding: const EdgeInsets.all(12.0),
-                        child: Row(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Container(
-                              width: 80,
-                              height: 80,
-                              decoration: BoxDecoration(
-                                color: Theme.of(context)
-                                    .colorScheme
-                                    .primary
-                                    .withOpacity(0.08),
-                                borderRadius: BorderRadius.circular(8),
-                              ),
-                              child: Icon(
-                                _categoryIcon(item.category),
-                                size: 36,
-                                color: Theme.of(context).colorScheme.primary,
-                              ),
-                            ),
-                            const SizedBox(width: 16),
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(
-                                    item.name,
-                                    style: const TextStyle(
-                                        fontWeight: FontWeight.bold,
-                                        fontSize: 16),
-                                  ),
-                                  const SizedBox(height: 4),
-                                  Text(
-                                    "Vendor: ${vendor.fullName} (${vendor.info})",
-                                    style: TextStyle(
-                                        color: Colors.blueGrey[600], fontSize: 12),
-                                  ),
-                                  const SizedBox(height: 4),
-                                  Text(
-                                    item.description,
-                                    maxLines: 2,
-                                    overflow: TextOverflow.ellipsis,
-                                    style: TextStyle(
-                                        color: Colors.blueGrey[500], fontSize: 11),
-                                  ),
-                                  const SizedBox(height: 8),
-                                  Row(
-                                    mainAxisAlignment:
-                                        MainAxisAlignment.spaceBetween,
-                                    children: [
-                                      Text(
-                                        "GH₵ ${item.price.toStringAsFixed(2)}",
-                                        style: TextStyle(
-                                          fontWeight: FontWeight.w900,
-                                          fontSize: 15,
-                                          color: Theme.of(context)
-                                              .colorScheme
-                                              .primary,
-                                        ),
-                                      ),
-                                      ElevatedButton.icon(
-                                        onPressed: () => _showOrderSheet(
-                                            context, item, provider),
-                                        icon: const Icon(
-                                            Icons.add_shopping_cart,
-                                            size: 16),
-                                        label: const Text("ORDER"),
-                                        style: ElevatedButton.styleFrom(
-                                          minimumSize: const Size(80, 32),
-                                          padding: const EdgeInsets.symmetric(
-                                              horizontal: 12),
-                                        ),
-                                      ),
-                                    ],
-                                  )
-                                ],
-                              ),
-                            )
-                          ],
-                        ),
-                      ),
+                    return FoodCard(
+                      name: item.name,
+                      description: item.description,
+                      category: item.category,
+                      price: item.price,
+                      available: item.isAvailable,
+                      onAdd: () => provider.addToCart(item),
                     );
                   },
                 ),
