@@ -401,17 +401,17 @@ class CafeteriaProvider extends ChangeNotifier {
     notifyListeners();
 
     final normalizedEmail = email.trim().toLowerCase();
-    if (normalizedEmail.isEmpty || !RegExp(r'^[^@\s]+@[^@\s]+\.[^@\s]+
+    final validEmail = RegExp(r'^[^@\\s]+@[^@\\s]+\\.[^@\\s]+$').hasMatch(normalizedEmail);
+    if (!validEmail || password.length < 8) {
+      _loginError = 'Enter a valid email address and a password of at least 8 characters.';
       _isLoading = false;
       notifyListeners();
       return false;
     }
 
-    // Production path: authenticate against Laravel first.
     try {
       final loginUrl = Uri.parse('$_laravelBaseUrl/api/login');
-      final client = HttpClient()
-        ..connectionTimeout = const Duration(seconds: 4);
+      final client = HttpClient()..connectionTimeout = const Duration(seconds: 5);
       try {
         final request = await client.postUrl(loginUrl);
         request.headers
@@ -432,8 +432,7 @@ class CafeteriaProvider extends ChangeNotifier {
 
         if (response.statusCode == 200 && decoded['requires_2fa'] == true) {
           _requiresTwoFactor = true;
-          _loginError =
-              decoded['message']?.toString() ?? 'Verification code required.';
+          _loginError = decoded['message']?.toString() ?? 'Verification code required.';
           _isLoading = false;
           notifyListeners();
           return false;
@@ -443,39 +442,25 @@ class CafeteriaProvider extends ChangeNotifier {
           final payload = decoded['user'] is Map
               ? Map<String, dynamic>.from(decoded['user'] as Map)
               : decoded;
-          final remoteUser = User.fromJson(payload).copyWith(
+          _currentUser = User.fromJson(payload).copyWith(
             username: normalizedEmail,
             passwordHash: _localCacheCredentialHash(password),
           );
-          _currentUser = remoteUser;
-          _authToken = decoded['token']?.toString() ??
-              response.headers.value('x-auth-token');
+          _authToken = decoded['token']?.toString() ?? response.headers.value('x-auth-token');
           if (_authToken != null && _authToken!.isNotEmpty) {
-            await SecureSessionStore.save(
-                token: _authToken!, username: normalizedEmail);
+            await SecureSessionStore.save(token: _authToken!, username: normalizedEmail);
           }
-
-          // Cache the authenticated profile for resilient/offline reads.
           try {
-            if (remoteUser.id != null) {
-              await _db.insertUser(remoteUser);
-            }
-          } catch (_) {
-            // Cache failure must not invalidate a successful remote login.
-          }
-
+            if (_currentUser!.id != null) await _db.insertUser(_currentUser!);
+          } catch (_) {}
           await refreshAllData();
           _isLoading = false;
           notifyListeners();
           return true;
         }
 
-        // A real authentication response must not silently become an offline login.
-        if (response.statusCode == 400 ||
-            response.statusCode == 401 ||
-            response.statusCode == 403) {
-          _loginError =
-              decoded['message']?.toString() ?? 'Invalid username or PIN.';
+        if (response.statusCode == 400 || response.statusCode == 401 || response.statusCode == 403) {
+          _loginError = decoded['message']?.toString() ?? 'Invalid email or password.';
           _isLoading = false;
           notifyListeners();
           return false;
@@ -484,17 +469,14 @@ class CafeteriaProvider extends ChangeNotifier {
         client.close(force: true);
       }
     } on SocketException catch (_) {
-      debugPrint('Laravel unavailable; attempting local cache authentication.');
+      debugPrint('Laravel unavailable; remote authentication could not be completed.');
     } on TimeoutException catch (_) {
-      debugPrint(
-          'Laravel login timed out; attempting local cache authentication.');
+      debugPrint('Laravel login timed out.');
     } catch (e) {
-      debugPrint(
-          'Remote login unavailable; attempting local cache authentication: $e');
+      debugPrint('Remote login failed: $e');
     }
 
-    _loginError ??=
-        'Unable to authenticate. Please check the server connection.';
+    _loginError ??= 'Unable to authenticate. Please check your connection and try again.';
     _isLoading = false;
     notifyListeners();
     return false;
@@ -617,8 +599,7 @@ class CafeteriaProvider extends ChangeNotifier {
     required String password,
     required String role,
     required String fullName,
-    required String info,
-    String? email,
+    String info = '',
   }) async {
     _isLoading = true;
     _registrationSuccess = false;
@@ -628,23 +609,19 @@ class CafeteriaProvider extends ChangeNotifier {
     final normalizedEmail = email.trim().toLowerCase();
     final normalizedRole = role.trim().toUpperCase();
     final normalizedName = fullName.trim();
-    final normalizedInfo = info.trim().isEmpty
-        ? (normalizedRole == 'STUDENT'
-            ? 'ATU-2026-STUDENT'
-            : 'ATU Local Vendor')
-        : info.trim();
 
-    if (normalizedEmail.isEmpty || !RegExp(r'^[^@\s]+@[^@\s]+\.[^@\s]+
+    if (!RegExp(r'^[^@\\s]+@[^@\\s]+\\.[^@\\s]+$').hasMatch(normalizedEmail) ||
+        password.length < 8 ||
+        normalizedName.isEmpty) {
+      _loginError = 'Enter your full name, a valid email address, and a password of at least 8 characters.';
       _isLoading = false;
       notifyListeners();
       return false;
     }
 
-    // Production path: create the account centrally in Laravel first.
     try {
       final registerUrl = Uri.parse('$_laravelBaseUrl/api/register');
-      final client = HttpClient()
-        ..connectionTimeout = const Duration(seconds: 5);
+      final client = HttpClient()..connectionTimeout = const Duration(seconds: 5);
       try {
         final request = await client.postUrl(registerUrl);
         request.headers
@@ -653,10 +630,10 @@ class CafeteriaProvider extends ChangeNotifier {
         request.add(utf8.encode(json.encode({
           'username': normalizedEmail,
           'pin': password,
-          'email': normalizedEmail,
           'role': normalizedRole,
           'fullName': normalizedName,
-          'info': normalizedInfo,
+          'info': info.trim(),
+          'email': normalizedEmail,
         })));
         final response = await request.close();
         final body = await response.transform(utf8.decoder).join();
@@ -665,25 +642,22 @@ class CafeteriaProvider extends ChangeNotifier {
           final value = json.decode(body);
           if (value is Map<String, dynamic>) decoded = value;
         }
-
         if (response.statusCode == 201 || response.statusCode == 200) {
           final payload = decoded['user'] is Map
               ? Map<String, dynamic>.from(decoded['user'] as Map)
               : decoded;
           final remoteUser = User.fromJson(payload).copyWith(
+            username: normalizedEmail,
             passwordHash: _localCacheCredentialHash(password),
           );
-          if (remoteUser.id != null) {
-            await _db.insertUser(remoteUser);
-          }
+          if (remoteUser.id != null) await _db.insertUser(remoteUser);
           _registrationSuccess = true;
           _isLoading = false;
           notifyListeners();
           return true;
         }
         if (response.statusCode == 400 || response.statusCode == 422) {
-          _loginError = decoded['message']?.toString() ??
-              'Registration details are not valid.';
+          _loginError = decoded['message']?.toString() ?? 'Registration details are not valid.';
           _isLoading = false;
           notifyListeners();
           return false;
@@ -692,47 +666,17 @@ class CafeteriaProvider extends ChangeNotifier {
         client.close(force: true);
       }
     } on SocketException catch (_) {
-      debugPrint('Laravel unavailable; using local registration fallback.');
+      debugPrint('Laravel unavailable; registration requires the server.');
     } on TimeoutException catch (_) {
-      debugPrint('Laravel registration timed out; using local fallback.');
+      debugPrint('Laravel registration timed out.');
     } catch (e) {
-      debugPrint('Remote registration unavailable; using local fallback: $e');
+      debugPrint('Remote registration failed: $e');
     }
 
-    // Offline development fallback.
-    try {
-      final existing = await _db.getUserByUsername(normalizedEmail);
-      if (existing != null) {
-        _loginError = 'An account with this email already exists.';
-        _isLoading = false;
-        notifyListeners();
-        return false;
-      }
-
-      final newUser = User(
-        username: normalizedEmail,
-        passwordHash: _localCacheCredentialHash(password),
-        role: normalizedRole,
-        fullName: normalizedName,
-        info: normalizedInfo,
-      );
-      final newUserId = await _db.insertUser(newUser);
-      await _db.insertAuditLog(AuditLog(
-        userId: newUserId,
-        action: 'USER_REGISTRATION',
-        details: 'New user registered with role: $normalizedRole.',
-        timestamp: DateTime.now().millisecondsSinceEpoch,
-      ));
-      _registrationSuccess = true;
-      await refreshAllData();
-    } catch (e) {
-      _loginError = 'Registration failed. Please try again.';
-      debugPrint('Local registration failed: $e');
-    }
-
+    _loginError = 'Unable to create your account. Please check the server connection and try again.';
     _isLoading = false;
     notifyListeners();
-    return _registrationSuccess;
+    return false;
   }
 
   Future<bool> requestEmailVerification() async {
