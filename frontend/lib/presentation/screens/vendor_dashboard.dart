@@ -58,7 +58,7 @@ class _VendorDashboardScreenState extends State<VendorDashboardScreen> {
         leading: provider.isAdminActing
             ? IconButton(
                 icon:
-                    const Icon(Icons.admin_panel_settings, color: Colors.amber),
+                    const Icon(Icons.admin_panel_settings, color: const Color(0xFFFFA000)),
                 tooltip: "Return to Admin Console",
                 onPressed: () {
                   provider.stopImpersonation();
@@ -72,7 +72,7 @@ class _VendorDashboardScreenState extends State<VendorDashboardScreen> {
               padding: const EdgeInsets.only(right: 8.0),
               child: ElevatedButton.icon(
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.amber[800],
+                  backgroundColor: const Color(0xFFE8751A),
                   foregroundColor: Colors.white,
                   padding: const EdgeInsets.symmetric(horizontal: 12),
                   minimumSize: const Size(64, 36),
@@ -166,19 +166,19 @@ class _VendorDashboardScreenState extends State<VendorDashboardScreen> {
         switch (order.status) {
           case 'Order Placed':
           case 'PENDING':
-            stateColor = Colors.green;
+            stateColor = const Color(0xFF2E7D32);
             break;
           case 'Preparing':
           case 'PREPARING':
-            stateColor = Colors.blue;
+            stateColor = const Color(0xFF1565C0);
             break;
           case 'Out for Delivery':
           case 'OUT_FOR_DELIVERY':
           case 'READY':
-            stateColor = Colors.orange;
+            stateColor = const Color(0xFFE8751A);
             break;
           default:
-            stateColor = Colors.grey;
+            stateColor = Colors.blueGrey;
         }
 
         return Card(
@@ -199,7 +199,7 @@ class _VendorDashboardScreenState extends State<VendorDashboardScreen> {
                     ),
                     Text(timeStr,
                         style:
-                            const TextStyle(fontSize: 10, color: Colors.grey)),
+                            const TextStyle(fontSize: 10, color: Colors.blueGrey)),
                   ],
                 ),
                 const SizedBox(height: 12),
@@ -262,7 +262,7 @@ class _VendorDashboardScreenState extends State<VendorDashboardScreen> {
                     onPressed: () => provider.updateOrderStatus(
                         order.id!, "Out for Delivery"),
                     style: ElevatedButton.styleFrom(
-                        backgroundColor: Colors.orange,
+                        backgroundColor: const Color(0xFFE8751A),
                         foregroundColor: Colors.white),
                     child: const Text("DISPATCH / OUT FOR DELIVERY"),
                   )
@@ -328,7 +328,7 @@ class _VendorDashboardScreenState extends State<VendorDashboardScreen> {
                           },
                         ),
                         IconButton(
-                          icon: const Icon(Icons.delete, color: Colors.grey),
+                          icon: const Icon(Icons.delete, color: Colors.blueGrey),
                           onPressed: () {
                             provider.deleteVendorFoodItem(item);
                           },
@@ -489,7 +489,7 @@ class _VendorDashboardScreenState extends State<VendorDashboardScreen> {
             ),
 
           Card(
-            color: hasRemote ? Colors.green[900] : Colors.blueGrey[900],
+            color: hasRemote ? const Color(0xFF123B5D) : const Color(0xFF0B1F3A),
             shape:
                 RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
             child: Padding(
@@ -519,7 +519,7 @@ class _VendorDashboardScreenState extends State<VendorDashboardScreen> {
                       padding: const EdgeInsets.symmetric(
                           horizontal: 8, vertical: 2),
                       decoration: BoxDecoration(
-                        color: Colors.green[400],
+                        color: const Color(0xFF2E7D32)[400],
                         borderRadius: BorderRadius.circular(8),
                       ),
                       child: const Text(
@@ -563,7 +563,7 @@ class _VendorDashboardScreenState extends State<VendorDashboardScreen> {
                   value: "$totalOrders",
                   subtitle: "Processed",
                   icon: Icons.shopping_bag_outlined,
-                  color: Colors.blue,
+                  color: const Color(0xFF1565C0),
                 ),
               ),
               const SizedBox(width: 12),
@@ -574,7 +574,7 @@ class _VendorDashboardScreenState extends State<VendorDashboardScreen> {
                   value: "${avgPrepMinutes.toStringAsFixed(1)} min",
                   subtitle: "Per Meal Ticket",
                   icon: Icons.timer_outlined,
-                  color: Colors.orange,
+                  color: const Color(0xFFE8751A),
                 ),
               ),
             ],
@@ -589,7 +589,7 @@ class _VendorDashboardScreenState extends State<VendorDashboardScreen> {
                   value: "${successRate.toStringAsFixed(1)}%",
                   subtitle: "Success Handshake",
                   icon: Icons.check_circle_outline,
-                  color: Colors.green,
+                  color: const Color(0xFF2E7D32),
                 ),
               ),
               const SizedBox(width: 12),
@@ -600,7 +600,7 @@ class _VendorDashboardScreenState extends State<VendorDashboardScreen> {
                   value: "${overallAvg.toStringAsFixed(1)} ★",
                   subtitle: "Compliance Score",
                   icon: Icons.star_outline_rounded,
-                  color: Colors.amber,
+                  color: const Color(0xFFFFA000),
                 ),
               ),
             ],
@@ -628,7 +628,7 @@ class _VendorDashboardScreenState extends State<VendorDashboardScreen> {
                           fontWeight: FontWeight.bold,
                           fontSize: 13,
                           letterSpacing: 0.8,
-                          color: Colors.indigo)),
+                          color: const Color(0xFF283593))),
                   const Divider(height: 16),
                   const SizedBox(height: 8),
                   _denseRatingBar("Culinary Preparation Quality", avgQuality),
@@ -656,7 +656,7 @@ class _VendorDashboardScreenState extends State<VendorDashboardScreen> {
                         fontWeight: FontWeight.bold,
                         fontSize: 13,
                         letterSpacing: 0.8,
-                        color: Colors.indigo),
+                        color: const Color(0xFF283593)),
                   ),
                   const Divider(height: 16),
                   const SizedBox(height: 8),
@@ -668,13 +668,13 @@ class _VendorDashboardScreenState extends State<VendorDashboardScreen> {
                         children: [
                           CircleAvatar(
                             radius: 14,
-                            backgroundColor: Colors.blue.withOpacity(0.12),
+                            backgroundColor: const Color(0xFF1565C0).withOpacity(0.12),
                             child: Text(
                               "${index + 1}",
                               style: const TextStyle(
                                   fontSize: 11,
                                   fontWeight: FontWeight.bold,
-                                  color: Colors.blue),
+                                  color: const Color(0xFF1565C0)),
                             ),
                           ),
                           const SizedBox(width: 12),
@@ -694,7 +694,7 @@ class _VendorDashboardScreenState extends State<VendorDashboardScreen> {
                                 Text(
                                   "Sold: ${item['count']} portions  •  Valued at GH₵ ${item['revenue'].toStringAsFixed(2)}",
                                   style: const TextStyle(
-                                      fontSize: 11, color: Colors.grey),
+                                      fontSize: 11, color: Colors.blueGrey),
                                 )
                               ],
                             ),
@@ -741,7 +741,7 @@ class _VendorDashboardScreenState extends State<VendorDashboardScreen> {
           if (provider.aiAnalysisText != null) ...[
             const SizedBox(height: 16),
             Card(
-              color: Colors.blueGrey[900],
+              color: const Color(0xFF0B1F3A),
               shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(12)),
               child: Padding(
@@ -788,7 +788,7 @@ class _VendorDashboardScreenState extends State<VendorDashboardScreen> {
                       color: Colors.white,
                       child: ListTile(
                         leading: CircleAvatar(
-                          backgroundColor: Colors.amberAccent[100],
+                          backgroundColor: const Color(0xFFFFA000)Accent[100],
                           child: Text(score.toStringAsFixed(1),
                               style: const TextStyle(
                                   color: Colors.black87,
@@ -832,7 +832,7 @@ class _VendorDashboardScreenState extends State<VendorDashboardScreen> {
                     style: const TextStyle(
                         fontSize: 10,
                         fontWeight: FontWeight.bold,
-                        color: Colors.grey,
+                        color: Colors.blueGrey,
                         letterSpacing: 0.5)),
                 Icon(icon, color: color, size: 16),
               ],
@@ -845,7 +845,7 @@ class _VendorDashboardScreenState extends State<VendorDashboardScreen> {
             const SizedBox(height: 4),
             Text(
               subtitle,
-              style: TextStyle(fontSize: 10, color: Colors.grey[500]),
+              style: TextStyle(fontSize: 10, color: Colors.blueGrey[500]),
             ),
           ],
         ),
@@ -930,8 +930,8 @@ class _VendorDashboardScreenState extends State<VendorDashboardScreen> {
           ListTile(
             shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(8),
-                side: const BorderSide(color: Colors.grey)),
-            leading: const Icon(Icons.import_export, color: Colors.blueAccent),
+                side: const BorderSide(color: Colors.blueGrey)),
+            leading: const Icon(Icons.import_export, color: const Color(0xFF1565C0)),
             title: const Text("Compile Secure CSV Excel Audit Logs",
                 style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold)),
             subtitle: const Text(
@@ -939,7 +939,7 @@ class _VendorDashboardScreenState extends State<VendorDashboardScreen> {
                 style: TextStyle(fontSize: 11)),
             trailing: IconButton(
               icon:
-                  const Icon(Icons.arrow_circle_down, color: Colors.blueAccent),
+                  const Icon(Icons.arrow_circle_down, color: const Color(0xFF1565C0)),
               onPressed: () {
                 ScaffoldMessenger.of(context).showSnackBar(
                   const SnackBar(
@@ -998,7 +998,7 @@ class _VendorDashboardScreenState extends State<VendorDashboardScreen> {
                     content: Text(success
                         ? "Verification Match! Custody transfer complete."
                         : "Invalid PIN code. Access denied."),
-                    backgroundColor: success ? Colors.green : Colors.red,
+                    backgroundColor: success ? const Color(0xFF2E7D32) : Colors.red,
                   ),
                 );
               },
@@ -1121,7 +1121,7 @@ class _VendorDashboardScreenState extends State<VendorDashboardScreen> {
                   style: const TextStyle(
                       fontSize: 11,
                       fontWeight: FontWeight.bold,
-                      color: Colors.indigoAccent)),
+                      color: const Color(0xFF283593)Accent)),
             ],
           ),
           const SizedBox(height: 4),
@@ -1131,7 +1131,7 @@ class _VendorDashboardScreenState extends State<VendorDashboardScreen> {
               value: rating / 5.0,
               minHeight: 6,
               color: const Color(0xFFE5A93C),
-              backgroundColor: Colors.grey[200],
+              backgroundColor: Colors.blueGrey[200],
             ),
           )
         ],
