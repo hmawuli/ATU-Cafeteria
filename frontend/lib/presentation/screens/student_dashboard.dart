@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 import 'package:intl/intl.dart';
 import 'package:atu_cafeteria/domain/models/models.dart' as models;
 import 'package:atu_cafeteria/presentation/providers/cafeteria_provider.dart';
+import 'package:atu_cafeteria/presentation/providers/cart_provider.dart';
 import 'package:atu_cafeteria/presentation/widgets/professional_widgets.dart';
 
 class StudentDashboardScreen extends StatefulWidget {
@@ -310,7 +311,12 @@ class _StudentDashboardScreenState extends State<StudentDashboardScreen> {
                       category: item.category,
                       price: item.price,
                       available: item.isAvailable,
-                      onAdd: () => provider.addToCart(item),
+                      onAdd: () {
+                        context.read<CartProvider>().add(item);
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(content: Text('${item.name} added to cart')),
+                        );
+                      },
                     );
                   },
                 ),
