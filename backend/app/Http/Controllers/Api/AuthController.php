@@ -117,36 +117,32 @@ class AuthController extends Controller
     public function login(Request $request)
     {
         $validator = Validator::make($request->all(), [
-            'username' => 'required|string|max:255',
-            'pin' => 'required|string|min:4|max:128',
+            'email' => 'required|email|max:255',
+            'password' => 'required|string|min:8|max:128',
         ]);
         if ($validator->fails()) {
-            return response()->json(['success' => false, 'message' => 'Username and PIN are required.', 'errors' => $validator->errors()], 422);
+            return response()->json([
+                'success' => false,
+                'message' => 'A valid email address and password are required.',
+                'errors' => $validator->errors(),
+            ], 422);
         }
 
-        $user = User::where('username', trim($request->input('username')))->first();
-        if (!$user) {
-            return response()->json(['success' => false, 'message' => 'Invalid credentials.'], 401);
-        }
+        $email = strtolower(trim($request->input('email')));
+        $user = User::where('username', $email)
+            ->orWhereRaw("JSON_UNQUOTE(JSON_EXTRACT(profile_info, '$.email')) = ?", [$email])
+            ->first();
 
-        $submitted = (string) $request->input('pin');
-        $valid = $this->verifyCredential($user, $submitted);
-        if (!$valid) {
-            AuditLog::create([
-                'user_id' => $user->id, 'timestamp' => time() * 1000,
-                'action' => 'AUTH_FAILURE', 'details' => 'Failed login attempt.',
-            ]);
-            $recentFailures = AuditLog::where('user_id', $user->id)->where('action', 'AUTH_FAILURE')->where('created_at', '>=', now()->subMinutes(10))->count();
-            if ($recentFailures >= 5 && !SecurityAlert::where('user_id', $user->id)->where('type', 'FAILED_LOGIN_PATTERN')->whereNull('resolved_at')->where('created_at', '>=', now()->subHours(1))->exists()) {
-                SecurityAlert::create([
+        if (!$user || !$this->verifyCredential($user, (string) $request->input('password'))) {
+            if ($user) {
+                AuditLog::create([
                     'user_id' => $user->id,
-                    'type' => 'FAILED_LOGIN_PATTERN',
-                    'severity' => 'HIGH',
-                    'message' => 'Five or more failed login attempts were recorded for this account within ten minutes.',
-                    'occurred_at' => now(),
+                    'timestamp' => time() * 1000,
+                    'action' => 'AUTH_FAILURE',
+                    'details' => 'Failed login attempt.',
                 ]);
             }
-            return response()->json(['success' => false, 'message' => 'Invalid credentials.'], 401);
+            return response()->json(['success' => false, 'message' => 'Invalid email or password.'], 401);
         }
 
         if (!$user->isActive()) {
@@ -156,8 +152,10 @@ class AuthController extends Controller
         if (strtoupper((string) $user->role) === 'ADMIN' && $user->two_factor_enabled) {
             $this->issueCode($user, 'ADMIN_2FA');
             AuditLog::create([
-                'user_id' => $user->id, 'timestamp' => time() * 1000,
-                'action' => 'AUTH_2FA_CHALLENGE', 'details' => 'Admin login requires two-factor verification.',
+                'user_id' => $user->id,
+                'timestamp' => time() * 1000,
+                'action' => 'AUTH_2FA_CHALLENGE',
+                'details' => 'Admin login requires two-factor verification.',
             ]);
             return response()->json([
                 'success' => true,
@@ -203,29 +201,64 @@ class AuthController extends Controller
 
     public function forgotPassword(Request $request)
     {
-        $request->validate(['username'=>'required|string|max:255']);
-        $user = User::where('username', trim($request->username))->first();
-        // Do not disclose whether an account exists.
+        $request->validate(['email' => 'required|email|max:255']);
+        $email = strtolower(trim($request->input('email')));
+        $user = User::where('username', $email)
+            ->orWhereRaw("JSON_UNQUOTE(JSON_EXTRACT(profile_info, '$.email')) = ?", [$email])
+            ->first();
+
         if ($user) {
             $this->issueCode($user, 'PASSWORD_RESET');
-            AuditLog::create(['user_id'=>$user->id,'timestamp'=>time()*1000,'action'=>'PASSWORD_RESET_REQUEST','details'=>'Password reset code requested.']);
+            AuditLog::create([
+                'user_id' => $user->id,
+                'timestamp' => time() * 1000,
+                'action' => 'PASSWORD_RESET_REQUEST',
+                'details' => 'Password reset code requested.',
+            ]);
         }
-        return response()->json(['success'=>true,'message'=>'If the account exists, a password reset code has been sent.']);
+
+        return response()->json([
+            'success' => true,
+            'message' => 'If the account exists, a password reset code has been sent.',
+        ]);
     }
 
     public function resetPassword(Request $request)
     {
         $validator = Validator::make($request->all(), [
-            'username'=>'required|string|max:255', 'code'=>'required|digits:6', 'pin'=>'required|string|min:4|max:128',
+            'email' => 'required|email|max:255',
+            'code' => 'required|digits:6',
+            'password' => 'required|string|min:8|max:128',
         ]);
-        if ($validator->fails()) return response()->json(['success'=>false,'message'=>'Invalid reset details.','errors'=>$validator->errors()],422);
-        $user = User::where('username', trim($request->username))->first();
-        if (!$user || !$this->verifyCode($user->username, 'PASSWORD_RESET', $request->code)) return response()->json(['success'=>false,'message'=>'Invalid or expired reset code.'],401);
-        $user->password = Hash::make($request->pin);
+        if ($validator->fails()) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Invalid password reset details.',
+                'errors' => $validator->errors(),
+            ], 422);
+        }
+
+        $email = strtolower(trim($request->input('email')));
+        $user = User::where('username', $email)
+            ->orWhereRaw("JSON_UNQUOTE(JSON_EXTRACT(profile_info, '$.email')) = ?", [$email])
+            ->first();
+
+        if (!$user || !$this->verifyCode($user->username, 'PASSWORD_RESET', $request->input('code'))) {
+            return response()->json(['success' => false, 'message' => 'Invalid or expired reset code.'], 401);
+        }
+
+        $user->password = Hash::make($request->input('password'));
         $user->saveQuietly();
         $user->tokens()->delete();
-        AuditLog::create(['user_id'=>$user->id,'timestamp'=>time()*1000,'action'=>'PASSWORD_CHANGED','details'=>'Password reset completed; all existing sessions were revoked.']);
-        return response()->json(['success'=>true,'message'=>'Password changed successfully.']);
+
+        AuditLog::create([
+            'user_id' => $user->id,
+            'timestamp' => time() * 1000,
+            'action' => 'PASSWORD_CHANGED',
+            'details' => 'Password reset completed; all existing sessions were revoked.',
+        ]);
+
+        return response()->json(['success' => true, 'message' => 'Password changed successfully.']);
     }
 
     public function requestEmailVerification(Request $request)
