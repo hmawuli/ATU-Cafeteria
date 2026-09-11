@@ -15,7 +15,6 @@ class _RegisterScreenState extends State<RegisterScreen> {
   final _passwordController = TextEditingController();
   final _fullNameController = TextEditingController();
   final _infoController = TextEditingController();
-  String _role = 'STUDENT';
   bool _obscurePassword = true;
 
   @override
@@ -34,7 +33,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
     final success = await provider.registerUser(
       email: _emailController.text.trim(),
       password: _passwordController.text,
-      role: _role,
+      role: 'STUDENT',
       fullName: _fullNameController.text.trim(),
       info: _infoController.text.trim(),
     );
@@ -111,7 +110,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                       ),
                       const SizedBox(height: 6),
                       const Text(
-                        'Create your secure account. Student ID is not used for authentication.',
+                        'Create your secure student account. Vendor accounts are created by an administrator.',
                         textAlign: TextAlign.center,
                       ),
                       const SizedBox(height: 28),
@@ -165,27 +164,12 @@ class _RegisterScreenState extends State<RegisterScreen> {
                             value == null || value.length < 8 ? 'Use at least 8 characters.' : null,
                       ),
                       const SizedBox(height: 16),
-                      DropdownButtonFormField<String>(
-                        value: _role,
-                        decoration: const InputDecoration(
-                          labelText: 'Account type',
-                          prefixIcon: Icon(Icons.badge_outlined),
-                          border: OutlineInputBorder(),
-                        ),
-                        items: const [
-                          DropdownMenuItem(value: 'STUDENT', child: Text('Student')),
-                          DropdownMenuItem(value: 'VENDOR', child: Text('Vendor')),
-                        ],
-                        onChanged: (value) => setState(() => _role = value ?? 'STUDENT'),
-                      ),
                       const SizedBox(height: 16),
                       TextFormField(
                         controller: _infoController,
                         maxLines: 2,
                         decoration: InputDecoration(
-                          labelText: _role == 'STUDENT'
-                              ? 'Department / Programme (optional)'
-                              : 'Food booth / business name',
+                          labelText: 'Department / Programme (optional)',
                           prefixIcon: const Icon(Icons.info_outline),
                           border: const OutlineInputBorder(),
                         ),
