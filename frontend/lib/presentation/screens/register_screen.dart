@@ -11,17 +11,15 @@ class RegisterScreen extends StatefulWidget {
 
 class _RegisterScreenState extends State<RegisterScreen> {
   final _formKey = GlobalKey<FormState>();
-  final _usernameController = TextEditingController();
-  final _pinController = TextEditingController();
+  final _passwordController = TextEditingController();
   final _fullNameController = TextEditingController();
-  final _emailController = TextEditingController();
+  
   final _infoController = TextEditingController();
   String _role = 'STUDENT'; // 'STUDENT' or 'VENDOR'
 
   @override
   void dispose() {
-    _usernameController.dispose();
-    _pinController.dispose();
+    _passwordController.dispose();
     _fullNameController.dispose();
     _emailController.dispose();
     _infoController.dispose();
@@ -33,18 +31,18 @@ class _RegisterScreenState extends State<RegisterScreen> {
 
     final provider = Provider.of<CafeteriaProvider>(context, listen: false);
     final success = await provider.registerUser(
-      username: _usernameController.text.trim(),
-      pinCode: _pinController.text.trim(),
+      email: _emailController.text.trim(),
+      password: _passwordController.text,
       role: _role,
       fullName: _fullNameController.text.trim(),
       info: _infoController.text.trim(),
-      email: _emailController.text.trim().isEmpty ? null : _emailController.text.trim(),
+      
     );
 
     if (success && mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: const Text("Registration Successful! Please authenticate with your PIN."),
+          content: const Text("Registration successful. You can now sign in with your email and password."),
           backgroundColor: Theme.of(context).colorScheme.primary,
         ),
       );
@@ -65,7 +63,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('CREATE PORTAL IDENTITY'),
+        title: const Text('CREATE YOUR ACCOUNT'),
       ),
       body: Center(
         child: SingleChildScrollView(
@@ -77,7 +75,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
               child: Column(
                 children: [
                   Text(
-                    'ATU CAFETERIA ARCHITECT',
+                    'ATU CAFETERIA',
                     style: TextStyle(
                       fontSize: 20,
                       fontWeight: FontWeight.bold,
@@ -86,7 +84,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                   ),
                   const SizedBox(height: 8),
                   Text(
-                    'Establish credentials for digital food procurement and performance audits.',
+                    'Create a secure account to access the ATU Cafeteria platform.',
                     textAlign: TextAlign.center,
                     style: TextStyle(color: Colors.grey[600], fontSize: 13),
                   ),
@@ -102,7 +100,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           const Text(
-                            'User Profile Details',
+                            'Account Details',
                             style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
                           ),
                           const SizedBox(height: 16),
@@ -133,9 +131,9 @@ class _RegisterScreenState extends State<RegisterScreen> {
                           ),
                           const SizedBox(height: 12),
                           TextFormField(
-                            controller: _usernameController,
+                            controller: _emailController,
                             decoration: const InputDecoration(
-                              labelText: 'Username (Unique)',
+                              labelText: 'Email Address',
                               prefixIcon: Icon(Icons.person),
                               border: OutlineInputBorder(),
                             ),
@@ -144,16 +142,15 @@ class _RegisterScreenState extends State<RegisterScreen> {
                           ),
                           const SizedBox(height: 12),
                           TextFormField(
-                            controller: _pinController,
+                            controller: _passwordController,
                             obscureText: true,
-                            keyboardType: TextInputType.number,
                             decoration: const InputDecoration(
-                              labelText: 'Security PIN (4+ digits)',
+                              labelText: 'Password (minimum 8 characters)',
                               prefixIcon: Icon(Icons.lock_person),
                               border: OutlineInputBorder(),
                             ),
                             validator: (val) =>
-                                val == null || val.length < 4 ? 'Enter 4+ digits security numeric PIN' : null,
+                                val == null || val.length < 8 ? 'Use at least 8 characters' : null,
                           ),
                           const SizedBox(height: 16),
                           DropdownButtonFormField<String>(
@@ -176,11 +173,11 @@ class _RegisterScreenState extends State<RegisterScreen> {
                             controller: _infoController,
                             decoration: InputDecoration(
                               labelText: _role == 'STUDENT'
-                                  ? 'Student Registration ID (e.g., ATU-2024-D45)'
+                                  ? 'Department / Programme (optional)'
                                   : 'Vendor Food-Booth Brand Name (e.g., Kofi Rice Joint)',
                               prefixIcon: const Icon(Icons.business_center),
                               border: const OutlineInputBorder(),
-                              helperText: 'Leave empty for automated registry generation.',
+                              helperText: 'Student ID is not required for login.',
                             ),
                           ),
                           const SizedBox(height: 20),
