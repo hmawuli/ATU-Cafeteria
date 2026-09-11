@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 import 'package:atu_cafeteria/core/theme/app_theme.dart';
 import 'package:atu_cafeteria/presentation/providers/cafeteria_provider.dart';
 import 'package:atu_cafeteria/presentation/providers/admin_state_provider.dart';
+import 'package:atu_cafeteria/presentation/providers/cart_provider.dart';
 import 'package:atu_cafeteria/core/network/api_client.dart';
 import 'package:atu_cafeteria/presentation/screens/admin_dashboard.dart';
 import 'package:atu_cafeteria/presentation/screens/login_screen.dart';
@@ -12,6 +13,8 @@ import 'package:atu_cafeteria/presentation/screens/vendor_dashboard.dart';
 import 'package:atu_cafeteria/presentation/screens/smart_insights_screen.dart';
 import 'package:atu_cafeteria/presentation/screens/password_reset_screen.dart';
 import 'package:atu_cafeteria/presentation/screens/email_verification_screen.dart';
+import 'package:atu_cafeteria/presentation/screens/cart_screen.dart';
+import 'package:atu_cafeteria/presentation/screens/checkout_screen.dart';
 import 'package:atu_cafeteria/presentation/screens/admin_security_screen.dart';
 import 'package:atu_cafeteria/presentation/widgets/auth_gate.dart';
 
@@ -28,6 +31,7 @@ class ATUCafeteriaApp extends StatelessWidget {
     return MultiProvider(
       providers: [
         ChangeNotifierProvider(create: (_) => CafeteriaProvider()),
+        ChangeNotifierProvider(create: (_) => CartProvider()),
         ChangeNotifierProvider(create: (_) => AdminStateProvider(ApiClient())),
       ],
       child: MaterialApp(
@@ -47,6 +51,8 @@ class ATUCafeteriaApp extends StatelessWidget {
           '/reset-password': (_) => const PasswordResetScreen(),
           '/verify-email': (_) => const EmailVerificationScreen(),
           '/admin-security': (_) => const AdminSecurityScreen(),
+          '/cart': (_) => const CartScreen(),
+          '/checkout': (_) => const CheckoutScreen(),
         },
       ),
     );
