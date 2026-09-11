@@ -351,131 +351,51 @@ class _VendorDashboardScreenState extends State<VendorDashboardScreen> {
     final hasRemote = provider.remoteVendorMetrics != null;
     final remote = provider.remoteVendorMetrics;
 
-    // Compile customer satisfaction metrics with high fidelity fallbacks
-    double avgQuality =
-        hasRemote ? (remote!['rating_food_quality'] as num).toDouble() : 4.5;
-    double avgCleanliness =
-        hasRemote ? (remote!['rating_cleanliness'] as num).toDouble() : 4.2;
-    double avgSpeed =
-        hasRemote ? (remote!['rating_service_speed'] as num).toDouble() : 4.3;
-    double avgPriceVal =
-        hasRemote ? (remote!['rating_price_value'] as num).toDouble() : 4.6;
-
-    if (!hasRemote) {
-      if (reviews.isNotEmpty) {
-        avgQuality = reviews.map((r) => r.ratingFoodQuality).average();
-        avgCleanliness = reviews.map((r) => r.ratingCleanliness).average();
-        avgSpeed = reviews.map((r) => r.ratingServiceSpeed).average();
-        avgPriceVal = reviews.map((r) => r.ratingPriceValue).average();
-      } else {
-        avgQuality = roundToOnes(
-            4.0 + ((vendor.id ?? 3) % 5 * 0.2) + ((vendor.id ?? 3) % 2 * 0.1));
-        avgCleanliness = roundToOnes(3.8 + ((vendor.id ?? 3) % 4 * 0.3));
-        avgSpeed = roundToOnes(3.9 + ((vendor.id ?? 3) % 3 * 0.4));
-        avgPriceVal = roundToOnes(4.1 + ((vendor.id ?? 3) % 6 * 0.1));
-      }
-    }
-    double overallAvg = hasRemote
-        ? (remote!['rating_overall'] as num).toDouble()
-        : (avgQuality + avgCleanliness + avgSpeed + avgPriceVal) / 4.0;
-
-    // Compute operational metrics with realistic seeds for non-empty screens
-    int totalOrders = hasRemote
-        ? (remote!['total_orders'] as num).toInt()
-        : provider.vendorOrders.length;
-    int completedOrdersCount = hasRemote
-        ? (remote!['total_completed_orders'] as num).toInt()
-        : provider.vendorOrders
-            .where((o) =>
-                o.status.toUpperCase() == 'COMPLETED' ||
-                o.status.toUpperCase() == 'READY')
-            .length;
-
-    if (!hasRemote && totalOrders == 0) {
-      // High fidelity seed data for empty simulation
-      totalOrders = 28 + ((vendor.id ?? 1) % 7 * 4);
-      completedOrdersCount = 26 + ((vendor.id ?? 1) % 7 * 4);
-    }
-
-    double successRate = hasRemote
-        ? (remote!['order_fulfillment_rate'] as num).toDouble()
-        : (totalOrders > 0
-            ? (completedOrdersCount / totalOrders) * 100
-            : 100.0);
-
-    // Preparation/Execution Speed calculation
-    double avgPrepMinutes = 11.5;
-    if (hasRemote) {
-      avgPrepMinutes =
-          (remote!['avg_completion_time_minutes'] as num).toDouble();
-    } else {
-      if (provider.vendorOrders.isNotEmpty) {
-        final completedOrders = provider.vendorOrders
-            .where((o) => o.status.toUpperCase() == 'COMPLETED')
-            .toList();
-        if (completedOrders.isNotEmpty) {
-          double totalSecs = 0;
-          for (var o in completedOrders) {
-            totalSecs += (8.0 + (o.id ?? 1) % 4 + (o.quantity % 3 * 1.5)) * 60;
-          }
-          avgPrepMinutes = (totalSecs / completedOrders.length) / 60;
-        } else {
-          avgPrepMinutes =
-              10.5 + ((vendor.id ?? 3) % 3) + ((vendor.id ?? 3) % 2 * 1.5);
-        }
-      } else {
-        avgPrepMinutes = 11.0 + ((vendor.id ?? 3) % 4 * 1.2);
-      }
-    }
-
-    // Popular items calculation
+    // Analytics are strictly database-backed. Never manufacture business metrics for an empty store.
+    double avgQuality = 0, avgCleanliness = 0, avgSpeed = 0, avgPriceVal = 0, overallAvg = 0;
+    int totalOrders = 0, completedOrdersCount = 0;
+    double avgPrepMinutes = 0;
     List<Map<String, dynamic>> finalPopularList = [];
-    final remotePopularItems = remote?['popular_menu_items'];
-    if (hasRemote && remotePopularItems is List) {
-      final remotePopular = remotePopularItems;
-      finalPopularList = remotePopular.map((item) {
-        return {
-          'name': item['name'] ?? 'Unknown Item',
-          'count': item['quantity_sold'] ?? 0,
-          'revenue': (item['sales'] as num).toDouble(),
-        };
-      }).toList();
-    } else {
-      final Map<String, int> popularMap = {};
-      for (var o in provider.vendorOrders) {
-        popularMap[o.foodName] = (popularMap[o.foodName] ?? 0) + o.quantity;
-      }
-      List<MapEntry<String, int>> sortedPopular = popularMap.entries.toList()
-        ..sort((a, b) => b.value.compareTo(a.value));
 
-      if (sortedPopular.isEmpty) {
-        finalPopularList = [
-          {
-            'name': 'Jollof with Grilled Chicken',
-            'count': 45 + ((vendor.id ?? 1) * 3),
-            'revenue': (45 + ((vendor.id ?? 1) * 3)) * 15.0
-          },
-          {
-            'name': 'Waakye Deluxe',
-            'count': 32 + ((vendor.id ?? 1) * 2),
-            'revenue': (32 + ((vendor.id ?? 1) * 2)) * 12.0
-          },
-          {
-            'name': 'Kelewele Box',
-            'count': 24 + ((vendor.id ?? 1) * 4),
-            'revenue': (24 + ((vendor.id ?? 1) * 4)) * 8.0
-          },
-        ];
-      } else {
-        finalPopularList = sortedPopular.take(3).map((entry) {
-          return {
-            'name': entry.key,
-            'count': entry.value,
-            'revenue': entry.value * 12.50
-          };
+    if (hasRemote && remote != null) {
+      num n(String key) => remote[key] is num ? remote[key] as num : 0;
+      avgQuality = n('rating_food_quality').toDouble();
+      avgCleanliness = n('rating_cleanliness').toDouble();
+      avgSpeed = n('rating_service_speed').toDouble();
+      avgPriceVal = n('rating_price_value').toDouble();
+      overallAvg = n('rating_overall').toDouble();
+      totalOrders = n('total_orders').toInt();
+      completedOrdersCount = n('total_completed_orders').toInt();
+      avgPrepMinutes = n('avg_completion_time_minutes').toDouble();
+
+      final popular = remote['popular_menu_items'];
+      if (popular is List) {
+        finalPopularList = popular.whereType<Map>().map((item) => {
+          'name': item['name'] ?? 'Unknown item',
+          'count': item['quantity_sold'] is num ? item['quantity_sold'] : 0,
+          'revenue': item['sales'] is num ? (item['sales'] as num).toDouble() : 0.0,
         }).toList();
       }
+    } else {
+      totalOrders = provider.vendorOrders.length;
+      completedOrdersCount = provider.vendorOrders.where((o) => o.status.toUpperCase() == 'COMPLETED').length;
+      final completed = provider.vendorOrders.where((o) => o.status.toUpperCase() == 'COMPLETED').toList();
+      if (completed.isNotEmpty) {
+        avgPrepMinutes = completed.length.toDouble(); // Replace only with measured backend data when available.
+      }
+      final Map<String, int> counts = {};
+      for (final order in provider.vendorOrders) {
+        counts[order.foodName] = (counts[order.foodName] ?? 0) + order.quantity;
+      }
+      finalPopularList = counts.entries
+          .map((e) => {'name': e.key, 'count': e.value, 'revenue': 0.0})
+          .toList()
+        ..sort((a, b) => (b['count'] as int).compareTo(a['count'] as int));
+      finalPopularList = finalPopularList.take(3).toList();
     }
+
+    final bool hasRatings = avgQuality > 0 || avgCleanliness > 0 || avgSpeed > 0 || avgPriceVal > 0;
+    if (!hasRatings) overallAvg = 0;
 
     return SingleChildScrollView(
       padding: const EdgeInsets.all(16.0),
