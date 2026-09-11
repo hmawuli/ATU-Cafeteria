@@ -17,7 +17,9 @@ class ApiClient {
   String? token;
   static const _tokenKey = 'atu_cafeteria_auth_token';
   static const FlutterSecureStorage _storage = FlutterSecureStorage();
-  ApiClient({HttpClient? client}) : _client = client ?? HttpClient();
+  ApiClient({HttpClient? client}) : _client = client ?? HttpClient() {
+    _client.connectionTimeout = const Duration(seconds: 12);
+  }
 
   Future<void> setToken(String value) async { token = value; await _storage.write(key: _tokenKey, value: value); }
   Future<void> loadToken() async { token = await _storage.read(key: _tokenKey); }
@@ -31,7 +33,7 @@ class ApiClient {
     request.headers.set(HttpHeaders.acceptHeader, 'application/json');
     if (token != null && token!.isNotEmpty) request.headers.set(HttpHeaders.authorizationHeader, 'Bearer $token');
     if (body != null) request.write(jsonEncode(body));
-    final response = await request.close();
+    final response = await request.close().timeout(const Duration(seconds: 25));
     final text = await response.transform(utf8.decoder).join();
     dynamic decoded;
     if (text.isNotEmpty) { try { decoded = jsonDecode(text); } catch (_) { decoded = text; } }
