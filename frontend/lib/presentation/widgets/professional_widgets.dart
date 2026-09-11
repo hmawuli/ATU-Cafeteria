@@ -78,3 +78,26 @@ class AppStatusChip extends StatelessWidget {
     return Chip(avatar: Icon(Icons.circle, size: 9, color: c), label: Text(label, style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 11)));
   }
 }
+
+class FoodCard extends StatelessWidget {
+  final String name, description, category;
+  final double price;
+  final bool available;
+  final VoidCallback? onAdd, onFavorite;
+  const FoodCard({super.key, required this.name, required this.description, required this.category, required this.price, this.available=true, this.onAdd, this.onFavorite});
+  IconData _icon() { final v=category.toLowerCase(); if(v.contains('drink')) return Icons.local_drink_rounded; if(v.contains('snack')) return Icons.fastfood_rounded; if(v.contains('breakfast')) return Icons.breakfast_dining_rounded; return Icons.restaurant_rounded; }
+  @override Widget build(BuildContext context) { final scheme=Theme.of(context).colorScheme; return Card(clipBehavior:Clip.antiAlias, child:Padding(padding:const EdgeInsets.all(12), child:Row(children:[
+    Container(width:82,height:82,decoration:BoxDecoration(color:scheme.primary.withOpacity(.09),borderRadius:BorderRadius.circular(14)),child:Icon(_icon(),size:38,color:scheme.primary)),
+    const SizedBox(width:14), Expanded(child:Column(crossAxisAlignment:CrossAxisAlignment.start,children:[
+      Text(name,maxLines:1,overflow:TextOverflow.ellipsis,style:const TextStyle(fontWeight:FontWeight.w800,fontSize:16)),
+      const SizedBox(height:4), Text(description,maxLines:2,overflow:TextOverflow.ellipsis,style:Theme.of(context).textTheme.bodySmall),
+      const SizedBox(height:8), Row(children:[Text('GH₵ '+price.toStringAsFixed(2),style:TextStyle(fontWeight:FontWeight.w900,color:scheme.primary)),const Spacer(),
+        if(onFavorite!=null) IconButton(visualDensity:VisualDensity.compact,onPressed:onFavorite,icon:const Icon(Icons.favorite_border_rounded),tooltip:'Add to favourites'),
+        if(onAdd!=null) FilledButton.icon(onPressed:available?onAdd:null,icon:const Icon(Icons.add_shopping_cart_rounded,size:17),label:Text(available?'Add':'Unavailable'))
+      ])]))]))); }
+}
+
+class OrderStatusTimeline extends StatelessWidget {
+  final String status; const OrderStatusTimeline({super.key,required this.status});
+  @override Widget build(BuildContext context) { final n=status.toUpperCase().replaceAll('_',' '); const stages=['ORDER PLACED','PREPARING','READY','COMPLETED']; var a=n.contains('COMPLETE')||n.contains('DELIVER')?3:n.contains('READY')?2:n.contains('PREPAR')?1:0; if(n.contains('CANCEL')||n.contains('DECLIN'))a=-1; return Row(children:List.generate(stages.length,(i){final done=a>=i&&a>=0;final current=a==i;return Expanded(child:Column(children:[Row(children:[if(i>0)Expanded(child:Divider(thickness:2,color:a>=i?Theme.of(context).colorScheme.primary:Colors.grey.shade300)),Container(width:28,height:28,decoration:BoxDecoration(shape:BoxShape.circle,color:done?Theme.of(context).colorScheme.primary:Colors.grey.shade200),child:Icon(done?Icons.check_rounded:Icons.circle,size:done?17:8,color:done?Colors.white:Colors.grey.shade500)),if(i<stages.length-1)Expanded(child:Divider(thickness:2,color:a>i?Theme.of(context).colorScheme.primary:Colors.grey.shade300))]),const SizedBox(height:6),Text(stages[i],textAlign:TextAlign.center,style:TextStyle(fontSize:9,fontWeight:current?FontWeight.w900:FontWeight.w600))]));})); }
+}
