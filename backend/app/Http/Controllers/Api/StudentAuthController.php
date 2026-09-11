@@ -31,12 +31,15 @@ class StudentAuthController extends Controller
             ], 400);
         }
 
-        // Check if username already exists
-        $existing = User::where('username', $request->input('username'))->first();
+        // Email is the account identity; Student ID is not required.
+        $email = strtolower(trim($request->input('email')));
+        $existing = User::where('username', $email)
+            ->orWhereRaw("JSON_UNQUOTE(JSON_EXTRACT(profile_info, '$.email')) = ?", [$email])
+            ->first();
         if ($existing) {
             return response()->json([
                 'success' => false,
-                'message' => 'Username already exists.'
+                'message' => 'An account with this email address already exists.'
             ], 400);
         }
 
@@ -47,7 +50,7 @@ class StudentAuthController extends Controller
                 'password' => Hash::make($request->input('password')),
                 'role' => 'STUDENT',
                 'fullName' => $request->input('fullName'),
-                'info' => $request->input('studentId'),
+                'info' => '',
                 'profile_info' => array_filter(['email' => $request->input('email')], fn ($value) => filled($value)),
             ]);
 
@@ -56,7 +59,7 @@ class StudentAuthController extends Controller
                 'user_id' => $createdUser->id,
                 'timestamp' => time() * 1000,
                 'action' => 'STUDENT_REGISTRATION',
-                'details' => "Registered student {$createdUser->fullName} (ID: {$createdUser->info}) via Student API.",
+                'details' => "Registered student {$createdUser->fullName} via Student API.",
             ]);
 
             return $createdUser;
