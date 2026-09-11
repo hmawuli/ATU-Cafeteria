@@ -77,7 +77,7 @@ class AuthController extends Controller
         $validator = Validator::make($request->all(), [
             'email' => 'required|email|max:255',
             'password' => 'required|string|min:8|max:128',
-            'role' => 'required|string|in:STUDENT,VENDOR',
+            'role' => 'required|string|in:STUDENT',
             'fullName' => 'required|string|max:255',
             'info' => 'nullable|string|max:1000',
         ]);
@@ -85,7 +85,7 @@ class AuthController extends Controller
         if ($validator->fails()) {
             return response()->json([
                 'success' => false,
-                'message' => 'Please provide a valid name, email address, password, and account type.',
+                'message' => 'Please provide a valid name, email address, and password for a student account.',
                 'errors' => $validator->errors(),
             ], 422);
         }
