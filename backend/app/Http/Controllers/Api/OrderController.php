@@ -702,88 +702,107 @@ class OrderController extends Controller
      */
     public function verifyAndCompletePickup(Request $request, $id)
     {
+        $user = $request->user();
+        if (!$user) {
+            return response()->json(['success' => false, 'message' => 'Unauthenticated.'], 401);
+        }
+
+        if (!in_array(strtoupper($user->role), ['VENDOR', 'ADMIN'], true)) {
+            return response()->json(['success' => false, 'message' => 'Only an authorized vendor can verify pickup.'], 403);
+        }
+
         $order = Order::find($id);
         if (!$order) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Pre-order ticket not found.'
-            ], 404);
+            return response()->json(['success' => false, 'message' => 'Order not found.'], 404);
+        }
+
+        if (strtoupper($user->role) === 'VENDOR' && (int) $order->vendor_id !== (int) $user->id) {
+            return response()->json(['success' => false, 'message' => 'You are not authorized to verify this order.'], 403);
         }
 
         $validator = Validator::make($request->all(), [
-            'vendor_id' => 'required|integer',
-            'pickup_pin' => 'required|string',
+            'pickup_pin' => ['required', 'string', 'size:4', 'regex:/^\\d{4}$/'],
         ]);
 
         if ($validator->fails()) {
             return response()->json([
                 'success' => false,
-                'message' => 'Vendor ID and hand-off PIN are required.'
-            ], 400);
+                'message' => 'A valid 4-digit pickup PIN is required.',
+                'errors' => $validator->errors(),
+            ], 422);
         }
 
-        $vendorId = $request->input('vendor_id');
-        $inputPin = $request->input('pickup_pin');
-
-        if ($order->vendor_id == $vendorId && $order->pickup_pin === $inputPin) {
-            $updatedOrder = DB::transaction(function () use ($order, $vendorId) {
-                $order->status = 'COMPLETED';
-                $order->order_status = 'COMPLETED';
-                $order->collected_at = now();
-                $order->save();
-
-                // Register Audit Log
-                AuditLog::create([
-                    'user_id' => $vendorId,
-                    'timestamp' => time() * 1000,
-                    'action' => 'PICKUP_VALIDATED',
-                    'details' => "Order #{$order->id} verification PIN validated successfully. Released meal hand-off.",
-                ]);
-
-                return $order;
-            });
-
-            // Notify the student user of the status change to COMPLETED
-            $studentId = $updatedOrder->customer_id ?? $updatedOrder->student_id;
-            if ($studentId) {
-                $student = \App\Models\User::find($studentId);
-                if ($student) {
-                    try {
-                        $student->notify(new \App\Notifications\OrderStatusChangedNotification($updatedOrder, 'READY', 'COMPLETED'));
-                        // Fire real-time broadcast event to students
-                        event(new \App\Events\OrderStatusUpdatedBroadcast($updatedOrder, 'READY', 'COMPLETED'));
-                    } catch (\Exception $e) {
-                        \Illuminate\Support\Facades\Log::error("Failed to notify student {$studentId} of order completed: " . $e->getMessage());
-                    }
-                }
-            }
-
-            // Dispatch event for order completion
-            event(new OrderStatusCompleted($updatedOrder));
-
+        if (!in_array($order->status, ['READY', 'OUT_FOR_DELIVERY'], true)) {
             return response()->json([
-                'success' => true,
-                'message' => 'Pre-order hand-off completed successfully.',
-                'order' => $updatedOrder
-            ], 200);
+                'success' => false,
+                'message' => 'This order is not ready for pickup.',
+            ], 409);
         }
 
-        // Register Audit Log on failure
-        DB::transaction(function () use ($order, $vendorId, $inputPin) {
+        $inputPin = (string) $request->input('pickup_pin');
+
+        // Use a constant-time comparison and never accept a vendor_id supplied by the client.
+        if (!hash_equals((string) $order->pickup_pin, $inputPin)) {
             AuditLog::create([
-                'user_id' => $vendorId,
+                'user_id' => $user->id,
                 'timestamp' => time() * 1000,
                 'action' => 'PICKUP_FAIL',
-                'details' => "Arrested bad PIN input: '{$inputPin}' for Pre-order #{$order->id}.",
+                'details' => "Invalid pickup PIN attempt for order #{$order->id}.",
             ]);
+
+            return response()->json([
+                'success' => false,
+                'message' => 'Invalid pickup PIN.',
+            ], 401);
+        }
+
+        $updatedOrder = DB::transaction(function () use ($order, $user) {
+            $locked = Order::whereKey($order->id)->lockForUpdate()->firstOrFail();
+
+            if (!in_array($locked->status, ['READY', 'OUT_FOR_DELIVERY'], true)) {
+                throw new \RuntimeException('This order is no longer ready for pickup.');
+            }
+
+            $locked->status = 'COMPLETED';
+            $locked->order_status = 'COMPLETED';
+            $locked->collected_at = now();
+            $locked->save();
+
+            AuditLog::create([
+                'user_id' => $user->id,
+                'timestamp' => time() * 1000,
+                'action' => 'PICKUP_VALIDATED',
+                'details' => "Pickup PIN validated successfully for order #{$locked->id}.",
+            ]);
+
+            return $locked;
         });
 
-        return response()->json([
-            'success' => false,
-            'message' => 'Verification PIN mismatch. Access Denied.'
-        ], 401);
-    }
+        $studentId = $updatedOrder->customer_id ?? $updatedOrder->student_id;
+        if ($studentId) {
+            $student = User::find($studentId);
+            if ($student) {
+                try {
+                    $student->notify(new \App\Notifications\OrderStatusChangedNotification(
+                        $updatedOrder, 'READY', 'COMPLETED'
+                    ));
+                    event(new \App\Events\OrderStatusUpdatedBroadcast(
+                        $updatedOrder, 'READY', 'COMPLETED'
+                    ));
+                } catch (\Throwable $e) {
+                    Log::error("Failed to notify student {$studentId} after pickup: ".$e->getMessage());
+                }
+            }
+        }
 
+        event(new OrderStatusCompleted($updatedOrder));
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Pickup verified and order completed successfully.',
+            'order' => $updatedOrder,
+        ], 200);
+    }
     /**
      * Retrieve the authenticated student's personal order history, filtered by date.
      */
