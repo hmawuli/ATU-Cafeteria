@@ -139,7 +139,90 @@ class _RegisterScreenState extends State<RegisterScreen> {
                         validator: (value) {
                           final email = value?.trim() ?? '';
                           if (email.isEmpty) return 'Enter your email address.';
-                          if (!RegExp(r'^[^@\\s]+@[^@\\s]+\\.[^@\\s]+$').hasMatch(email)) {
+                          if (!RegExp(r'^[^@\s]+@[^@\s]+\.[^@\s]+).hasMatch(email)) {
+                            return 'Enter a valid email address.';
+                          }
+                          return null;
+                        },
+                      ),
+                      const SizedBox(height: 16),
+                      TextFormField(
+                        controller: _passwordController,
+                        obscureText: _obscurePassword,
+                        textInputAction: TextInputAction.next,
+                        decoration: InputDecoration(
+                          labelText: 'Password',
+                          helperText: 'Use at least 8 characters.',
+                          prefixIcon: const Icon(Icons.lock_outline),
+                          suffixIcon: IconButton(
+                            tooltip: _obscurePassword ? 'Show password' : 'Hide password',
+                            icon: Icon(_obscurePassword ? Icons.visibility : Icons.visibility_off),
+                            onPressed: () => setState(() => _obscurePassword = !_obscurePassword),
+                          ),
+                          border: const OutlineInputBorder(),
+                        ),
+                        validator: (value) =>
+                            value == null || value.length < 8 ? 'Use at least 8 characters.' : null,
+                      ),
+                      const SizedBox(height: 16),
+                      DropdownButtonFormField<String>(
+                        value: _role,
+                        decoration: const InputDecoration(
+                          labelText: 'Account type',
+                          prefixIcon: Icon(Icons.badge_outlined),
+                          border: OutlineInputBorder(),
+                        ),
+                        items: const [
+                          DropdownMenuItem(value: 'STUDENT', child: Text('Student')),
+                          DropdownMenuItem(value: 'VENDOR', child: Text('Vendor')),
+                        ],
+                        onChanged: (value) => setState(() => _role = value ?? 'STUDENT'),
+                      ),
+                      const SizedBox(height: 16),
+                      TextFormField(
+                        controller: _infoController,
+                        maxLines: 2,
+                        decoration: InputDecoration(
+                          labelText: _role == 'STUDENT'
+                              ? 'Department / Programme (optional)'
+                              : 'Food booth / business name',
+                          prefixIcon: const Icon(Icons.info_outline),
+                          border: const OutlineInputBorder(),
+                        ),
+                      ),
+                      const SizedBox(height: 24),
+                      SizedBox(
+                        height: 50,
+                        child: ElevatedButton(
+                          onPressed: provider.isLoading ? null : _submit,
+                          child: provider.isLoading
+                              ? const SizedBox(
+                                  width: 22,
+                                  height: 22,
+                                  child: CircularProgressIndicator(strokeWidth: 2),
+                                )
+                              : const Text('Create account'),
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      TextButton(
+                        onPressed: provider.isLoading
+                            ? null
+                            : () => Navigator.pushReplacementNamed(context, '/login'),
+                        child: const Text('Already have an account? Sign in'),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+).hasMatch(email)) {
                             return 'Enter a valid email address.';
                           }
                           return null;
