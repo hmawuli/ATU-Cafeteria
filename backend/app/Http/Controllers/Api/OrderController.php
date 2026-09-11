@@ -1415,198 +1415,154 @@ class OrderController extends Controller
      */
     public function cartCheckout(Request $request)
     {
-        $user = $request->user();
-        if (!$user) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Unauthenticated.'
-            ], 401);
-        }
-
         $validator = Validator::make($request->all(), [
-            'items' => 'required|array|min:1',
-            'items.*.menu_item_id' => 'required|integer|exists:menu_items,id',
-            'items.*.quantity' => 'required|integer|min:1',
+            'items' => 'required|array|min:1|max:50',
+            'items.*.menu_item_id' => 'required|integer|distinct|exists:menu_items,id',
+            'items.*.quantity' => 'required|integer|min:1|max:50',
+            'points_to_redeem' => 'nullable|integer|min:0|max:100000',
         ]);
 
         if ($validator->fails()) {
             return response()->json([
                 'success' => false,
-                'message' => 'Validation failed: cart items array structure is invalid.',
-                'errors' => $validator->errors()
-            ], 400);
+                'message' => 'Please review your cart and try again.',
+                'errors' => $validator->errors(),
+            ], 422);
         }
 
-        $cartItems = $request->input('items');
-        $validatedItems = [];
-        $totalCheckoutCost = 0;
-
-        foreach ($cartItems as $index => $item) {
-            $menuItemId = $item['menu_item_id'];
-            $quantity = intval($item['quantity']);
-
-            $menuItem = \App\Models\MenuItem::find($menuItemId);
-            if (!$menuItem) {
-                return response()->json([
-                    'success' => false,
-                    'message' => "Menu item at index {$index} does not exist."
-                ], 404);
-            }
-
-            if (!$menuItem->is_available) {
-                return response()->json([
-                    'success' => false,
-                    'message' => "Menu item '{$menuItem->name}' is currently unavailable."
-                ], 400);
-            }
-
-            $price = floatval($menuItem->price);
-            $itemTotal = round($price * $quantity, 2);
-            $totalCheckoutCost += $itemTotal;
-
-            $validatedItems[] = [
-                'menu_item' => $menuItem,
-                'quantity' => $quantity,
-                'unit_price' => $price,
-                'total_price' => $itemTotal,
-                'vendor_id' => $menuItem->vendor_id,
-                'food_name' => $menuItem->name,
-            ];
-        }
-
-        // Verify loyalty points redemption if requested
-        $pointsToRedeem = intval($request->input('points_to_redeem', 0));
-        $discount = 0.00;
-        if ($pointsToRedeem > 0) {
-            if (($user->loyalty_points ?? 0) < $pointsToRedeem) {
-                return response()->json([
-                    'success' => false,
-                    'message' => 'Insufficient loyalty points balance. You have ' . ($user->loyalty_points ?? 0) . ' points.'
-                ], 400);
-            }
-            // 10 points = 1.00 GHS discount
-            $discount = round($pointsToRedeem * 0.10, 2);
-        }
-
-        $finalCheckoutCost = max(0.00, round($totalCheckoutCost - $discount, 2));
-
-        // Verify sufficient balance
-        if ($user->balance < $finalCheckoutCost) {
-            return response()->json([
-                'success' => false,
-                'message' => "Insufficient wallet balance. Total cart cost is GH₵ " . number_format($finalCheckoutCost, 2) . ", but your balance is GH₵ " . number_format($user->balance, 2) . "."
-            ], 400);
+        $user = $request->user();
+        if (!$user || !$user->isActive()) {
+            return response()->json(['success' => false, 'message' => 'Your authenticated session is no longer valid.'], 401);
         }
 
         try {
-            $createdOrders = DB::transaction(function () use ($request, $user, $validatedItems, $totalCheckoutCost, $finalCheckoutCost, $pointsToRedeem, $discount) {
-                // Deduct balance and loyalty points
-                $user->balance = $user->balance - $finalCheckoutCost;
-                if ($pointsToRedeem > 0) {
-                    $user->loyalty_points = ($user->loyalty_points ?? 0) - $pointsToRedeem;
-                }
-                $user->save();
+            $result = DB::transaction(function () use ($request, $user) {
+                // Lock the wallet owner row so two simultaneous checkouts cannot spend the same balance.
+                $lockedUser = User::whereKey($user->id)->lockForUpdate()->firstOrFail();
+                $pointsToRedeem = (int) $request->input('points_to_redeem', 0);
+                $total = 0.0;
+                $items = [];
 
-                $orders = [];
-                $securePin = (string) random_int(1000, 9999);
+                foreach ($request->input('items') as $index => $input) {
+                    $menuItem = AppModelsMenuItem::whereKey((int) $input['menu_item_id'])
+                        ->lockForUpdate()->first();
 
-                $remainingPointsToDistribute = $pointsToRedeem;
-                $remainingDiscountToDistribute = $discount;
-                $itemsCount = count($validatedItems);
-
-                foreach ($validatedItems as $index => $item) {
-                    // Proportional distribution of points and discount
-                    if ($index === $itemsCount - 1) {
-                        // Last item gets the remainder
-                        $itemPoints = $remainingPointsToDistribute;
-                        $itemDiscount = $remainingDiscountToDistribute;
-                    } else {
-                        $ratio = $item['total_price'] / max(1.0, $totalCheckoutCost);
-                        $itemPoints = intval(round($pointsToRedeem * $ratio));
-                        $itemDiscount = round($discount * $ratio, 2);
-
-                        $remainingPointsToDistribute -= $itemPoints;
-                        $remainingDiscountToDistribute -= $itemDiscount;
+                    if (!$menuItem) {
+                        throw new \RuntimeException("Menu item at index {$index} is no longer available.");
+                    }
+                    if (!$menuItem->is_available) {
+                        throw new \RuntimeException("Menu item '{$menuItem->name}' is currently unavailable.");
                     }
 
-                    $itemFinalPrice = max(0.00, round($item['total_price'] - $itemDiscount, 2));
+                    $quantity = (int) $input['quantity'];
+                    $stock = $menuItem->current_stock;
+                    if ($stock !== null && $stock < $quantity) {
+                        throw new \RuntimeException("Only {$stock} unit(s) of '{$menuItem->name}' remain.");
+                    }
 
-                    $createdOrder = Order::create([
-                        'customer_id' => $user->id,
-                        'student_id' => $user->id,
-                        'user_id' => $user->id,
-                        'vendor_id' => $item['vendor_id'],
-                        'menu_item_id' => $item['menu_item']->id,
-                        'food_name' => $item['food_name'],
+                    $unitPrice = round((float) $menuItem->price, 2);
+                    $lineTotal = round($unitPrice * $quantity, 2);
+                    $total = round($total + $lineTotal, 2);
+                    $items[] = compact('menuItem', 'quantity', 'unitPrice', 'lineTotal');
+                }
+
+                if ($pointsToRedeem > (int) ($lockedUser->loyalty_points ?? 0)) {
+                    throw new \RuntimeException('Insufficient loyalty points balance.');
+                }
+
+                $discount = round($pointsToRedeem * 0.10, 2);
+                $finalTotal = max(0.0, round($total - $discount, 2));
+
+                if ((float) $lockedUser->balance < $finalTotal) {
+                    throw new \RuntimeException(
+                        'Insufficient wallet balance. You need GH₵ '.number_format($finalTotal, 2).
+                        ', but your balance is GH₵ '.number_format((float) $lockedUser->balance, 2).'.'
+                    );
+                }
+
+                $pin = (string) random_int(1000, 9999);
+                $createdOrders = [];
+
+                foreach ($items as $item) {
+                    $ratio = $total > 0 ? $item['lineTotal'] / $total : 0;
+                    $itemDiscount = round($discount * $ratio, 2);
+
+                    $order = Order::create([
+                        'customer_id' => $lockedUser->id,
+                        'student_id' => $lockedUser->id,
+                        'user_id' => $lockedUser->id,
+                        'vendor_id' => $item['menuItem']->vendor_id,
+                        'menu_item_id' => $item['menuItem']->id,
+                        'food_name' => $item['menuItem']->name,
                         'quantity' => $item['quantity'],
-                        'unit_price' => $item['unit_price'],
-                        'total_price' => $itemFinalPrice,
-                        'order_timestamp' => time() * 1000,
+                        'unit_price' => $item['unitPrice'],
+                        'total_price' => max(0.0, round($item['lineTotal'] - $itemDiscount, 2)),
+                        'order_timestamp' => now()->getTimestampMs(),
                         'status' => 'PENDING',
-                        'pickup_pin' => $securePin,
+                        'pickup_pin' => $pin,
                         'estimated_pickup_time' => $request->input('estimated_pickup_time', 'Calculating...'),
-                        'points_redeemed' => $itemPoints,
+                        'points_redeemed' => 0,
                         'discount_applied' => $itemDiscount,
                     ]);
 
-                    // Add an order item entry if order_items table exists
-                    try {
-                        DB::table('order_items')->insert([
-                            'order_id' => $createdOrder->id,
-                            'food_item_id' => $item['menu_item']->id,
-                            'quantity' => $item['quantity'],
-                            'price' => $item['unit_price'],
-                            'created_at' => now(),
-                            'updated_at' => now(),
-                        ]);
-                    } catch (\Exception $e) {
-                        // Suppress if table doesn't fully match or exist
+                    if ($item['menuItem']->current_stock !== null) {
+                        $item['menuItem']->decrement('current_stock', $item['quantity']);
+                        if (($item['menuItem']->current_stock - $item['quantity']) <= 0) {
+                            $item['menuItem']->update(['is_available' => false]);
+                        }
                     }
 
-                    // Register individual audit log
-                    \App\Models\AuditLog::create([
-                        'user_id' => $user->id,
+                    AuditLog::create([
+                        'user_id' => $lockedUser->id,
                         'action' => 'ORDER_CREATED',
-                        'details' => "Placed order #{$createdOrder->id} for '{$item['food_name']}' x {$item['quantity']}",
-                        'created_at' => now(),
-                        'updated_at' => now(),
+                        'details' => "Placed order #{$order->id} for '{$item['menuItem']->name}' x {$item['quantity']}",
                     ]);
-
-                    $orders[] = $createdOrder;
+                    $createdOrders[] = $order;
                 }
 
-                // Register Wallet Transaction
-                \App\Models\WalletTransaction::create([
-                    'user_id' => $user->id,
+                $lockedUser->balance = round((float) $lockedUser->balance - $finalTotal, 2);
+                $lockedUser->loyalty_points = (int) ($lockedUser->loyalty_points ?? 0) - $pointsToRedeem;
+                $lockedUser->save();
+
+                WalletTransaction::create([
+                    'user_id' => $lockedUser->id,
                     'type' => 'PAYMENT',
-                    'amount' => -$totalCheckoutCost,
+                    'amount' => -$finalTotal,
                     'status' => 'SUCCESS',
-                    'reference' => 'CART-ORD-' . uniqid() . '-' . time(),
-                    'description' => 'Cart Checkout payment for ' . count($validatedItems) . ' food items.',
-                    'created_at' => now(),
-                    'updated_at' => now(),
+                    'reference' => 'CART-ORD-'.Str::upper(Str::random(20)),
+                    'details' => 'Cafeteria cart checkout payment.',
                 ]);
 
-                return $orders;
-            });
+                return [
+                    'orders' => $createdOrders,
+                    'total_cost' => $total,
+                    'discount' => $discount,
+                    'final_total' => $finalTotal,
+                    'remaining_balance' => (float) $lockedUser->balance,
+                    'pickup_pin' => $pin,
+                ];
+            }, 3);
 
             return response()->json([
                 'success' => true,
-                'message' => 'Cart checkout completed successfully. Orders placed.',
-                'orders' => $createdOrders,
-                'total_cost' => $totalCheckoutCost,
-                'remaining_balance' => round($user->balance, 2)
-            ], 200);
-
-        } catch (\Exception $e) {
+                'message' => 'Order placed successfully.',
+                'orders' => $result['orders'],
+                'total_cost' => $result['total_cost'],
+                'discount' => $result['discount'],
+                'final_total' => $result['final_total'],
+                'remaining_balance' => $result['remaining_balance'],
+                'pickup_pin' => $result['pickup_pin'],
+            ]);
+        } catch (\RuntimeException $e) {
+            return response()->json(['success' => false, 'message' => $e->getMessage()], 400);
+        } catch (\Throwable $e) {
+            report($e);
             return response()->json([
                 'success' => false,
-                'message' => 'Cart checkout transactional failure.',
-                'error' => $e->getMessage()
+                'message' => 'We could not complete your order. No payment was taken. Please try again.',
             ], 500);
         }
     }
-
     /**
      * Remove the specified order from storage (Admin only).
      */
