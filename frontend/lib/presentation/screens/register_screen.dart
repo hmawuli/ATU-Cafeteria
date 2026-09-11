@@ -57,13 +57,30 @@ class _RegisterScreenState extends State<RegisterScreen> {
     final provider = context.watch<CafeteriaProvider>();
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Create Account')),
-      body: Center(
-        child: SingleChildScrollView(
+      appBar: AppBar(
+        title: const Text('Create Account'),
+        backgroundColor: const Color(0xFF0B1F3A),
+        foregroundColor: Colors.white,
+      ),
+      body: Container(
+        decoration: const BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+            colors: [Color(0xFFF4F7FB), Color(0xFFE9EEF5)],
+          ),
+        ),
+        child: Center(
+          child: SingleChildScrollView(
           padding: const EdgeInsets.all(24),
           child: ConstrainedBox(
             constraints: const BoxConstraints(maxWidth: 520),
             child: Card(
+              elevation: 10,
+              shadowColor: const Color(0x330B1F3A),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(24),
+              ),
               child: Padding(
                 padding: const EdgeInsets.all(28),
                 child: Form(
@@ -71,13 +88,26 @@ class _RegisterScreenState extends State<RegisterScreen> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
-                      Icon(Icons.restaurant_menu,
-                          size: 56, color: Theme.of(context).colorScheme.primary),
+                      Container(
+                        width: 74,
+                        height: 74,
+                        decoration: BoxDecoration(
+                          gradient: const LinearGradient(
+                            colors: [Color(0xFFE8751A), Color(0xFFFFB347)],
+                          ),
+                          borderRadius: BorderRadius.circular(20),
+                        ),
+                        child: const Icon(
+                          Icons.restaurant_rounded,
+                          size: 40,
+                          color: Colors.white,
+                        ),
+                      ),
                       const SizedBox(height: 12),
                       const Text(
                         'ATU Cafeteria',
                         textAlign: TextAlign.center,
-                        style: TextStyle(fontSize: 26, fontWeight: FontWeight.bold),
+                        style: TextStyle(fontSize: 26, fontWeight: FontWeight.w800, letterSpacing: 1.0),
                       ),
                       const SizedBox(height: 6),
                       const Text(
