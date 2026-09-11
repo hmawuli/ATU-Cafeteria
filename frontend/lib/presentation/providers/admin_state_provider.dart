@@ -49,6 +49,7 @@ class AdminStateProvider extends ChangeNotifier {
 
   Future<bool> changeUserStatus(int id, String status) async => _run(() async { await repository.updateUserStatus(id, status); await loadAll(); });
   Future<bool> changeVendorStatus(int id, String status) async => _run(() async { await repository.updateVendorStatus(id, status); await loadAll(); });
+  Future<bool> createVendor({required String email, required String password, required String fullName, required String storeName, String? location, String? contactEmail, String? contactInfo}) async => _run(() async { await repository.createVendor(email: email, password: password, fullName: fullName, storeName: storeName, location: location, contactEmail: contactEmail, contactInfo: contactInfo); await loadAll(); });
   Future<bool> changeAdminLevel(int id, String level) async => _run(() async { await repository.updateAdminLevel(id, level); await loadAll(); });
   Future<bool> adjustWallet(int id, double amount, String type, String reason) async => _run(() async { await repository.walletAdjustment(id, amount, type, reason); await loadAll(); });
   Future<bool> _run(Future<void> Function() action) async { try { _error=null; await action(); return true; } catch(e) { _error=e.toString(); notifyListeners(); return false; } }
