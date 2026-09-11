@@ -42,7 +42,7 @@ class _StudentDashboardScreenState extends State<StudentDashboardScreen> {
         leading: provider.isAdminActing
             ? IconButton(
                 icon:
-                    const Icon(Icons.admin_panel_settings, color: Colors.amber),
+                    const Icon(Icons.admin_panel_settings, color: const Color(0xFFFFA000)),
                 tooltip: "Return to Admin Console",
                 onPressed: () {
                   provider.stopImpersonation();
@@ -56,7 +56,7 @@ class _StudentDashboardScreenState extends State<StudentDashboardScreen> {
               padding: const EdgeInsets.only(right: 8.0),
               child: ElevatedButton.icon(
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.amber[800],
+                  backgroundColor: const Color(0xFFE8751A),
                   foregroundColor: Colors.white,
                   padding: const EdgeInsets.symmetric(horizontal: 12),
                   minimumSize: const Size(64, 36),
@@ -149,9 +149,9 @@ class _StudentDashboardScreenState extends State<StudentDashboardScreen> {
             padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
             decoration: BoxDecoration(
               color: Colors.red[50]?.withOpacity(0.4) ??
-                  Colors.amber[50]?.withOpacity(0.4),
+                  const Color(0xFFFFA000)[50]?.withOpacity(0.4),
               borderRadius: BorderRadius.circular(10),
-              border: Border.all(color: Colors.red[100] ?? Colors.amber[100]!),
+              border: Border.all(color: Colors.red[100] ?? const Color(0xFFFFA000)[100]!),
             ),
             child: Row(
               children: [
@@ -159,7 +159,7 @@ class _StudentDashboardScreenState extends State<StudentDashboardScreen> {
                   padding:
                       const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                   decoration: BoxDecoration(
-                    color: Colors.redAccent,
+                    color: const Color(0xFFC62828),
                     borderRadius: BorderRadius.circular(4),
                   ),
                   child: const Text(
@@ -193,7 +193,7 @@ class _StudentDashboardScreenState extends State<StudentDashboardScreen> {
                         builder: (context) => AlertDialog(
                           title: const Row(
                             children: [
-                              Icon(Icons.radar, color: Colors.blueAccent),
+                              Icon(Icons.radar, color: const Color(0xFF1565C0)),
                               SizedBox(width: 8),
                               Text("Real-Time Stock Stream"),
                             ],
@@ -226,7 +226,7 @@ class _StudentDashboardScreenState extends State<StudentDashboardScreen> {
                       "+${provider.liveAlerts.length - 1} more",
                       style: const TextStyle(
                         fontSize: 9,
-                        color: Colors.blueAccent,
+                        color: const Color(0xFF1565C0),
                         fontWeight: FontWeight.bold,
                         decoration: TextDecoration.underline,
                       ),
@@ -327,7 +327,7 @@ class _StudentDashboardScreenState extends State<StudentDashboardScreen> {
                                   Text(
                                     "Vendor: ${vendor.fullName} (${vendor.info})",
                                     style: TextStyle(
-                                        color: Colors.grey[600], fontSize: 12),
+                                        color: Colors.blueGrey[600], fontSize: 12),
                                   ),
                                   const SizedBox(height: 4),
                                   Text(
@@ -335,7 +335,7 @@ class _StudentDashboardScreenState extends State<StudentDashboardScreen> {
                                     maxLines: 2,
                                     overflow: TextOverflow.ellipsis,
                                     style: TextStyle(
-                                        color: Colors.grey[500], fontSize: 11),
+                                        color: Colors.blueGrey[500], fontSize: 11),
                                   ),
                                   const SizedBox(height: 8),
                                   Row(
@@ -393,7 +393,7 @@ class _StudentDashboardScreenState extends State<StudentDashboardScreen> {
         Padding(
           padding: const EdgeInsets.fromLTRB(12.0, 12.0, 12.0, 4.0),
           child: Card(
-            color: isOffline ? Colors.orange[900] : Colors.green[900],
+            color: isOffline ? const Color(0xFF0B1F3A) : const Color(0xFF123B5D),
             shape:
                 RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
             child: Padding(
@@ -512,10 +512,10 @@ class _StudentDashboardScreenState extends State<StudentDashboardScreen> {
                                       padding: const EdgeInsets.symmetric(
                                           horizontal: 14, vertical: 6),
                                       decoration: BoxDecoration(
-                                        color: Colors.grey[200],
+                                        color: Colors.blueGrey[200],
                                         borderRadius: BorderRadius.circular(6),
                                         border: Border.all(
-                                            color: Colors.grey[400]!),
+                                            color: Colors.blueGrey[400]!),
                                       ),
                                       child: Text(
                                         order.pickupPin,
@@ -533,7 +533,7 @@ class _StudentDashboardScreenState extends State<StudentDashboardScreen> {
                                 Text(
                                   "Provide this secure 4-digit token to the cook upon receiving custody of order to validate pickup.",
                                   style: TextStyle(
-                                      color: Colors.grey[500], fontSize: 11),
+                                      color: Colors.blueGrey[500], fontSize: 11),
                                 ),
                                 const SizedBox(height: 16),
                                 if (order.status == 'COMPLETED') ...[
@@ -580,7 +580,7 @@ class _StudentDashboardScreenState extends State<StudentDashboardScreen> {
                 borderRadius: BorderRadius.circular(16),
                 boxShadow: [
                   BoxShadow(
-                      color: Colors.blue.withOpacity(0.3),
+                      color: const Color(0xFF1565C0).withOpacity(0.3),
                       blurRadius: 8,
                       offset: const Offset(0, 4))
                 ]),
@@ -721,14 +721,14 @@ class _StudentDashboardScreenState extends State<StudentDashboardScreen> {
 
               return ListTile(
                 leading: const Icon(Icons.history_toggle_off,
-                    color: Colors.blueAccent),
+                    color: const Color(0xFF1565C0)),
                 title: Text(log.action,
                     style: const TextStyle(
                         fontWeight: FontWeight.bold, fontSize: 13)),
                 subtitle:
                     Text(log.details, style: const TextStyle(fontSize: 11)),
                 trailing: Text(dateStr,
-                    style: const TextStyle(fontSize: 10, color: Colors.grey)),
+                    style: const TextStyle(fontSize: 10, color: Colors.blueGrey)),
               );
             },
           )
@@ -775,11 +775,11 @@ class _StudentDashboardScreenState extends State<StudentDashboardScreen> {
                       style: const TextStyle(
                           fontSize: 20, fontWeight: FontWeight.bold)),
                   Text("Category: ${food.category}",
-                      style: TextStyle(color: Colors.grey[600], fontSize: 12)),
+                      style: TextStyle(color: Colors.blueGrey[600], fontSize: 12)),
                   const SizedBox(height: 16),
                   Text("Quantity Selection:",
                       style: TextStyle(
-                          color: Colors.grey[700],
+                          color: Colors.blueGrey[700],
                           fontWeight: FontWeight.bold,
                           fontSize: 13)),
                   const SizedBox(height: 8),
@@ -843,7 +843,7 @@ class _StudentDashboardScreenState extends State<StudentDashboardScreen> {
                                     ? "Order registered dynamically!"
                                     : "Failed. Insufficient wallet balance."),
                                 backgroundColor:
-                                    success ? Colors.green : Colors.red,
+                                    success ? const Color(0xFF2E7D32) : Colors.red,
                               ),
                             );
                           },
@@ -950,11 +950,11 @@ class _StudentDashboardScreenState extends State<StudentDashboardScreen> {
                   Container(
                     padding: const EdgeInsets.all(6),
                     decoration: BoxDecoration(
-                      color: Colors.blue.withOpacity(0.1),
+                      color: const Color(0xFF1565C0).withOpacity(0.1),
                       borderRadius: BorderRadius.circular(8),
                     ),
                     child: const Icon(Icons.account_balance_wallet,
-                        color: Colors.blue, size: 20),
+                        color: const Color(0xFF1565C0), size: 20),
                   ),
                   const SizedBox(width: 12),
                   const Text("MoMo / Card Wallet Top-Up",
@@ -968,7 +968,7 @@ class _StudentDashboardScreenState extends State<StudentDashboardScreen> {
                 children: [
                   const Text(
                     "Load digital funds securely to your student cafeteria wallet via Paystack gateway.",
-                    style: TextStyle(fontSize: 11, color: Colors.grey),
+                    style: TextStyle(fontSize: 11, color: Colors.blueGrey),
                   ),
                   const SizedBox(height: 16),
                   TextField(
@@ -1136,16 +1136,16 @@ class _StudentDashboardScreenState extends State<StudentDashboardScreen> {
                           padding: const EdgeInsets.symmetric(
                               horizontal: 8, vertical: 4),
                           decoration: BoxDecoration(
-                            color: Colors.amber.withOpacity(0.12),
+                            color: const Color(0xFFFFA000).withOpacity(0.12),
                             borderRadius: BorderRadius.circular(6),
                           ),
                           child: const Row(
                             children: [
-                              Icon(Icons.lock, color: Colors.amber, size: 10),
+                              Icon(Icons.lock, color: const Color(0xFFFFA000), size: 10),
                               SizedBox(width: 4),
                               Text("TEST GATEWAY",
                                   style: TextStyle(
-                                      color: Colors.amber,
+                                      color: const Color(0xFFFFA000),
                                       fontSize: 8,
                                       fontWeight: FontWeight.bold)),
                             ],
@@ -1160,7 +1160,7 @@ class _StudentDashboardScreenState extends State<StudentDashboardScreen> {
                       Text(
                         "PAYMENT TO: Accra Tech Cafeteria",
                         style: TextStyle(
-                            color: Colors.grey[600],
+                            color: Colors.blueGrey[600],
                             fontSize: 10,
                             fontWeight: FontWeight.bold,
                             letterSpacing: 0.5),
@@ -1179,7 +1179,7 @@ class _StudentDashboardScreenState extends State<StudentDashboardScreen> {
                         style: TextStyle(
                             fontSize: 9,
                             fontFamily: 'monospace',
-                            color: Colors.grey[500]),
+                            color: Colors.blueGrey[500]),
                       ),
                       const SizedBox(height: 16),
 
@@ -1188,7 +1188,7 @@ class _StudentDashboardScreenState extends State<StudentDashboardScreen> {
                         padding: const EdgeInsets.symmetric(
                             vertical: 8, horizontal: 12),
                         decoration: BoxDecoration(
-                          border: Border.all(color: Colors.grey[300]!),
+                          border: Border.all(color: Colors.blueGrey[300]!),
                           borderRadius: BorderRadius.circular(8),
                         ),
                         child: Row(
@@ -1197,7 +1197,7 @@ class _StudentDashboardScreenState extends State<StudentDashboardScreen> {
                             const Row(
                               children: [
                                 Icon(Icons.phone_android,
-                                    color: Colors.teal, size: 18),
+                                    color: const Color(0xFF00796B), size: 18),
                                 SizedBox(width: 8),
                                 Text("Mobile Money (MTN/Telecel/AT)",
                                     style: TextStyle(
@@ -1206,7 +1206,7 @@ class _StudentDashboardScreenState extends State<StudentDashboardScreen> {
                               ],
                             ),
                             Icon(Icons.check_circle,
-                                color: Colors.teal[700], size: 16),
+                                color: const Color(0xFF00796B)[700], size: 16),
                           ],
                         ),
                       ),
@@ -1260,7 +1260,7 @@ class _StudentDashboardScreenState extends State<StudentDashboardScreen> {
                         child: Text(
                           "A push notification OTP was simulated to your handset. Please type '1234' below to authorize the withdrawal request.",
                           textAlign: TextAlign.center,
-                          style: TextStyle(fontSize: 11, color: Colors.grey),
+                          style: TextStyle(fontSize: 11, color: Colors.blueGrey),
                         ),
                       ),
                       const SizedBox(height: 16),
@@ -1285,7 +1285,7 @@ class _StudentDashboardScreenState extends State<StudentDashboardScreen> {
                       const SizedBox(height: 20),
                       ElevatedButton(
                         style: ElevatedButton.styleFrom(
-                          backgroundColor: Colors.teal[600],
+                          backgroundColor: const Color(0xFF00796B)[600],
                           padding: const EdgeInsets.symmetric(vertical: 14),
                         ),
                         onPressed: () {
@@ -1337,7 +1337,7 @@ class _StudentDashboardScreenState extends State<StudentDashboardScreen> {
                           textAlign: TextAlign.center,
                           style: TextStyle(
                               fontSize: 10,
-                              color: Colors.grey,
+                              color: Colors.blueGrey,
                               fontStyle: FontStyle.italic),
                         ),
                       ),
@@ -1346,7 +1346,7 @@ class _StudentDashboardScreenState extends State<StudentDashboardScreen> {
                     // STEP 3: TRANSACTION SUCCESS
                     if (step == 3) ...[
                       const Icon(Icons.check_circle_rounded,
-                          color: Colors.green, size: 64),
+                          color: const Color(0xFF2E7D32), size: 64),
                       const SizedBox(height: 16),
                       const Center(
                         child: Text(
@@ -1354,7 +1354,7 @@ class _StudentDashboardScreenState extends State<StudentDashboardScreen> {
                           style: TextStyle(
                               fontWeight: FontWeight.bold,
                               fontSize: 16,
-                              color: Colors.green),
+                              color: const Color(0xFF2E7D32)),
                         ),
                       ),
                       const SizedBox(height: 8),
@@ -1368,7 +1368,7 @@ class _StudentDashboardScreenState extends State<StudentDashboardScreen> {
                       const SizedBox(height: 24),
                       ElevatedButton(
                         style: ElevatedButton.styleFrom(
-                            backgroundColor: Colors.green),
+                            backgroundColor: const Color(0xFF2E7D32)),
                         onPressed: () {
                           Navigator.pop(context);
                         },
@@ -1455,22 +1455,22 @@ class _StudentDashboardScreenState extends State<StudentDashboardScreen> {
     switch (status) {
       case 'Order Placed':
       case 'PENDING':
-        return Colors.green;
+        return const Color(0xFF2E7D32);
       case 'Preparing':
       case 'PREPARING':
-        return Colors.blue;
+        return const Color(0xFF1565C0);
       case 'Out for Delivery':
       case 'OUT_FOR_DELIVERY':
       case 'READY':
-        return Colors.orange;
+        return const Color(0xFFE8751A);
       case 'Delivered':
       case 'COMPLETED':
-        return Colors.teal;
+        return const Color(0xFF00796B);
       case 'DECLINED':
       case 'Declined':
         return Colors.red;
       default:
-        return Colors.grey;
+        return Colors.blueGrey;
     }
   }
 
@@ -1535,23 +1535,23 @@ class _StudentDashboardScreenState extends State<StudentDashboardScreen> {
       margin: const EdgeInsets.symmetric(vertical: 8),
       padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 8),
       decoration: BoxDecoration(
-        color: Colors.blue[50]?.withOpacity(0.3),
+        color: const Color(0xFF1565C0)[50]?.withOpacity(0.3),
         borderRadius: BorderRadius.circular(10),
-        border: Border.all(color: Colors.blue[100]!),
+        border: Border.all(color: const Color(0xFF1565C0)[100]!),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           const Row(
             children: [
-              Icon(Icons.radar, color: Colors.blueAccent, size: 14),
+              Icon(Icons.radar, color: const Color(0xFF1565C0), size: 14),
               SizedBox(width: 6),
               Text(
                 "REAL-TIME ORDER TRACKING STREAMS",
                 style: TextStyle(
                   fontWeight: FontWeight.bold,
                   fontSize: 10,
-                  color: Colors.blueAccent,
+                  color: const Color(0xFF1565C0),
                   letterSpacing: 0.8,
                 ),
               ),
@@ -1568,8 +1568,8 @@ class _StudentDashboardScreenState extends State<StudentDashboardScreen> {
               final icon = stage['icon'] as IconData;
 
               final Color color = isActive
-                  ? Colors.blueAccent
-                  : (isPassed ? Colors.green : Colors.grey[400]!);
+                  ? const Color(0xFF1565C0)
+                  : (isPassed ? const Color(0xFF2E7D32) : Colors.blueGrey[400]!);
 
               return Expanded(
                 child: Column(
@@ -1582,18 +1582,18 @@ class _StudentDashboardScreenState extends State<StudentDashboardScreen> {
                             color: idx == 0
                                 ? Colors.transparent
                                 : (idx <= currentStage
-                                    ? Colors.green
-                                    : Colors.grey[300]),
+                                    ? const Color(0xFF2E7D32)
+                                    : Colors.blueGrey[300]),
                           ),
                         ),
                         Container(
                           padding: const EdgeInsets.all(6),
                           decoration: BoxDecoration(
                             color: isActive
-                                ? Colors.blue[100]
+                                ? const Color(0xFF1565C0)[100]
                                 : (isPassed
-                                    ? Colors.green[50]
-                                    : Colors.grey[100]),
+                                    ? const Color(0xFF2E7D32)[50]
+                                    : Colors.blueGrey[100]),
                             shape: BoxShape.circle,
                             border: Border.all(color: color, width: 2),
                           ),
@@ -1605,8 +1605,8 @@ class _StudentDashboardScreenState extends State<StudentDashboardScreen> {
                             color: idx == stages.length - 1
                                 ? Colors.transparent
                                 : (idx < currentStage
-                                    ? Colors.green
-                                    : Colors.grey[300]),
+                                    ? const Color(0xFF2E7D32)
+                                    : Colors.blueGrey[300]),
                           ),
                         ),
                       ],
@@ -1620,8 +1620,8 @@ class _StudentDashboardScreenState extends State<StudentDashboardScreen> {
                         fontWeight:
                             isActive ? FontWeight.bold : FontWeight.normal,
                         color: isActive
-                            ? Colors.blueAccent
-                            : (isPassed ? Colors.green : Colors.grey[600]),
+                            ? const Color(0xFF1565C0)
+                            : (isPassed ? const Color(0xFF2E7D32) : Colors.blueGrey[600]),
                       ),
                     ),
                   ],
