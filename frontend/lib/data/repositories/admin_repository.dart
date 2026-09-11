@@ -7,6 +7,7 @@ class AdminRepository {
   Future<Map<String, dynamic>> dashboard() async => _map(await api.request('GET', 'admin/dashboard'));
   Future<Map<String, dynamic>> users({String? role, String? status, String? search}) async => _map(await api.request('GET', _query('admin/users', {'role': role, 'status': status, 'search': search})));
   Future<Map<String, dynamic>> vendors() async => _map(await api.request('GET', 'admin/vendors'));
+  Future<Map<String, dynamic>> createVendor({required String email, required String password, required String fullName, required String storeName, String? location, String? contactEmail, String? contactInfo}) async => _map(await api.request('POST', 'admin/vendors', body: {'email': email, 'password': password, 'fullName': fullName, 'storeName': storeName, 'location': location, 'contactEmail': contactEmail, 'contactInfo': contactInfo}));
   Future<Map<String, dynamic>> orders({String? status}) async => _map(await api.request('GET', _query('admin/orders', {'status': status})));
   Future<Map<String, dynamic>> finance() async => _map(await api.request('GET', 'admin/finance/summary'));
   Future<Map<String, dynamic>> auditLogs() async => _map(await api.request('GET', 'admin/audit-logs'));
