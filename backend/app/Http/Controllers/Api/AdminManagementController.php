@@ -71,6 +71,60 @@ class AdminManagementController extends Controller
         return response()->json(['success'=>true,'message'=>'Administrative level updated.','data'=>$user->fresh()]);
     }
 
+    /**
+     * Provision a vendor account. Vendor creation is restricted to administrators.
+     */
+    public function createVendor(Request $request)
+    {
+        $data = $request->validate([
+            'email' => ['required', 'email', 'max:255'],
+            'password' => ['required', 'string', 'min:8', 'max:128'],
+            'fullName' => ['required', 'string', 'max:255'],
+            'storeName' => ['required', 'string', 'max:255'],
+            'location' => ['nullable', 'string', 'max:255'],
+            'contactEmail' => ['nullable', 'email', 'max:255'],
+            'contactInfo' => ['nullable', 'string', 'max:255'],
+        ]);
+
+        $email = strtolower(trim($data['email']));
+        if (User::where('username', $email)->exists()) {
+            return response()->json(['success' => false, 'message' => 'An account with this email address already exists.'], 409);
+        }
+
+        $user = DB::transaction(function () use ($data, $email, $request) {
+            $user = User::create([
+                'username' => $email,
+                'password' => \Illuminate\Support\Facades\Hash::make($data['password']),
+                'role' => 'VENDOR',
+                'fullName' => trim($data['fullName']),
+                'info' => trim($data['storeName']),
+                'profile_info' => ['email' => $email],
+                'account_status' => 'ACTIVE',
+            ]);
+
+            Vendor::create([
+                'user_id' => $user->id,
+                'name' => trim($data['fullName']),
+                'store_name' => trim($data['storeName']),
+                'location' => trim((string) ($data['location'] ?? '')),
+                'location_within_campus' => trim((string) ($data['location'] ?? '')),
+                'contact_email' => $data['contactEmail'] ?? $email,
+                'contact_info' => trim((string) ($data['contactInfo'] ?? '')),
+                'operational_status' => 'ACTIVE',
+            ]);
+
+            AuditLog::create([
+                'user_id' => $request->user()->id,
+                'timestamp' => now()->getTimestampMs(),
+                'action' => 'VENDOR_PROVISIONED',
+                'details' => "Provisioned vendor {$user->fullName} ({$email}) for {$user->info}.",
+            ]);
+            return $user;
+        });
+
+        return response()->json(['success' => true, 'message' => 'Vendor account created successfully. The vendor can now sign in.', 'data' => $user->fresh()], 201);
+    }
+
     public function vendors(Request $request)
     {
         $vendors = Vendor::with('user:id,username,fullName,account_status,admin_level')->latest()->paginate(min((int)$request->input('per_page',50),100));
