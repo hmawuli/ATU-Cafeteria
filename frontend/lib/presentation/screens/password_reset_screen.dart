@@ -18,7 +18,7 @@ class _PasswordResetScreenState extends State<PasswordResetScreen> {
 
   @override
   void dispose() {
-    _usernameController.dispose();
+    _emailController.dispose();
     _codeController.dispose();
     _passwordController.dispose();
     super.dispose();
@@ -26,7 +26,7 @@ class _PasswordResetScreenState extends State<PasswordResetScreen> {
 
   Future<void> _requestCode() async {
     final username = _usernameController.text.trim();
-    if (username.isEmpty) {
+    if (!RegExp(r'^[^@\s]+@[^@\s]+\.[^@\s]+ {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Enter the email address associated with your account.')),
       );
@@ -35,7 +35,140 @@ class _PasswordResetScreenState extends State<PasswordResetScreen> {
 
     setState(() => _loading = true);
     final provider = context.read<CafeteriaProvider>();
-    final ok = await provider.requestPasswordReset(username);
+    final ok = await provider.requestPasswordReset(email);
+    if (!mounted) return;
+    setState(() {
+      _sent = ok;
+      _loading = false;
+    });
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          ok
+              ? 'If the account exists, a reset code has been sent.'
+              : (provider.loginError ?? 'Request failed.'),
+        ),
+      ),
+    );
+  }
+
+  Future<void> _resetPassword() async {
+    final username = _usernameController.text.trim();
+    final code = _codeController.text.trim();
+    final password = _passwordController.text;
+
+    if (code.length != 6 || password.length < 8) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Enter a valid 6-digit code and a at least 8 characters.')),
+      );
+      return;
+    }
+
+    setState(() => _loading = true);
+    final provider = context.read<CafeteriaProvider>();
+    final ok = await provider.resetPassword(email, code, password);
+    if (!mounted) return;
+    setState(() => _loading = false);
+
+    if (ok) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Password changed successfully.')),
+      );
+      Navigator.pop(context);
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(provider.loginError ?? 'Reset failed.')),
+      );
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(title: const Text('Reset Password')),
+      body: Center(
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.all(24),
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 460),
+            child: Card(
+              child: Padding(
+                padding: const EdgeInsets.all(24),
+                child: Column(
+                  children: [
+                    const Icon(Icons.lock_reset, size: 60),
+                    const SizedBox(height: 12),
+                    const Text(
+                      'Reset your password',
+                      style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
+                    ),
+                    const SizedBox(height: 20),
+                    TextField(
+                      controller: _usernameController,
+                      enabled: !_sent,
+                      decoration: const InputDecoration(
+                        labelText: 'Email address',
+                        border: OutlineInputBorder(),
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    if (_sent) ...[
+                      TextField(
+                        controller: _codeController,
+                        keyboardType: TextInputType.number,
+                        maxLength: 6,
+                        decoration: const InputDecoration(
+                          labelText: '6-digit code',
+                          border: OutlineInputBorder(),
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      TextField(
+                        controller: _passwordController,
+                        obscureText: true,
+                        decoration: const InputDecoration(
+                          labelText: 'New password',
+                          border: OutlineInputBorder(),
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      SizedBox(
+                        width: double.infinity,
+                        height: 48,
+                        child: ElevatedButton(
+                          onPressed: _loading ? null : _resetPassword,
+                          child: Text(_loading ? 'Please wait...' : 'Change Password'),
+                        ),
+                      ),
+                    ] else
+                      SizedBox(
+                        width: double.infinity,
+                        height: 48,
+                        child: ElevatedButton(
+                          onPressed: _loading ? null : _requestCode,
+                          child: Text(_loading ? 'Please wait...' : 'Send Reset Code'),
+                        ),
+                      ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+).hasMatch(email)) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Enter the email address associated with your account.')),
+      );
+      return;
+    }
+
+    setState(() => _loading = true);
+    final provider = context.read<CafeteriaProvider>();
+    final ok = await provider.requestPasswordReset(email);
     if (!mounted) return;
     setState(() {
       _sent = ok;
