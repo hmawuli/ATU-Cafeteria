@@ -106,7 +106,7 @@ Route::middleware(['auth:sanctum', \App\Http\Middleware\InactivityTimeout::class
         Route::get('/users', [AdminManagementController::class, 'users'])->middleware('permission:users.view');
         Route::patch('/users/{user}/status', [AdminManagementController::class, 'updateUserStatus'])->middleware('permission:users.suspend');
         Route::patch('/users/{user}/admin-level', [AdminManagementController::class, 'updateAdminLevel'])->middleware('permission:users.update');
-        Route::get('/vendors', [AdminManagementController::class, 'vendors'])->middleware('permission:vendors.view');
+        Route::get('/vendors', [AdminManagementController::class, 'vendors'])->middleware('permission:vendors.view');\n        Route::post('/vendors', [AdminManagementController::class, 'createVendor'])->middleware('permission:vendors.view');
         Route::patch('/vendors/{vendor}/status', [AdminManagementController::class, 'updateVendorStatus'])->middleware('permission:vendors.suspend');
         Route::get('/orders', [AdminManagementController::class, 'orders'])->middleware('permission:orders.view');
         Route::get('/finance/summary', [AdminManagementController::class, 'financeSummary'])->middleware('permission:payments.view');
