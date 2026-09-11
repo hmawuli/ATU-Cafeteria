@@ -61,7 +61,11 @@ class _LoginScreenState extends State<LoginScreen> {
           gradient: LinearGradient(
             begin: Alignment.topCenter,
             end: Alignment.bottomCenter,
-            colors: [Colors.orange.shade800, Colors.deepOrange.shade900],
+            colors: [
+            const Color(0xFF0B1F3A),
+            const Color(0xFF123B5D),
+            const Color(0xFFE8751A),
+          ],
           ),
         ),
         child: SafeArea(
@@ -78,22 +82,52 @@ class _LoginScreenState extends State<LoginScreen> {
                     padding: const EdgeInsets.all(28),
                     child: Column(
                       children: [
-                        const Icon(
-                          Icons.restaurant_menu,
-                          size: 64,
-                          color: Colors.deepOrange,
+                        Container(
+                          width: 82,
+                          height: 82,
+                          decoration: BoxDecoration(
+                            gradient: const LinearGradient(
+                              colors: [Color(0xFFE8751A), Color(0xFFFFB347)],
+                              begin: Alignment.topLeft,
+                              end: Alignment.bottomRight,
+                            ),
+                            borderRadius: BorderRadius.circular(24),
+                            boxShadow: const [
+                              BoxShadow(
+                                blurRadius: 18,
+                                offset: Offset(0, 8),
+                                color: Color(0x33000000),
+                              ),
+                            ],
+                          ),
+                          child: const Icon(
+                            Icons.restaurant_rounded,
+                            size: 44,
+                            color: Colors.white,
+                          ),
                         ),
                         const SizedBox(height: 12),
                         const Text(
-                          'ATU Cafeteria',
+                          'ATU CAFETERIA',
                           style: TextStyle(
                             fontSize: 28,
-                            fontWeight: FontWeight.bold,
+                            fontWeight: FontWeight.w800,
+                            letterSpacing: 1.2,
                           ),
                         ),
+                        Text(
+                          'SMART CAMPUS FOOD PLATFORM',
+                          style: TextStyle(
+                            color: Colors.blueGrey.shade600,
+                            fontSize: 12,
+                            fontWeight: FontWeight.w700,
+                            letterSpacing: 1.5,
+                          ),
+                        ),
+                        const SizedBox(height: 6),
                         const Text(
-                          'Smart Campus Food Ordering',
-                          style: TextStyle(color: Colors.grey),
+                          'Secure access for students, vendors and administrators.',
+                          textAlign: TextAlign.center,
                         ),
                         const SizedBox(height: 28),
                         TextField(
@@ -200,7 +234,11 @@ class _TwoFactorScreenState extends State<TwoFactorScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Security Verification')),
+      appBar: AppBar(
+        title: const Text('Security Verification'),
+        backgroundColor: const Color(0xFF0B1F3A),
+        foregroundColor: Colors.white,
+      ),
       body: Center(
         child: Padding(
           padding: const EdgeInsets.all(24),
@@ -212,7 +250,18 @@ class _TwoFactorScreenState extends State<TwoFactorScreen> {
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    const Icon(Icons.verified_user, size: 60),
+                    Container(
+                      padding: const EdgeInsets.all(18),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFE8751A).withOpacity(.12),
+                        shape: BoxShape.circle,
+                      ),
+                      child: const Icon(
+                        Icons.verified_user_rounded,
+                        size: 52,
+                        color: Color(0xFFE8751A),
+                      ),
+                    ),
                     const SizedBox(height: 16),
                     const Text(
                       'Two-factor authentication',
