@@ -34,5 +34,8 @@ class ApiClient {
     return decoded;
   }
 
+  Future<dynamic> get(String path) => request('GET', path);
+  Future<dynamic> post(String path, {Map<String, dynamic>? body}) => request('POST', path, body: body);
+
   void close() => _client.close(force: true);
 }
