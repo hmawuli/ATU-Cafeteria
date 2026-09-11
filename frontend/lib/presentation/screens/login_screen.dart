@@ -9,27 +9,27 @@ class LoginScreen extends StatefulWidget {
 }
 
 class _LoginScreenState extends State<LoginScreen> {
-  final username = TextEditingController();
-  final pin = TextEditingController();
+  final email = TextEditingController();
+  final password = TextEditingController();
   bool obscure = true;
 
   @override
   void dispose() {
-    username.dispose();
-    pin.dispose();
+    email.dispose();
+    password.dispose();
     super.dispose();
   }
 
   Future<void> login() async {
     final provider = context.read<CafeteriaProvider>();
-    final ok = await provider.loginUser(username.text, pin.text);
+    final ok = await provider.loginUser(email.text, password.text);
     if (!mounted) return;
 
     if (provider.requiresTwoFactor) {
       Navigator.push(
         context,
         MaterialPageRoute(
-          builder: (_) => TwoFactorScreen(username: username.text.trim()),
+          builder: (_) => TwoFactorScreen(username: email.text.trim()),
         ),
       );
       return;
@@ -97,20 +97,20 @@ class _LoginScreenState extends State<LoginScreen> {
                         ),
                         const SizedBox(height: 28),
                         TextField(
-                          controller: username,
+                          controller: email,
                           autofocus: true,
                           decoration: const InputDecoration(
-                            labelText: 'Username / Student ID',
+                            labelText: 'Email address',
                             prefixIcon: Icon(Icons.person),
                             border: OutlineInputBorder(),
                           ),
                         ),
                         const SizedBox(height: 16),
                         TextField(
-                          controller: pin,
+                          controller: password,
                           obscureText: obscure,
                           decoration: InputDecoration(
-                            labelText: 'Password / PIN',
+                            labelText: 'Password',
                             prefixIcon: const Icon(Icons.lock),
                             suffixIcon: IconButton(
                               icon: Icon(
@@ -220,7 +220,7 @@ class _TwoFactorScreenState extends State<TwoFactorScreen> {
                     ),
                     const SizedBox(height: 8),
                     const Text(
-                      'Enter the 6-digit code sent to your administrator email address.',
+                      'Enter the 6-digit verification code sent to your administrator email address.',
                       textAlign: TextAlign.center,
                     ),
                     const SizedBox(height: 20),
