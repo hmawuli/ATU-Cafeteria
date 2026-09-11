@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:atu_cafeteria/core/config/app_config.dart';
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 
 class ApiException implements Exception {
   final int statusCode;
@@ -14,9 +15,16 @@ class ApiException implements Exception {
 class ApiClient {
   final HttpClient _client;
   String? token;
+  static const _tokenKey = 'atu_cafeteria_auth_token';
+  static const FlutterSecureStorage _storage = FlutterSecureStorage();
   ApiClient({HttpClient? client}) : _client = client ?? HttpClient();
 
+  Future<void> setToken(String value) async { token = value; await _storage.write(key: _tokenKey, value: value); }
+  Future<void> loadToken() async { token = await _storage.read(key: _tokenKey); }
+  Future<void> clearToken() async { token = null; await _storage.delete(key: _tokenKey); }
+
   Future<dynamic> request(String method, String path, {Map<String, dynamic>? body}) async {
+    if (token == null || token!.isEmpty) { token = await _storage.read(key: _tokenKey); }
     final uri = Uri.parse('${AppConfig.normalizedApiBaseUrl}$path');
     final request = await _client.openUrl(method, uri);
     request.headers.contentType = ContentType.json;
