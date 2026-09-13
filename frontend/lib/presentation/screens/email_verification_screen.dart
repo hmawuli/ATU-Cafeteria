@@ -6,7 +6,8 @@ class EmailVerificationScreen extends StatefulWidget {
   const EmailVerificationScreen({super.key});
 
   @override
-  State<EmailVerificationScreen> createState() => _EmailVerificationScreenState();
+  State<EmailVerificationScreen> createState() =>
+      _EmailVerificationScreenState();
 }
 
 class _EmailVerificationScreenState extends State<EmailVerificationScreen> {
@@ -87,7 +88,8 @@ class _EmailVerificationScreenState extends State<EmailVerificationScreen> {
                     const SizedBox(height: 12),
                     const Text(
                       'Verify your email',
-                      style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
+                      style:
+                          TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
                     ),
                     const SizedBox(height: 8),
                     Text(
@@ -110,11 +112,14 @@ class _EmailVerificationScreenState extends State<EmailVerificationScreen> {
                       width: double.infinity,
                       height: 48,
                       child: ElevatedButton(
-                        onPressed: _loading ? null : (_sent ? _verify : _requestCode),
+                        onPressed:
+                            _loading ? null : (_sent ? _verify : _requestCode),
                         child: Text(
                           _loading
                               ? 'Please wait...'
-                              : (_sent ? 'Verify email' : 'Send verification code'),
+                              : (_sent
+                                  ? 'Verify email'
+                                  : 'Send verification code'),
                         ),
                       ),
                     ),

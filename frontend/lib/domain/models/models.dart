@@ -52,17 +52,22 @@ class User {
         role: _asString(map['role'], fallback: 'STUDENT').toUpperCase(),
         fullName: _asString(map['fullName'] ?? map['full_name']),
         info: _asString(map['info']),
-        studentStaffId: _asNullableString(map['student_staff_id'] ?? map['studentStaffId']),
+        studentStaffId:
+            _asNullableString(map['student_staff_id'] ?? map['studentStaffId']),
         telephone: _asNullableString(map['telephone'] ?? map['phone_number']),
         email: _asNullableString(map['email']),
         department: _asNullableString(map['department']),
-        programOfStudy: _asNullableString(map['program_of_study'] ?? map['programOfStudy']),
+        programOfStudy:
+            _asNullableString(map['program_of_study'] ?? map['programOfStudy']),
         balance: _asDouble(map['balance']),
         isOpen: _asBool(map['is_open'] ?? map['isOpen'], fallback: true),
-        accountStatus: _asString(map['account_status'] ?? map['accountStatus'], fallback: 'ACTIVE'),
+        accountStatus: _asString(map['account_status'] ?? map['accountStatus'],
+            fallback: 'ACTIVE'),
         adminLevel: _asNullableString(map['admin_level'] ?? map['adminLevel']),
-        twoFactorEnabled: _asBool(map['two_factor_enabled'] ?? map['twoFactorEnabled']),
-        emailVerifiedAt: _asDateTime(map['email_verified_at'] ?? map['emailVerifiedAt']),
+        twoFactorEnabled:
+            _asBool(map['two_factor_enabled'] ?? map['twoFactorEnabled']),
+        emailVerifiedAt:
+            _asDateTime(map['email_verified_at'] ?? map['emailVerifiedAt']),
       );
 
   factory User.fromJson(Map<String, dynamic> json) => User.fromMap(json);
@@ -160,12 +165,14 @@ class FoodItem {
         category: _asString(map['category'], fallback: 'General'),
         imageUrl: _asString(map['imageUrl'] ?? map['image_url']),
         description: _asString(map['description']),
-        isAvailable: _asBool(map['isAvailable'] ?? map['is_available'], fallback: true),
+        isAvailable:
+            _asBool(map['isAvailable'] ?? map['is_available'], fallback: true),
         calories: _asInt(map['calories']) ?? 250,
         allergens: _asString(map['allergens'], fallback: 'None'),
       );
 
-  factory FoodItem.fromJson(Map<String, dynamic> json) => FoodItem.fromMap(json);
+  factory FoodItem.fromJson(Map<String, dynamic> json) =>
+      FoodItem.fromMap(json);
 
   Map<String, dynamic> toMap() => {
         'id': id,
@@ -245,16 +252,25 @@ class Order {
         customerId: _asInt(map['customerId'] ?? map['customer_id']) ?? 0,
         vendorId: _asInt(map['vendorId'] ?? map['vendor_id']) ?? 0,
         foodItemId: _asInt(map['foodItemId'] ?? map['food_item_id']) ?? 0,
-        foodName: _asString(map['foodName'] ?? map['food_name'], fallback: 'Meal'),
+        foodName:
+            _asString(map['foodName'] ?? map['food_name'], fallback: 'Meal'),
         quantity: _asInt(map['quantity']) ?? 1,
         unitPrice: _asDouble(map['unitPrice'] ?? map['unit_price']),
         totalPrice: _asDouble(map['totalPrice'] ?? map['total_price']),
-        orderTimestamp: _asInt(map['orderTimestamp'] ?? map['order_timestamp']) ?? DateTime.now().millisecondsSinceEpoch,
-        status: _asString(map['status'] ?? map['order_status'], fallback: 'PENDING').toUpperCase(),
-        pickupPin: _asString(map['pickupPin'] ?? map['pickup_pin'], fallback: '0000'),
-        estimatedPickupTime: _asNullableString(map['estimatedPickupTime'] ?? map['estimated_pickup_time']),
-        pointsRedeemed: _asInt(map['pointsRedeemed'] ?? map['points_redeemed']) ?? 0,
-        discountApplied: _asDouble(map['discountApplied'] ?? map['discount_applied']),
+        orderTimestamp:
+            _asInt(map['orderTimestamp'] ?? map['order_timestamp']) ??
+                DateTime.now().millisecondsSinceEpoch,
+        status:
+            _asString(map['status'] ?? map['order_status'], fallback: 'PENDING')
+                .toUpperCase(),
+        pickupPin:
+            _asString(map['pickupPin'] ?? map['pickup_pin'], fallback: '0000'),
+        estimatedPickupTime: _asNullableString(
+            map['estimatedPickupTime'] ?? map['estimated_pickup_time']),
+        pointsRedeemed:
+            _asInt(map['pointsRedeemed'] ?? map['points_redeemed']) ?? 0,
+        discountApplied:
+            _asDouble(map['discountApplied'] ?? map['discount_applied']),
       );
 
   factory Order.fromJson(Map<String, dynamic> json) => Order.fromMap(json);
@@ -341,15 +357,22 @@ class Feedback {
         orderId: _asInt(map['orderId'] ?? map['order_id']) ?? 0,
         vendorId: _asInt(map['vendorId'] ?? map['vendor_id']) ?? 0,
         customerId: _asInt(map['customerId'] ?? map['customer_id']) ?? 0,
-        ratingFoodQuality: _asInt(map['ratingFoodQuality'] ?? map['rating_food_quality']) ?? 0,
-        ratingCleanliness: _asInt(map['ratingCleanliness'] ?? map['rating_cleanliness']) ?? 0,
-        ratingServiceSpeed: _asInt(map['ratingServiceSpeed'] ?? map['rating_service_speed']) ?? 0,
-        ratingPriceValue: _asInt(map['ratingPriceValue'] ?? map['rating_price_value']) ?? 0,
+        ratingFoodQuality:
+            _asInt(map['ratingFoodQuality'] ?? map['rating_food_quality']) ?? 0,
+        ratingCleanliness:
+            _asInt(map['ratingCleanliness'] ?? map['rating_cleanliness']) ?? 0,
+        ratingServiceSpeed:
+            _asInt(map['ratingServiceSpeed'] ?? map['rating_service_speed']) ??
+                0,
+        ratingPriceValue:
+            _asInt(map['ratingPriceValue'] ?? map['rating_price_value']) ?? 0,
         comment: _asString(map['comment']),
-        timestamp: _asInt(map['timestamp']) ?? DateTime.now().millisecondsSinceEpoch,
+        timestamp:
+            _asInt(map['timestamp']) ?? DateTime.now().millisecondsSinceEpoch,
       );
 
-  factory Feedback.fromJson(Map<String, dynamic> json) => Feedback.fromMap(json);
+  factory Feedback.fromJson(Map<String, dynamic> json) =>
+      Feedback.fromMap(json);
 
   Map<String, dynamic> toMap() => {
         'id': id,
@@ -384,13 +407,15 @@ class AuditLog {
 
   factory AuditLog.fromMap(Map<String, dynamic> map) => AuditLog(
         id: _asInt(map['id']),
-        timestamp: _asInt(map['timestamp']) ?? DateTime.now().millisecondsSinceEpoch,
+        timestamp:
+            _asInt(map['timestamp']) ?? DateTime.now().millisecondsSinceEpoch,
         userId: _asInt(map['userId'] ?? map['user_id']) ?? 0,
         action: _asString(map['action']),
         details: _asString(map['details']),
       );
 
-  factory AuditLog.fromJson(Map<String, dynamic> json) => AuditLog.fromMap(json);
+  factory AuditLog.fromJson(Map<String, dynamic> json) =>
+      AuditLog.fromMap(json);
 
   Map<String, dynamic> toMap() => {
         'id': id,
@@ -415,13 +440,15 @@ double _asDouble(dynamic value) {
   return double.tryParse(value?.toString() ?? '') ?? 0.0;
 }
 
-DateTime? _asDateTime(dynamic value) { if (value == null) return null; return DateTime.tryParse(value.toString()); }
+DateTime? _asDateTime(dynamic value) {
+  if (value == null) return null;
+  return DateTime.tryParse(value.toString());
+}
 
 String _asString(dynamic value, {String fallback = ''}) =>
     value?.toString() ?? fallback;
 
-String? _asNullableString(dynamic value) =>
-    value?.toString();
+String? _asNullableString(dynamic value) => value?.toString();
 
 bool _asBool(dynamic value, {bool fallback = false}) {
   if (value is bool) return value;

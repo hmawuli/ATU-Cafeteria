@@ -32,6 +32,5 @@ class AppServiceProvider extends ServiceProvider
         RateLimiter::for('auth', function (Request $request) {
             return Limit::perMinute(5)->by(strtolower(trim((string) $request->input('username', ''))) . '|' . $request->ip())->response(function (Request $request, array $headers) { return response()->json(['success'=>false,'message'=>'Too many authentication attempts. Please wait a minute and try again.','error_code'=>'AUTH_RATE_LIMITED'],429,$headers); });
         });
-        });
     }
 }

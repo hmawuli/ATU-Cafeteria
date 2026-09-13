@@ -797,7 +797,6 @@ class CafeteriaProvider extends ChangeNotifier {
     }
     _authToken = null;
     _currentUser = null;
-    _aiAnalysisText = null;
     _loginError = null;
     _registrationSuccess = false;
     _customerOrders = [];

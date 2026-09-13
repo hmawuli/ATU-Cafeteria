@@ -222,11 +222,13 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
           return ListTile(
             leading: const CircleAvatar(child: Icon(Icons.storefront_rounded)),
             title: Text('${v['store_name'] ?? v['name'] ?? 'Vendor'}'),
-            subtitle: Text('${u['fullName'] ?? ''} • ${v['operational_status'] ?? 'UNKNOWN'}'),
+            subtitle: Text(
+                '${u['fullName'] ?? ''} • ${v['operational_status'] ?? 'UNKNOWN'}'),
             trailing: PopupMenuButton<String>(
               onSelected: (x) => s.changeVendorStatus(v['id'], x),
               itemBuilder: (_) => const [
-                PopupMenuItem(value: 'ACTIVE', child: Text('Approve / Activate')),
+                PopupMenuItem(
+                    value: 'ACTIVE', child: Text('Approve / Activate')),
                 PopupMenuItem(value: 'PENDING', child: Text('Set Pending')),
                 PopupMenuItem(value: 'SUSPENDED', child: Text('Suspend')),
                 PopupMenuItem(value: 'INACTIVE', child: Text('Deactivate')),
@@ -235,7 +237,8 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
           );
         }),
         Positioned(
-          right: 20, bottom: 20,
+          right: 20,
+          bottom: 20,
           child: FloatingActionButton.extended(
             onPressed: () => _showCreateVendorDialog(context, s),
             icon: const Icon(Icons.person_add_alt_1_rounded),
@@ -246,7 +249,8 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
     );
   }
 
-  Future<void> _showCreateVendorDialog(BuildContext context, AdminStateProvider state) async {
+  Future<void> _showCreateVendorDialog(
+      BuildContext context, AdminStateProvider state) async {
     final formKey = GlobalKey<FormState>();
     final name = TextEditingController();
     final email = TextEditingController();
@@ -265,37 +269,106 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
               key: formKey,
               child: SingleChildScrollView(
                 child: Column(mainAxisSize: MainAxisSize.min, children: [
-                  const Text('Vendor accounts are provisioned by an administrator. The vendor will sign in with the email and password provided here.'),
+                  const Text(
+                      'Vendor accounts are provisioned by an administrator. The vendor will sign in with the email and password provided here.'),
                   const SizedBox(height: 16),
-                  TextFormField(controller: name, decoration: const InputDecoration(labelText: 'Vendor full name', prefixIcon: Icon(Icons.person_outline)), validator: (v) => v == null || v.trim().isEmpty ? 'Enter the vendor name.' : null),
+                  TextFormField(
+                      controller: name,
+                      decoration: const InputDecoration(
+                          labelText: 'Vendor full name',
+                          prefixIcon: Icon(Icons.person_outline)),
+                      validator: (v) => v == null || v.trim().isEmpty
+                          ? 'Enter the vendor name.'
+                          : null),
                   const SizedBox(height: 12),
-                  TextFormField(controller: email, keyboardType: TextInputType.emailAddress, decoration: const InputDecoration(labelText: 'Email address', prefixIcon: Icon(Icons.email_outlined)), validator: (v) { final value = v?.trim() ?? ''; if (value.isEmpty) return 'Enter an email address.'; if (!RegExp(r'^[^@\s]+@[^@\s]+\.[^@\s]+$').hasMatch(value)) return 'Enter a valid email address.'; return null; }),
+                  TextFormField(
+                      controller: email,
+                      keyboardType: TextInputType.emailAddress,
+                      decoration: const InputDecoration(
+                          labelText: 'Email address',
+                          prefixIcon: Icon(Icons.email_outlined)),
+                      validator: (v) {
+                        final value = v?.trim() ?? '';
+                        if (value.isEmpty) return 'Enter an email address.';
+                        if (!RegExp(r'^[^@\s]+@[^@\s]+\.[^@\s]+$')
+                            .hasMatch(value)) {
+                          return 'Enter a valid email address.';
+                        }
+                        return null;
+                      }),
                   const SizedBox(height: 12),
-                  TextFormField(controller: password, obscureText: true, decoration: const InputDecoration(labelText: 'Temporary password', prefixIcon: Icon(Icons.lock_outline)), validator: (v) => v == null || v.length < 8 ? 'Use at least 8 characters.' : null),
+                  TextFormField(
+                      controller: password,
+                      obscureText: true,
+                      decoration: const InputDecoration(
+                          labelText: 'Temporary password',
+                          prefixIcon: Icon(Icons.lock_outline)),
+                      validator: (v) => v == null || v.length < 8
+                          ? 'Use at least 8 characters.'
+                          : null),
                   const SizedBox(height: 12),
-                  TextFormField(controller: store, decoration: const InputDecoration(labelText: 'Store / Booth name', prefixIcon: Icon(Icons.store_outlined)), validator: (v) => v == null || v.trim().isEmpty ? 'Enter the store or booth name.' : null),
+                  TextFormField(
+                      controller: store,
+                      decoration: const InputDecoration(
+                          labelText: 'Store / Booth name',
+                          prefixIcon: Icon(Icons.store_outlined)),
+                      validator: (v) => v == null || v.trim().isEmpty
+                          ? 'Enter the store or booth name.'
+                          : null),
                   const SizedBox(height: 12),
-                  TextFormField(controller: location, decoration: const InputDecoration(labelText: 'Location (optional)', prefixIcon: Icon(Icons.location_on_outlined))),
+                  TextFormField(
+                      controller: location,
+                      decoration: const InputDecoration(
+                          labelText: 'Location (optional)',
+                          prefixIcon: Icon(Icons.location_on_outlined))),
                   const SizedBox(height: 12),
-                  TextFormField(controller: contact, decoration: const InputDecoration(labelText: 'Contact information (optional)', prefixIcon: Icon(Icons.phone_outlined))),
+                  TextFormField(
+                      controller: contact,
+                      decoration: const InputDecoration(
+                          labelText: 'Contact information (optional)',
+                          prefixIcon: Icon(Icons.phone_outlined))),
                 ]),
               ),
             ),
           ),
           actions: [
-            TextButton(onPressed: () => Navigator.pop(dialogContext), child: const Text('Cancel')),
-            FilledButton.icon(icon: const Icon(Icons.check_circle_outline), label: const Text('Create Vendor'), onPressed: () async {
-              if (!formKey.currentState!.validate()) return;
-              Navigator.pop(dialogContext);
-              final ok = await state.createVendor(email: email.text.trim(), password: password.text, fullName: name.text.trim(), storeName: store.text.trim(), location: location.text.trim(), contactEmail: email.text.trim(), contactInfo: contact.text.trim());
-              if (!context.mounted) return;
-              ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(ok ? 'Vendor account created successfully.' : (state.error ?? 'Unable to create vendor account.'))));
-            }),
+            TextButton(
+                onPressed: () => Navigator.pop(dialogContext),
+                child: const Text('Cancel')),
+            FilledButton.icon(
+                icon: const Icon(Icons.check_circle_outline),
+                label: const Text('Create Vendor'),
+                onPressed: () async {
+                  if (!formKey.currentState!.validate()) return;
+                  Navigator.pop(dialogContext);
+                  final ok = await state.createVendor(
+                      email: email.text.trim(),
+                      password: password.text,
+                      fullName: name.text.trim(),
+                      storeName: store.text.trim(),
+                      location: location.text.trim(),
+                      contactEmail: email.text.trim(),
+                      contactInfo: contact.text.trim());
+                  if (!context.mounted) return;
+                  ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+                      content: Text(ok
+                          ? 'Vendor account created successfully.'
+                          : (state.error ??
+                              'Unable to create vendor account.'))));
+                }),
           ],
         ),
       );
-    } finally { name.dispose(); email.dispose(); password.dispose(); store.dispose(); location.dispose(); contact.dispose(); }
+    } finally {
+      name.dispose();
+      email.dispose();
+      password.dispose();
+      store.dispose();
+      location.dispose();
+      contact.dispose();
+    }
   }
+
   Widget _orders(AdminStateProvider s) => _list(
       s.orders,
       (o) => ListTile(

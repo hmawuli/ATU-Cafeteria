@@ -45,8 +45,8 @@ class _StudentDashboardScreenState extends State<StudentDashboardScreen> {
             : 'STUDENT CENTRAL HUB'),
         leading: provider.isAdminActing
             ? IconButton(
-                icon:
-                    const Icon(Icons.admin_panel_settings, color: const Color(0xFFFFA000)),
+                icon: const Icon(Icons.admin_panel_settings,
+                    color: Color(0xFFFFA000)),
                 tooltip: "Return to Admin Console",
                 onPressed: () {
                   provider.stopImpersonation();
@@ -122,7 +122,12 @@ class _StudentDashboardScreenState extends State<StudentDashboardScreen> {
     }
     if (_searchQuery.isNotEmpty) {
       final q = _searchQuery.toLowerCase();
-      list = list.where((item) => item.name.toLowerCase().contains(q) || item.description.toLowerCase().contains(q) || item.category.toLowerCase().contains(q)).toList();
+      list = list
+          .where((item) =>
+              item.name.toLowerCase().contains(q) ||
+              item.description.toLowerCase().contains(q) ||
+              item.category.toLowerCase().contains(q))
+          .toList();
     }
 
     return Column(
@@ -130,18 +135,30 @@ class _StudentDashboardScreenState extends State<StudentDashboardScreen> {
         Padding(
           padding: const EdgeInsets.fromLTRB(12, 14, 12, 4),
           child: Row(children: [
-            Expanded(child: Text('Good food, right on campus.', style: Theme.of(context).textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.w900))),
-            IconButton(onPressed: () => provider.refreshAllData(), icon: const Icon(Icons.refresh_rounded), tooltip: 'Refresh'),
+            Expanded(
+                child: Text('Good food, right on campus.',
+                    style: Theme.of(context)
+                        .textTheme
+                        .headlineSmall
+                        ?.copyWith(fontWeight: FontWeight.w900))),
+            IconButton(
+                onPressed: () => provider.refreshAllData(),
+                icon: const Icon(Icons.refresh_rounded),
+                tooltip: 'Refresh'),
           ]),
         ),
         Padding(
           padding: const EdgeInsets.fromLTRB(12, 8, 12, 4),
-          child: AppSearchField(controller: _searchController, hint: 'Search meals, categories...', onChanged: (v) => setState(() => _searchQuery = v.trim())),
+          child: AppSearchField(
+              controller: _searchController,
+              hint: 'Search meals, categories...',
+              onChanged: (v) => setState(() => _searchQuery = v.trim())),
         ),
         // Announcement bar
         Container(
           width: double.infinity,
-          color: Theme.of(context).colorScheme.secondary.withOpacity(0.15),
+          color:
+              Theme.of(context).colorScheme.secondary.withValues(alpha: 0.15),
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
           child: Row(
             children: [
@@ -167,10 +184,9 @@ class _StudentDashboardScreenState extends State<StudentDashboardScreen> {
             margin: const EdgeInsets.only(left: 12, right: 12, top: 10),
             padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
             decoration: BoxDecoration(
-              color: Colors.red[50]?.withOpacity(0.4) ??
-                  const Color(0xFFFFA000)[50]?.withOpacity(0.4),
+              color: Colors.red.shade50.withValues(alpha: 0.4),
               borderRadius: BorderRadius.circular(10),
-              border: Border.all(color: Colors.red[100] ?? const Color(0xFFFFA000)[100]!),
+              border: Border.all(color: Colors.red.shade100),
             ),
             child: Row(
               children: [
@@ -212,7 +228,7 @@ class _StudentDashboardScreenState extends State<StudentDashboardScreen> {
                         builder: (context) => AlertDialog(
                           title: const Row(
                             children: [
-                              Icon(Icons.radar, color: const Color(0xFF1565C0)),
+                              Icon(Icons.radar, color: Color(0xFF1565C0)),
                               SizedBox(width: 8),
                               Text("Real-Time Stock Stream"),
                             ],
@@ -245,7 +261,7 @@ class _StudentDashboardScreenState extends State<StudentDashboardScreen> {
                       "+${provider.liveAlerts.length - 1} more",
                       style: const TextStyle(
                         fontSize: 9,
-                        color: const Color(0xFF1565C0),
+                        color: Color(0xFF1565C0),
                         fontWeight: FontWeight.bold,
                         decoration: TextDecoration.underline,
                       ),
@@ -273,8 +289,10 @@ class _StudentDashboardScreenState extends State<StudentDashboardScreen> {
                   child: FilterChip(
                     selected: isSelected,
                     label: Text(cat),
-                    selectedColor:
-                        Theme.of(context).colorScheme.primary.withOpacity(0.2),
+                    selectedColor: Theme.of(context)
+                        .colorScheme
+                        .primary
+                        .withValues(alpha: 0.2),
                     checkmarkColor: Theme.of(context).colorScheme.primary,
                     onSelected: (val) {
                       setState(() => _selectedCategory = cat);
@@ -289,21 +307,17 @@ class _StudentDashboardScreenState extends State<StudentDashboardScreen> {
         // Food Grid / List
         Expanded(
           child: list.isEmpty
-              ? AppEmptyState(icon: Icons.restaurant_rounded, title: "No meals found", message: _searchQuery.isEmpty ? "There are no meals available in this category right now." : "Try another meal name or category.")
+              ? AppEmptyState(
+                  icon: Icons.restaurant_rounded,
+                  title: "No meals found",
+                  message: _searchQuery.isEmpty
+                      ? "There are no meals available in this category right now."
+                      : "Try another meal name or category.")
               : ListView.builder(
                   padding: const EdgeInsets.all(12),
                   itemCount: list.length,
                   itemBuilder: (context, index) {
                     final item = list[index];
-                    final vendor = provider.allVendors.firstWhere(
-                      (v) => v.id == item.vendorId,
-                      orElse: () => const models.User(
-                          username: 'unknown',
-                          passwordHash: '',
-                          role: 'VENDOR',
-                          fullName: 'ATU Kitchen',
-                          info: 'Registered Chef'),
-                    );
 
                     return FoodCard(
                       name: item.name,
@@ -337,7 +351,8 @@ class _StudentDashboardScreenState extends State<StudentDashboardScreen> {
         Padding(
           padding: const EdgeInsets.fromLTRB(12.0, 12.0, 12.0, 4.0),
           child: Card(
-            color: isOffline ? const Color(0xFF0B1F3A) : const Color(0xFF123B5D),
+            color:
+                isOffline ? const Color(0xFF0B1F3A) : const Color(0xFF123B5D),
             shape:
                 RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
             child: Padding(
@@ -417,7 +432,7 @@ class _StudentDashboardScreenState extends State<StudentDashboardScreen> {
                               padding: const EdgeInsets.symmetric(
                                   vertical: 4, horizontal: 8),
                               decoration: BoxDecoration(
-                                  color: orderColor.withOpacity(0.12),
+                                  color: orderColor.withValues(alpha: 0.12),
                                   borderRadius: BorderRadius.circular(8)),
                               child: Text(
                                 order.status,
@@ -477,7 +492,8 @@ class _StudentDashboardScreenState extends State<StudentDashboardScreen> {
                                 Text(
                                   "Provide this secure 4-digit token to the cook upon receiving custody of order to validate pickup.",
                                   style: TextStyle(
-                                      color: Colors.blueGrey[500], fontSize: 11),
+                                      color: Colors.blueGrey[500],
+                                      fontSize: 11),
                                 ),
                                 const SizedBox(height: 16),
                                 if (order.status == 'COMPLETED') ...[
@@ -524,7 +540,7 @@ class _StudentDashboardScreenState extends State<StudentDashboardScreen> {
                 borderRadius: BorderRadius.circular(16),
                 boxShadow: [
                   BoxShadow(
-                      color: const Color(0xFF1565C0).withOpacity(0.3),
+                      color: const Color(0xFF1565C0).withValues(alpha: 0.3),
                       blurRadius: 8,
                       offset: const Offset(0, 4))
                 ]),
@@ -594,7 +610,7 @@ class _StudentDashboardScreenState extends State<StudentDashboardScreen> {
                     const Text("NFC SECURED CASH LESS PASS",
                         style: TextStyle(color: Colors.white60, fontSize: 9)),
                     Icon(Icons.qr_code,
-                        color: Colors.white.withOpacity(0.8), size: 28)
+                        color: Colors.white.withValues(alpha: 0.8), size: 28)
                   ],
                 )
               ],
@@ -665,145 +681,20 @@ class _StudentDashboardScreenState extends State<StudentDashboardScreen> {
 
               return ListTile(
                 leading: const Icon(Icons.history_toggle_off,
-                    color: const Color(0xFF1565C0)),
+                    color: Color(0xFF1565C0)),
                 title: Text(log.action,
                     style: const TextStyle(
                         fontWeight: FontWeight.bold, fontSize: 13)),
                 subtitle:
                     Text(log.details, style: const TextStyle(fontSize: 11)),
                 trailing: Text(dateStr,
-                    style: const TextStyle(fontSize: 10, color: Colors.blueGrey)),
+                    style:
+                        const TextStyle(fontSize: 10, color: Colors.blueGrey)),
               );
             },
           )
         ],
       ),
-    );
-  }
-
-  // Helper popup sheets
-  void _showOrderSheet(
-      BuildContext context, models.FoodItem food, CafeteriaProvider provider) {
-    int qty = 1;
-    bool payWallet = false;
-
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      builder: (context) {
-        return StatefulBuilder(
-          builder: (context, setSheetState) {
-            final double priceSum = food.price * qty;
-            final hasSufficientWallet =
-                provider.studentWalletBalance >= priceSum;
-
-            return Padding(
-              padding: EdgeInsets.only(
-                top: 20,
-                left: 20,
-                right: 20,
-                bottom: MediaQuery.of(context).viewInsets.bottom + 24,
-              ),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text("ORDER COMPILATION",
-                      style: TextStyle(
-                          fontWeight: FontWeight.bold,
-                          color: Theme.of(context).colorScheme.primary,
-                          fontSize: 13,
-                          letterSpacing: 0.8)),
-                  const SizedBox(height: 8),
-                  Text(food.name,
-                      style: const TextStyle(
-                          fontSize: 20, fontWeight: FontWeight.bold)),
-                  Text("Category: ${food.category}",
-                      style: TextStyle(color: Colors.blueGrey[600], fontSize: 12)),
-                  const SizedBox(height: 16),
-                  Text("Quantity Selection:",
-                      style: TextStyle(
-                          color: Colors.blueGrey[700],
-                          fontWeight: FontWeight.bold,
-                          fontSize: 13)),
-                  const SizedBox(height: 8),
-                  Row(
-                    children: [
-                      IconButton(
-                        icon: const Icon(Icons.remove_circle_outline),
-                        onPressed:
-                            qty > 1 ? () => setSheetState(() => qty--) : null,
-                      ),
-                      Text("$qty",
-                          style: const TextStyle(
-                              fontSize: 18, fontWeight: FontWeight.bold)),
-                      IconButton(
-                        icon: const Icon(Icons.add_circle_outline),
-                        onPressed: () => setSheetState(() => qty++),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 16),
-                  SwitchListTile(
-                    title: const Text("Pay using Digital Wallet",
-                        style: TextStyle(
-                            fontWeight: FontWeight.bold, fontSize: 14)),
-                    subtitle: Text(
-                        "Available: GH₵ ${provider.studentWalletBalance.toStringAsFixed(2)}",
-                        style: const TextStyle(fontSize: 11)),
-                    value: payWallet,
-                    onChanged: (val) {
-                      setSheetState(() => payWallet = val);
-                    },
-                  ),
-                  const SizedBox(height: 16),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      const Text("Grand Total:",
-                          style: TextStyle(
-                              fontWeight: FontWeight.bold, fontSize: 16)),
-                      Text(
-                        "GH₵ ${priceSum.toStringAsFixed(2)}",
-                        style: TextStyle(
-                            fontWeight: FontWeight.w900,
-                            color: Theme.of(context).colorScheme.primary,
-                            fontSize: 20),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 20),
-                  ElevatedButton(
-                    onPressed: (payWallet && !hasSufficientWallet)
-                        ? null
-                        : () async {
-                            final success =
-                                await provider.placeOrder(food, qty, payWallet);
-                            if (mounted) Navigator.pop(context);
-
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              SnackBar(
-                                content: Text(success
-                                    ? "Order registered dynamically!"
-                                    : "Failed. Insufficient wallet balance."),
-                                backgroundColor:
-                                    success ? const Color(0xFF2E7D32) : Colors.red,
-                              ),
-                            );
-                          },
-                    child: Text(
-                      (payWallet && !hasSufficientWallet)
-                          ? "INSUFFICIENT WALLET BALANCE"
-                          : "COMPILE ORDER NOW",
-                      style: const TextStyle(fontWeight: FontWeight.bold),
-                    ),
-                  )
-                ],
-              ),
-            );
-          },
-        );
-      },
     );
   }
 
@@ -894,11 +785,11 @@ class _StudentDashboardScreenState extends State<StudentDashboardScreen> {
                   Container(
                     padding: const EdgeInsets.all(6),
                     decoration: BoxDecoration(
-                      color: const Color(0xFF1565C0).withOpacity(0.1),
+                      color: const Color(0xFF1565C0).withValues(alpha: 0.1),
                       borderRadius: BorderRadius.circular(8),
                     ),
                     child: const Icon(Icons.account_balance_wallet,
-                        color: const Color(0xFF1565C0), size: 20),
+                        color: Color(0xFF1565C0), size: 20),
                   ),
                   const SizedBox(width: 12),
                   const Text("MoMo / Card Wallet Top-Up",
@@ -979,6 +870,7 @@ class _StudentDashboardScreenState extends State<StudentDashboardScreen> {
                             email: email,
                             purpose: 'WALLET_TOPUP',
                           );
+                          if (!context.mounted) return;
 
                           setDialogState(() {
                             isLoading = false;
@@ -997,6 +889,7 @@ class _StudentDashboardScreenState extends State<StudentDashboardScreen> {
 
                             // Fallback mock top-up if backend is not running
                             Future.delayed(const Duration(seconds: 1), () {
+                              if (!context.mounted) return;
                               provider.rechargeWallet(amt);
                               Navigator.pop(context);
                               ScaffoldMessenger.of(context).showSnackBar(
@@ -1080,16 +973,18 @@ class _StudentDashboardScreenState extends State<StudentDashboardScreen> {
                           padding: const EdgeInsets.symmetric(
                               horizontal: 8, vertical: 4),
                           decoration: BoxDecoration(
-                            color: const Color(0xFFFFA000).withOpacity(0.12),
+                            color:
+                                const Color(0xFFFFA000).withValues(alpha: 0.12),
                             borderRadius: BorderRadius.circular(6),
                           ),
                           child: const Row(
                             children: [
-                              Icon(Icons.lock, color: const Color(0xFFFFA000), size: 10),
+                              Icon(Icons.lock,
+                                  color: Color(0xFFFFA000), size: 10),
                               SizedBox(width: 4),
                               Text("TEST GATEWAY",
                                   style: TextStyle(
-                                      color: const Color(0xFFFFA000),
+                                      color: Color(0xFFFFA000),
                                       fontSize: 8,
                                       fontWeight: FontWeight.bold)),
                             ],
@@ -1135,13 +1030,13 @@ class _StudentDashboardScreenState extends State<StudentDashboardScreen> {
                           border: Border.all(color: Colors.blueGrey[300]!),
                           borderRadius: BorderRadius.circular(8),
                         ),
-                        child: Row(
+                        child: const Row(
                           mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           children: [
-                            const Row(
+                            Row(
                               children: [
                                 Icon(Icons.phone_android,
-                                    color: const Color(0xFF00796B), size: 18),
+                                    color: Color(0xFF00796B), size: 18),
                                 SizedBox(width: 8),
                                 Text("Mobile Money (MTN/Telecel/AT)",
                                     style: TextStyle(
@@ -1150,7 +1045,7 @@ class _StudentDashboardScreenState extends State<StudentDashboardScreen> {
                               ],
                             ),
                             Icon(Icons.check_circle,
-                                color: const Color(0xFF00796B)[700], size: 16),
+                                color: Color(0xFF00796B), size: 16),
                           ],
                         ),
                       ),
@@ -1204,7 +1099,8 @@ class _StudentDashboardScreenState extends State<StudentDashboardScreen> {
                         child: Text(
                           "A push notification OTP was simulated to your handset. Please type '1234' below to authorize the withdrawal request.",
                           textAlign: TextAlign.center,
-                          style: TextStyle(fontSize: 11, color: Colors.blueGrey),
+                          style:
+                              TextStyle(fontSize: 11, color: Colors.blueGrey),
                         ),
                       ),
                       const SizedBox(height: 16),
@@ -1229,7 +1125,7 @@ class _StudentDashboardScreenState extends State<StudentDashboardScreen> {
                       const SizedBox(height: 20),
                       ElevatedButton(
                         style: ElevatedButton.styleFrom(
-                          backgroundColor: const Color(0xFF00796B)[600],
+                          backgroundColor: const Color(0xFF00796B),
                           padding: const EdgeInsets.symmetric(vertical: 14),
                         ),
                         onPressed: () {
@@ -1290,7 +1186,7 @@ class _StudentDashboardScreenState extends State<StudentDashboardScreen> {
                     // STEP 3: TRANSACTION SUCCESS
                     if (step == 3) ...[
                       const Icon(Icons.check_circle_rounded,
-                          color: const Color(0xFF2E7D32), size: 64),
+                          color: Color(0xFF2E7D32), size: 64),
                       const SizedBox(height: 16),
                       const Center(
                         child: Text(
@@ -1298,7 +1194,7 @@ class _StudentDashboardScreenState extends State<StudentDashboardScreen> {
                           style: TextStyle(
                               fontWeight: FontWeight.bold,
                               fontSize: 16,
-                              color: const Color(0xFF2E7D32)),
+                              color: Color(0xFF2E7D32)),
                         ),
                       ),
                       const SizedBox(height: 8),
@@ -1344,6 +1240,7 @@ class _StudentDashboardScreenState extends State<StudentDashboardScreen> {
       amount: amount,
       purpose: 'WALLET_TOPUP',
     );
+    if (!context.mounted) return;
 
     if (success) {
       setSimState(() {
@@ -1380,19 +1277,6 @@ class _StudentDashboardScreenState extends State<StudentDashboardScreen> {
         )
       ],
     );
-  }
-
-  IconData _categoryIcon(String category) {
-    switch (category) {
-      case 'Drinks':
-        return Icons.local_drink;
-      case 'Snacks':
-        return Icons.cookie;
-      case 'Traditional':
-        return Icons.rice_bowl;
-      default:
-        return Icons.restaurant;
-    }
   }
 
   Color _statusColor(String status) {
@@ -1479,23 +1363,23 @@ class _StudentDashboardScreenState extends State<StudentDashboardScreen> {
       margin: const EdgeInsets.symmetric(vertical: 8),
       padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 8),
       decoration: BoxDecoration(
-        color: const Color(0xFF1565C0)[50]?.withOpacity(0.3),
+        color: Colors.blue.shade50.withValues(alpha: 0.3),
         borderRadius: BorderRadius.circular(10),
-        border: Border.all(color: const Color(0xFF1565C0)[100]!),
+        border: Border.all(color: Colors.blue.shade100),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           const Row(
             children: [
-              Icon(Icons.radar, color: const Color(0xFF1565C0), size: 14),
+              Icon(Icons.radar, color: Color(0xFF1565C0), size: 14),
               SizedBox(width: 6),
               Text(
                 "REAL-TIME ORDER TRACKING STREAMS",
                 style: TextStyle(
                   fontWeight: FontWeight.bold,
                   fontSize: 10,
-                  color: const Color(0xFF1565C0),
+                  color: Color(0xFF1565C0),
                   letterSpacing: 0.8,
                 ),
               ),
@@ -1513,7 +1397,9 @@ class _StudentDashboardScreenState extends State<StudentDashboardScreen> {
 
               final Color color = isActive
                   ? const Color(0xFF1565C0)
-                  : (isPassed ? const Color(0xFF2E7D32) : Colors.blueGrey[400]!);
+                  : (isPassed
+                      ? const Color(0xFF2E7D32)
+                      : Colors.blueGrey[400]!);
 
               return Expanded(
                 child: Column(
@@ -1534,9 +1420,9 @@ class _StudentDashboardScreenState extends State<StudentDashboardScreen> {
                           padding: const EdgeInsets.all(6),
                           decoration: BoxDecoration(
                             color: isActive
-                                ? const Color(0xFF1565C0)[100]
+                                ? Colors.blue.shade100
                                 : (isPassed
-                                    ? const Color(0xFF2E7D32)[50]
+                                    ? Colors.green.shade50
                                     : Colors.blueGrey[100]),
                             shape: BoxShape.circle,
                             border: Border.all(color: color, width: 2),
@@ -1565,7 +1451,9 @@ class _StudentDashboardScreenState extends State<StudentDashboardScreen> {
                             isActive ? FontWeight.bold : FontWeight.normal,
                         color: isActive
                             ? const Color(0xFF1565C0)
-                            : (isPassed ? const Color(0xFF2E7D32) : Colors.blueGrey[600]),
+                            : (isPassed
+                                ? const Color(0xFF2E7D32)
+                                : Colors.blueGrey[600]),
                       ),
                     ),
                   ],

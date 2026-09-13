@@ -5,69 +5,149 @@ import '../../core/network/api_client.dart';
 
 class CheckoutScreen extends StatefulWidget {
   const CheckoutScreen({super.key});
-  @override State<CheckoutScreen> createState() => _CheckoutScreenState();
+  @override
+  State<CheckoutScreen> createState() => _CheckoutScreenState();
 }
+
 class _CheckoutScreenState extends State<CheckoutScreen> {
   String _method = 'Wallet';
   final TextEditingController _noteController = TextEditingController();
   bool _submitting = false;
   final ApiClient _api = ApiClient();
-  @override void dispose() { _noteController.dispose(); _api.close(); super.dispose(); }
-  @override Widget build(BuildContext context) {
+  @override
+  void dispose() {
+    _noteController.dispose();
+    _api.close();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final cart = context.watch<CartProvider>();
     final total = cart.subtotal;
     return Scaffold(
       appBar: AppBar(title: const Text('Checkout')),
-      body: cart.isEmpty ? const Center(child: Text('Your cart is empty.')) : ListView(
-        padding: const EdgeInsets.all(20),
-        children: [
-          Text('Review your order', style: Theme.of(context).textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.w900)),
-          const SizedBox(height: 6), const Text('Confirm your meals and payment method before placing the order.'),
-          const SizedBox(height: 18),
-          Card(child: Column(children: cart.lines.map((line) => ListTile(
-            title: Text(line.item.name, style: const TextStyle(fontWeight: FontWeight.w700)),
-            subtitle: Text('Quantity: ${line.quantity}'),
-            trailing: Text('GH₵ ${line.total.toStringAsFixed(2)}', style: const TextStyle(fontWeight: FontWeight.w800)),
-          )).toList())),
-          const SizedBox(height: 18),
-          Card(child: Padding(padding: const EdgeInsets.all(16), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            const Text('Payment method', style: TextStyle(fontWeight: FontWeight.w800)),
-            RadioListTile<String>(value:'Wallet',groupValue:_method,onChanged:(v)=>setState(()=>_method=v!),title:const Text('ATU Cafeteria Wallet'),secondary:const Icon(Icons.account_balance_wallet_outlined)),
-            ListTile(
-              leading: const Icon(Icons.credit_card_rounded),
-              title: const Text('Online payment'),
-              subtitle: const Text('Coming soon. Wallet payment is currently available.'),
-              enabled: false,
+      body: cart.isEmpty
+          ? const Center(child: Text('Your cart is empty.'))
+          : ListView(
+              padding: const EdgeInsets.all(20),
+              children: [
+                Text('Review your order',
+                    style: Theme.of(context)
+                        .textTheme
+                        .headlineSmall
+                        ?.copyWith(fontWeight: FontWeight.w900)),
+                const SizedBox(height: 6),
+                const Text(
+                    'Confirm your meals and payment method before placing the order.'),
+                const SizedBox(height: 18),
+                Card(
+                  child: Column(
+                    children: cart.lines
+                        .map((line) => ListTile(
+                              title: Text(line.item.name,
+                                  style: const TextStyle(
+                                      fontWeight: FontWeight.w700)),
+                              subtitle: Text('Quantity: ${line.quantity}'),
+                              trailing: Text(
+                                  'GH₵ ${line.total.toStringAsFixed(2)}',
+                                  style: const TextStyle(
+                                      fontWeight: FontWeight.w800)),
+                            ))
+                        .toList(),
+                  ),
+                ),
+                const SizedBox(height: 18),
+                Card(
+                    child: Padding(
+                        padding: const EdgeInsets.all(16),
+                        child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              const Text('Payment method',
+                                  style:
+                                      TextStyle(fontWeight: FontWeight.w800)),
+                              RadioGroup<String>(
+                                groupValue: _method,
+                                onChanged: (value) =>
+                                    setState(() => _method = value!),
+                                child: const RadioListTile<String>(
+                                  value: 'Wallet',
+                                  title: Text('ATU Cafeteria Wallet'),
+                                  secondary: Icon(
+                                      Icons.account_balance_wallet_outlined),
+                                ),
+                              ),
+                              const ListTile(
+                                leading: Icon(Icons.credit_card_rounded),
+                                title: Text('Online payment'),
+                                subtitle: Text(
+                                    'Coming soon. Wallet payment is currently available.'),
+                                enabled: false,
+                              ),
+                            ]))),
+                const SizedBox(height: 18),
+                Card(
+                    child: Padding(
+                        padding: const EdgeInsets.all(16),
+                        child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              const Text('Order note (optional)',
+                                  style:
+                                      TextStyle(fontWeight: FontWeight.w800)),
+                              const SizedBox(height: 8),
+                              TextField(
+                                controller: _noteController,
+                                maxLength: 160,
+                                decoration: const InputDecoration(
+                                  hintText: 'Add a note for the cafeteria',
+                                  prefixIcon: Icon(Icons.notes_outlined),
+                                ),
+                              ),
+                            ]))),
+                const SizedBox(height: 18),
+                Card(
+                    child: Padding(
+                        padding: const EdgeInsets.all(18),
+                        child: Column(children: [
+                          Row(children: [
+                            const Text('Subtotal'),
+                            const Spacer(),
+                            Text('GH₵ ${total.toStringAsFixed(2)}')
+                          ]),
+                          const Divider(height: 28),
+                          Row(children: [
+                            const Text('Total',
+                                style: TextStyle(
+                                    fontSize: 18, fontWeight: FontWeight.w900)),
+                            const Spacer(),
+                            Text('GH₵ ${total.toStringAsFixed(2)}',
+                                style: TextStyle(
+                                    fontSize: 20,
+                                    fontWeight: FontWeight.w900,
+                                    color:
+                                        Theme.of(context).colorScheme.primary))
+                          ]),
+                          const SizedBox(height: 16),
+                          SizedBox(
+                              width: double.infinity,
+                              height: 52,
+                              child: FilledButton.icon(
+                                onPressed: _submitting
+                                    ? null
+                                    : () => _showConfirmation(context),
+                                icon: const Icon(Icons.check_circle_outline),
+                                label: Text(_submitting
+                                    ? 'Processing...'
+                                    : 'Place Order Securely'),
+                              )),
+                        ]))),
+              ],
             ),
-          ]))),
-          const SizedBox(height: 18),
-          Card(child: Padding(padding: const EdgeInsets.all(16), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            const Text('Order note (optional)', style: TextStyle(fontWeight: FontWeight.w800)),
-            const SizedBox(height: 8),
-            TextField(
-              controller: _noteController,
-              maxLength: 160,
-              decoration: const InputDecoration(
-                hintText: 'Add a note for the cafeteria',
-                prefixIcon: Icon(Icons.notes_outlined),
-              ),
-            ),
-          ]))),
-          const SizedBox(height: 18),
-          Card(child: Padding(padding: const EdgeInsets.all(18), child: Column(children: [
-            Row(children:[const Text('Subtotal'),const Spacer(),Text('GH₵ ${total.toStringAsFixed(2)}')]),
-            const Divider(height:28),
-            Row(children:[const Text('Total',style:TextStyle(fontSize:18,fontWeight:FontWeight.w900)),const Spacer(),Text('GH₵ ${total.toStringAsFixed(2)}',style:TextStyle(fontSize:20,fontWeight:FontWeight.w900,color:Theme.of(context).colorScheme.primary))]),
-            const SizedBox(height:16),
-            SizedBox(width:double.infinity,height:52,child:FilledButton.icon(
-              onPressed:_submitting?null:()=>_showConfirmation(context),
-              icon:const Icon(Icons.check_circle_outline),label:Text(_submitting?'Processing...':'Place Order Securely'),
-            )),
-          ]))),
-        ],
-      ),
     );
   }
+
   Future<void> _showConfirmation(BuildContext context) async {
     final cart = context.read<CartProvider>();
     if (cart.isEmpty) return;
@@ -75,10 +155,15 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
       context: context,
       builder: (ctx) => AlertDialog(
         title: const Text('Confirm order'),
-        content: Text('Place this order for GH₵ ${cart.subtotal.toStringAsFixed(2)} using your cafeteria wallet?'),
+        content: Text(
+            'Place this order for GH₵ ${cart.subtotal.toStringAsFixed(2)} using your cafeteria wallet?'),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Review')),
-          FilledButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('Confirm')),
+          TextButton(
+              onPressed: () => Navigator.pop(ctx, false),
+              child: const Text('Review')),
+          FilledButton(
+              onPressed: () => Navigator.pop(ctx, true),
+              child: const Text('Confirm')),
         ],
       ),
     );
@@ -87,10 +172,11 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
     try {
       final result = await _api.post('/student/cart-checkout', body: {
         'items': cart.toCheckoutPayload(),
-        if (_noteController.text.trim().isNotEmpty) 'note': _noteController.text.trim(),
+        if (_noteController.text.trim().isNotEmpty)
+          'note': _noteController.text.trim(),
         'payment_method': _method.toLowerCase(),
       });
-      if (!mounted) return;
+      if (!context.mounted) return;
       cart.clear();
       final message = result is Map && result['message'] != null
           ? result['message'].toString()
@@ -113,12 +199,20 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
         ),
       );
     } on ApiException catch (e) {
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.message)));
+      if (context.mounted) {
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text(e.message)));
+      }
     } catch (_) {
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Unable to place the order. Please check your connection and try again.')),
-      );
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+              content: Text(
+                  'Unable to place the order. Please check your connection and try again.')),
+        );
+      }
     } finally {
       if (mounted) setState(() => _submitting = false);
     }
   }
+}

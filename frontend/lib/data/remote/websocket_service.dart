@@ -10,15 +10,18 @@ class WebSocketService {
   final _orderController = StreamController<Order>.broadcast();
   Stream<Order> get orderStream => _orderController.stream;
 
-  final _notificationController = StreamController<Map<String, dynamic>>.broadcast();
-  Stream<Map<String, dynamic>> get notificationStream => _notificationController.stream;
+  final _notificationController =
+      StreamController<Map<String, dynamic>>.broadcast();
+  Stream<Map<String, dynamic>> get notificationStream =>
+      _notificationController.stream;
 
   void emitOrderStatusUpdate(Order updatedOrder) {
     _orderController.add(updatedOrder);
     _notificationController.add({
       'order_id': updatedOrder.id,
       'status': updatedOrder.status,
-      'message': 'Order #${updatedOrder.id} status changed to ${updatedOrder.displayStatus}',
+      'message':
+          'Order #${updatedOrder.id} status changed to ${updatedOrder.displayStatus}',
       'timestamp': DateTime.now().millisecondsSinceEpoch,
     });
   }

@@ -58,15 +58,15 @@ class _LoginScreenState extends State<LoginScreen> {
     final loading = context.watch<CafeteriaProvider>().isLoading;
     return Scaffold(
       body: Container(
-        decoration: BoxDecoration(
+        decoration: const BoxDecoration(
           gradient: LinearGradient(
             begin: Alignment.topCenter,
             end: Alignment.bottomCenter,
             colors: [
-            const Color(0xFF0B1F3A),
-            const Color(0xFF123B5D),
-            const Color(0xFFE8751A),
-          ],
+              Color(0xFF0B1F3A),
+              Color(0xFF123B5D),
+              Color(0xFFE8751A),
+            ],
           ),
         ),
         child: SafeArea(
@@ -81,117 +81,136 @@ class _LoginScreenState extends State<LoginScreen> {
                   ),
                   child: Padding(
                     padding: const EdgeInsets.all(28),
-                    child: Form(key: _formKey, child: Column(
-                      children: [
-                        Container(
-                          width: 82,
-                          height: 82,
-                          decoration: BoxDecoration(
-                            gradient: const LinearGradient(
-                              colors: [Color(0xFFE8751A), Color(0xFFFFB347)],
-                              begin: Alignment.topLeft,
-                              end: Alignment.bottomRight,
-                            ),
-                            borderRadius: BorderRadius.circular(24),
-                            boxShadow: const [
-                              BoxShadow(
-                                blurRadius: 18,
-                                offset: Offset(0, 8),
-                                color: Color(0x33000000),
-                              ),
-                            ],
-                          ),
-                          child: const Icon(
-                            Icons.restaurant_rounded,
-                            size: 44,
-                            color: Colors.white,
-                          ),
-                        ),
-                        const SizedBox(height: 12),
-                        const Text(
-                          'ATU CAFETERIA',
-                          style: TextStyle(
-                            fontSize: 28,
-                            fontWeight: FontWeight.w800,
-                            letterSpacing: 1.2,
-                          ),
-                        ),
-                        Text(
-                          'SMART CAMPUS FOOD PLATFORM',
-                          style: TextStyle(
-                            color: Colors.blueGrey.shade600,
-                            fontSize: 12,
-                            fontWeight: FontWeight.w700,
-                            letterSpacing: 1.5,
-                          ),
-                        ),
-                        const SizedBox(height: 6),
-                        const Text(
-                          'Secure access for students, vendors and administrators.',
-                          textAlign: TextAlign.center,
-                        ),
-                        const SizedBox(height: 28),
-                        TextFormField(
-                          controller: username,
-                          autofocus: true,
-                          decoration: const InputDecoration(
-                            labelText: 'Username',
-                            prefixIcon: Icon(Icons.badge_outlined),
-                            border: OutlineInputBorder(),
-                          ),
-                          validator: (v) => v == null || v.trim().isEmpty ? 'Enter your username.' : null,
-                        ),
-                        const SizedBox(height: 16),
-                        TextFormField(
-                          controller: password,
-                          obscureText: obscure,
-                          decoration: InputDecoration(
-                            labelText: 'PIN',
-                            prefixIcon: const Icon(Icons.lock),
-                            suffixIcon: IconButton(
-                              icon: Icon(
-                                obscure ? Icons.visibility : Icons.visibility_off,
-                              ),
-                              onPressed: () => setState(() => obscure = !obscure),
-                            ),
-                            border: const OutlineInputBorder(),
-                          ),
-                        ),
-                        Align(
-                          alignment: Alignment.centerRight,
-                          child: TextButton(
-                            onPressed: () => Navigator.pushNamed(
-                              context,
-                              '/reset-password',
-                            ),
-                            child: const Text('Forgot password?'),
-                          ),
-                        ),
-                        const SizedBox(height: 8),
-                        SizedBox(
-                          width: double.infinity,
-                          height: 50,
-                          child: ElevatedButton(
-                            onPressed: loading ? null : () { if (_formKey.currentState?.validate() ?? false) login(); },
-                            child: loading
-                                ? const SizedBox(
-                                    width: 22,
-                                    height: 22,
-                                    child: CircularProgressIndicator(),
-                                  )
-                                : const Text(
-                                    'Sign In',
-                                    style: TextStyle(fontWeight: FontWeight.bold),
+                    child: Form(
+                        key: _formKey,
+                        child: Column(
+                          children: [
+                            Container(
+                              width: 82,
+                              height: 82,
+                              decoration: BoxDecoration(
+                                gradient: const LinearGradient(
+                                  colors: [
+                                    Color(0xFFE8751A),
+                                    Color(0xFFFFB347)
+                                  ],
+                                  begin: Alignment.topLeft,
+                                  end: Alignment.bottomRight,
+                                ),
+                                borderRadius: BorderRadius.circular(24),
+                                boxShadow: const [
+                                  BoxShadow(
+                                    blurRadius: 18,
+                                    offset: Offset(0, 8),
+                                    color: Color(0x33000000),
                                   ),
-                          ),
-                        ),
-                        const SizedBox(height: 12),
-                        TextButton(
-                          onPressed: () => Navigator.pushNamed(context, '/register'),
-                          child: const Text('Create an account'),
-                        ),
-                      ],
-                    )),
+                                ],
+                              ),
+                              child: const Icon(
+                                Icons.restaurant_rounded,
+                                size: 44,
+                                color: Colors.white,
+                              ),
+                            ),
+                            const SizedBox(height: 12),
+                            const Text(
+                              'ATU CAFETERIA',
+                              style: TextStyle(
+                                fontSize: 28,
+                                fontWeight: FontWeight.w800,
+                                letterSpacing: 1.2,
+                              ),
+                            ),
+                            Text(
+                              'SMART CAMPUS FOOD PLATFORM',
+                              style: TextStyle(
+                                color: Colors.blueGrey.shade600,
+                                fontSize: 12,
+                                fontWeight: FontWeight.w700,
+                                letterSpacing: 1.5,
+                              ),
+                            ),
+                            const SizedBox(height: 6),
+                            const Text(
+                              'Secure access for students, vendors and administrators.',
+                              textAlign: TextAlign.center,
+                            ),
+                            const SizedBox(height: 28),
+                            TextFormField(
+                              controller: username,
+                              autofocus: true,
+                              decoration: const InputDecoration(
+                                labelText: 'Username',
+                                prefixIcon: Icon(Icons.badge_outlined),
+                                border: OutlineInputBorder(),
+                              ),
+                              validator: (v) => v == null || v.trim().isEmpty
+                                  ? 'Enter your username.'
+                                  : null,
+                            ),
+                            const SizedBox(height: 16),
+                            TextFormField(
+                              controller: password,
+                              obscureText: obscure,
+                              decoration: InputDecoration(
+                                labelText: 'PIN',
+                                prefixIcon: const Icon(Icons.lock),
+                                suffixIcon: IconButton(
+                                  icon: Icon(
+                                    obscure
+                                        ? Icons.visibility
+                                        : Icons.visibility_off,
+                                  ),
+                                  onPressed: () =>
+                                      setState(() => obscure = !obscure),
+                                ),
+                                border: const OutlineInputBorder(),
+                              ),
+                            ),
+                            Align(
+                              alignment: Alignment.centerRight,
+                              child: TextButton(
+                                onPressed: () => Navigator.pushNamed(
+                                  context,
+                                  '/reset-password',
+                                ),
+                                child: const Text('Forgot password?'),
+                              ),
+                            ),
+                            const SizedBox(height: 8),
+                            SizedBox(
+                              width: double.infinity,
+                              height: 50,
+                              child: ElevatedButton(
+                                onPressed: loading
+                                    ? null
+                                    : () {
+                                        if (_formKey.currentState?.validate() ??
+                                            false) {
+                                          login();
+                                        }
+                                      },
+                                child: loading
+                                    ? const SizedBox(
+                                        width: 22,
+                                        height: 22,
+                                        child: CircularProgressIndicator(),
+                                      )
+                                    : const Text(
+                                        'Sign In',
+                                        style: TextStyle(
+                                            fontWeight: FontWeight.bold),
+                                      ),
+                              ),
+                            ),
+                            const SizedBox(height: 12),
+                            TextButton(
+                              onPressed: () =>
+                                  Navigator.pushNamed(context, '/register'),
+                              child: const Text('Create an account'),
+                            ),
+                          ],
+                        )),
                   ),
                 ),
               ),
@@ -255,7 +274,7 @@ class _TwoFactorScreenState extends State<TwoFactorScreen> {
                     Container(
                       padding: const EdgeInsets.all(18),
                       decoration: BoxDecoration(
-                        color: const Color(0xFFE8751A).withOpacity(.12),
+                        color: const Color(0xFFE8751A).withValues(alpha: .12),
                         shape: BoxShape.circle,
                       ),
                       child: const Icon(
@@ -267,7 +286,8 @@ class _TwoFactorScreenState extends State<TwoFactorScreen> {
                     const SizedBox(height: 16),
                     const Text(
                       'Two-factor authentication',
-                      style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
+                      style:
+                          TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
                     ),
                     const SizedBox(height: 8),
                     const Text(

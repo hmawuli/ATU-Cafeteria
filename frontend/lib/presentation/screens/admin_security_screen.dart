@@ -41,7 +41,8 @@ class _AdminSecurityScreenState extends State<AdminSecurityScreen> {
   Future<void> _requestCode() async {
     setState(() => _loading = true);
     try {
-      final result = await _call('POST', 'admin/security/2fa/request-enable', {});
+      final result =
+          await _call('POST', 'admin/security/2fa/request-enable', {});
       if (!mounted) return;
       setState(() => _requested = true);
       ScaffoldMessenger.of(context).showSnackBar(
@@ -76,7 +77,9 @@ class _AdminSecurityScreenState extends State<AdminSecurityScreen> {
       );
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(result['message']?.toString() ?? 'Two-factor enabled.')),
+        SnackBar(
+            content:
+                Text(result['message']?.toString() ?? 'Two-factor enabled.')),
       );
       Navigator.pop(context);
     } catch (error) {
@@ -169,7 +172,9 @@ class _AdminSecurityScreenState extends State<AdminSecurityScreen> {
             SizedBox(
               height: 48,
               child: ElevatedButton(
-                onPressed: _loading ? null : (_requested ? _enableTwoFactor : _requestCode),
+                onPressed: _loading
+                    ? null
+                    : (_requested ? _enableTwoFactor : _requestCode),
                 child: Text(
                   _loading
                       ? 'Please wait...'
@@ -178,7 +183,8 @@ class _AdminSecurityScreenState extends State<AdminSecurityScreen> {
               ),
             ),
           ] else ...[
-            const Text('Two-factor authentication is protecting this administrator account.'),
+            const Text(
+                'Two-factor authentication is protecting this administrator account.'),
             const SizedBox(height: 24),
             SizedBox(
               height: 48,

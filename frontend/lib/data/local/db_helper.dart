@@ -30,8 +30,10 @@ class DbHelper {
   Future<void> _upgradeDB(Database db, int oldVersion, int newVersion) async {
     if (oldVersion < 2) {
       // Keep upgrades additive so existing local demo data is preserved.
-      await db.execute("ALTER TABLE food_items ADD COLUMN calories INTEGER NOT NULL DEFAULT 250");
-      await db.execute("ALTER TABLE food_items ADD COLUMN allergens TEXT NOT NULL DEFAULT 'None'");
+      await db.execute(
+          "ALTER TABLE food_items ADD COLUMN calories INTEGER NOT NULL DEFAULT 250");
+      await db.execute(
+          "ALTER TABLE food_items ADD COLUMN allergens TEXT NOT NULL DEFAULT 'None'");
     }
   }
 

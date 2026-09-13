@@ -14,7 +14,8 @@ class ApiService {
       };
 
   // 1. Authentication
-  static Future<Map<String, dynamic>> login(String username, String password) async {
+  static Future<Map<String, dynamic>> login(
+      String username, String password) async {
     try {
       final response = await http.post(
         Uri.parse('${baseUrl}login'),
@@ -37,7 +38,8 @@ class ApiService {
   // 2. Fetch Food Items
   static Future<List<FoodItem>> getFoodItems() async {
     try {
-      final response = await http.get(Uri.parse('${baseUrl}food-items'), headers: _headers);
+      final response =
+          await http.get(Uri.parse('${baseUrl}food-items'), headers: _headers);
       if (response.statusCode == 200) {
         final List<dynamic> data = jsonDecode(response.body);
         return data.map((item) => FoodItem.fromJson(item)).toList();
@@ -90,7 +92,9 @@ class ApiService {
   }
 
   // 4. Update Order Status
-  static Future<bool> updateOrderStatus(int vendorId, int orderId, String newStatus, {String? estimatedTime}) async {
+  static Future<bool> updateOrderStatus(
+      int vendorId, int orderId, String newStatus,
+      {String? estimatedTime}) async {
     try {
       final response = await http.put(
         Uri.parse('${baseUrl}vendor/$vendorId/orders/$orderId/status'),

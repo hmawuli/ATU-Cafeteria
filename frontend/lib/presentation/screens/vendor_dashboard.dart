@@ -57,8 +57,8 @@ class _VendorDashboardScreenState extends State<VendorDashboardScreen> {
             : 'VENDOR PORTAL CONTROLLER'),
         leading: provider.isAdminActing
             ? IconButton(
-                icon:
-                    const Icon(Icons.admin_panel_settings, color: const Color(0xFFFFA000)),
+                icon: const Icon(Icons.admin_panel_settings,
+                    color: Color(0xFFFFA000)),
                 tooltip: "Return to Admin Console",
                 onPressed: () {
                   provider.stopImpersonation();
@@ -111,8 +111,7 @@ class _VendorDashboardScreenState extends State<VendorDashboardScreen> {
               icon: Icon(Icons.receipt), label: 'Incoming Orders'),
           NavigationDestination(
               icon: Icon(Icons.breakfast_dining), label: 'Menu Catalog'),
-          NavigationDestination(
-              icon: Icon(Icons.insights), label: 'Analytics'),
+          NavigationDestination(icon: Icon(Icons.insights), label: 'Analytics'),
           NavigationDestination(
               icon: Icon(Icons.settings_suggest), label: 'Storefront Hub'),
         ],
@@ -198,8 +197,8 @@ class _VendorDashboardScreenState extends State<VendorDashboardScreen> {
                           color: Theme.of(context).colorScheme.primary),
                     ),
                     Text(timeStr,
-                        style:
-                            const TextStyle(fontSize: 10, color: Colors.blueGrey)),
+                        style: const TextStyle(
+                            fontSize: 10, color: Colors.blueGrey)),
                   ],
                 ),
                 const SizedBox(height: 12),
@@ -219,7 +218,7 @@ class _VendorDashboardScreenState extends State<VendorDashboardScreen> {
                       padding: const EdgeInsets.symmetric(
                           horizontal: 8, vertical: 4),
                       decoration: BoxDecoration(
-                          color: stateColor.withOpacity(0.12),
+                          color: stateColor.withValues(alpha: 0.12),
                           borderRadius: BorderRadius.circular(6)),
                       child: Text(
                         "Status: ${order.status}",
@@ -328,7 +327,8 @@ class _VendorDashboardScreenState extends State<VendorDashboardScreen> {
                           },
                         ),
                         IconButton(
-                          icon: const Icon(Icons.delete, color: Colors.blueGrey),
+                          icon:
+                              const Icon(Icons.delete, color: Colors.blueGrey),
                           onPressed: () {
                             provider.deleteVendorFoodItem(item);
                           },
@@ -352,7 +352,11 @@ class _VendorDashboardScreenState extends State<VendorDashboardScreen> {
     final remote = provider.remoteVendorMetrics;
 
     // Analytics are strictly database-backed. Never manufacture business metrics for an empty store.
-    double avgQuality = 0, avgCleanliness = 0, avgSpeed = 0, avgPriceVal = 0, overallAvg = 0;
+    double avgQuality = 0,
+        avgCleanliness = 0,
+        avgSpeed = 0,
+        avgPriceVal = 0,
+        overallAvg = 0;
     int totalOrders = 0, completedOrdersCount = 0;
     double avgPrepMinutes = 0;
     List<Map<String, dynamic>> finalPopularList = [];
@@ -370,18 +374,29 @@ class _VendorDashboardScreenState extends State<VendorDashboardScreen> {
 
       final popular = remote['popular_menu_items'];
       if (popular is List) {
-        finalPopularList = popular.whereType<Map>().map((item) => {
-          'name': item['name'] ?? 'Unknown item',
-          'count': item['quantity_sold'] is num ? item['quantity_sold'] : 0,
-          'revenue': item['sales'] is num ? (item['sales'] as num).toDouble() : 0.0,
-        }).toList();
+        finalPopularList = popular
+            .whereType<Map>()
+            .map((item) => {
+                  'name': item['name'] ?? 'Unknown item',
+                  'count':
+                      item['quantity_sold'] is num ? item['quantity_sold'] : 0,
+                  'revenue': item['sales'] is num
+                      ? (item['sales'] as num).toDouble()
+                      : 0.0,
+                })
+            .toList();
       }
     } else {
       totalOrders = provider.vendorOrders.length;
-      completedOrdersCount = provider.vendorOrders.where((o) => o.status.toUpperCase() == 'COMPLETED').length;
-      final completed = provider.vendorOrders.where((o) => o.status.toUpperCase() == 'COMPLETED').toList();
+      completedOrdersCount = provider.vendorOrders
+          .where((o) => o.status.toUpperCase() == 'COMPLETED')
+          .length;
+      final completed = provider.vendorOrders
+          .where((o) => o.status.toUpperCase() == 'COMPLETED')
+          .toList();
       if (completed.isNotEmpty) {
-        avgPrepMinutes = completed.length.toDouble(); // Replace only with measured backend data when available.
+        avgPrepMinutes = completed.length
+            .toDouble(); // Replace only with measured backend data when available.
       }
       final Map<String, int> counts = {};
       for (final order in provider.vendorOrders) {
@@ -394,7 +409,11 @@ class _VendorDashboardScreenState extends State<VendorDashboardScreen> {
       finalPopularList = finalPopularList.take(3).toList();
     }
 
-    final bool hasRatings = avgQuality > 0 || avgCleanliness > 0 || avgSpeed > 0 || avgPriceVal > 0;
+    final successRate =
+        totalOrders == 0 ? 0.0 : completedOrdersCount / totalOrders * 100;
+
+    final bool hasRatings =
+        avgQuality > 0 || avgCleanliness > 0 || avgSpeed > 0 || avgPriceVal > 0;
     if (!hasRatings) overallAvg = 0;
 
     return SingleChildScrollView(
@@ -409,7 +428,8 @@ class _VendorDashboardScreenState extends State<VendorDashboardScreen> {
             ),
 
           Card(
-            color: hasRemote ? const Color(0xFF123B5D) : const Color(0xFF0B1F3A),
+            color:
+                hasRemote ? const Color(0xFF123B5D) : const Color(0xFF0B1F3A),
             shape:
                 RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
             child: Padding(
@@ -439,7 +459,7 @@ class _VendorDashboardScreenState extends State<VendorDashboardScreen> {
                       padding: const EdgeInsets.symmetric(
                           horizontal: 8, vertical: 2),
                       decoration: BoxDecoration(
-                        color: const Color(0xFF2E7D32)[400],
+                        color: Colors.green.shade400,
                         borderRadius: BorderRadius.circular(8),
                       ),
                       child: const Text(
@@ -548,7 +568,7 @@ class _VendorDashboardScreenState extends State<VendorDashboardScreen> {
                           fontWeight: FontWeight.bold,
                           fontSize: 13,
                           letterSpacing: 0.8,
-                          color: const Color(0xFF283593))),
+                          color: Color(0xFF283593))),
                   const Divider(height: 16),
                   const SizedBox(height: 8),
                   _denseRatingBar("Culinary Preparation Quality", avgQuality),
@@ -576,7 +596,7 @@ class _VendorDashboardScreenState extends State<VendorDashboardScreen> {
                         fontWeight: FontWeight.bold,
                         fontSize: 13,
                         letterSpacing: 0.8,
-                        color: const Color(0xFF283593)),
+                        color: Color(0xFF283593)),
                   ),
                   const Divider(height: 16),
                   const SizedBox(height: 8),
@@ -588,13 +608,14 @@ class _VendorDashboardScreenState extends State<VendorDashboardScreen> {
                         children: [
                           CircleAvatar(
                             radius: 14,
-                            backgroundColor: const Color(0xFF1565C0).withOpacity(0.12),
+                            backgroundColor:
+                                const Color(0xFF1565C0).withValues(alpha: 0.12),
                             child: Text(
                               "${index + 1}",
                               style: const TextStyle(
                                   fontSize: 11,
                                   fontWeight: FontWeight.bold,
-                                  color: const Color(0xFF1565C0)),
+                                  color: Color(0xFF1565C0)),
                             ),
                           ),
                           const SizedBox(width: 12),
@@ -636,9 +657,7 @@ class _VendorDashboardScreenState extends State<VendorDashboardScreen> {
           reviews.isEmpty
               ? const Padding(
                   padding: EdgeInsets.symmetric(vertical: 20),
-                  child: Center(
-                      child: Text(
-                          "No feedback logs found yet.")),
+                  child: Center(child: Text("No feedback logs found yet.")),
                 )
               : ListView.builder(
                   shrinkWrap: true,
@@ -658,7 +677,7 @@ class _VendorDashboardScreenState extends State<VendorDashboardScreen> {
                       color: Colors.white,
                       child: ListTile(
                         leading: CircleAvatar(
-                          backgroundColor: const Color(0xFFFFA000)Accent[100],
+                          backgroundColor: Colors.amber.shade100,
                           child: Text(score.toStringAsFixed(1),
                               style: const TextStyle(
                                   color: Colors.black87,
@@ -801,7 +820,7 @@ class _VendorDashboardScreenState extends State<VendorDashboardScreen> {
             shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(8),
                 side: const BorderSide(color: Colors.blueGrey)),
-            leading: const Icon(Icons.import_export, color: const Color(0xFF1565C0)),
+            leading: const Icon(Icons.import_export, color: Color(0xFF1565C0)),
             title: const Text("Compile Secure CSV Excel Audit Logs",
                 style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold)),
             subtitle: const Text(
@@ -809,7 +828,7 @@ class _VendorDashboardScreenState extends State<VendorDashboardScreen> {
                 style: TextStyle(fontSize: 11)),
             trailing: IconButton(
               icon:
-                  const Icon(Icons.arrow_circle_down, color: const Color(0xFF1565C0)),
+                  const Icon(Icons.arrow_circle_down, color: Color(0xFF1565C0)),
               onPressed: () {
                 ScaffoldMessenger.of(context).showSnackBar(
                   const SnackBar(
@@ -861,14 +880,16 @@ class _VendorDashboardScreenState extends State<VendorDashboardScreen> {
               onPressed: () async {
                 final success = await provider.verifyAndCompletePickup(
                     order.id!, pinController.text.trim());
-                if (mounted) Navigator.pop(context);
+                if (!context.mounted) return;
+                Navigator.pop(context);
 
                 ScaffoldMessenger.of(context).showSnackBar(
                   SnackBar(
                     content: Text(success
                         ? "Verification Match! Custody transfer complete."
                         : "Invalid PIN code. Access denied."),
-                    backgroundColor: success ? const Color(0xFF2E7D32) : Colors.red,
+                    backgroundColor:
+                        success ? const Color(0xFF2E7D32) : Colors.red,
                   ),
                 );
               },
@@ -991,7 +1012,7 @@ class _VendorDashboardScreenState extends State<VendorDashboardScreen> {
                   style: const TextStyle(
                       fontSize: 11,
                       fontWeight: FontWeight.bold,
-                      color: const Color(0xFF283593)Accent)),
+                      color: Color(0xFF283593))),
             ],
           ),
           const SizedBox(height: 4),

@@ -283,7 +283,6 @@ Route::middleware(['auth:sanctum', \App\Http\Middleware\InactivityTimeout::class
     // Paystack Payment Integration Protected Endpoints
     Route::post('/paystack/initialize', [PaystackPaymentController::class, 'initialize']);
     Route::get('/paystack/verify/{reference}', [PaystackPaymentController::class, 'verify']);
-});
 
 // Automated Inventory & Availability Cron Checker routes
 Route::match(['get', 'post'], '/cron/check-availability', [InventoryCronController::class, 'checkAndNotify']);

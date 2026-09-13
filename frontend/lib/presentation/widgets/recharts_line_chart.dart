@@ -38,7 +38,7 @@ class _RechartsLineChartState extends State<RechartsLineChart> {
     for (var o in widget.orders) {
       final od = DateTime.fromMillisecondsSinceEpoch(o.orderTimestamp);
       final orderDate = DateTime(od.year, od.month, od.day);
-      
+
       for (int i = 0; i < 7; i++) {
         if (orderDate.isAtSameMomentAs(pastDays[i])) {
           dailyVolumes[i] += o.quantity;
@@ -54,14 +54,29 @@ class _RechartsLineChartState extends State<RechartsLineChart> {
       for (int i = 0; i < 7; i++) {
         final seedScalar = (widget.vendorId * (i + 1) + 7) % 11;
         dailyVolumes[i] = 12 + seedScalar * 3 + (i % 2 * 4);
-        dailyRevenues[i] = dailyVolumes[i] * (10.0 + (widget.vendorId % 3 * 2.5));
+        dailyRevenues[i] =
+            dailyVolumes[i] * (10.0 + (widget.vendorId % 3 * 2.5));
       }
     }
 
     // 2. Prepare Hourly Peak Data (8 AM to 8 PM)
     final List<int> hourlyCounts = List.filled(13, 0);
-    final List<String> hoursLabels = ["8 AM", "9 AM", "10 AM", "11 AM", "12 PM", "1 PM", "2 PM", "3 PM", "4 PM", "5 PM", "6 PM", "7 PM", "8 PM"];
-    
+    final List<String> hoursLabels = [
+      "8 AM",
+      "9 AM",
+      "10 AM",
+      "11 AM",
+      "12 PM",
+      "1 PM",
+      "2 PM",
+      "3 PM",
+      "4 PM",
+      "5 PM",
+      "6 PM",
+      "7 PM",
+      "8 PM"
+    ];
+
     for (var o in widget.orders) {
       final od = DateTime.fromMillisecondsSinceEpoch(o.orderTimestamp);
       final hr = od.hour;
@@ -69,7 +84,7 @@ class _RechartsLineChartState extends State<RechartsLineChart> {
         hourlyCounts[hr - 8] += o.quantity;
       }
     }
-    
+
     final totalHourlySum = hourlyCounts.reduce((a, b) => a + b);
     if (totalHourlySum == 0) {
       // Seed nice popular curves: Breakfast rush, Afternoon Lunch Peak, late Snack/Dinner rush
@@ -81,7 +96,8 @@ class _RechartsLineChartState extends State<RechartsLineChart> {
 
     // 3. Choose datasets based on chosen Tab
     final int pointsCount = _selectedTab == 0 ? 7 : 13;
-    final List<int> activeVolumes = _selectedTab == 0 ? dailyVolumes : hourlyCounts;
+    final List<int> activeVolumes =
+        _selectedTab == 0 ? dailyVolumes : hourlyCounts;
     final int maxVal = activeVolumes.reduce(max);
     final int yMax = maxVal > 5 ? ((maxVal / 5).ceil() * 5) : 10;
 
@@ -101,7 +117,9 @@ class _RechartsLineChartState extends State<RechartsLineChart> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        _selectedTab == 0 ? "DAILY REVENUE & VOLUME" : "PEAK ORDER TIMES (HOURLY)",
+                        _selectedTab == 0
+                            ? "DAILY REVENUE & VOLUME"
+                            : "PEAK ORDER TIMES (HOURLY)",
                         style: const TextStyle(
                           fontWeight: FontWeight.bold,
                           fontSize: 13,
@@ -119,17 +137,20 @@ class _RechartsLineChartState extends State<RechartsLineChart> {
                     ],
                   ),
                 ),
-                
+
                 // Mode Toggle Button / Row
                 Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     TextButton(
                       style: TextButton.styleFrom(
-                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 8, vertical: 4),
                         minimumSize: Size.zero,
                         tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                        backgroundColor: _selectedTab == 0 ? Colors.indigo.withOpacity(0.1) : null,
+                        backgroundColor: _selectedTab == 0
+                            ? Colors.indigo.withValues(alpha: 0.1)
+                            : null,
                       ),
                       onPressed: () => setState(() {
                         _selectedTab = 0;
@@ -141,17 +162,21 @@ class _RechartsLineChartState extends State<RechartsLineChart> {
                         style: TextStyle(
                           fontSize: 11,
                           fontWeight: FontWeight.bold,
-                          color: _selectedTab == 0 ? Colors.indigo : Colors.grey,
+                          color:
+                              _selectedTab == 0 ? Colors.indigo : Colors.grey,
                         ),
                       ),
                     ),
                     const SizedBox(width: 4),
                     TextButton(
                       style: TextButton.styleFrom(
-                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 8, vertical: 4),
                         minimumSize: Size.zero,
                         tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                        backgroundColor: _selectedTab == 1 ? Colors.orange.withOpacity(0.1) : null,
+                        backgroundColor: _selectedTab == 1
+                            ? Colors.orange.withValues(alpha: 0.1)
+                            : null,
                       ),
                       onPressed: () => setState(() {
                         _selectedTab = 1;
@@ -163,7 +188,8 @@ class _RechartsLineChartState extends State<RechartsLineChart> {
                         style: TextStyle(
                           fontSize: 11,
                           fontWeight: FontWeight.bold,
-                          color: _selectedTab == 1 ? Colors.orange : Colors.grey,
+                          color:
+                              _selectedTab == 1 ? Colors.orange : Colors.grey,
                         ),
                       ),
                     ),
@@ -172,11 +198,12 @@ class _RechartsLineChartState extends State<RechartsLineChart> {
               ],
             ),
             const Divider(height: 20),
-            
+
             // Interactive Chart Space
             LayoutBuilder(
               builder: (context, constraints) {
-                final double chartWidth = constraints.maxWidth - 40; // reserve space for axis labels
+                final double chartWidth =
+                    constraints.maxWidth - 40; // reserve space for axis labels
                 const double chartHeight = 160.0;
                 const double leftMargin = 32.0;
                 const double rightMargin = 8.0;
@@ -186,13 +213,16 @@ class _RechartsLineChartState extends State<RechartsLineChart> {
                 final plotWidth = chartWidth - leftMargin - rightMargin;
 
                 return GestureDetector(
-                  onPanDown: (details) => _handleTouch(details.localPosition, leftMargin, plotWidth, pointsCount),
-                  onPanUpdate: (details) => _handleTouch(details.localPosition, leftMargin, plotWidth, pointsCount),
+                  onPanDown: (details) => _handleTouch(details.localPosition,
+                      leftMargin, plotWidth, pointsCount),
+                  onPanUpdate: (details) => _handleTouch(details.localPosition,
+                      leftMargin, plotWidth, pointsCount),
                   onPanEnd: (_) => setState(() {
                     _hoveredIndex = null;
                     _hoverOffset = null;
                   }),
-                  onTapDown: (details) => _handleTouch(details.localPosition, leftMargin, plotWidth, pointsCount),
+                  onTapDown: (details) => _handleTouch(details.localPosition,
+                      leftMargin, plotWidth, pointsCount),
                   child: Stack(
                     clipBehavior: Clip.none,
                     children: [
@@ -211,19 +241,27 @@ class _RechartsLineChartState extends State<RechartsLineChart> {
                             rightMargin: rightMargin,
                             topMargin: topMargin,
                             bottomMargin: bottomMargin,
-                            themeColor: _selectedTab == 0 ? Colors.indigo : Colors.orange,
+                            themeColor: _selectedTab == 0
+                                ? Colors.indigo
+                                : Colors.orange,
                             isBar: _selectedTab == 1,
                           ),
                         ),
                       ),
-                      
+
                       // Floating Recharts Tooltip Overlay
-                      if (_hoveredIndex != null && _hoverOffset != null && _hoveredIndex! < pointsCount)
+                      if (_hoveredIndex != null &&
+                          _hoverOffset != null &&
+                          _hoveredIndex! < pointsCount)
                         _buildTooltip(
                           _selectedTab == 0 ? pastDays[_hoveredIndex!] : null,
-                          _selectedTab == 1 ? hoursLabels[_hoveredIndex!] : null,
+                          _selectedTab == 1
+                              ? hoursLabels[_hoveredIndex!]
+                              : null,
                           activeVolumes[_hoveredIndex!],
-                          _selectedTab == 0 ? dailyRevenues[_hoveredIndex!] : 0.0,
+                          _selectedTab == 0
+                              ? dailyRevenues[_hoveredIndex!]
+                              : 0.0,
                           _hoverOffset!,
                           chartHeight,
                           constraints.maxWidth,
@@ -239,12 +277,13 @@ class _RechartsLineChartState extends State<RechartsLineChart> {
     );
   }
 
-  void _handleTouch(Offset localPos, double leftMargin, double plotWidth, int numPoints) {
+  void _handleTouch(
+      Offset localPos, double leftMargin, double plotWidth, int numPoints) {
     if (plotWidth <= 0 || numPoints <= 1) return;
-    
+
     // Convert touch x to plot coordinates, bounded
     final double plotX = (localPos.dx - leftMargin).clamp(0.0, plotWidth);
-    
+
     // Map plotX to point index
     final double step = plotWidth / (numPoints - 1);
     final int index = (plotX / step).round().clamp(0, numPoints - 1);
@@ -264,16 +303,15 @@ class _RechartsLineChartState extends State<RechartsLineChart> {
     double chartHeight,
     double totalWidth,
   ) {
-    final titleStr = date != null 
+    final titleStr = date != null
         ? DateFormat('EEE, d MMM').format(date)
         : "Operational $hourLabel";
-    
+
     // Decide whether to show tooltip on left or right of touched point to prevent clipping
     const double tooltipWidth = 145.0;
     bool showOnLeft = pointXOffset.dx > (totalWidth / 2);
-    double leftPos = showOnLeft 
-        ? pointXOffset.dx - tooltipWidth - 12 
-        : pointXOffset.dx + 12;
+    double leftPos =
+        showOnLeft ? pointXOffset.dx - tooltipWidth - 12 : pointXOffset.dx + 12;
 
     return Positioned(
       left: leftPos,
@@ -282,11 +320,11 @@ class _RechartsLineChartState extends State<RechartsLineChart> {
         width: tooltipWidth,
         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
         decoration: BoxDecoration(
-          color: Colors.grey[900]?.withOpacity(0.95),
+          color: Colors.grey[900]?.withValues(alpha: 0.95),
           borderRadius: BorderRadius.circular(8),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withOpacity(0.2),
+              color: Colors.black.withValues(alpha: 0.2),
               blurRadius: 6,
               offset: const Offset(2, 2),
             )
@@ -308,11 +346,11 @@ class _RechartsLineChartState extends State<RechartsLineChart> {
             Row(
               children: [
                 Container(
-                  width: 6, 
-                  height: 6, 
-                  color: date != null ? Colors.cyanAccent : Colors.orangeAccent, 
-                  margin: const EdgeInsets.only(right: 6)
-                ),
+                    width: 6,
+                    height: 6,
+                    color:
+                        date != null ? Colors.cyanAccent : Colors.orangeAccent,
+                    margin: const EdgeInsets.only(right: 6)),
                 Expanded(
                   child: Text(
                     "Volume: $volume Qty",
@@ -330,7 +368,11 @@ class _RechartsLineChartState extends State<RechartsLineChart> {
               const SizedBox(height: 2),
               Row(
                 children: [
-                  Container(width: 6, height: 6, color: Colors.greenAccent, margin: const EdgeInsets.only(right: 6)),
+                  Container(
+                      width: 6,
+                      height: 6,
+                      color: Colors.greenAccent,
+                      margin: const EdgeInsets.only(right: 6)),
                   Expanded(
                     child: Text(
                       "Sales: GH₵ ${rev.toStringAsFixed(1)}",
@@ -358,7 +400,7 @@ class _RechartsPainter extends CustomPainter {
   final List<String>? hours;
   final int yMax;
   final int? hoveredIndex;
-  
+
   final double leftMargin;
   final double rightMargin;
   final double topMargin;
@@ -406,12 +448,14 @@ class _RechartsPainter extends CustomPainter {
       final int gridVal = (ratio * yMax).round();
 
       // Horizontal grid line
-      canvas.drawLine(Offset(leftMargin, y), Offset(size.width - rightMargin, y), gridPaint);
+      canvas.drawLine(Offset(leftMargin, y),
+          Offset(size.width - rightMargin, y), gridPaint);
 
       // Y Label text inside left margin
       textPainter.text = TextSpan(
         text: "$gridVal",
-        style: TextStyle(fontSize: 9, color: Colors.grey[600], fontWeight: FontWeight.bold),
+        style: TextStyle(
+            fontSize: 9, color: Colors.grey[600], fontWeight: FontWeight.bold),
       );
       textPainter.layout();
       textPainter.paint(
@@ -436,10 +480,13 @@ class _RechartsPainter extends CustomPainter {
       if (text.isNotEmpty) {
         textPainter.text = TextSpan(
           text: text,
-          style: TextStyle(fontSize: 8, color: Colors.grey[600], fontWeight: FontWeight.bold),
+          style: TextStyle(
+              fontSize: 8,
+              color: Colors.grey[600],
+              fontWeight: FontWeight.bold),
         );
         textPainter.layout();
-        
+
         // Paint x labels centered under tickers
         textPainter.paint(
           canvas,
@@ -463,27 +510,30 @@ class _RechartsPainter extends CustomPainter {
       for (int i = 0; i < points.length; i++) {
         final p = points[i];
         final rect = RRect.fromRectAndCorners(
-          Rect.fromLTRB(p.dx - barWidth / 2, p.dy, p.dx + barWidth / 2, topMargin + plotHeight),
+          Rect.fromLTRB(p.dx - barWidth / 2, p.dy, p.dx + barWidth / 2,
+              topMargin + plotHeight),
           topLeft: const Radius.circular(3),
           topRight: const Radius.circular(3),
         );
-        
+
         if (hoveredIndex == i) {
-          canvas.drawRRect(rect, Paint()..color = themeColor.withOpacity(0.95));
+          canvas.drawRRect(
+              rect, Paint()..color = themeColor.withValues(alpha: 0.95));
           // Large border glow
           canvas.drawRRect(
-            RRect.fromRectAndCorners(
-              Rect.fromLTRB(p.dx - barWidth / 2 - 2, p.dy - 2, p.dx + barWidth / 2 + 2, topMargin + plotHeight),
-              topLeft: const Radius.circular(5),
-              topRight: const Radius.circular(5),
-            ),
-            Paint()
-              ..color = themeColor.withOpacity(0.2)
-              ..strokeWidth = 2.0
-              ..style = PaintingStyle.stroke
-          );
+              RRect.fromRectAndCorners(
+                Rect.fromLTRB(p.dx - barWidth / 2 - 2, p.dy - 2,
+                    p.dx + barWidth / 2 + 2, topMargin + plotHeight),
+                topLeft: const Radius.circular(5),
+                topRight: const Radius.circular(5),
+              ),
+              Paint()
+                ..color = themeColor.withValues(alpha: 0.2)
+                ..strokeWidth = 2.0
+                ..style = PaintingStyle.stroke);
         } else {
-          canvas.drawRRect(rect, Paint()..color = themeColor.withOpacity(0.75));
+          canvas.drawRRect(
+              rect, Paint()..color = themeColor.withValues(alpha: 0.75));
         }
       }
     } else {
@@ -500,11 +550,12 @@ class _RechartsPainter extends CustomPainter {
           begin: Alignment.topCenter,
           end: Alignment.bottomCenter,
           colors: [
-            themeColor.withOpacity(0.24),
-            themeColor.withOpacity(0.01),
+            themeColor.withValues(alpha: 0.24),
+            themeColor.withValues(alpha: 0.01),
           ],
-        ).createShader(Rect.fromLTWH(leftMargin, topMargin, plotWidth, plotHeight));
-      
+        ).createShader(
+            Rect.fromLTWH(leftMargin, topMargin, plotWidth, plotHeight));
+
       canvas.drawPath(areaPath, areaPaint);
 
       // 5. Draw the elegant spline curve
@@ -540,22 +591,25 @@ class _RechartsPainter extends CustomPainter {
     }
 
     // 7. If hovered/touched, draw a vertical visual guide line and highlighted elements
-    if (hoveredIndex != null && hoveredIndex! >= 0 && hoveredIndex! < points.length) {
+    if (hoveredIndex != null &&
+        hoveredIndex! >= 0 &&
+        hoveredIndex! < points.length) {
       final hPoint = points[hoveredIndex!];
-      
+
       // Vertical guide line
       final guidePaint = Paint()
         ..color = Colors.grey[300]!
         ..strokeWidth = 1.0
         ..style = PaintingStyle.stroke;
-      
+
       double curY = topMargin;
       const dashH = 5.0;
       const spaceH = 4.0;
       while (curY < topMargin + plotHeight) {
         canvas.drawLine(
           Offset(hPoint.dx, curY),
-          Offset(hPoint.dx, (curY + dashH).clamp(topMargin, topMargin + plotHeight)),
+          Offset(hPoint.dx,
+              (curY + dashH).clamp(topMargin, topMargin + plotHeight)),
           guidePaint,
         );
         curY += dashH + spaceH;
@@ -565,9 +619,9 @@ class _RechartsPainter extends CustomPainter {
         final dotOuterPaint = Paint()..color = Colors.white;
         final dotInnerPaint = Paint()..color = themeColor;
         final glowPaint = Paint()
-          ..color = themeColor.withOpacity(0.3)
+          ..color = themeColor.withValues(alpha: 0.3)
           ..style = PaintingStyle.fill;
-        
+
         canvas.drawCircle(hPoint, 9.0, glowPaint);
         canvas.drawCircle(hPoint, 5.5, dotInnerPaint);
         canvas.drawCircle(hPoint, 3.5, dotOuterPaint);
