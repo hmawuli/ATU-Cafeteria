@@ -11,18 +11,82 @@ use Illuminate\Support\Facades\Cache;
 
 class VendorController extends Controller
 {
+    /**
+     * Fetch the authenticated vendor's cafeteria menu items.
+     */
+    public function getMyFoodItems(Request $request)
+    {
+        $user = $request->user();
 
-        $service = new \App\Services\GeminiPerformanceReportService();
-        $report = $service->generateReport($user->id);
+        if (strtoupper($user->role) !== 'VENDOR' && strtoupper($user->role) !== 'ADMIN') {
+            return response()->json([
+                'success' => false,
+                'message' => 'Unauthorized. This resource requires VENDOR or ADMIN privileges.'
+            ], 403);
+        }
+
+        $foodItems = $user->foodItems;
+
+        return response()->json($foodItems, 200);
+    }
+
+    /**
+     * Fetch the authenticated vendor's order history.
+     */
+    public function getMyOrders(Request $request)
+    {
+        $user = $request->user();
+
+        if (strtoupper($user->role) !== 'VENDOR' && strtoupper($user->role) !== 'ADMIN') {
+            return response()->json([
+                'success' => false,
+                'message' => 'Unauthorized. This resource requires VENDOR or ADMIN privileges.'
+            ], 403);
+        }
+
+        $orders = $user->vendorOrders()->orderBy('order_timestamp', 'desc')->get();
+
+        return response()->json($orders, 200);
+    }
+
+    /**
+     * Fetch authenticated vendor's performance report (aggregate completion times, ratings, order volumes).
+     */
+    public function getMyAnalytics(Request $request)
+    {
+        $user = $request->user();
+
+        if (strtoupper($user->role) !== 'VENDOR' && strtoupper($user->role) !== 'ADMIN') {
+            return response()->json([
+                'success' => false,
+                'message' => 'Unauthorized. This resource requires VENDOR or ADMIN privileges.'
+            ], 403);
+        }
+
+        $service = new PerformanceAnalyticsService();
+        $report = $service->getVendorReport($user->id);
 
         return response()->json($report, 200);
     }
 
-        $service = new \App\Services\GeminiOrderInsightService();
-        $insights = $service->analyzeHistoricalOrders($user->id);
+    /**
+     * Fetch competitive vendor rankings and comparison report.
+     */
+    public function getComparativeAnalytics(Request $request)
+    {
+        $service = new PerformanceAnalyticsService();
+        $report = $service->getComparativeVendorsReport();
 
-        return response()->json($insights, 200);
+        return response()->json($report, 200);
     }
+
+    
+
+    
+
+    
+
+    
 
     /**
      * Toggle or explicitly set the authenticated vendor's open status (is_open).
