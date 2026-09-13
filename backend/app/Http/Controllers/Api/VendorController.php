@@ -11,88 +11,6 @@ use Illuminate\Support\Facades\Cache;
 
 class VendorController extends Controller
 {
-    /**
-     * Fetch the authenticated vendor's cafeteria menu items.
-     */
-    public function getMyFoodItems(Request $request)
-    {
-        $user = $request->user();
-
-        if (strtoupper($user->role) !== 'VENDOR' && strtoupper($user->role) !== 'ADMIN') {
-            return response()->json([
-                'success' => false,
-                'message' => 'Unauthorized. This resource requires VENDOR or ADMIN privileges.'
-            ], 403);
-        }
-
-        $foodItems = $user->foodItems;
-
-        return response()->json($foodItems, 200);
-    }
-
-    /**
-     * Fetch the authenticated vendor's order history.
-     */
-    public function getMyOrders(Request $request)
-    {
-        $user = $request->user();
-
-        if (strtoupper($user->role) !== 'VENDOR' && strtoupper($user->role) !== 'ADMIN') {
-            return response()->json([
-                'success' => false,
-                'message' => 'Unauthorized. This resource requires VENDOR or ADMIN privileges.'
-            ], 403);
-        }
-
-        $orders = $user->vendorOrders()->orderBy('order_timestamp', 'desc')->get();
-
-        return response()->json($orders, 200);
-    }
-
-    /**
-     * Fetch authenticated vendor's performance report (aggregate completion times, ratings, order volumes).
-     */
-    public function getMyAnalytics(Request $request)
-    {
-        $user = $request->user();
-
-        if (strtoupper($user->role) !== 'VENDOR' && strtoupper($user->role) !== 'ADMIN') {
-            return response()->json([
-                'success' => false,
-                'message' => 'Unauthorized. This resource requires VENDOR or ADMIN privileges.'
-            ], 403);
-        }
-
-        $service = new PerformanceAnalyticsService();
-        $report = $service->getVendorReport($user->id);
-
-        return response()->json($report, 200);
-    }
-
-    /**
-     * Fetch competitive vendor rankings and comparison report.
-     */
-    public function getComparativeAnalytics(Request $request)
-    {
-        $service = new PerformanceAnalyticsService();
-        $report = $service->getComparativeVendorsReport();
-
-        return response()->json($report, 200);
-    }
-
-    /**
-     * Generate an AI-powered Gemini performance report for the logged-in vendor.
-     */
-    public function getMyGeminiReport(Request $request)
-    {
-        $user = $request->user();
-
-        if (strtoupper($user->role) !== 'VENDOR' && strtoupper($user->role) !== 'ADMIN') {
-            return response()->json([
-                'success' => false,
-                'message' => 'Unauthorized. This resource requires VENDOR or ADMIN privileges.'
-            ], 403);
-        }
 
         $service = new \App\Services\GeminiPerformanceReportService();
         $report = $service->generateReport($user->id);
@@ -100,44 +18,8 @@ class VendorController extends Controller
         return response()->json($report, 200);
     }
 
-    /**
-     * Generate an AI-powered Gemini performance report for any specific vendor (e.g. for ADMIN overview).
-     */
-    public function getVendorGeminiReport(Request $request, $vendorId)
-    {
-        $service = new \App\Services\GeminiPerformanceReportService();
-        $report = $service->generateReport(intval($vendorId));
-
-        return response()->json($report, 200);
-    }
-
-    /**
-     * Generate detailed Gemini AI Insights about popular food items and peak ordering times from historical logs.
-     */
-    public function getMyGeminiOrderInsights(Request $request)
-    {
-        $user = $request->user();
-
-        if (strtoupper($user->role) !== 'VENDOR' && strtoupper($user->role) !== 'ADMIN') {
-            return response()->json([
-                'success' => false,
-                'message' => 'Unauthorized. This resource requires VENDOR or ADMIN privileges.'
-            ], 403);
-        }
-
         $service = new \App\Services\GeminiOrderInsightService();
         $insights = $service->analyzeHistoricalOrders($user->id);
-
-        return response()->json($insights, 200);
-    }
-
-    /**
-     * Generate detailed Gemini AI Insights about popular food items and peak ordering times for any specific vendor (ADMIN overview).
-     */
-    public function getVendorGeminiOrderInsights(Request $request, $vendorId)
-    {
-        $service = new \App\Services\GeminiOrderInsightService();
-        $insights = $service->analyzeHistoricalOrders(intval($vendorId));
 
         return response()->json($insights, 200);
     }
