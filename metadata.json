@@ -1,6 +1,5 @@
 {
   "name": "ATU Cafeteria",
   "description": "Secure mobile-based food ordering and vendor performance management system using ATU smart analytics for Accra Technical University.",
-  "requestFramePermissions": [],
-  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+  "requestFramePermissions": []
 }
