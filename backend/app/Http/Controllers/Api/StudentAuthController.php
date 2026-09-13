@@ -18,54 +18,53 @@ class StudentAuthController extends Controller
     public function register(Request $request)
     {
         $validator = Validator::make($request->all(), [
+            'fullName' => 'required|string|min:2|max:255',
+            'username' => 'required|string|min:3|max:100|alpha_dash',
             'email' => 'required|email|max:255',
-            'password' => 'required|string|min:8|max:128',
-            'fullName' => 'required|string|max:255',
+            'pin' => 'required|digits_between:4,6',
+            'pin_confirmation' => 'required|same:pin',
+            'info' => 'nullable|string|max:500',
         ]);
 
         if ($validator->fails()) {
             return response()->json([
                 'success' => false,
-                'message' => 'Please provide a valid email address, password, and full name.',
-                'errors' => $validator->errors()
-            ], 400);
+                'message' => 'Please correct the highlighted registration details.',
+                'errors' => $validator->errors(),
+            ], 422);
         }
 
-        // Email is the account identity; Student ID is not required.
-        $email = strtolower(trim($request->input('email')));
-        $existing = User::where('username', $email)
-            ->orWhereRaw("JSON_UNQUOTE(JSON_EXTRACT(profile_info, '$.email')) = ?", [$email])
-            ->first();
-        if ($existing) {
-            return response()->json([
-                'success' => false,
-                'message' => 'An account with this email address already exists.'
-            ], 400);
+        $username = trim((string) $request->input('username'));
+        $email = strtolower(trim((string) $request->input('email')));
+
+        if (User::whereRaw('LOWER(username) = ?', [strtolower($username)])->exists()) {
+            return response()->json(['success' => false, 'message' => 'That username is already in use.'], 409);
         }
 
-        // Create the student user inside a transaction
-        $user = DB::transaction(function () use ($request) {
+        if (User::whereRaw("JSON_UNQUOTE(JSON_EXTRACT(profile_info, '$.email')) = ?", [$email])->exists()) {
+            return response()->json(['success' => false, 'message' => 'An account with that email already exists.'], 409);
+        }
+
+        $user = DB::transaction(function () use ($request, $username, $email) {
             $createdUser = User::create([
-                'username' => strtolower(trim($request->input('email'))),
-                'password' => Hash::make($request->input('password')),
+                'username' => $username,
+                'password' => Hash::make((string) $request->input('pin')),
                 'role' => 'STUDENT',
-                'fullName' => $request->input('fullName'),
-                'info' => '',
-                'profile_info' => array_filter(['email' => $request->input('email')], fn ($value) => filled($value)),
+                'fullName' => trim((string) $request->input('fullName')),
+                'info' => trim((string) $request->input('info', '')),
+                'profile_info' => ['email' => $email],
             ]);
 
-            // Register Audit Log
             AuditLog::create([
                 'user_id' => $createdUser->id,
                 'timestamp' => time() * 1000,
                 'action' => 'STUDENT_REGISTRATION',
-                'details' => "Registered student {$createdUser->fullName} via Student API.",
+                'details' => "Registered student {$createdUser->fullName}.",
             ]);
 
             return $createdUser;
         });
 
-        // Generate Laravel Sanctum token
         $token = $user->createToken('student_token', ['student'])->plainTextToken;
         $response = $user->toArray();
         $response['token'] = $token;
@@ -73,7 +72,7 @@ class StudentAuthController extends Controller
         return response()->json([
             'success' => true,
             'message' => 'Student registered successfully.',
-            'user' => $response
+            'user' => $response,
         ], 201)->header('X-Auth-Token', $token);
     }
 
