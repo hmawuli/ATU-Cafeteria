@@ -361,27 +361,25 @@ class CafeteriaProvider extends ChangeNotifier {
     _authToken = token;
     try {
       final url = Uri.parse('$_laravelBaseUrl/api/me');
-      final client = HttpClient()
-        ..connectionTimeout = const Duration(seconds: 4);
-      try {
-        final request = await client.getUrl(url);
-        request.headers
-          ..set(HttpHeaders.acceptHeader, 'application/json')
-          ..set(HttpHeaders.authorizationHeader, 'Bearer $token');
-        final response = await request.close();
-        final body = await response.transform(utf8.decoder).join();
-        if (response.statusCode != 200) {
-          _authToken = null;
-          await SecureSessionStore.clear();
-          return;
-        }
-        final decoded = jsonDecode(body) as Map<String, dynamic>;
-        _currentUser =
-            User.fromJson(Map<String, dynamic>.from(decoded['user'] ?? {}));
-      } finally {
-        client.close(force: true);
+      final response = await http.get(
+        url,
+        headers: {
+          'Accept': 'application/json',
+          'Authorization': 'Bearer $token',
+        },
+      ).timeout(const Duration(seconds: 10));
+
+      if (response.statusCode != 200) {
+        _authToken = null;
+        await SecureSessionStore.clear();
+        return;
       }
-    } catch (_) {
+
+      final decoded = jsonDecode(response.body) as Map<String, dynamic>;
+      _currentUser =
+          User.fromJson(Map<String, dynamic>.from(decoded['user'] ?? {}));
+    } catch (e) {
+      debugPrint('Session restore failed: $e');
       _authToken = null;
       await SecureSessionStore.clear();
     }
@@ -504,42 +502,49 @@ class CafeteriaProvider extends ChangeNotifier {
     notifyListeners();
     try {
       final url = Uri.parse('$_laravelBaseUrl/api/login/2fa');
-      final client = HttpClient()
-        ..connectionTimeout = const Duration(seconds: 5);
-      try {
-        final req = await client.postUrl(url);
-        req.headers
-          ..set(HttpHeaders.contentTypeHeader, 'application/json')
-          ..set(HttpHeaders.acceptHeader, 'application/json');
-        req.add(utf8.encode(
-            jsonEncode({'username': username.trim(), 'code': code.trim()})));
-        final res = await req.close();
-        final body = await res.transform(utf8.decoder).join();
-        final decoded = body.isNotEmpty
-            ? jsonDecode(body) as Map<String, dynamic>
-            : <String, dynamic>{};
-        if (res.statusCode == 200) {
-          final payload = decoded['user'] is Map
-              ? Map<String, dynamic>.from(decoded['user'])
-              : decoded;
-          _currentUser = User.fromJson(payload);
-          _authToken =
-              decoded['token']?.toString() ?? res.headers.value('x-auth-token');
-          _requiresTwoFactor = false;
-          if (_authToken != null && _authToken!.isNotEmpty) {
-            await SecureSessionStore.save(
-                token: _authToken!, username: username.trim());
-          }
-          _isLoading = false;
-          notifyListeners();
-          await refreshAllData();
-          return true;
+      final res = await http
+          .post(
+            url,
+            headers: const {
+              'Content-Type': 'application/json',
+              'Accept': 'application/json',
+            },
+            body: jsonEncode({
+              'username': username.trim(),
+              'code': code.trim(),
+            }),
+          )
+          .timeout(const Duration(seconds: 10));
+
+      final decoded = res.body.isNotEmpty
+          ? Map<String, dynamic>.from(jsonDecode(res.body) as Map)
+          : <String, dynamic>{};
+
+      if (res.statusCode == 200) {
+        final payload = decoded['user'] is Map
+            ? Map<String, dynamic>.from(decoded['user'])
+            : decoded;
+        _currentUser = User.fromJson(payload);
+        _authToken =
+            decoded['token']?.toString() ?? res.headers['x-auth-token'];
+        _requiresTwoFactor = false;
+        if (_authToken != null && _authToken!.isNotEmpty) {
+          await SecureSessionStore.save(
+              token: _authToken!, username: username.trim());
         }
-        _loginError = decoded['message']?.toString() ?? 'Verification failed.';
-      } finally {
-        client.close(force: true);
+        _isLoading = false;
+        notifyListeners();
+        try {
+          await refreshAllData();
+        } catch (e) {
+          debugPrint('Post-2FA data refresh skipped: $e');
+        }
+        return true;
       }
-    } catch (_) {
+
+      _loginError = decoded['message']?.toString() ?? 'Verification failed.';
+    } catch (e) {
+      debugPrint('2FA request failed: $e');
       _loginError = 'Unable to verify the code. Please try again.';
     }
     _isLoading = false;
@@ -586,28 +591,54 @@ class CafeteriaProvider extends ChangeNotifier {
   Future<dynamic> _authRequest(
       String method, String path, Map<String, dynamic> body) async {
     final url = Uri.parse('$_laravelBaseUrl/api/$path');
-    final client = HttpClient()..connectionTimeout = const Duration(seconds: 5);
-    try {
-      final req = await client.openUrl(method, url);
-      req.headers
-        ..set(HttpHeaders.contentTypeHeader, 'application/json')
-        ..set(HttpHeaders.acceptHeader, 'application/json');
-      if (_authToken != null) {
-        req.headers.set(HttpHeaders.authorizationHeader, 'Bearer $_authToken');
-      }
-      req.add(utf8.encode(jsonEncode(body)));
-      final res = await req.close();
-      final text = await res.transform(utf8.decoder).join();
-      final decoded = text.isNotEmpty ? jsonDecode(text) : {};
-      if (res.statusCode < 200 || res.statusCode >= 300) {
-        final msg =
-            decoded is Map ? decoded['message']?.toString() : 'Request failed.';
-        throw Exception(msg ?? 'Request failed.');
-      }
-      return decoded;
-    } finally {
-      client.close(force: true);
+    final headers = <String, String>{
+      'Content-Type': 'application/json',
+      'Accept': 'application/json',
+    };
+    if (_authToken != null && _authToken!.isNotEmpty) {
+      headers['Authorization'] = 'Bearer $_authToken';
     }
+
+    final encodedBody = jsonEncode(body);
+    late http.Response response;
+    switch (method.toUpperCase()) {
+      case 'GET':
+        response = await http.get(url, headers: headers).timeout(
+              const Duration(seconds: 10),
+            );
+        break;
+      case 'POST':
+        response = await http.post(url, headers: headers, body: encodedBody).timeout(
+              const Duration(seconds: 10),
+            );
+        break;
+      case 'PUT':
+        response = await http.put(url, headers: headers, body: encodedBody).timeout(
+              const Duration(seconds: 10),
+            );
+        break;
+      case 'PATCH':
+        response = await http.patch(url, headers: headers, body: encodedBody).timeout(
+              const Duration(seconds: 10),
+            );
+        break;
+      case 'DELETE':
+        response = await http.delete(url, headers: headers, body: encodedBody).timeout(
+              const Duration(seconds: 10),
+            );
+        break;
+      default:
+        throw ArgumentError('Unsupported HTTP method: $method');
+    }
+
+    final decoded = response.body.isNotEmpty ? jsonDecode(response.body) : {};
+    if (response.statusCode < 200 || response.statusCode >= 300) {
+      final msg = decoded is Map
+          ? decoded['message']?.toString()
+          : 'Request failed.';
+      throw Exception(msg ?? 'Request failed.');
+    }
+    return decoded;
   }
 
   Future<bool> registerUser({
@@ -641,7 +672,13 @@ class CafeteriaProvider extends ChangeNotifier {
       return false;
     }
 
-    // Production path: create the account centrally in Laravel first.
+    if (normalizedRole != 'STUDENT') {
+      _loginError = 'Only student registration is supported here.';
+      _isLoading = false;
+      notifyListeners();
+      return false;
+    }
+
     try {
       final registerUrl = Uri.parse('$_laravelBaseUrl/api/student/register');
       final response = await http
@@ -661,79 +698,38 @@ class CafeteriaProvider extends ChangeNotifier {
             }),
           )
           .timeout(const Duration(seconds: 10));
-      try {
-        Map<String, dynamic> decoded = {};
-        if (response.body.isNotEmpty) {
-          final value = jsonDecode(response.body);
-          if (value is Map) {
-            decoded = Map<String, dynamic>.from(value);
-          }
-        }
 
-        if (response.statusCode == 201 || response.statusCode == 200) {
-          final payload = decoded['user'] is Map
-              ? Map<String, dynamic>.from(decoded['user'] as Map)
-              : decoded;
-          final remoteUser = User.fromJson(payload).copyWith(
-            passwordHash: _localCacheCredentialHash(pinCode),
-          );
-          if (remoteUser.id != null) {
-            await _db.insertUser(remoteUser);
-          }
-          _registrationSuccess = true;
-          _isLoading = false;
-          notifyListeners();
-          return true;
-        }
-        if (response.statusCode == 400 || response.statusCode == 422) {
-          _loginError = decoded['message']?.toString() ??
-              'Registration details are not valid.';
-          _isLoading = false;
-          notifyListeners();
-          return false;
-        }
-    } on SocketException catch (_) {
-      debugPrint('Laravel unavailable; using local registration fallback.');
-    } on TimeoutException catch (_) {
-      debugPrint('Laravel registration timed out; using local fallback.');
-    } catch (e) {
-      debugPrint('Remote registration unavailable; using local fallback: $e');
-    }
+      final decoded = response.body.isNotEmpty
+          ? Map<String, dynamic>.from(jsonDecode(response.body) as Map)
+          : <String, dynamic>{};
 
-    // Offline development fallback.
-    try {
-      final existing = await _db.getUserByUsername(normalizedUsername);
-      if (existing != null) {
-        _loginError = 'Username already exists.';
+      if (response.statusCode == 201 || response.statusCode == 200) {
+        final payload = decoded['user'] is Map
+            ? Map<String, dynamic>.from(decoded['user'] as Map)
+            : decoded;
+        final remoteUser = User.fromJson(payload).copyWith(
+          passwordHash: _localCacheCredentialHash(pinCode),
+        );
+        if (remoteUser.id != null) {
+          await _db.insertUser(remoteUser);
+        }
+        _registrationSuccess = true;
         _isLoading = false;
         notifyListeners();
-        return false;
+        return true;
       }
 
-      final newUser = User(
-        username: normalizedUsername,
-        passwordHash: _localCacheCredentialHash(pinCode),
-        role: normalizedRole,
-        fullName: normalizedName,
-        info: normalizedInfo,
-      );
-      final newUserId = await _db.insertUser(newUser);
-      await _db.insertAuditLog(AuditLog(
-        userId: newUserId,
-        action: 'USER_REGISTRATION',
-        details: 'New user registered with role: $normalizedRole.',
-        timestamp: DateTime.now().millisecondsSinceEpoch,
-      ));
-      _registrationSuccess = true;
-      await refreshAllData();
+      _loginError = decoded['message']?.toString() ??
+          'Registration details are not valid.';
     } catch (e) {
-      _loginError = 'Registration failed. Please try again.';
-      debugPrint('Local registration failed: $e');
+      debugPrint('Student registration request failed: $e');
+      _loginError =
+          'Unable to create your account. Please check the server connection.';
     }
 
     _isLoading = false;
     notifyListeners();
-    return _registrationSuccess;
+    return false;
   }
 
   Future<bool> requestEmailVerification() async {
