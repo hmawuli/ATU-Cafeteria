@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:provider/provider.dart';
-import 'package:atu_cafeteria/presentation/providers/cafeteria_provider.dart';
+import '../../core/network/api_client.dart';
 
 class RegisterScreen extends StatefulWidget {
   const RegisterScreen({super.key});
@@ -11,273 +10,121 @@ class RegisterScreen extends StatefulWidget {
 
 class _RegisterScreenState extends State<RegisterScreen> {
   final _formKey = GlobalKey<FormState>();
-  final _emailController = TextEditingController();
-  final _passwordController = TextEditingController();
-  final _fullNameController = TextEditingController();
-  final _infoController = TextEditingController();
-  bool _obscurePassword = true;
+  final _name = TextEditingController();
+  final _email = TextEditingController();
+  final _password = TextEditingController();
+  final _confirm = TextEditingController();
+  final _programme = TextEditingController();
+  final _api = ApiClient();
+  bool _busy = false;
+  bool _obscure = true;
 
   @override
   void dispose() {
-    _emailController.dispose();
-    _passwordController.dispose();
-    _fullNameController.dispose();
-    _infoController.dispose();
+    _name.dispose();
+    _email.dispose();
+    _password.dispose();
+    _confirm.dispose();
+    _programme.dispose();
+    _api.close();
     super.dispose();
   }
 
-  Future<void> _submit() async {
+  Future<void> _register() async {
     if (!_formKey.currentState!.validate()) return;
-
-    final provider = context.read<CafeteriaProvider>();
-    final success = await provider.registerUser(
-      email: _emailController.text.trim(),
-      password: _passwordController.text,
-      role: 'STUDENT',
-      fullName: _fullNameController.text.trim(),
-      info: _infoController.text.trim(),
-    );
-
-    if (!mounted) return;
-    if (success) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Account created successfully. You can now sign in.')),
+    setState(() => _busy = true);
+    try {
+      await _api.post('/student/register', body: {
+        'fullName': _name.text.trim(),
+        'email': _email.text.trim().toLowerCase(),
+        'password': _password.text,
+        'info': _programme.text.trim(),
+      });
+      if (!mounted) return;
+      await showDialog<void>(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          icon: const Icon(Icons.check_circle_outline, size: 48),
+          title: const Text('Account created'),
+          content: const Text('Your student account has been created successfully. You can now sign in.'),
+          actions: [FilledButton(onPressed: () => Navigator.pop(ctx), child: const Text('Continue'))],
+        ),
       );
-      Navigator.pushReplacementNamed(context, '/login');
-    } else {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(provider.loginError ?? 'Registration failed.')),
+      if (mounted) Navigator.pushReplacementNamed(context, '/login');
+    } on ApiException catch (e) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.message)));
+    } catch (_) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Unable to create your account. Check your connection and try again.')),
       );
+    } finally {
+      if (mounted) setState(() => _busy = false);
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    final provider = context.watch<CafeteriaProvider>();
-
+    final scheme = Theme.of(context).colorScheme;
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Create Account'),
-        backgroundColor: const Color(0xFF0B1F3A),
-        foregroundColor: Colors.white,
-      ),
+      appBar: AppBar(title: const Text('Create Student Account')),
       body: Container(
-        decoration: const BoxDecoration(
+        decoration: BoxDecoration(
           gradient: LinearGradient(
             begin: Alignment.topCenter,
             end: Alignment.bottomCenter,
-            colors: [Color(0xFFF4F7FB), Color(0xFFE9EEF5)],
+            colors: [scheme.primary.withOpacity(.06), scheme.surface, scheme.secondary.withOpacity(.05)],
           ),
         ),
         child: Center(
           child: SingleChildScrollView(
-          padding: const EdgeInsets.all(24),
-          child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 520),
-            child: Card(
-              elevation: 10,
-              shadowColor: const Color(0x330B1F3A),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(24),
-              ),
-              child: Padding(
-                padding: const EdgeInsets.all(28),
-                child: Form(
-                  key: _formKey,
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      Container(
-                        width: 74,
-                        height: 74,
-                        decoration: BoxDecoration(
-                          gradient: const LinearGradient(
-                            colors: [Color(0xFFE8751A), Color(0xFFFFB347)],
-                          ),
-                          borderRadius: BorderRadius.circular(20),
-                        ),
-                        child: const Icon(
-                          Icons.restaurant_rounded,
-                          size: 40,
-                          color: Colors.white,
-                        ),
-                      ),
+            padding: const EdgeInsets.all(24),
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 520),
+              child: Card(
+                child: Padding(
+                  padding: const EdgeInsets.all(28),
+                  child: Form(
+                    key: _formKey,
+                    child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+                      Icon(Icons.restaurant_rounded, size: 52, color: scheme.secondary),
                       const SizedBox(height: 12),
-                      const Text(
-                        'ATU Cafeteria',
-                        textAlign: TextAlign.center,
-                        style: TextStyle(fontSize: 26, fontWeight: FontWeight.w800, letterSpacing: 1.0),
-                      ),
+                      Text('Welcome to ATU Cafeteria', textAlign: TextAlign.center,
+                        style: Theme.of(context).textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.w900)),
                       const SizedBox(height: 6),
-                      const Text(
-                        'Create your secure student account. Vendor accounts are created by an administrator.',
-                        textAlign: TextAlign.center,
-                      ),
-                      const SizedBox(height: 28),
-                      TextFormField(
-                        controller: _fullNameController,
-                        textInputAction: TextInputAction.next,
-                        decoration: const InputDecoration(
-                          labelText: 'Full name',
-                          prefixIcon: Icon(Icons.person_outline),
-                          border: OutlineInputBorder(),
-                        ),
-                        validator: (value) =>
-                            value == null || value.trim().isEmpty ? 'Enter your full name.' : null,
-                      ),
-                      const SizedBox(height: 16),
-                      TextFormField(
-                        controller: _emailController,
-                        keyboardType: TextInputType.emailAddress,
-                        textInputAction: TextInputAction.next,
-                        decoration: const InputDecoration(
-                          labelText: 'Email address',
-                          prefixIcon: Icon(Icons.email_outlined),
-                          border: OutlineInputBorder(),
-                        ),
-                        validator: (value) {
-                          final email = value?.trim() ?? '';
-                          if (email.isEmpty) return 'Enter your email address.';
-                          if (!RegExp(r'^[^@\s]+@[^@\s]+\.[^@\s]+$').hasMatch(email)) {
-                            return 'Enter a valid email address.';
-                          }
-                          return null;
-                        },
-                      },
-                      const SizedBox(height: 16),
-                      TextFormField(
-                        controller: _passwordController,
-                        obscureText: _obscurePassword,
-                        textInputAction: TextInputAction.next,
-                        decoration: InputDecoration(
-                          labelText: 'Password',
-                          helperText: 'Use at least 8 characters.',
-                          prefixIcon: const Icon(Icons.lock_outline),
-                          suffixIcon: IconButton(
-                            tooltip: _obscurePassword ? 'Show password' : 'Hide password',
-                            icon: Icon(_obscurePassword ? Icons.visibility : Icons.visibility_off),
-                            onPressed: () => setState(() => _obscurePassword = !_obscurePassword),
-                          ),
-                          border: const OutlineInputBorder(),
-                        ),
-                        validator: (value) =>
-                            value == null || value.length < 8 ? 'Use at least 8 characters.' : null,
-                      ),
-                      const SizedBox(height: 16),
-                      TextFormField(
-                        controller: _infoController,
-                        maxLines: 2,
-                        decoration: InputDecoration(
-                          labelText: 'Department / Programme (optional)',
-                          prefixIcon: const Icon(Icons.info_outline),
-                          border: const OutlineInputBorder(),
-                        ),
-                      ),
+                      const Text('Create a student account to browse meals and place orders.', textAlign: TextAlign.center),
+                      const SizedBox(height: 26),
+                      TextFormField(controller: _name, textInputAction: TextInputAction.next,
+                        decoration: const InputDecoration(labelText: 'Full name', prefixIcon: Icon(Icons.person_outline)),
+                        validator: (v) => v == null || v.trim().length < 2 ? 'Enter your full name.' : null),
+                      const SizedBox(height: 14),
+                      TextFormField(controller: _email, keyboardType: TextInputType.emailAddress, textInputAction: TextInputAction.next,
+                        decoration: const InputDecoration(labelText: 'Email address', prefixIcon: Icon(Icons.email_outlined)),
+                        validator: (v) {
+                          final value = v?.trim() ?? '';
+                          return RegExp(r'^[^@\\s]+@[^@\\s]+\\.[^@\\s]+$').hasMatch(value) ? null : 'Enter a valid email address.';
+                        }),
+                      const SizedBox(height: 14),
+                      TextFormField(controller: _password, obscureText: _obscure, textInputAction: TextInputAction.next,
+                        decoration: InputDecoration(labelText: 'Password', helperText: 'At least 8 characters.', prefixIcon: const Icon(Icons.lock_outline),
+                          suffixIcon: IconButton(onPressed: () => setState(() => _obscure = !_obscure), icon: Icon(_obscure ? Icons.visibility : Icons.visibility_off))),
+                        validator: (v) => v == null || v.length < 8 ? 'Use at least 8 characters.' : null),
+                      const SizedBox(height: 14),
+                      TextFormField(controller: _confirm, obscureText: true, textInputAction: TextInputAction.next,
+                        decoration: const InputDecoration(labelText: 'Confirm password', prefixIcon: Icon(Icons.lock_reset_outlined)),
+                        validator: (v) => v != _password.text ? 'Passwords do not match.' : null),
+                      const SizedBox(height: 14),
+                      TextFormField(controller: _programme, maxLines: 2,
+                        decoration: const InputDecoration(labelText: 'Department / Programme (optional)', prefixIcon: Icon(Icons.school_outlined))),
                       const SizedBox(height: 24),
-                      SizedBox(
-                        height: 50,
-                        child: ElevatedButton(
-                          onPressed: provider.isLoading ? null : _submit,
-                          child: provider.isLoading
-                              ? const SizedBox(
-                                  width: 22,
-                                  height: 22,
-                                  child: CircularProgressIndicator(strokeWidth: 2),
-                                )
-                              : const Text('Create account'),
-                        ),
-                      ),
+                      SizedBox(height: 52, child: FilledButton.icon(
+                        onPressed: _busy ? null : _register,
+                        icon: _busy ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2)) : const Icon(Icons.person_add_alt_1),
+                        label: Text(_busy ? 'Creating account…' : 'Create account'),
+                      )),
                       const SizedBox(height: 8),
-                      TextButton(
-                        onPressed: provider.isLoading
-                            ? null
-                            : () => Navigator.pushReplacementNamed(context, '/login'),
-                        child: const Text('Already have an account? Sign in'),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-}
-).hasMatch(email)) {
-                            return 'Enter a valid email address.';
-                          }
-                          return null;
-                        },
-                      ),
-                      const SizedBox(height: 16),
-                      TextFormField(
-                        controller: _passwordController,
-                        obscureText: _obscurePassword,
-                        textInputAction: TextInputAction.next,
-                        decoration: InputDecoration(
-                          labelText: 'Password',
-                          helperText: 'Use at least 8 characters.',
-                          prefixIcon: const Icon(Icons.lock_outline),
-                          suffixIcon: IconButton(
-                            tooltip: _obscurePassword ? 'Show password' : 'Hide password',
-                            icon: Icon(_obscurePassword ? Icons.visibility : Icons.visibility_off),
-                            onPressed: () => setState(() => _obscurePassword = !_obscurePassword),
-                          ),
-                          border: const OutlineInputBorder(),
-                        ),
-                        validator: (value) =>
-                            value == null || value.length < 8 ? 'Use at least 8 characters.' : null,
-                      ),
-                      const SizedBox(height: 16),
-                      DropdownButtonFormField<String>(
-                        value: _role,
-                        decoration: const InputDecoration(
-                          labelText: 'Account type',
-                          prefixIcon: Icon(Icons.badge_outlined),
-                          border: OutlineInputBorder(),
-                        ),
-                        items: const [
-                          DropdownMenuItem(value: 'STUDENT', child: Text('Student')),
-                          DropdownMenuItem(value: 'VENDOR', child: Text('Vendor')),
-                        ],
-                        onChanged: (value) => setState(() => _role = value ?? 'STUDENT'),
-                      ),
-                      const SizedBox(height: 16),
-                      TextFormField(
-                        controller: _infoController,
-                        maxLines: 2,
-                        decoration: InputDecoration(
-                          labelText: _role == 'STUDENT'
-                              ? 'Department / Programme (optional)'
-                              : 'Food booth / business name',
-                          prefixIcon: const Icon(Icons.info_outline),
-                          border: const OutlineInputBorder(),
-                        ),
-                      ),
-                      const SizedBox(height: 24),
-                      SizedBox(
-                        height: 50,
-                        child: ElevatedButton(
-                          onPressed: provider.isLoading ? null : _submit,
-                          child: provider.isLoading
-                              ? const SizedBox(
-                                  width: 22,
-                                  height: 22,
-                                  child: CircularProgressIndicator(strokeWidth: 2),
-                                )
-                              : const Text('Create account'),
-                        ),
-                      ),
-                      const SizedBox(height: 8),
-                      TextButton(
-                        onPressed: provider.isLoading
-                            ? null
-                            : () => Navigator.pushReplacementNamed(context, '/login'),
-                        child: const Text('Already have an account? Sign in'),
-                      ),
-                    ],
+                      TextButton(onPressed: _busy ? null : () => Navigator.pushReplacementNamed(context, '/login'),
+                        child: const Text('Already have an account? Sign in')),
+                    ]),
                   ),
                 ),
               ),
