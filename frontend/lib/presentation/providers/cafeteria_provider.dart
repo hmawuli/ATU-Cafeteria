@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'dart:io';
 import 'dart:async';
 import 'package:flutter/foundation.dart';
+import 'package:http/http.dart' as http;
 import 'package:atu_cafeteria/domain/models/models.dart';
 import 'package:atu_cafeteria/data/local/db_helper.dart';
 import 'package:atu_cafeteria/core/config/app_config.dart';
@@ -401,94 +402,97 @@ class CafeteriaProvider extends ChangeNotifier {
       return false;
     }
 
-    // Production path: authenticate against Laravel first.
+    // Use package:http so authentication works on Web, Linux, Android and iOS.
     try {
-      final loginUrl = Uri.parse('$_laravelBaseUrl/api/login');
-      final client = HttpClient()
-        ..connectionTimeout = const Duration(seconds: 4);
-      try {
-        final request = await client.postUrl(loginUrl);
-        request.headers
-          ..set(HttpHeaders.contentTypeHeader, 'application/json')
-          ..set(HttpHeaders.acceptHeader, 'application/json');
-        request.add(utf8.encode(json.encode({
-          'username': normalizedUsername,
-          'pin': pinCode,
-        })));
+      final loginUrl = Uri.parse('$_laravelBaseUrl/api/student/login');
+      final response = await http
+          .post(
+            loginUrl,
+            headers: const {
+              'Content-Type': 'application/json',
+              'Accept': 'application/json',
+            },
+            body: jsonEncode({
+              'username': normalizedUsername,
+              'pin': pinCode,
+            }),
+          )
+          .timeout(const Duration(seconds: 10));
 
-        final response = await request.close();
-        final body = await response.transform(utf8.decoder).join();
-        Map<String, dynamic> decoded = {};
-        if (body.isNotEmpty) {
-          final value = json.decode(body);
-          if (value is Map<String, dynamic>) decoded = value;
+      Map<String, dynamic> decoded = {};
+      if (response.body.isNotEmpty) {
+        final value = jsonDecode(response.body);
+        if (value is Map) {
+          decoded = Map<String, dynamic>.from(value);
         }
-
-        if (response.statusCode == 200 && decoded['requires_2fa'] == true) {
-          _requiresTwoFactor = true;
-          _loginError =
-              decoded['message']?.toString() ?? 'Verification code required.';
-          _isLoading = false;
-          notifyListeners();
-          return false;
-        }
-
-        if (response.statusCode == 200) {
-          final payload = decoded['user'] is Map
-              ? Map<String, dynamic>.from(decoded['user'] as Map)
-              : decoded;
-          final remoteUser = User.fromJson(payload).copyWith(
-            username: normalizedUsername,
-            passwordHash: _localCacheCredentialHash(pinCode),
-          );
-          _currentUser = remoteUser;
-          _authToken = decoded['token']?.toString() ??
-              response.headers.value('x-auth-token');
-          if (_authToken != null && _authToken!.isNotEmpty) {
-            await SecureSessionStore.save(
-                token: _authToken!, username: normalizedUsername);
-          }
-
-          // Cache the authenticated profile for resilient/offline reads.
-          try {
-            if (remoteUser.id != null) {
-              await _db.insertUser(remoteUser);
-            }
-          } catch (_) {
-            // Cache failure must not invalidate a successful remote login.
-          }
-
-          await refreshAllData();
-          _isLoading = false;
-          notifyListeners();
-          return true;
-        }
-
-        // A real authentication response must not silently become an offline login.
-        if (response.statusCode == 400 ||
-            response.statusCode == 401 ||
-            response.statusCode == 403) {
-          _loginError =
-              decoded['message']?.toString() ?? 'Invalid username or PIN.';
-          _isLoading = false;
-          notifyListeners();
-          return false;
-        }
-      } finally {
-        client.close(force: true);
       }
-    } on SocketException catch (_) {
-      debugPrint('Laravel unavailable; attempting local cache authentication.');
-    } on TimeoutException catch (_) {
-      debugPrint(
-          'Laravel login timed out; attempting local cache authentication.');
+
+      if (response.statusCode == 200 && decoded['requires_2fa'] == true) {
+        _requiresTwoFactor = true;
+        _loginError =
+            decoded['message']?.toString() ?? 'Verification code required.';
+        _isLoading = false;
+        notifyListeners();
+        return false;
+      }
+
+      if (response.statusCode == 200) {
+        final payload = decoded['user'] is Map
+            ? Map<String, dynamic>.from(decoded['user'] as Map)
+            : decoded;
+        final remoteUser = User.fromJson(payload).copyWith(
+          username: normalizedUsername,
+          passwordHash: _localCacheCredentialHash(pinCode),
+        );
+        _currentUser = remoteUser;
+        _authToken = decoded['token']?.toString() ??
+            response.headers['x-auth-token'];
+
+        if (_authToken != null && _authToken!.isNotEmpty) {
+          await SecureSessionStore.save(
+              token: _authToken!, username: normalizedUsername);
+        }
+
+        try {
+          if (remoteUser.id != null) {
+            await _db.insertUser(remoteUser);
+          }
+        } catch (_) {
+          // Local cache failure must not invalidate a successful remote login.
+        }
+
+        try {
+          await refreshAllData();
+        } catch (e) {
+          // Login is already authenticated. Keep the session even if optional
+          // background synchronization is unavailable.
+          debugPrint('Post-login data refresh skipped: $e');
+        }
+
+        _isLoading = false;
+        notifyListeners();
+        return true;
+      }
+
+      if (response.statusCode == 400 ||
+          response.statusCode == 401 ||
+          response.statusCode == 403 ||
+          response.statusCode == 422) {
+        _loginError =
+            decoded['message']?.toString() ?? 'Invalid username or PIN.';
+        _isLoading = false;
+        notifyListeners();
+        return false;
+      }
+
+      _loginError =
+          decoded['message']?.toString() ?? 'Unable to authenticate.';
     } catch (e) {
-      debugPrint(
-          'Remote login unavailable; attempting local cache authentication: $e');
+      debugPrint('Laravel login request failed: $e');
+      _loginError =
+          'Unable to authenticate. Please check the server connection.';
     }
 
-    _loginError ??=
-        'Unable to authenticate. Please check the server connection.';
     _isLoading = false;
     notifyListeners();
     return false;
@@ -639,27 +643,31 @@ class CafeteriaProvider extends ChangeNotifier {
 
     // Production path: create the account centrally in Laravel first.
     try {
-      final registerUrl = Uri.parse('$_laravelBaseUrl/api/register');
-      final client = HttpClient()
-        ..connectionTimeout = const Duration(seconds: 5);
+      final registerUrl = Uri.parse('$_laravelBaseUrl/api/student/register');
+      final response = await http
+          .post(
+            registerUrl,
+            headers: const {
+              'Content-Type': 'application/json',
+              'Accept': 'application/json',
+            },
+            body: jsonEncode({
+              'username': normalizedUsername,
+              'pin': pinCode,
+              'pin_confirmation': pinCode,
+              'fullName': normalizedName,
+              'info': normalizedInfo,
+              'email': email?.trim().toLowerCase() ?? '',
+            }),
+          )
+          .timeout(const Duration(seconds: 10));
       try {
-        final request = await client.postUrl(registerUrl);
-        request.headers
-          ..set(HttpHeaders.contentTypeHeader, 'application/json')
-          ..set(HttpHeaders.acceptHeader, 'application/json');
-        request.add(utf8.encode(json.encode({
-          'username': normalizedUsername,
-          'pin': pinCode,
-          'role': normalizedRole,
-          'fullName': normalizedName,
-          'info': normalizedInfo,
-        })));
-        final response = await request.close();
-        final body = await response.transform(utf8.decoder).join();
         Map<String, dynamic> decoded = {};
-        if (body.isNotEmpty) {
-          final value = json.decode(body);
-          if (value is Map<String, dynamic>) decoded = value;
+        if (response.body.isNotEmpty) {
+          final value = jsonDecode(response.body);
+          if (value is Map) {
+            decoded = Map<String, dynamic>.from(value);
+          }
         }
 
         if (response.statusCode == 201 || response.statusCode == 200) {
@@ -684,9 +692,6 @@ class CafeteriaProvider extends ChangeNotifier {
           notifyListeners();
           return false;
         }
-      } finally {
-        client.close(force: true);
-      }
     } on SocketException catch (_) {
       debugPrint('Laravel unavailable; using local registration fallback.');
     } on TimeoutException catch (_) {
