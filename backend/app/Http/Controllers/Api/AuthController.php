@@ -137,32 +137,31 @@ class AuthController extends Controller
     public function login(Request $request)
     {
         $validator = Validator::make($request->all(), [
-            'email' => 'required|email|max:255',
-            'password' => 'required|string|min:8|max:128',
+            'username' => 'required|string|max:255',
+            'pin' => 'required|string|min:4|max:128',
         ]);
+
         if ($validator->fails()) {
             return response()->json([
                 'success' => false,
-                'message' => 'A valid email address and password are required.',
+                'message' => 'Username and PIN are required.',
                 'errors' => $validator->errors(),
             ], 422);
         }
 
-        $email = strtolower(trim($request->input('email')));
-        $user = User::where('username', $email)
-            ->orWhereRaw("JSON_UNQUOTE(JSON_EXTRACT(profile_info, '$.email')) = ?", [$email])
-            ->first();
+        $username = trim((string) $request->input('username'));
+        $user = User::whereRaw('LOWER(username) = ?', [strtolower($username)])->first();
 
-        if (!$user || !$this->verifyCredential($user, (string) $request->input('password'))) {
+        if (!$user || !$this->verifyCredential($user, (string) $request->input('pin'))) {
             if ($user) {
                 AuditLog::create([
                     'user_id' => $user->id,
                     'timestamp' => time() * 1000,
                     'action' => 'AUTH_FAILURE',
-                    'details' => 'Failed login attempt.',
+                    'details' => 'Failed username/PIN login attempt.',
                 ]);
             }
-            return response()->json(['success' => false, 'message' => 'Invalid email or password.'], 401);
+            return response()->json(['success' => false, 'message' => 'Invalid username or PIN.'], 401);
         }
 
         if (!$user->isActive()) {
