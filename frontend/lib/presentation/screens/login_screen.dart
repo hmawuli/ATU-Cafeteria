@@ -9,28 +9,28 @@ class LoginScreen extends StatefulWidget {
 }
 
 class _LoginScreenState extends State<LoginScreen> {
-  final email = TextEditingController();
+  final username = TextEditingController();
   final _formKey = GlobalKey<FormState>();
   final password = TextEditingController();
   bool obscure = true;
 
   @override
   void dispose() {
-    email.dispose();
+    username.dispose();
     password.dispose();
     super.dispose();
   }
 
   Future<void> login() async {
     final provider = context.read<CafeteriaProvider>();
-    final ok = await provider.loginUser(email.text, password.text);
+    final ok = await provider.loginUser(username.text, password.text);
     if (!mounted) return;
 
     if (provider.requiresTwoFactor) {
       Navigator.push(
         context,
         MaterialPageRoute(
-          builder: (_) => TwoFactorScreen(username: email.text.trim()),
+          builder: (_) => TwoFactorScreen(username: username.text.trim()),
         ),
       );
       return;
@@ -132,21 +132,21 @@ class _LoginScreenState extends State<LoginScreen> {
                         ),
                         const SizedBox(height: 28),
                         TextFormField(
-                          controller: email,
+                          controller: username,
                           autofocus: true,
                           decoration: const InputDecoration(
-                            labelText: 'Email address',
-                            prefixIcon: Icon(Icons.person),
+                            labelText: 'Username / Student ID',
+                            prefixIcon: Icon(Icons.badge_outlined),
                             border: OutlineInputBorder(),
                           ),
-                          validator: (v) => v == null || v.trim().isEmpty ? 'Enter your email address.' : null,
+                          validator: (v) => v == null || v.trim().isEmpty ? 'Enter your username or student ID.' : null,
                         ),
                         const SizedBox(height: 16),
                         TextFormField(
                           controller: password,
                           obscureText: obscure,
                           decoration: InputDecoration(
-                            labelText: 'Password',
+                            labelText: 'PIN',
                             prefixIcon: const Icon(Icons.lock),
                             suffixIcon: IconButton(
                               icon: Icon(
