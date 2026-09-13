@@ -200,7 +200,6 @@ Route::middleware(['auth:sanctum', \App\Http\Middleware\InactivityTimeout::class
         Route::get('/vendor/my-orders', [VendorController::class, 'getMyOrders']);
         Route::get('/vendor/analytics', [VendorController::class, 'getMyAnalytics']);
         Route::get('/vendor/analytics/comparative', [VendorController::class, 'getComparativeAnalytics']);
-        });
         Route::get('/vendor/performance-metrics', [VendorPerformanceController::class, 'getVendorPerformanceMetrics']);
         Route::get('/vendor/performance', [VendorPerformanceController::class, 'getPerformance']);
         Route::get('/vendor/sales-summary', [VendorMetricsController::class, 'getVendorSalesSummary']);
@@ -211,7 +210,7 @@ Route::middleware(['auth:sanctum', \App\Http\Middleware\InactivityTimeout::class
         Route::get('/vendor/daily-revenue', [DailyRevenueController::class, 'getDailyRevenue']);
         Route::get('/vendor/{vendorId}/daily-sales-revenue', [DailyRevenueController::class, 'getVendorDailyRevenue']);
         Route::post('/vendor/toggle-status', [VendorController::class, 'toggleStatus']);
-
+        });
         // Order Items Dashboard Metrics Endpoints
         Route::get('/vendor/order-items-metrics', [OrderItemMetricsController::class, 'getDashboardMetrics']);
         Route::get('/vendor/order-items-revenue', [OrderItemMetricsController::class, 'getDailyRevenueMetrics']);
