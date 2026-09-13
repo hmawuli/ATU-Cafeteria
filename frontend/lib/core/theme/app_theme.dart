@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart';
 
 class AppTheme {
-  static const Color primary = Color(0xFF1565C0);
-  static const Color accent = Color(0xFFE8751A);
+  static const Color primary = Color(0xFF0B5CAD);
+  static const Color accent = Color(0xFFFF8A1F);
   static const Color success = Color(0xFF2E7D32);
-  static const Color background = Color(0xFFF6F8FB);
+  static const Color background = Color(0xFFF4F7FB);
 
   static ThemeData light() {
     final scheme = ColorScheme.fromSeed(
@@ -18,11 +18,16 @@ class AppTheme {
       colorScheme: scheme,
       scaffoldBackgroundColor: background,
       fontFamily: 'Roboto',
+      visualDensity: VisualDensity.adaptivePlatformDensity,
+      snackBarTheme: const SnackBarThemeData(behavior: SnackBarBehavior.floating),
+      dividerTheme: const DividerThemeData(space: 1, thickness: 1),
+      listTileTheme: const ListTileThemeData(contentPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 4)),
       appBarTheme: const AppBarTheme(
         centerTitle: false,
         elevation: 0,
         scrolledUnderElevation: 2,
         titleTextStyle: TextStyle(fontSize: 20, fontWeight: FontWeight.w800),
+        toolbarHeight: 64,
       ),
       cardTheme: CardThemeData(
         margin: EdgeInsets.zero,
