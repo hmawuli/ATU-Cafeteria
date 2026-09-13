@@ -26,7 +26,6 @@ use App\Http\Controllers\Api\OrderItemMetricsController;
 use App\Http\Controllers\Api\VendorMenuItemController;
 use App\Http\Controllers\Api\VendorMetricsController;
 use App\Http\Controllers\Api\FavoriteMenuItemController;
-use App\Http\Controllers\Api\IngredientDemandController;
 use App\Http\Controllers\Api\StudentBudgetController;
 use App\Http\Controllers\Api\LoyaltyController;
 use App\Http\Controllers\Api\GroupOrderController;
@@ -202,8 +201,6 @@ Route::middleware(['auth:sanctum', \App\Http\Middleware\InactivityTimeout::class
         Route::get('/vendor/analytics', [VendorController::class, 'getMyAnalytics']);
         Route::get('/vendor/analytics/comparative', [VendorController::class, 'getComparativeAnalytics']);
         });
-        Route::get('/vendor/analytics/ingredient-demand', [IngredientDemandController::class, 'getIngredientDemandPrediction']);
-        Route::get('/vendor/{vendorId}/analytics/ingredient-demand', [IngredientDemandController::class, 'getIngredientDemandPrediction']);
         Route::get('/vendor/performance-metrics', [VendorPerformanceController::class, 'getVendorPerformanceMetrics']);
         Route::get('/vendor/performance', [VendorPerformanceController::class, 'getPerformance']);
         Route::get('/vendor/sales-summary', [VendorMetricsController::class, 'getVendorSalesSummary']);
