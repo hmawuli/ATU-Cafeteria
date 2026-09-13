@@ -112,7 +112,7 @@ class _VendorDashboardScreenState extends State<VendorDashboardScreen> {
           NavigationDestination(
               icon: Icon(Icons.breakfast_dining), label: 'Menu Catalog'),
           NavigationDestination(
-              icon: Icon(Icons.insights), label: 'Analytics & AI'),
+              icon: Icon(Icons.insights), label: 'Analytics'),
           NavigationDestination(
               icon: Icon(Icons.settings_suggest), label: 'Storefront Hub'),
         ],
@@ -125,7 +125,7 @@ class _VendorDashboardScreenState extends State<VendorDashboardScreen> {
                 children: [
                   _buildIncomingOrders(context, provider),
                   _buildMenuCatalog(context, provider),
-                  _buildAnalyticsAndAi(context, provider, user),
+                  _buildAnalytics(context, provider, user),
                   _buildStorefrontHub(context, provider, user),
                 ],
               ),
@@ -343,9 +343,9 @@ class _VendorDashboardScreenState extends State<VendorDashboardScreen> {
   }
 
   // ==========================================
-  // TAB 3: PERFORMANCE METRICS & GEMINI AI BULLETIN
+  // TAB 3: PERFORMANCE METRICS
   // ==========================================
-  Widget _buildAnalyticsAndAi(
+  Widget _buildAnalytics(
       BuildContext context, CafeteriaProvider provider, User vendor) {
     final reviews = provider.vendorFeedback;
     final hasRemote = provider.remoteVendorMetrics != null;
@@ -629,56 +629,6 @@ class _VendorDashboardScreenState extends State<VendorDashboardScreen> {
           ),
           const SizedBox(height: 16),
 
-          // 4. Gemini Decision Support
-          ElevatedButton.icon(
-            icon: provider.isAnalyzing
-                ? const SizedBox(
-                    width: 16,
-                    height: 16,
-                    child: CircularProgressIndicator(
-                        color: Colors.white, strokeWidth: 2))
-                : const Icon(Icons.psychology),
-            onPressed: provider.isAnalyzing
-                ? null
-                : () {
-                    provider.runGeminiVendorAnalytics(
-                        vendor, reviews, provider.vendorOrders.length);
-                  },
-            label: const Text("GENERATE PREDICTIVE GEMINI AUDIT BULLETIN",
-                style: TextStyle(fontWeight: FontWeight.bold)),
-          ),
-
-          if (provider.isAnalyzing) ...[
-            const SizedBox(height: 16),
-            const LinearProgressIndicator(),
-            const SizedBox(height: 8),
-            const Center(
-                child: Text("Gemini parsing local SQLite arrays...",
-                    style:
-                        TextStyle(fontStyle: FontStyle.italic, fontSize: 11))),
-          ],
-
-          if (provider.aiAnalysisText != null) ...[
-            const SizedBox(height: 16),
-            Card(
-              color: const Color(0xFF0B1F3A),
-              shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12)),
-              child: Padding(
-                padding: const EdgeInsets.all(16.0),
-                child: Text(
-                  provider.aiAnalysisText!,
-                  style: const TextStyle(
-                    fontFamily: 'monospace',
-                    color: Colors.white,
-                    fontSize: 12,
-                    height: 1.4,
-                  ),
-                ),
-              ),
-            ),
-          ],
-
           const SizedBox(height: 20),
           const Text("Historic Scholar Review Comments",
               style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
@@ -688,7 +638,7 @@ class _VendorDashboardScreenState extends State<VendorDashboardScreen> {
                   padding: EdgeInsets.symmetric(vertical: 20),
                   child: Center(
                       child: Text(
-                          "No feedback logs found. Default/mock compliance feedback seeded.")),
+                          "No feedback logs found yet.")),
                 )
               : ListView.builder(
                   shrinkWrap: true,
