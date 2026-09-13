@@ -10,6 +10,7 @@ class LoginScreen extends StatefulWidget {
 
 class _LoginScreenState extends State<LoginScreen> {
   final email = TextEditingController();
+  final _formKey = GlobalKey<FormState>();
   final password = TextEditingController();
   bool obscure = true;
 
@@ -80,7 +81,7 @@ class _LoginScreenState extends State<LoginScreen> {
                   ),
                   child: Padding(
                     padding: const EdgeInsets.all(28),
-                    child: Column(
+                    child: Form(key: _formKey, child: Column(
                       children: [
                         Container(
                           width: 82,
@@ -130,7 +131,7 @@ class _LoginScreenState extends State<LoginScreen> {
                           textAlign: TextAlign.center,
                         ),
                         const SizedBox(height: 28),
-                        TextField(
+                        TextFormField(
                           controller: email,
                           autofocus: true,
                           decoration: const InputDecoration(
@@ -138,9 +139,10 @@ class _LoginScreenState extends State<LoginScreen> {
                             prefixIcon: Icon(Icons.person),
                             border: OutlineInputBorder(),
                           ),
+                          validator: (v) => v == null || v.trim().isEmpty ? 'Enter your email address.' : null,
                         ),
                         const SizedBox(height: 16),
-                        TextField(
+                        TextFormField(
                           controller: password,
                           obscureText: obscure,
                           decoration: InputDecoration(
@@ -170,7 +172,7 @@ class _LoginScreenState extends State<LoginScreen> {
                           width: double.infinity,
                           height: 50,
                           child: ElevatedButton(
-                            onPressed: loading ? null : login,
+                            onPressed: loading ? null : () { if (_formKey.currentState?.validate() ?? false) login(); },
                             child: loading
                                 ? const SizedBox(
                                     width: 22,
@@ -189,7 +191,7 @@ class _LoginScreenState extends State<LoginScreen> {
                           child: const Text('Create an account'),
                         ),
                       ],
-                    ),
+                    )),
                   ),
                 ),
               ),
