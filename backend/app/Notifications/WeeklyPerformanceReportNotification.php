@@ -45,8 +45,6 @@ class WeeklyPerformanceReportNotification extends Notification
     public function toMail($notifiable)
     {
         $metrics = $this->reportData['source_metrics'] ?? $this->reportData;
-        $geminiSummary = $this->reportData['gemini_response'] ?? $this->reportData['report_content'] ?? 'No AI generated insights available for this week.';
-
         $totalCompleted = $metrics['order_metrics']['completed_orders_all_time'] ?? $metrics['completed_orders'] ?? 0;
         $totalRevenue = $metrics['order_metrics']['total_completed_revenue'] ?? $metrics['total_revenue'] ?? 0.00;
         $completionRate = $metrics['order_metrics']['completion_rate'] ?? 100.0;
