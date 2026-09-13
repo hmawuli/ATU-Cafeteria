@@ -20,7 +20,6 @@ DB_USERNAME=<username>
 DB_PASSWORD=<password>
 
 PAYSTACK_SECRET_KEY=<server-secret>
-GEMINI_API_KEY=<server-secret>
 ```
 
 Do not commit `.env` or production secrets.
