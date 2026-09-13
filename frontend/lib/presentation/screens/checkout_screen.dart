@@ -9,9 +9,10 @@ class CheckoutScreen extends StatefulWidget {
 }
 class _CheckoutScreenState extends State<CheckoutScreen> {
   String _method = 'Wallet';
+  final TextEditingController _noteController = TextEditingController();
   bool _submitting = false;
   final ApiClient _api = ApiClient();
-  @override void dispose() { _api.close(); super.dispose(); }
+  @override void dispose() { _noteController.dispose(); _api.close(); super.dispose(); }
   @override Widget build(BuildContext context) {
     final cart = context.watch<CartProvider>();
     final total = cart.subtotal;
@@ -32,7 +33,25 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
           Card(child: Padding(padding: const EdgeInsets.all(16), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
             const Text('Payment method', style: TextStyle(fontWeight: FontWeight.w800)),
             RadioListTile<String>(value:'Wallet',groupValue:_method,onChanged:(v)=>setState(()=>_method=v!),title:const Text('ATU Cafeteria Wallet'),secondary:const Icon(Icons.account_balance_wallet_outlined)),
-            RadioListTile<String>(value:'Paystack',groupValue:_method,onChanged:(v)=>setState(()=>_method=v!),title:const Text('Paystack'),secondary:const Icon(Icons.credit_card_rounded)),
+            ListTile(
+              leading: const Icon(Icons.credit_card_rounded),
+              title: const Text('Online payment'),
+              subtitle: const Text('Coming soon. Wallet payment is currently available.'),
+              enabled: false,
+            ),
+          ]))),
+          const SizedBox(height: 18),
+          Card(child: Padding(padding: const EdgeInsets.all(16), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            const Text('Order note (optional)', style: TextStyle(fontWeight: FontWeight.w800)),
+            const SizedBox(height: 8),
+            TextField(
+              controller: _noteController,
+              maxLength: 160,
+              decoration: const InputDecoration(
+                hintText: 'Add a note for the cafeteria',
+                prefixIcon: Icon(Icons.notes_outlined),
+              ),
+            ),
           ]))),
           const SizedBox(height: 18),
           Card(child: Padding(padding: const EdgeInsets.all(18), child: Column(children: [
