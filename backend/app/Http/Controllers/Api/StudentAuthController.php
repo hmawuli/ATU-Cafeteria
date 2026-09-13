@@ -135,4 +135,5 @@ class StudentAuthController extends Controller
             'message' => 'Student logged in successfully.',
             'user' => $responseData,
         ], 200)->header('X-Auth-Token', $token);
-    }}
+    }
+}
