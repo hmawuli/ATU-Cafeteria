@@ -12,7 +12,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
   final _formKey = GlobalKey<FormState>();
   final _name = TextEditingController();
   final _email = TextEditingController();
-  final _password = TextEditingController();
+  final _username = TextEditingController();
+  final _pin = TextEditingController();
   final _confirm = TextEditingController();
   final _programme = TextEditingController();
   final _api = ApiClient();
@@ -23,7 +24,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
   void dispose() {
     _name.dispose();
     _email.dispose();
-    _password.dispose();
+    _username.dispose();
+    _pin.dispose();
     _confirm.dispose();
     _programme.dispose();
     _api.close();
@@ -36,8 +38,10 @@ class _RegisterScreenState extends State<RegisterScreen> {
     try {
       await _api.post('/student/register', body: {
         'fullName': _name.text.trim(),
+        'username': _username.text.trim(),
         'email': _email.text.trim().toLowerCase(),
-        'password': _password.text,
+        'pin': _pin.text,
+        'pin_confirmation': _confirm.text,
         'info': _programme.text.trim(),
       });
       if (!mounted) return;
@@ -96,6 +100,116 @@ class _RegisterScreenState extends State<RegisterScreen> {
                       TextFormField(controller: _name, textInputAction: TextInputAction.next,
                         decoration: const InputDecoration(labelText: 'Full name', prefixIcon: Icon(Icons.person_outline)),
                         validator: (v) => v == null || v.trim().length < 2 ? 'Enter your full name.' : null),
+                      const SizedBox(height: 14),
+                      TextFormField(controller: _username, textInputAction: TextInputAction.next,
+                        decoration: const InputDecoration(labelText: 'Username / Student ID', prefixIcon: Icon(Icons.badge_outlined)),
+                        validator: (v) => v == null || !RegExp(r'^[A-Za-z0-9_-]{3,100} keyboardType: TextInputType.emailAddress, textInputAction: TextInputAction.next,
+                        decoration: const InputDecoration(labelText: 'Email address', prefixIcon: Icon(Icons.email_outlined)),
+                        validator: (v) {
+                          final value = v?.trim() ?? '';
+                          return RegExp(r'^[^@\\s]+@[^@\\s]+\\.[^@\\s]+$').hasMatch(value) ? null : 'Enter a valid email address.';
+                        }),
+                      const SizedBox(height: 14),
+                      TextFormField(controller: _pin, obscureText: _obscure, keyboardType: TextInputType.number, maxLength: 6, textInputAction: TextInputAction.next,
+                        decoration: InputDecoration(labelText: 'PIN', helperText: 'Use a 4–6 digit PIN.', prefixIcon: const Icon(Icons.lock_outline),
+                          suffixIcon: IconButton(onPressed: () => setState(() => _obscure = !_obscure), icon: Icon(_obscure ? Icons.visibility : Icons.visibility_off))),
+                        validator: (v) => v == null || !RegExp(r'^\d{4,6}),
+                      const SizedBox(height: 14),
+                      TextFormField(controller: _confirm, obscureText: true, textInputAction: TextInputAction.next,
+                        decoration: const InputDecoration(labelText: 'Confirm password', prefixIcon: Icon(Icons.lock_reset_outlined)),
+                        validator: (v) => v != _pin.text ? 'PINs do not match.' : null),
+                      const SizedBox(height: 14),
+                      TextFormField(controller: _programme, maxLines: 2,
+                        decoration: const InputDecoration(labelText: 'Department / Programme (optional)', prefixIcon: Icon(Icons.school_outlined))),
+                      const SizedBox(height: 24),
+                      SizedBox(height: 52, child: FilledButton.icon(
+                        onPressed: _busy ? null : _register,
+                        icon: _busy ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2)) : const Icon(Icons.person_add_alt_1),
+                        label: Text(_busy ? 'Creating account…' : 'Create account'),
+                      )),
+                      const SizedBox(height: 8),
+                      TextButton(onPressed: _busy ? null : () => Navigator.pushReplacementNamed(context, '/login'),
+                        child: const Text('Already have an account? Sign in')),
+                    ]),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+).hasMatch(v.trim()) ? 'Use 3–100 letters, numbers, _ or -.' : null),
+                      const SizedBox(height: 14),
+                      TextFormField(controller: _email, keyboardType: TextInputType.emailAddress, textInputAction: TextInputAction.next,
+                        decoration: const InputDecoration(labelText: 'Email address', prefixIcon: Icon(Icons.email_outlined)),
+                        validator: (v) {
+                          final value = v?.trim() ?? '';
+                          return RegExp(r'^[^@\\s]+@[^@\\s]+\\.[^@\\s]+$').hasMatch(value) ? null : 'Enter a valid email address.';
+                        }),
+                      const SizedBox(height: 14),
+                      TextFormField(controller: _password, obscureText: _obscure, textInputAction: TextInputAction.next,
+                        decoration: InputDecoration(labelText: 'Password', helperText: 'At least 8 characters.', prefixIcon: const Icon(Icons.lock_outline),
+                          suffixIcon: IconButton(onPressed: () => setState(() => _obscure = !_obscure), icon: Icon(_obscure ? Icons.visibility : Icons.visibility_off))),
+                        validator: (v) => v == null || v.length < 8 ? 'Use at least 8 characters.' : null),
+                      const SizedBox(height: 14),
+                      TextFormField(controller: _confirm, obscureText: true, textInputAction: TextInputAction.next,
+                        decoration: const InputDecoration(labelText: 'Confirm password', prefixIcon: Icon(Icons.lock_reset_outlined)),
+                        validator: (v) => v != _password.text ? 'Passwords do not match.' : null),
+                      const SizedBox(height: 14),
+                      TextFormField(controller: _programme, maxLines: 2,
+                        decoration: const InputDecoration(labelText: 'Department / Programme (optional)', prefixIcon: Icon(Icons.school_outlined))),
+                      const SizedBox(height: 24),
+                      SizedBox(height: 52, child: FilledButton.icon(
+                        onPressed: _busy ? null : _register,
+                        icon: _busy ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2)) : const Icon(Icons.person_add_alt_1),
+                        label: Text(_busy ? 'Creating account…' : 'Create account'),
+                      )),
+                      const SizedBox(height: 8),
+                      TextButton(onPressed: _busy ? null : () => Navigator.pushReplacementNamed(context, '/login'),
+                        child: const Text('Already have an account? Sign in')),
+                    ]),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+).hasMatch(v) ? 'Use a 4–6 digit PIN.' : null),
+                      const SizedBox(height: 14),
+                      TextFormField(controller: _confirm, obscureText: true, textInputAction: TextInputAction.next,
+                        decoration: const InputDecoration(labelText: 'Confirm password', prefixIcon: Icon(Icons.lock_reset_outlined)),
+                        validator: (v) => v != _password.text ? 'Passwords do not match.' : null),
+                      const SizedBox(height: 14),
+                      TextFormField(controller: _programme, maxLines: 2,
+                        decoration: const InputDecoration(labelText: 'Department / Programme (optional)', prefixIcon: Icon(Icons.school_outlined))),
+                      const SizedBox(height: 24),
+                      SizedBox(height: 52, child: FilledButton.icon(
+                        onPressed: _busy ? null : _register,
+                        icon: _busy ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2)) : const Icon(Icons.person_add_alt_1),
+                        label: Text(_busy ? 'Creating account…' : 'Create account'),
+                      )),
+                      const SizedBox(height: 8),
+                      TextButton(onPressed: _busy ? null : () => Navigator.pushReplacementNamed(context, '/login'),
+                        child: const Text('Already have an account? Sign in')),
+                    ]),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+).hasMatch(v.trim()) ? 'Use 3–100 letters, numbers, _ or -.' : null),
                       const SizedBox(height: 14),
                       TextFormField(controller: _email, keyboardType: TextInputType.emailAddress, textInputAction: TextInputAction.next,
                         decoration: const InputDecoration(labelText: 'Email address', prefixIcon: Icon(Icons.email_outlined)),
