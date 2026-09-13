@@ -69,8 +69,8 @@ class WeeklyPerformanceReportNotification extends Notification
             }
         }
 
-        $mail->line("AI-Powered Performance Insights & Recommendations:")
-             ->line($geminiSummary)
+        $mail->line("Performance Summary & Recommendations:")
+             ->line($this->reportData['report_content'] ?? 'Review weekly sales, order completion and customer feedback metrics.')
               ->line('Keep up the great work in serving the Accra Technical University community! For support or inventory requests, please coordinate with cafeteria administrators.');
 
         if ($this->pdfPath && file_exists($this->pdfPath)) {
