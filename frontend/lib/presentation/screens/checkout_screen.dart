@@ -69,33 +69,56 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
     );
   }
   Future<void> _showConfirmation(BuildContext context) async {
-    setState(()=>_submitting=true);
-    await Future<void>.delayed(const Duration(milliseconds:350));
-    if(!mounted)return;
-    setState(()=>_submitting=false);
-    final ok=await showDialog<bool>(context:context,builder:(ctx)=>AlertDialog(
-      title:const Text('Confirm order'),content:const Text('Your order details are ready. Continue to place this order?'),
-      actions:[TextButton(onPressed:()=>Navigator.pop(ctx,false),child:const Text('Review')),FilledButton(onPressed:()=>Navigator.pop(ctx,true),child:const Text('Confirm'))],
-    ));
-    if(ok==true && mounted) {
-      setState(()=>_submitting=true);
-      try {
-        final result = await _api.post('/student/cart-checkout', body: {'items': cart.toCheckoutPayload()});
-        if (!mounted) return;
-        context.read<CartProvider>().clear();
-        await showDialog<void>(context: context, builder: (ctx) => AlertDialog(
-          title: const Text('Order placed successfully'),
-          content: Text(result is Map && result['message'] != null ? result['message'].toString() : 'Your order has been sent to the cafeteria.'),
-          actions: [FilledButton(onPressed: () => Navigator.pop(ctx), child: const Text('Done'))],
-        ));
-        if (mounted) Navigator.pop(context);
-      } on ApiException catch (e) {
-        if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.message)));
-      } catch (_) {
-        if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Unable to place the order. Please try again.')));
-      } finally {
-        if (mounted) setState(()=>_submitting=false);
-      }
+    final cart = context.read<CartProvider>();
+    if (cart.isEmpty) return;
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Confirm order'),
+        content: Text('Place this order for GH₵ ${cart.subtotal.toStringAsFixed(2)} using your cafeteria wallet?'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Review')),
+          FilledButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('Confirm')),
+        ],
+      ),
+    );
+    if (ok != true || !mounted) return;
+    setState(() => _submitting = true);
+    try {
+      final result = await _api.post('/student/cart-checkout', body: {
+        'items': cart.toCheckoutPayload(),
+        if (_noteController.text.trim().isNotEmpty) 'note': _noteController.text.trim(),
+        'payment_method': _method.toLowerCase(),
+      });
+      if (!mounted) return;
+      cart.clear();
+      final message = result is Map && result['message'] != null
+          ? result['message'].toString()
+          : 'Your order has been placed successfully.';
+      await showDialog<void>(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          icon: const Icon(Icons.check_circle_outline, size: 48),
+          title: const Text('Order placed'),
+          content: Text(message),
+          actions: [
+            FilledButton(
+              onPressed: () {
+                Navigator.pop(ctx);
+                Navigator.pushReplacementNamed(ctx, '/student');
+              },
+              child: const Text('View dashboard'),
+            ),
+          ],
+        ),
+      );
+    } on ApiException catch (e) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.message)));
+    } catch (_) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Unable to place the order. Please check your connection and try again.')),
+      );
+    } finally {
+      if (mounted) setState(() => _submitting = false);
     }
   }
-}
