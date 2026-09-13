@@ -37,7 +37,6 @@ flutter run --dart-define=API_BASE_URL=http://192.168.1.100:8000/api/
 - `APP_DEBUG=false`
 - configure a managed production database
 - set `APP_KEY`
-- set Paystack/Gemini secrets only on the server
 - restrict `CORS_ALLOWED_ORIGINS` to trusted browser origins
 - run `php artisan migrate --force`
 - run `php artisan config:cache`
