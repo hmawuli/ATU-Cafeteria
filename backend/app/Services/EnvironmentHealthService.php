@@ -35,10 +35,7 @@ class EnvironmentHealthService
                 $recommendations[] = 'Run chmod -R 775 storage bootstrap/cache.';
             }
 
-            if (str_contains($content, 'GEMINI_API_KEY') || str_contains($content, 'cURL error 28')) {
-                $foundErrors[] = 'Gemini API network timeout or missing GEMINI_API_KEY configuration.';
-                $recommendations[] = 'Ensure valid GEMINI_API_KEY is supplied in .env or Secrets panel.';
-            }
+
         }
 
         // Test Database connection dynamically
