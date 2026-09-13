@@ -83,64 +83,57 @@ class StudentAuthController extends Controller
     public function login(Request $request)
     {
         $validator = Validator::make($request->all(), [
-            'email' => 'required|email|max:255',
-            'password' => 'required|string|min:8|max:128',
+            'username' => 'required|string|max:255',
+            'pin' => 'required|string|min:4|max:128',
         ]);
 
         if ($validator->fails()) {
             return response()->json([
                 'success' => false,
-                'message' => 'Email address and password are required.'
-            ], 400);
+                'message' => 'Username and PIN are required.',
+                'errors' => $validator->errors(),
+            ], 422);
         }
 
-        $email = strtolower(trim($request->input('email')));
-        $user = User::where('username', $email)
-            ->orWhereRaw("JSON_UNQUOTE(JSON_EXTRACT(profile_info, '$.email')) = ?", [$email])
+        $username = trim((string) $request->input('username'));
+        $user = User::whereRaw('LOWER(username) = ?', [strtolower($username)])
+            ->where('role', 'STUDENT')
             ->first();
 
-        // Enforce student role and valid credentials
-        if (!$user || $user->role !== 'STUDENT') {
-            return response()->json([
-                'success' => false,
-                'message' => 'Invalid student credentials or unauthorized role.'
-            ], 401);
+        if (!$user || !Hash::check((string) $request->input('pin'), (string) $user->password)) {
+            if ($user) {
+                AuditLog::create([
+                    'user_id' => $user->id,
+                    'timestamp' => time() * 1000,
+                    'action' => 'STUDENT_AUTH_FAILURE',
+                    'details' => 'Failed student username/PIN login attempt.',
+                ]);
+            }
+            return response()->json(['success' => false, 'message' => 'Invalid student username or PIN.'], 401);
         }
 
-        // Compare direct PIN (Pre-hashed from clients)
-        if (Hash::check($request->input('password'), (string) $user->password)) {
-            
-            // Register Audit Log
-            AuditLog::create([
-                'user_id' => $user->id,
-                'timestamp' => time() * 1000,
-                'action' => 'STUDENT_AUTHENTICATION',
-                'details' => "Student {$user->fullName} logged in successfully via Sanctum.",
-            ]);
-
-            // Generate Laravel Sanctum token
-            $token = $user->createToken('student_token', ['student'])->plainTextToken;
-            $responseData = $user->toArray();
-            $responseData['token'] = $token;
-
-            return response()->json([
-                'success' => true,
-                'message' => 'Student logged in successfully.',
-                'user' => $responseData
-            ], 200)->header('X-Auth-Token', $token);
+        if (!$user->isActive()) {
+            return response()->json(['success' => false, 'message' => 'Your account is not active.'], 403);
         }
 
-        // Record failed login attempt
+        $user->last_login_at = now();
+        $user->saveQuietly();
+        $user->tokens()->delete();
+        $token = $user->createToken('student_token', ['student'])->plainTextToken;
+
         AuditLog::create([
             'user_id' => $user->id,
             'timestamp' => time() * 1000,
-            'action' => 'STUDENT_AUTH_FAILURE',
-            'details' => 'Failed student login attempt with invalid password.',
+            'action' => 'STUDENT_AUTHENTICATION',
+            'details' => 'Student logged in successfully via Sanctum.',
         ]);
 
+        $responseData = $user->toArray();
+        $responseData['token'] = $token;
+
         return response()->json([
-            'success' => false,
-            'message' => 'Invalid credentials.'
-        ], 401);
-    }
-}
+            'success' => true,
+            'message' => 'Student logged in successfully.',
+            'user' => $responseData,
+        ], 200)->header('X-Auth-Token', $token);
+    }}
