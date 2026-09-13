@@ -85,13 +85,6 @@ class CafeteriaProvider extends ChangeNotifier {
   List<Feedback> _vendorFeedback = [];
   List<Feedback> get vendorFeedback => _vendorFeedback;
 
-  // AI Review States
-  String? _aiAnalysisText;
-  String? get aiAnalysisText => _aiAnalysisText;
-
-  bool _isAnalyzing = false;
-  bool get isAnalyzing => _isAnalyzing;
-
   // Simple string hash function matching sha256 conceptually
   String _localCacheCredentialHash(String pin) {
     // Generate a secure lookup hash safely without external dependency errors
@@ -1497,69 +1490,18 @@ class CafeteriaProvider extends ChangeNotifier {
     return false;
   }
 
-  // ==========================================
-  // REAL AI WORK: GEMINI PREDICTIVE PERFORMANCE
-  // ==========================================
-
+  // Vendor quality metrics are calculated from recorded feedback.
   double getAverageRating(List<Feedback> feedbacks) {
     if (feedbacks.isEmpty) return 0.0;
     double sum = 0.0;
-    for (var f in feedbacks) {
-      sum += (f.ratingFoodQuality +
-              f.ratingCleanliness +
-              f.ratingServiceSpeed +
-              f.ratingPriceValue) /
+    for (final feedback in feedbacks) {
+      sum += (feedback.ratingFoodQuality +
+              feedback.ratingCleanliness +
+              feedback.ratingServiceSpeed +
+              feedback.ratingPriceValue) /
           4.0;
     }
     return sum / feedbacks.length;
-  }
-
-  Future<void> runGeminiVendorAnalytics(
-      User vendor, List<Feedback> vendorFeedbacks, int ordersCount) async {
-    _isAnalyzing = true;
-    _aiAnalysisText = null;
-    notifyListeners();
-
-    try {
-      // We will perform a smart offline analysis fallback if keys aren't provisioned to ensure 100% stability
-      await Future.delayed(
-          const Duration(seconds: 2)); // Simulate thinking latency
-
-      final qualityScore = getAverageRating(vendorFeedbacks);
-      String complianceGrade = "A - Gold Standard";
-      if (qualityScore < 3.0) {
-        complianceGrade = "C - Bronze (Action Required)";
-      } else if (qualityScore < 4.0) {
-        complianceGrade = "B - Silver Standard";
-      }
-
-      _aiAnalysisText = '''
-==============================================
-  ATU QUALITY ASSURANCE BOARD ACADEMIC BULLETIN
-==============================================
-Vendor Audit Target: ${vendor.fullName} (${vendor.info})
-Compliance Rating: $complianceGrade (Avg Rating: ${qualityScore.toStringAsFixed(2)}/5.0)
-
-STRENGTH ANALYSIS:
-- Dynamic recipe satisfaction of student consumers is highly steady under peak times.
-- Strong digital payment ledger integration with secure token-verified deliveries.
-
-HYGIENE & SYSTEM COMPLIANCE WEAKNESSES:
-- Minor service delay logs noted during peak lecturing hours (12:00 PM - 1:30 PM).
-- Periodic cleanliness reviews point to disposal bins layout at the cafeteria.
-
-PREDICTIVE RECONSTRUCTIONS & NEXT STEPS:
-- Standardize waakye portion sizing using dynamic calibration measures.
-- Launch automated peak-hour pre-packing to resolve service velocity constraints.
-- Maintain a digital escrow standard via the secure ATU wallet protocol.
-''';
-    } catch (e) {
-      _aiAnalysisText =
-          "Failed to compile predictive audit bulletin. Please verify database synchronization.";
-    }
-
-    _isAnalyzing = false;
-    notifyListeners();
   }
 
   Future<void> insertAuditLog(AuditLog log) async {
