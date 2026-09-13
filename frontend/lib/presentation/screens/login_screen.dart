@@ -135,11 +135,11 @@ class _LoginScreenState extends State<LoginScreen> {
                           controller: username,
                           autofocus: true,
                           decoration: const InputDecoration(
-                            labelText: 'Username / Student ID',
+                            labelText: 'Username',
                             prefixIcon: Icon(Icons.badge_outlined),
                             border: OutlineInputBorder(),
                           ),
-                          validator: (v) => v == null || v.trim().isEmpty ? 'Enter your username or student ID.' : null,
+                          validator: (v) => v == null || v.trim().isEmpty ? 'Enter your username.' : null,
                         ),
                         const SizedBox(height: 16),
                         TextFormField(
