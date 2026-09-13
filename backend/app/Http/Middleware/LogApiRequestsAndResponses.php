@@ -48,11 +48,11 @@ class LogApiRequestsAndResponses
             }
 
             // Log AI endpoints and errors into SystemLog table if available
-            if (str_contains($path, 'gemini') || str_contains($path, 'ai') || $statusCode >= 400) {
+            if ($statusCode >= 400) {
                 if (class_exists(SystemLog::class)) {
                     SystemLog::create([
                         'level' => $statusCode >= 500 ? 'ERROR' : ($statusCode >= 400 ? 'WARNING' : 'INFO'),
-                        'event' => str_contains($path, 'gemini') ? 'AI_GEMINI_REQUEST' : 'API_REQUEST_LOG',
+                        'event' => 'API_REQUEST_LOG',
                         'message' => sprintf("[%s] %s -> %d (%s ms)", $method, $path, $statusCode, $durationMs),
                         'context' => json_encode([
                             'ip' => $request->ip(),
