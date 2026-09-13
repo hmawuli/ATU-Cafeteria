@@ -201,11 +201,6 @@ Route::middleware(['auth:sanctum', \App\Http\Middleware\InactivityTimeout::class
         Route::get('/vendor/my-orders', [VendorController::class, 'getMyOrders']);
         Route::get('/vendor/analytics', [VendorController::class, 'getMyAnalytics']);
         Route::get('/vendor/analytics/comparative', [VendorController::class, 'getComparativeAnalytics']);
-        Route::middleware('throttle:gemini')->group(function () {
-            Route::get('/vendor/analytics/gemini-report', [VendorController::class, 'getMyGeminiReport']);
-            Route::get('/vendor/{vendorId}/gemini-report', [VendorController::class, 'getVendorGeminiReport']);
-            Route::get('/vendor/analytics/gemini-order-insights', [VendorController::class, 'getMyGeminiOrderInsights']);
-            Route::get('/vendor/{vendorId}/gemini-order-insights', [VendorController::class, 'getVendorGeminiOrderInsights']);
         });
         Route::get('/vendor/analytics/ingredient-demand', [IngredientDemandController::class, 'getIngredientDemandPrediction']);
         Route::get('/vendor/{vendorId}/analytics/ingredient-demand', [IngredientDemandController::class, 'getIngredientDemandPrediction']);
