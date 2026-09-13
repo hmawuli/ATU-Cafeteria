@@ -172,221 +172,37 @@ class FeedbackController extends Controller
     }
 
     /**
-     * Get Gemini-powered sentiment analysis report of student feedback for the vendor.
-     */
+ * Return a transparent, database-backed feedback summary.
+ * No external AI service is used.
+ */
     public function getFeedbackSentimentReport(Request $request, $vendorId = null)
     {
         $user = $request->user();
-        if (!$user) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Unauthenticated.'
-            ], 401);
-        }
-
+        if (!$user) return response()->json(['success'=>false,'message'=>'Unauthenticated.'], 401);
         $role = strtoupper($user->role);
-        if ($role !== 'VENDOR' && $role !== 'ADMIN') {
-            return response()->json([
-                'success' => false,
-                'message' => 'Unauthorized. Only vendors and administrators can retrieve sentiment reports.'
-            ], 403);
+        if ($role !== 'VENDOR' && $role !== 'ADMIN') return response()->json(['success'=>false,'message'=>'Unauthorized.'], 403);
+        $targetVendorId = $role === 'VENDOR' ? (int)$user->id : ($vendorId ? (int)$vendorId : (int)$request->input('vendor_id'));
+        if (!$targetVendorId) return response()->json(['success'=>false,'message'=>'Vendor ID is required.'], 422);
+
+        $feedbacks = Feedback::where('vendor_id',$targetVendorId)->get();
+        $total = $feedbacks->count();
+        $average = fn(string $field) => $total ? round((float)$feedbacks->avg($field),2) : 0.0;
+        $positive=$neutral=$negative=0;
+        foreach($feedbacks as $feedback){
+            $score=((int)$feedback->rating_food_quality+(int)$feedback->rating_cleanliness+(int)$feedback->rating_service_speed+(int)$feedback->rating_price_value)/4;
+            if($score>=4)$positive++; elseif($score<=2.5)$negative++; else $neutral++;
         }
-
-        // Determine vendor ID
-        if ($role === 'ADMIN') {
-            if ($vendorId) {
-                $targetVendorId = (int)$vendorId;
-            } elseif ($request->has('vendor_id')) {
-                $targetVendorId = (int)$request->input('vendor_id');
-            } else {
-                return response()->json([
-                    'success' => false,
-                    'message' => 'Vendor ID is required for administrator requests.'
-                ], 400);
-            }
-        } else {
-            $targetVendorId = $user->id;
-        }
-
-        $vendor = \App\Models\User::find($targetVendorId);
-        $vendorName = $vendor ? $vendor->fullName : "Vendor #{$targetVendorId}";
-
-        // Get feedback with comments
-        $feedbacks = Feedback::where('vendor_id', $targetVendorId)
-            ->whereNotNull('comment')
-            ->where('comment', '!=', '')
-            ->get();
-
-        if ($feedbacks->isEmpty()) {
-            return response()->json([
-                'success' => true,
-                'vendor_id' => $targetVendorId,
-                'vendor_name' => $vendorName,
-                'report' => "# 📝 Student Feedback Sentiment Report: **{$vendorName}**\n\nNo student feedback comments with text have been recorded for this food joint yet. Once students submit text comments with their orders, Gemini AI will automatically generate dynamic sentiment analyses, pain-point lists, and actionable cooking/service improvements here.",
-                'source_metrics' => [
-                    'total_comments' => 0,
-                    'averages' => [
-                        'quality' => 0.0,
-                        'cleanliness' => 0.0,
-                        'speed' => 0.0,
-                        'value' => 0.0
-                    ]
-                ],
-                'generated_at' => date('c')
-            ], 200);
-        }
-
-        // Calculate quantitative metrics from reviews
-        $totalCount = $feedbacks->count();
-        $avgQuality = $feedbacks->avg('rating_food_quality');
-        $avgCleanliness = $feedbacks->avg('rating_cleanliness');
-        $avgSpeed = $feedbacks->avg('rating_service_speed');
-        $avgValue = $feedbacks->avg('rating_price_value');
-
-        // Segment comments into categories for mock summary
-        $positiveComments = [];
-        $negativeComments = [];
-        $neutralComments = [];
-
-        $commentsList = [];
-        foreach ($feedbacks as $fb) {
-            $commentText = trim($fb->comment);
-            $ratingSum = ($fb->rating_food_quality + $fb->rating_cleanliness + $fb->rating_service_speed + $fb->rating_price_value) / 4;
-            $commentsList[] = "- [Rating: " . round($ratingSum, 1) . "/5] \"{$commentText}\"";
-
-            if ($ratingSum >= 4.0) {
-                $positiveComments[] = $commentText;
-            } elseif ($ratingSum <= 2.5) {
-                $negativeComments[] = $commentText;
-            } else {
-                $neutralComments[] = $commentText;
-            }
-        }
-
-        $posPercent = round((count($positiveComments) / $totalCount) * 100, 1);
-        $negPercent = round((count($negativeComments) / $totalCount) * 100, 1);
-        $neuPercent = round((count($neutralComments) / $totalCount) * 100, 1);
-
-        $metricsData = [
-            'total_comments' => $totalCount,
-            'averages' => [
-                'quality' => round($avgQuality, 2),
-                'cleanliness' => round($avgCleanliness, 2),
-                'speed' => round($avgSpeed, 2),
-                'value' => round($avgValue, 2)
+        return response()->json([
+            'success'=>true,'vendor_id'=>$targetVendorId,'total_comments'=>$total,
+            'averages'=>['quality'=>$average('rating_food_quality'),'cleanliness'=>$average('rating_cleanliness'),'speed'=>$average('rating_service_speed'),'value'=>$average('rating_price_value')],
+            'distribution'=>[
+                'positive_percent'=>$total?round($positive/$total*100,1):0.0,
+                'neutral_percent'=>$total?round($neutral/$total*100,1):0.0,
+                'negative_percent'=>$total?round($negative/$total*100,1):0.0,
             ],
-            'distribution' => [
-                'positive_percent' => $posPercent,
-                'neutral_percent' => $neuPercent,
-                'negative_percent' => $negPercent
-            ]
-        ];
-
-        // Prepare Prompt for Gemini
-        $apiKey = env('GEMINI_API_KEY') ?: '';
-        $model = 'gemini-3.5-flash';
-
-        if (empty($apiKey) || $apiKey === 'MY_GEMINI_API_KEY') {
-            return response()->json([
-                'success' => true,
-                'vendor_id' => $targetVendorId,
-                'vendor_name' => $vendorName,
-                'report' => $this->generateMockSentimentReport($vendorName, $metricsData, $positiveComments, $negativeComments, $neutralComments),
-                'source_metrics' => $metricsData,
-                'note' => 'Local fallback generated. GEMINI_API_KEY is not configured in the environment.',
-                'generated_at' => date('c')
-            ], 200);
-        }
-
-        $commentsString = implode("\n", array_slice($commentsList, 0, 50)); // Limit to first 50 to avoid prompt size bloat
-        $prompt = "You are an institutional culinary consultant and AI sentiment analyst at Accra Technical University.
-Please review the student comments submitted for the vendor \"{$vendorName}\":
-
---- STUDENT REVIEWS AND TEXT COMMENTS ---
-{$commentsString}
-
---- STATISTICAL OVERVIEW ---
-- Total Comments: {$totalCount}
-- Avg Food Quality Score: " . round($avgQuality, 2) . " / 5.0
-- Avg Cleanliness Score: " . round($avgCleanliness, 2) . " / 5.0
-- Avg Service Speed Score: " . round($avgSpeed, 2) . " / 5.0
-- Avg Price Value Score: " . round($avgValue, 2) . " / 5.0
-
-Please generate a highly structured feedback and sentiment intelligence report in Markdown format:
-1. **📊 Sentiment Distribution**: Provide estimated percentages for positive, neutral, and negative tones based on your analysis of the comments and scores.
-2. **🔑 Key Praises**: Highlight what students appreciate the most (flavor, cleanliness, customer service, portion sizes).
-3. **⚠️ Key Pain Points & Friction Areas**: Identify the top customer grievances (e.g., long queue times, high prices, cold food).
-4. **💡 Highly Actionable Operational Steps**: Give 3 practical, campus-specific recommendations to optimize their scores.
-
-Write in a sharp, encouraging, objective, and professional tone tailored to a cafeteria vendor. Use bold numbers and bullet points. Limit to 350-400 words.";
-
-        try {
-            $response = \Illuminate\Support\Facades\Http::withHeaders([
-                'Content-Type' => 'application/json',
-            ])
-            ->timeout(60)
-            ->post("https://generativelanguage.googleapis.com/v1beta/models/{$model}:generateContent?key={$apiKey}", [
-                'contents' => [
-                    [
-                        'parts' => [
-                            ['text' => $prompt]
-                        ]
-                    ]
-                ],
-                'generationConfig' => [
-                    'temperature' => 0.4
-                ]
-            ]);
-
-            if ($response->failed()) {
-                \Illuminate\Support\Facades\Log::error("Gemini Sentiment Report API Error: " . $response->body());
-                return response()->json([
-                    'success' => true,
-                    'vendor_id' => $targetVendorId,
-                    'vendor_name' => $vendorName,
-                    'report' => $this->generateMockSentimentReport($vendorName, $metricsData, $positiveComments, $negativeComments, $neutralComments),
-                    'source_metrics' => $metricsData,
-                    'note' => 'Local fallback generated due to external endpoint error.',
-                    'generated_at' => date('c')
-                ], 200);
-            }
-
-            $result = $response->json();
-            $responseText = $result['candidates'][0]['content']['parts'][0]['text'] ?? null;
-
-            if (!$responseText) {
-                return response()->json([
-                    'success' => true,
-                    'vendor_id' => $targetVendorId,
-                    'vendor_name' => $vendorName,
-                    'report' => $this->generateMockSentimentReport($vendorName, $metricsData, $positiveComments, $negativeComments, $neutralComments),
-                    'source_metrics' => $metricsData,
-                    'note' => 'Local fallback generated due to empty API output.',
-                    'generated_at' => date('c')
-                ], 200);
-            }
-
-            return response()->json([
-                'success' => true,
-                'vendor_id' => $targetVendorId,
-                'vendor_name' => $vendorName,
-                'report' => $responseText,
-                'source_metrics' => $metricsData,
-                'generated_at' => date('c')
-            ], 200);
-
-        } catch (\Exception $e) {
-            \Illuminate\Support\Facades\Log::error("Gemini Sentiment Report Exception: " . $e->getMessage());
-            return response()->json([
-                'success' => true,
-                'vendor_id' => $targetVendorId,
-                'vendor_name' => $vendorName,
-                'report' => $this->generateMockSentimentReport($vendorName, $metricsData, $positiveComments, $negativeComments, $neutralComments),
-                'source_metrics' => $metricsData,
-                'note' => 'Local fallback generated due to client connection timeout.',
-                'generated_at' => date('c')
-            ], 200);
-        }
+            'message'=>'Feedback summary calculated from recorded student evaluations.',
+            'generated_at'=>date('c'),
+        ],200);
     }
 
     /**
