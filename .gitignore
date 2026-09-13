@@ -29,3 +29,7 @@ backend/database/*.sqlite-*
 *.iml
 .DS_Store
 Thumbs.db
+
+# Root generated files
+.gradle/
+build/
