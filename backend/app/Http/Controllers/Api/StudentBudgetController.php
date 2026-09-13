@@ -5,8 +5,6 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Http;
-use Illuminate\Support\Facades\Log;
 use App\Models\User;
 use App\Models\Order;
 
@@ -197,137 +195,24 @@ class StudentBudgetController extends Controller
             'remaining_budget' => round(max(0.0, $monthlyBudgetLimit - $currentMonthSpent), 2)
         ];
 
-        // Prepare data package for Gemini AI
-        $monthlyListStr = '';
-        foreach ($monthlyAggregations as $m) {
-            $monthlyListStr .= "- **{$m['month']}**: GH₵ {$m['total_spent']} spent across {$m['order_count']} orders (Budget: GH₵ {$m['budget_limit']})\n";
-        }
+        // Return deterministic budget analytics from verified transaction history.
+        $budgetAdvice = $this->generateMockBudgetAdvice(
+            $user->fullName ?: $user->username,
+            $overallMetrics,
+            $finalCategories
+        );
 
-        $categoryListStr = '';
-        foreach ($finalCategories as $c) {
-            $categoryListStr .= "- **{$c['category']}**: GH₵ {$c['total_spent']} (Quantity: {$c['item_count']} units)\n";
-        }
-
-        // Call Gemini API for Personalized Smart Savings & Budgeting Advice
-        $apiKey = env('GEMINI_API_KEY') ?: '';
-        $model = 'gemini-3.5-flash';
-
-        if (empty($apiKey) || $apiKey === 'MY_GEMINI_API_KEY') {
-            return response()->json([
-                'success' => true,
-                'student_id' => $user->id,
-                'student_name' => $user->fullName ?: $user->username,
-                'overall_metrics' => $overallMetrics,
-                'monthly_chart_data' => array_values($monthlyAggregations),
-                'category_chart_data' => $finalCategories,
-                'daily_trend_chart_data' => $finalDaily,
-                'budget_advice' => $this->generateMockBudgetAdvice($user->fullName ?: $user->username, $overallMetrics, $finalCategories),
-                'note' => 'Local smart fallback advice generated. GEMINI_API_KEY is not configured.',
-                'generated_at' => date('c')
-            ], 200);
-        }
-
-        $prompt = "You are an AI Student Financial Advisor and Wellness Coach at Accra Technical University (ATU).
-Please review this aggregated dataset from our cafeteria order records for the student \"{$user->fullName}\":
-
---- HISTORICAL SPENDING PER MONTH ---
-{$monthlyListStr}
-
---- CATEGORY BREAKDOWN ---
-{$categoryListStr}
-
---- CURRENT MONTH STATUS ---
-- Limit: GH₵ " . number_format($monthlyBudgetLimit, 2) . "
-- Spent so far: GH₵ " . number_format($currentMonthSpent, 2) . " (" . round($budgetPercent, 1) . "% consumed)
-- Remaining: GH₵ " . number_format(max(0.0, $monthlyBudgetLimit - $currentMonthSpent), 2) . "
-- Consumption Status: {$statusLevel}
-
-Please draft a highly personalized, empathetic, and actionable Student Savings & Financial Advice Report in Markdown:
-1. **📉 Personal Spending Diagnostics**: Analyze their transaction habits. Identify whether they spend heavily on luxury fast foods vs. traditional pocket-friendly dishes. Mention at least one category from their actual breakdown.
-2. **🛡️ Active Budget Health check**: Provide feedback on their current monthly spending. Offer gentle suggestions if they are in WARNING or EXCEEDED states, or praise them if they are safely UNDER.
-3. **💡 3 Custom ATU Campus Saving Hacks**: Provide 3 super contextual, fun student saving hacks tailored to Accra Technical University (e.g., opting for Waakye or Banku which offer excellent high-volume portion value for money, combining main meals with side proteins instead of buying multiple separate meals, avoiding premium fast foods on high-lecture days, etc.).
-
-Keep the tone incredibly warm, encouraging, student-friendly, and actionable. Avoid complex finance jargon. Limit to 300 words.";
-
-        try {
-            $response = Http::withHeaders([
-                'Content-Type' => 'application/json',
-            ])
-            ->timeout(45)
-            ->post("https://generativelanguage.googleapis.com/v1beta/models/{$model}:generateContent?key={$apiKey}", [
-                'contents' => [
-                    [
-                        'parts' => [
-                            ['text' => $prompt]
-                        ]
-                    ]
-                ],
-                'generationConfig' => [
-                    'temperature' => 0.4
-                ]
-            ]);
-
-            if ($response->failed()) {
-                Log::error("Gemini Budget Insight API Error: " . $response->body());
-                return response()->json([
-                    'success' => true,
-                    'student_id' => $user->id,
-                    'student_name' => $user->fullName ?: $user->username,
-                    'overall_metrics' => $overallMetrics,
-                    'monthly_chart_data' => array_values($monthlyAggregations),
-                    'category_chart_data' => $finalCategories,
-                    'daily_trend_chart_data' => $finalDaily,
-                    'budget_advice' => $this->generateMockBudgetAdvice($user->fullName ?: $user->username, $overallMetrics, $finalCategories),
-                    'note' => 'Local fallback generated due to external endpoint failure.',
-                    'generated_at' => date('c')
-                ], 200);
-            }
-
-            $result = $response->json();
-            $responseText = $result['candidates'][0]['content']['parts'][0]['text'] ?? null;
-
-            if (!$responseText) {
-                return response()->json([
-                    'success' => true,
-                    'student_id' => $user->id,
-                    'student_name' => $user->fullName ?: $user->username,
-                    'overall_metrics' => $overallMetrics,
-                    'monthly_chart_data' => array_values($monthlyAggregations),
-                    'category_chart_data' => $finalCategories,
-                    'daily_trend_chart_data' => $finalDaily,
-                    'budget_advice' => $this->generateMockBudgetAdvice($user->fullName ?: $user->username, $overallMetrics, $finalCategories),
-                    'note' => 'Local fallback generated due to empty API output.',
-                    'generated_at' => date('c')
-                ], 200);
-            }
-
-            return response()->json([
-                'success' => true,
-                'student_id' => $user->id,
-                'student_name' => $user->fullName ?: $user->username,
-                'overall_metrics' => $overallMetrics,
-                'monthly_chart_data' => array_values($monthlyAggregations),
-                'category_chart_data' => $finalCategories,
-                'daily_trend_chart_data' => $finalDaily,
-                'budget_advice' => $responseText,
-                'generated_at' => date('c')
-            ], 200);
-
-        } catch (\Exception $e) {
-            Log::error("Gemini Budget Insight Exception: " . $e->getMessage());
-            return response()->json([
-                'success' => true,
-                'student_id' => $user->id,
-                'student_name' => $user->fullName ?: $user->username,
-                'overall_metrics' => $overallMetrics,
-                'monthly_chart_data' => array_values($monthlyAggregations),
-                'category_chart_data' => $finalCategories,
-                'daily_trend_chart_data' => $finalDaily,
-                'budget_advice' => $this->generateMockBudgetAdvice($user->fullName ?: $user->username, $overallMetrics, $finalCategories),
-                'note' => 'Local fallback generated due to connection timeout.',
-                'generated_at' => date('c')
-            ], 200);
-        }
+        return response()->json([
+            'success' => true,
+            'student_id' => $user->id,
+            'student_name' => $user->fullName ?: $user->username,
+            'overall_metrics' => $overallMetrics,
+            'monthly_chart_data' => array_values($monthlyAggregations),
+            'category_chart_data' => $finalCategories,
+            'daily_trend_chart_data' => $finalDaily,
+            'budget_advice' => $budgetAdvice,
+            'generated_at' => date('c')
+        ], 200);
     }
 
     /**
