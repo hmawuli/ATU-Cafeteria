@@ -94,7 +94,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                     TextFormField(
                       controller: _username,
                       textInputAction: TextInputAction.next,
-                      decoration: const InputDecoration(labelText: 'Username / Student ID', prefixIcon: Icon(Icons.badge_outlined)),
+                      decoration: const InputDecoration(labelText: 'Username', prefixIcon: Icon(Icons.badge_outlined)),
                       validator: (v) => v == null || !RegExp(r'^[A-Za-z0-9_-]{3,100}$').hasMatch(v.trim())
                           ? 'Use 3–100 letters, numbers, _ or -.' : null,
                     ),
