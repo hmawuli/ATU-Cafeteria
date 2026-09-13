@@ -10,7 +10,6 @@ import 'package:atu_cafeteria/presentation/screens/login_screen.dart';
 import 'package:atu_cafeteria/presentation/screens/register_screen.dart';
 import 'package:atu_cafeteria/presentation/screens/student_dashboard.dart';
 import 'package:atu_cafeteria/presentation/screens/vendor_dashboard.dart';
-import 'package:atu_cafeteria/presentation/screens/smart_insights_screen.dart';
 import 'package:atu_cafeteria/presentation/screens/password_reset_screen.dart';
 import 'package:atu_cafeteria/presentation/screens/email_verification_screen.dart';
 import 'package:atu_cafeteria/presentation/screens/cart_screen.dart';
@@ -47,7 +46,6 @@ class ATUCafeteriaApp extends StatelessWidget {
           '/student': (_) => const StudentDashboardScreen(),
           '/vendor': (_) => const VendorDashboardScreen(),
           '/admin': (_) => const AdminDashboardScreen(),
-          '/smart-insights': (_) => const SmartInsightsScreen(),
           '/reset-password': (_) => const PasswordResetScreen(),
           '/verify-email': (_) => const EmailVerificationScreen(),
           '/admin-security': (_) => const AdminSecurityScreen(),
