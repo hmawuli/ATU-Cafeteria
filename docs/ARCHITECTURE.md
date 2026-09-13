@@ -57,7 +57,6 @@ app/
 - The Flutter client sends a SHA-256 PIN representation required by the existing backend contract.
 - Authenticated endpoints use the returned bearer token.
 - Role checks remain server-side; the Flutter role only controls navigation/UI.
-- Secrets such as Paystack and Gemini keys belong in server environment variables, never in Flutter source.
 
 ## Performance boundary
 
