@@ -82,10 +82,10 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                               ),
                               const RadioListTile<String>(
                                 value: 'Online',
-                                title: const Text('Mobile Money / Card'),
-                                subtitle: const Text(
+                                title: Text('Mobile Money / Card'),
+                                subtitle: Text(
                                     'Pay securely through Paystack.'),
-                                secondary: const Icon(Icons.payments_outlined),
+                                secondary: Icon(Icons.payments_outlined),
                               ),
                             ]))),
                 const SizedBox(height: 18),
