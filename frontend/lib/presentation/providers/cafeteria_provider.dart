@@ -17,6 +17,8 @@ class CafeteriaProvider extends ChangeNotifier {
   void dispose() {
     _readyPollingTimer?.cancel();
     _readyPollingTimer = null;
+    _vendorOrderPollingTimer?.cancel();
+    _vendorOrderPollingTimer = null;
     super.dispose();
   }
 
@@ -411,6 +413,39 @@ class CafeteriaProvider extends ChangeNotifier {
   // TRANSACTION / AUTH ACTIONS
   // ==========================================
 
+  Timer? _vendorOrderPollingTimer;
+
+  void startVendorOrderPolling() {
+    _vendorOrderPollingTimer?.cancel();
+    _vendorOrderPollingTimer = Timer.periodic(const Duration(seconds: 10), (_) {
+      if (_currentUser?.role == 'VENDOR' || _currentUser?.role == 'ADMIN') {
+        _refreshVendorOrdersSilently();
+      }
+    });
+  }
+
+  Future<void> _refreshVendorOrdersSilently() async {
+    if (_authToken == null || _currentUser?.id == null) return;
+    try {
+      final url = Uri.parse('$_laravelBaseUrl/api/vendor/my-orders');
+      final response = await http.get(url, headers: {
+        'Accept': 'application/json',
+        'Authorization': 'Bearer $_authToken',
+      }).timeout(const Duration(seconds: 8));
+      if (response.statusCode != 200) return;
+      final value = jsonDecode(response.body);
+      if (value is List) {
+        _vendorOrders = value
+            .whereType<Map>()
+            .map((e) => Order.fromJson(Map<String, dynamic>.from(e)))
+            .toList();
+        notifyListeners();
+      }
+    } catch (e) {
+      debugPrint('Vendor order refresh skipped: $e');
+    }
+  }
+
   Future<void> restoreSession() async {
     final token = await SecureSessionStore.token();
     if (token == null || token.isEmpty) return;
@@ -435,6 +470,9 @@ class CafeteriaProvider extends ChangeNotifier {
       _currentUser =
           User.fromJson(Map<String, dynamic>.from(decoded['user'] ?? {}));
       if (_currentUser?.role == 'STUDENT') _startReadyOrderPolling();
+      if (_currentUser?.role == 'VENDOR' || _currentUser?.role == 'ADMIN') {
+        startVendorOrderPolling();
+      }
     } catch (e) {
       debugPrint('Session restore failed: $e');
       _authToken = null;
@@ -525,7 +563,10 @@ class CafeteriaProvider extends ChangeNotifier {
         }
 
         _isLoading = false;
-        _startReadyOrderPolling();
+        if (_currentUser?.role == 'STUDENT') _startReadyOrderPolling();
+        if (_currentUser?.role == 'VENDOR' || _currentUser?.role == 'ADMIN') {
+          startVendorOrderPolling();
+        }
         notifyListeners();
         return true;
       }
