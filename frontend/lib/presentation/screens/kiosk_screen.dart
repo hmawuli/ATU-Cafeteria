@@ -33,7 +33,8 @@ class _KioskScreenState extends State<KioskScreen> {
   Widget build(BuildContext context) {
     final provider = context.watch<CafeteriaProvider>();
     final cart = context.watch<CartProvider>();
-    final items = provider.foodItems.where((item) {
+    final items = provider.allFoodItems.where((item) {
+      if (!item.isAvailable) return false;
       final q = _query.trim().toLowerCase();
       return q.isEmpty ||
           item.name.toLowerCase().contains(q) ||
