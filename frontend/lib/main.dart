@@ -15,6 +15,7 @@ import 'package:atu_cafeteria/presentation/screens/email_verification_screen.dar
 import 'package:atu_cafeteria/presentation/screens/cart_screen.dart';
 import 'package:atu_cafeteria/presentation/screens/checkout_screen.dart';
 import 'package:atu_cafeteria/presentation/screens/admin_security_screen.dart';
+import 'package:atu_cafeteria/presentation/screens/kiosk_screen.dart';
 import 'package:atu_cafeteria/presentation/widgets/auth_gate.dart';
 
 void main() {
@@ -51,6 +52,7 @@ class ATUCafeteriaApp extends StatelessWidget {
           '/admin-security': (_) => const AdminSecurityScreen(),
           '/cart': (_) => const CartScreen(),
           '/checkout': (_) => const CheckoutScreen(),
+          '/kiosk': (_) => const KioskScreen(),
         },
       ),
     );
