@@ -106,7 +106,8 @@ class _VendorDashboardScreenState extends State<VendorDashboardScreen> {
                 provider.logOut();
                 Navigator.pushReplacementNamed(context, '/login');
               },
-            )
+            ),
+          ],
         ],
       ),
       bottomNavigationBar: NavigationBar(
