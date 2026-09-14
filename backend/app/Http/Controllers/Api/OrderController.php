@@ -1458,6 +1458,8 @@ class OrderController extends Controller
             'items.*.menu_item_id' => 'required|integer|distinct|exists:menu_items,id',
             'items.*.quantity' => 'required|integer|min:1|max:50',
             'points_to_redeem' => 'nullable|integer|min:0|max:100000',
+            'payment_method' => 'nullable|string|in:wallet,momo,card,WALLET,MOMO,CARD',
+            'payment_reference' => 'nullable|string|max:120',
         ]);
 
         if ($validator->fails()) {
@@ -1478,6 +1480,8 @@ class OrderController extends Controller
                 // Lock the wallet owner row so two simultaneous checkouts cannot spend the same balance.
                 $lockedUser = User::whereKey($user->id)->lockForUpdate()->firstOrFail();
                 $pointsToRedeem = (int) $request->input('points_to_redeem', 0);
+                $paymentMethod = strtoupper((string) $request->input('payment_method', 'wallet'));
+                $paymentReference = trim((string) $request->input('payment_reference', ''));
                 $total = 0.0;
                 $items = [];
 
@@ -1511,7 +1515,19 @@ class OrderController extends Controller
                 $discount = round($pointsToRedeem * 0.10, 2);
                 $finalTotal = max(0.0, round($total - $discount, 2));
 
-                if ((float) $lockedUser->balance < $finalTotal) {
+                if ($paymentMethod !== 'WALLET') {
+                    if ($paymentReference === '') {
+                        throw new \RuntimeException('A verified online payment reference is required.');
+                    }
+                    $verifiedPayment = AuditLog::where('user_id', $lockedUser->id)
+                        ->where('action', 'PAYSTACK_DIRECT_PAY')
+                        ->where('details', 'like', '%' . $paymentReference . '%')
+                        ->where('details', 'like', 'Cleared GH₵ ' . number_format($finalTotal, 2) . '%')
+                        ->exists();
+                    if (!$verifiedPayment) {
+                        throw new \RuntimeException('The online payment could not be verified for this order total.');
+                    }
+                } elseif ((float) $lockedUser->balance < $finalTotal) {
                     throw new \RuntimeException(
                         'Insufficient wallet balance. You need GH₵ '.number_format($finalTotal, 2).
                         ', but your balance is GH₵ '.number_format((float) $lockedUser->balance, 2).'.'
@@ -1558,18 +1574,22 @@ class OrderController extends Controller
                     $createdOrders[] = $order;
                 }
 
-                $lockedUser->balance = round((float) $lockedUser->balance - $finalTotal, 2);
+                if ($paymentMethod === 'WALLET') {
+                    $lockedUser->balance = round((float) $lockedUser->balance - $finalTotal, 2);
+                }
                 $lockedUser->loyalty_points = (int) ($lockedUser->loyalty_points ?? 0) - $pointsToRedeem;
                 $lockedUser->save();
 
-                WalletTransaction::create([
-                    'user_id' => $lockedUser->id,
-                    'type' => 'PAYMENT',
-                    'amount' => -$finalTotal,
-                    'status' => 'SUCCESS',
-                    'reference' => 'CART-ORD-'.Str::upper(Str::random(20)),
-                    'details' => 'Cafeteria cart checkout payment.',
-                ]);
+                if ($paymentMethod === 'WALLET') {
+                    WalletTransaction::create([
+                        'user_id' => $lockedUser->id,
+                        'type' => 'PAYMENT',
+                        'amount' => -$finalTotal,
+                        'status' => 'SUCCESS',
+                        'reference' => 'CART-ORD-'.Str::upper(Str::random(20)),
+                        'details' => 'Cafeteria cart checkout payment.',
+                    ]);
+                }
 
                 return [
                     'orders' => $createdOrders,
