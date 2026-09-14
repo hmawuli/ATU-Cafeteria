@@ -217,7 +217,7 @@ class PaystackPaymentController extends Controller
                     'user_id' => $user->id,
                     'timestamp' => time() * 1000,
                     'action' => 'PAYSTACK_DIRECT_PAY',
-                    'details' => "Cleared GH₵ {$amountPaid} for direct order fulfillment via secure Paystack gateway. Ref: {$reference}.",
+                    'details' => "Cleared GH₵ " . number_format($amountPaid, 2) . " for direct order fulfillment via secure Paystack gateway. Ref: {$reference}.",
                 ]);
             }
 
