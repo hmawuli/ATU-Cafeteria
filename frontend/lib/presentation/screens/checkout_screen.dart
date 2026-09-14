@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../providers/cart_provider.dart';
+import '../providers/cafeteria_provider.dart';
 import '../../core/network/api_client.dart';
 
 class CheckoutScreen extends StatefulWidget {
@@ -149,6 +150,34 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
   }
 
   Future<void> _showConfirmation(BuildContext context) async {
+    final auth = context.read<CafeteriaProvider>();
+    if (auth.currentUser == null) {
+      final goToLogin = await showDialog<bool>(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          icon: const Icon(Icons.lock_outline, size: 42),
+          title: const Text('Sign in required'),
+          content: const Text(
+            'Please sign in to place your order. Your cart will be kept while you sign in.',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx, false),
+              child: const Text('Not now'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.pop(ctx, true),
+              child: const Text('Sign in'),
+            ),
+          ],
+        ),
+      );
+      if (goToLogin == true && mounted) {
+        Navigator.pushNamed(context, '/login');
+      }
+      return;
+    }
+
     final cart = context.read<CartProvider>();
     if (cart.isEmpty) return;
     final ok = await showDialog<bool>(
