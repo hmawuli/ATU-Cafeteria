@@ -16,6 +16,7 @@ import 'package:atu_cafeteria/presentation/screens/cart_screen.dart';
 import 'package:atu_cafeteria/presentation/screens/checkout_screen.dart';
 import 'package:atu_cafeteria/presentation/screens/admin_security_screen.dart';
 import 'package:atu_cafeteria/presentation/screens/kiosk_screen.dart';
+import 'package:atu_cafeteria/presentation/screens/vendor_order_display_screen.dart';
 import 'package:atu_cafeteria/presentation/widgets/auth_gate.dart';
 
 void main() {
@@ -53,6 +54,7 @@ class ATUCafeteriaApp extends StatelessWidget {
           '/cart': (_) => const CartScreen(),
           '/checkout': (_) => const CheckoutScreen(),
           '/kiosk': (_) => const KioskScreen(),
+          '/vendor-display': (_) => const VendorOrderDisplayScreen(),
         },
       ),
     );
