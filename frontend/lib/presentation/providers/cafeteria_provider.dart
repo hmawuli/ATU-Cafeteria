@@ -1121,6 +1121,10 @@ class CafeteriaProvider extends ChangeNotifier {
       client.connectionTimeout = const Duration(seconds: 3);
       final request = await client.postUrl(postUrl);
       request.headers.add("Content-Type", "application/json");
+      request.headers.add("Accept", "application/json");
+      if (_authToken != null && _authToken!.isNotEmpty) {
+        request.headers.add("Authorization", "Bearer $_authToken");
+      }
 
       final payload = json.encode({
         'customer_id': _currentUser!.id!,
@@ -1263,6 +1267,10 @@ class CafeteriaProvider extends ChangeNotifier {
       final client = HttpClient();
       client.connectionTimeout = const Duration(seconds: 4);
       final request = await client.getUrl(verifyUrl);
+      request.headers.add("Accept", "application/json");
+      if (_authToken != null && _authToken!.isNotEmpty) {
+        request.headers.add("Authorization", "Bearer $_authToken");
+      }
       final response = await request.close();
       final body = await response.transform(utf8.decoder).join();
       final decoded = json.decode(body);
