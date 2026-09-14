@@ -19,13 +19,12 @@ class DatabaseSeeder extends Seeder
      */
     public function run(): void
     {
-        // 1. Setup default password hash (SHA-256 for cross-compliance)
-        // 1234 -> sha256 to allow immediate login via mobile app PIN codes
-        $studHash = hash('sha256', '1234');
-        $v1Hash = hash('sha256', '1111');
-        $v2Hash = hash('sha256', '2222');
-        $v3Hash = hash('sha256', '3333');
-        $adminHash = hash('sha256', 'admin123');
+        // 1. Use Laravel's password hashing so authentication with Hash::check() works.
+        $studHash = Hash::make('1234');
+        $v1Hash = Hash::make('1111');
+        $v2Hash = Hash::make('2222');
+        $v3Hash = Hash::make('3333');
+        $adminHash = Hash::make('admin123');
 
         // 2. Create Users
         $stud1 = User::create([
