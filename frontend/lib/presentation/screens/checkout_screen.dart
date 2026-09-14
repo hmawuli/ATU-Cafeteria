@@ -176,34 +176,59 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
       }
       _paymentReference = reference;
 
-      final launched = await launchUrl(
-        Uri.parse(authorizationUrl),
-        mode: LaunchMode.externalApplication,
-      );
-      if (!launched) throw Exception('Unable to open the payment page.');
+      final simulated = init['is_simulated'] == true;
+      if (!simulated) {
+        final launched = await launchUrl(
+          Uri.parse(authorizationUrl),
+          mode: LaunchMode.externalApplication,
+        );
+        if (!launched) throw Exception('Unable to open the payment page.');
 
-      if (!mounted) return;
-      final verified = await showDialog<bool>(
-        context: context,
-        barrierDismissible: false,
-        builder: (ctx) => AlertDialog(
-          title: const Text('Complete your payment'),
-          content: const Text(
-            'Finish the payment in the browser, then return here and tap “I have paid”.',
+        if (!mounted) return;
+        final verified = await showDialog<bool>(
+          context: context,
+          barrierDismissible: false,
+          builder: (ctx) => AlertDialog(
+            title: const Text('Complete your payment'),
+            content: const Text(
+              'Finish the payment in the browser, then return here and tap “I have paid”.',
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(ctx, false),
+                child: const Text('Cancel'),
+              ),
+              FilledButton(
+                onPressed: () => Navigator.pop(ctx, true),
+                child: const Text('I have paid'),
+              ),
+            ],
           ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(ctx, false),
-              child: const Text('Cancel'),
+        );
+        if (verified != true || !mounted) return;
+      } else {
+        if (!mounted) return;
+        final proceed = await showDialog<bool>(
+          context: context,
+          builder: (ctx) => AlertDialog(
+            title: const Text('Payment simulation'),
+            content: Text(
+              'The backend is using its local Paystack simulation. Continue as a simulated successful payment of GH₵ ${cart.subtotal.toStringAsFixed(2)}?',
             ),
-            FilledButton(
-              onPressed: () => Navigator.pop(ctx, true),
-              child: const Text('I have paid'),
-            ),
-          ],
-        ),
-      );
-      if (verified != true || !mounted) return;
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(ctx, false),
+                child: const Text('Cancel'),
+              ),
+              FilledButton(
+                onPressed: () => Navigator.pop(ctx, true),
+                child: const Text('Simulate payment'),
+              ),
+            ],
+          ),
+        );
+        if (proceed != true || !mounted) return;
+      }
 
       final confirmed = await auth.verifyPaystackPayment(
         reference: reference,
