@@ -153,7 +153,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
 
   Future<void> _payOnline(BuildContext context, CafeteriaProvider auth, CartProvider cart) async {
     final user = auth.currentUser;
-    final email = user?.email ?? user?.profileInfo['email']?.toString();
+    final email = user?.email;
     if (email == null || email.trim().isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('A valid email address is required for online payment.')),
