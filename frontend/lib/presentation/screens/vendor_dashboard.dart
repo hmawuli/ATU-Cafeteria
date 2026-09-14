@@ -87,7 +87,18 @@ class _VendorDashboardScreenState extends State<VendorDashboardScreen> {
                 },
               ),
             )
-          else
+          else ...[
+            IconButton(
+              tooltip: 'Open order display',
+              icon: const Icon(Icons.tv_outlined),
+              onPressed: () =>
+                  Navigator.pushNamed(context, '/vendor-display'),
+            ),
+            IconButton(
+              tooltip: 'Open self-service kiosk',
+              icon: const Icon(Icons.point_of_sale_outlined),
+              onPressed: () => Navigator.pushNamed(context, '/kiosk'),
+            ),
             IconButton(
               icon: const Icon(Icons.logout),
               tooltip: "Logout Securely",
