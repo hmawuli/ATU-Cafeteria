@@ -128,8 +128,15 @@ class PaystackPaymentController extends Controller
                 if ($response->successful()) {
                     $resData = $response->json();
                     if ($resData['data']['status'] === 'success') {
+                        $amountPaid = $resData['data']['amount'] / 100.0;
+                        $expectedAmount = (float) $request->input('amount', 0);
+                        if ($expectedAmount > 0 && abs($amountPaid - $expectedAmount) > 0.01) {
+                            return response()->json([
+                                'success' => false,
+                                'message' => 'The payment amount does not match the order total.'
+                            ], 409);
+                        }
                         $paymentSuccess = true;
-                        $amountPaid = $resData['data']['amount'] / 100.0; // Convert back to GHS / NGN
                         $metadata = $resData['data']['metadata'] ?? [];
                     }
                 }
