@@ -75,7 +75,18 @@ class _StudentDashboardScreenState extends State<StudentDashboardScreen> {
                 },
               ),
             )
-          else
+          else ...[
+            Consumer<CartProvider>(
+              builder: (context, cart, _) => Badge(
+                isLabelVisible: cart.itemCount > 0,
+                label: Text('${cart.itemCount}'),
+                child: IconButton(
+                  icon: const Icon(Icons.shopping_cart_outlined),
+                  tooltip: 'View cart',
+                  onPressed: () => Navigator.pushNamed(context, '/cart'),
+                ),
+              ),
+            ),
             IconButton(
               icon: const Icon(Icons.logout),
               tooltip: "Logout Securely",
@@ -83,7 +94,8 @@ class _StudentDashboardScreenState extends State<StudentDashboardScreen> {
                 provider.logOut();
                 Navigator.pushReplacementNamed(context, '/login');
               },
-            )
+            ),
+          ]
         ],
       ),
       bottomNavigationBar: NavigationBar(
