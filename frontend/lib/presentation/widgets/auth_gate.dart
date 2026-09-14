@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../providers/cafeteria_provider.dart';
 import '../screens/login_screen.dart';
+import '../screens/public_home_screen.dart';
 
 class AuthGate extends StatefulWidget {
   const AuthGate({super.key});
@@ -11,6 +12,7 @@ class AuthGate extends StatefulWidget {
 
 class _AuthGateState extends State<AuthGate> {
   bool ready = false;
+
   @override
   void initState() {
     super.initState();
@@ -27,8 +29,10 @@ class _AuthGateState extends State<AuthGate> {
     if (!ready) {
       return const Scaffold(body: Center(child: CircularProgressIndicator()));
     }
+
     final p = context.watch<CafeteriaProvider>();
-    if (p.currentUser == null) return const LoginScreen();
+    if (p.currentUser == null) return const PublicHomeScreen();
+
     final role = p.currentUser!.role;
     if (role == 'ADMIN') return const _RoutePage(route: '/admin');
     if (role == 'VENDOR') return const _RoutePage(route: '/vendor');
@@ -39,6 +43,7 @@ class _AuthGateState extends State<AuthGate> {
 class _RoutePage extends StatelessWidget {
   final String route;
   const _RoutePage({required this.route});
+
   @override
   Widget build(BuildContext context) {
     WidgetsBinding.instance.addPostFrameCallback((_) {
