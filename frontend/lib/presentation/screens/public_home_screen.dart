@@ -69,7 +69,7 @@ class _PublicHomeScreenState extends State<PublicHomeScreen> {
     context.read<CartProvider>().add(item);
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        content: Text(item.name + ' added to your cart.'),
+        content: Text('${item.name} added to your cart.'),
         action: SnackBarAction(
           label: 'VIEW CART',
           onPressed: () => Navigator.pushNamed(context, '/cart'),
@@ -528,7 +528,7 @@ class _MealCard extends StatelessWidget {
                   Row(
                     children: [
                       Text(
-                        'GH₵ ' + item.price.toStringAsFixed(2),
+                        'GH₵ ${item.price.toStringAsFixed(2)}',
                         style: TextStyle(
                           fontSize: 17,
                           fontWeight: FontWeight.w900,
