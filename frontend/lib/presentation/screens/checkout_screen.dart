@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:url_launcher/url_launcher.dart';
 import 'package:provider/provider.dart';
 import '../providers/cart_provider.dart';
 import '../providers/cafeteria_provider.dart';
@@ -12,6 +13,7 @@ class CheckoutScreen extends StatefulWidget {
 
 class _CheckoutScreenState extends State<CheckoutScreen> {
   String _method = 'Wallet';
+  String? _paymentReference;
   final TextEditingController _noteController = TextEditingController();
   bool _submitting = false;
   final ApiClient _api = ApiClient();
@@ -79,12 +81,12 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                                       Icons.account_balance_wallet_outlined),
                                 ),
                               ),
-                              const ListTile(
-                                leading: Icon(Icons.credit_card_rounded),
-                                title: Text('Online payment'),
-                                subtitle: Text(
-                                    'Coming soon. Wallet payment is currently available.'),
-                                enabled: false,
+                              RadioListTile<String>(
+                                value: 'Online',
+                                title: const Text('Mobile Money / Card'),
+                                subtitle: const Text(
+                                    'Pay securely through Paystack.'),
+                                secondary: const Icon(Icons.payments_outlined),
                               ),
                             ]))),
                 const SizedBox(height: 18),
@@ -149,6 +151,108 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
     );
   }
 
+  Future<void> _payOnline(BuildContext context, CafeteriaProvider auth, CartProvider cart) async {
+    final user = auth.currentUser;
+    final email = user?.email ?? user?.profileInfo['email']?.toString();
+    if (email == null || email.trim().isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('A valid email address is required for online payment.')),
+      );
+      return;
+    }
+
+    setState(() => _submitting = true);
+    try {
+      final init = await auth.initializePaystackPayment(
+        amount: cart.subtotal,
+        email: email.trim(),
+        purpose: 'DIRECT_ORDER_PAY',
+      );
+      if (init == null) throw Exception('Payment could not be initialized.');
+      final reference = init['reference']?.toString();
+      final authorizationUrl = init['authorization_url']?.toString();
+      if (reference == null || authorizationUrl == null) {
+        throw Exception('Payment gateway returned an incomplete response.');
+      }
+      _paymentReference = reference;
+
+      final launched = await launchUrl(
+        Uri.parse(authorizationUrl),
+        mode: LaunchMode.externalApplication,
+      );
+      if (!launched) throw Exception('Unable to open the payment page.');
+
+      if (!mounted) return;
+      final verified = await showDialog<bool>(
+        context: context,
+        barrierDismissible: false,
+        builder: (ctx) => AlertDialog(
+          title: const Text('Complete your payment'),
+          content: const Text(
+            'Finish the payment in the browser, then return here and tap “I have paid”.',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx, false),
+              child: const Text('Cancel'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.pop(ctx, true),
+              child: const Text('I have paid'),
+            ),
+          ],
+        ),
+      );
+      if (verified != true || !mounted) return;
+
+      final confirmed = await auth.verifyPaystackPayment(
+        reference: reference,
+        amount: cart.subtotal,
+        purpose: 'DIRECT_ORDER_PAY',
+      );
+      if (!confirmed) throw Exception('Payment has not been confirmed by Paystack.');
+
+      final result = await _api.post('/student/cart-checkout', body: {
+        'items': cart.toCheckoutPayload(),
+        'payment_method': 'momo',
+        'payment_reference': reference,
+        if (_noteController.text.trim().isNotEmpty) 'note': _noteController.text.trim(),
+      });
+      if (!mounted) return;
+      cart.clear();
+      final pickupPin = result is Map ? result['pickup_pin']?.toString() : null;
+      await showDialog<void>(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          icon: const Icon(Icons.verified_outlined, size: 48),
+          title: const Text('Payment confirmed'),
+          content: Text(
+            pickupPin == null
+                ? 'Your order has been placed successfully.'
+                : 'Order placed successfully. Pickup PIN: $pickupPin',
+          ),
+          actions: [
+            FilledButton(
+              onPressed: () {
+                Navigator.pop(ctx);
+                Navigator.pushReplacementNamed(context, '/student');
+              },
+              child: const Text('View order'),
+            ),
+          ],
+        ),
+      );
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(e.toString().replaceFirst('Exception: ', ''))),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _submitting = false);
+    }
+  }
+
   Future<void> _showConfirmation(BuildContext context) async {
     final auth = context.read<CafeteriaProvider>();
     if (auth.currentUser == null) {
@@ -180,6 +284,11 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
 
     final cart = context.read<CartProvider>();
     if (cart.isEmpty) return;
+    if (_method == 'Online') {
+      await _payOnline(context, auth, cart);
+      return;
+    }
+
     final ok = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
