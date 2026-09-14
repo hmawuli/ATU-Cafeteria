@@ -13,7 +13,6 @@ class CheckoutScreen extends StatefulWidget {
 
 class _CheckoutScreenState extends State<CheckoutScreen> {
   String _method = 'Wallet';
-  String? _paymentReference;
   final TextEditingController _noteController = TextEditingController();
   bool _submitting = false;
   final ApiClient _api = ApiClient();
@@ -81,7 +80,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                                       Icons.account_balance_wallet_outlined),
                                 ),
                               ),
-                              RadioListTile<String>(
+                              const RadioListTile<String>(
                                 value: 'Online',
                                 title: const Text('Mobile Money / Card'),
                                 subtitle: const Text(
@@ -174,7 +173,6 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
       if (reference == null || authorizationUrl == null) {
         throw Exception('Payment gateway returned an incomplete response.');
       }
-      _paymentReference = reference;
 
       final simulated = init['is_simulated'] == true;
       if (!simulated) {
@@ -184,7 +182,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
         );
         if (!launched) throw Exception('Unable to open the payment page.');
 
-        if (!mounted) return;
+        if (!context.mounted) return;
         final verified = await showDialog<bool>(
           context: context,
           barrierDismissible: false,
@@ -205,9 +203,9 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
             ],
           ),
         );
-        if (verified != true || !mounted) return;
+        if (verified != true || !context.mounted) return;
       } else {
-        if (!mounted) return;
+        if (!context.mounted) return;
         final proceed = await showDialog<bool>(
           context: context,
           builder: (ctx) => AlertDialog(
@@ -227,7 +225,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
             ],
           ),
         );
-        if (proceed != true || !mounted) return;
+        if (proceed != true || !context.mounted) return;
       }
 
       final confirmed = await auth.verifyPaystackPayment(
@@ -243,7 +241,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
         'payment_reference': reference,
         if (_noteController.text.trim().isNotEmpty) 'note': _noteController.text.trim(),
       });
-      if (!mounted) return;
+      if (!context.mounted) return;
       cart.clear();
       final pickupPin = result is Map ? result['pickup_pin']?.toString() : null;
       await showDialog<void>(
@@ -268,7 +266,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
         ),
       );
     } catch (e) {
-      if (mounted) {
+      if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text(e.toString().replaceFirst('Exception: ', ''))),
         );
@@ -301,7 +299,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
           ],
         ),
       );
-      if (goToLogin == true && mounted) {
+      if (goToLogin == true && context.mounted) {
         Navigator.pushNamed(context, '/login');
       }
       return;
