@@ -10,6 +10,15 @@ import 'package:atu_cafeteria/core/storage/secure_session_store.dart';
 
 class CafeteriaProvider extends ChangeNotifier {
   final DbHelper _db = DbHelper.instance;
+  Timer? _readyPollingTimer;
+  final Set<int> _announcedReadyOrders = <int>{};
+
+  @override
+  void dispose() {
+    _readyPollingTimer?.cancel();
+    _readyPollingTimer = null;
+    super.dispose();
+  }
 
   // Real-time State Streams
   User? _currentUser;
@@ -352,6 +361,53 @@ class CafeteriaProvider extends ChangeNotifier {
   }
 
   // ==========================================
+  // STUDENT ORDER READY NOTIFICATIONS
+  // ==========================================
+  void _startReadyOrderPolling() {
+    _readyPollingTimer?.cancel();
+    _readyPollingTimer = Timer.periodic(const Duration(seconds: 15), (_) {
+      pollReadyOrders();
+    });
+    pollReadyOrders();
+  }
+
+  Future<void> pollReadyOrders() async {
+    if (_authToken == null || _currentUser?.role != 'STUDENT') return;
+    try {
+      final url = Uri.parse('$_laravelBaseUrl/api/student/orders/poll-ready');
+      final response = await http.get(url, headers: {
+        'Accept': 'application/json',
+        'Authorization': 'Bearer $_authToken',
+      }).timeout(const Duration(seconds: 8));
+
+      if (response.statusCode != 200 || response.body.isEmpty) return;
+      final decoded = jsonDecode(response.body);
+      if (decoded is! Map) return;
+      final alerts = decoded['ready_alerts'];
+      if (alerts is! List) return;
+
+      var changed = false;
+      for (final raw in alerts) {
+        if (raw is! Map) continue;
+        final id = int.tryParse(raw['order_id']?.toString() ?? '');
+        if (id == null || _announcedReadyOrders.contains(id)) continue;
+
+        _announcedReadyOrders.add(id);
+        final title = raw['title']?.toString() ?? 'Order Ready for Pickup! 🍽️';
+        final body = raw['body']?.toString() ??
+            'Your order #$id is ready for pickup.';
+        _liveAlerts.insert(0, '$title $body');
+        if (_liveAlerts.length > 5) _liveAlerts.removeLast();
+        changed = true;
+      }
+
+      if (changed) notifyListeners();
+    } catch (e) {
+      debugPrint('Ready-order polling skipped: $e');
+    }
+  }
+
+  // ==========================================
   // TRANSACTION / AUTH ACTIONS
   // ==========================================
 
@@ -378,6 +434,7 @@ class CafeteriaProvider extends ChangeNotifier {
       final decoded = jsonDecode(response.body) as Map<String, dynamic>;
       _currentUser =
           User.fromJson(Map<String, dynamic>.from(decoded['user'] ?? {}));
+      if (_currentUser?.role == 'STUDENT') _startReadyOrderPolling();
     } catch (e) {
       debugPrint('Session restore failed: $e');
       _authToken = null;
@@ -468,6 +525,7 @@ class CafeteriaProvider extends ChangeNotifier {
         }
 
         _isLoading = false;
+        _startReadyOrderPolling();
         notifyListeners();
         return true;
       }
@@ -796,6 +854,9 @@ class CafeteriaProvider extends ChangeNotifier {
             timestamp: DateTime.now().millisecondsSinceEpoch));
       } catch (_) {}
     }
+    _readyPollingTimer?.cancel();
+    _readyPollingTimer = null;
+    _announcedReadyOrders.clear();
     _authToken = null;
     _currentUser = null;
     _loginError = null;
