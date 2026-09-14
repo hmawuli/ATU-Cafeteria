@@ -38,7 +38,7 @@ class _VendorOrderDisplayScreenState extends State<VendorOrderDisplayScreen> {
         actions: [
           IconButton(
             tooltip: 'Refresh',
-            onPressed: () => provider.refreshAllData(),
+            onPressed: provider.refreshAllData,
             icon: const Icon(Icons.refresh),
           ),
           const SizedBox(width: 12),
