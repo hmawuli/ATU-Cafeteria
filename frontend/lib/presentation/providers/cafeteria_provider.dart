@@ -1233,23 +1233,22 @@ class CafeteriaProvider extends ChangeNotifier {
       client.connectionTimeout = const Duration(seconds: 4);
       final request = await client.postUrl(initUrl);
       request.headers.add("Content-Type", "application/json");
-
-      final payload = json.encode({
+      request.headers.add("Accept", "application/json");
+      if (_authToken != null && _authToken!.isNotEmpty) {
+        request.headers.add("Authorization", "Bearer $_authToken");
+      }
+      request.add(utf8.encode(json.encode({
         'amount': amount,
         'email': email,
         'purpose': purpose,
-      });
-      request.add(utf8.encode(payload));
-
+      })));
       final response = await request.close();
       final body = await response.transform(utf8.decoder).join();
       final decoded = json.decode(body);
-
-      if (response.statusCode == 200 && decoded['success'] == true) {
-        return Map<String, dynamic>.from(decoded['data']);
-      } else {
-        debugPrint("Initialize Paystack error response: $body");
+      if (response.statusCode == 200 && decoded is Map && decoded['success'] == true) {
+        return Map<String, dynamic>.from(decoded['data'] as Map);
       }
+      debugPrint("Initialize Paystack error response: $body");
     } catch (e) {
       debugPrint("Exception initializing Paystack payment: $e");
     }
@@ -1263,7 +1262,8 @@ class CafeteriaProvider extends ChangeNotifier {
   }) async {
     try {
       final verifyUrl = Uri.parse(
-          "$_laravelBaseUrl/api/paystack/verify/$reference?amount=$amount&purpose=$purpose");
+        "$_laravelBaseUrl/api/paystack/verify/$reference?amount=$amount&purpose=$purpose",
+      );
       final client = HttpClient();
       client.connectionTimeout = const Duration(seconds: 4);
       final request = await client.getUrl(verifyUrl);
@@ -1274,26 +1274,14 @@ class CafeteriaProvider extends ChangeNotifier {
       final response = await request.close();
       final body = await response.transform(utf8.decoder).join();
       final decoded = json.decode(body);
-
-      if (response.statusCode == 200 && decoded['success'] == true) {
+      if (response.statusCode == 200 && decoded is Map && decoded['success'] == true) {
         if (purpose == 'WALLET_TOPUP') {
-          // Sync local balance
           _studentWalletBalance += amount;
-          if (_currentUser != null) {
-            await _db.insertAuditLog(AuditLog(
-              userId: _currentUser!.id!,
-              action: "WALLET_CREDIT_SECURE",
-              details:
-                  "MoMo Paystack checkout validated successfully. Reference: $reference. Amount: GH₵ ${amount.toStringAsFixed(2)}",
-              timestamp: DateTime.now().millisecondsSinceEpoch,
-            ));
-          }
           await refreshAllData();
         }
         return true;
-      } else {
-        debugPrint("Verify Paystack error response: $body");
       }
+      debugPrint("Verify Paystack error response: $body");
     } catch (e) {
       debugPrint("Exception verifying Paystack payment: $e");
     }
