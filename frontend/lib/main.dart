@@ -19,6 +19,7 @@ import 'package:atu_cafeteria/presentation/screens/smart_insights_screen.dart';
 import 'package:atu_cafeteria/presentation/screens/kiosk_screen.dart';
 import 'package:atu_cafeteria/presentation/screens/vendor_order_display_screen.dart';
 import 'package:atu_cafeteria/presentation/screens/kfc_ordering_screen.dart';
+import 'package:atu_cafeteria/presentation/screens/order_tracking_screen.dart';
 import 'package:atu_cafeteria/presentation/widgets/auth_gate.dart';
 
 void main() {
@@ -59,6 +60,13 @@ class ATUCafeteriaApp extends StatelessWidget {
           '/kiosk': (_) => const KioskScreen(),
           '/vendor-display': (_) => const VendorOrderDisplayScreen(),
           '/kfc-ordering': (_) => const KfcOrderingScreen(),
+          '/order-tracking': (context) {
+            final id = ModalRoute.of(context)?.settings.arguments;
+            final orderId = id is int ? id : int.tryParse(id?.toString() ?? '');
+            return orderId == null
+                ? const Scaffold(body: Center(child: Text('Invalid order ID.')))
+                : OrderTrackingScreen(orderId: orderId);
+          },
         },
       ),
     );
