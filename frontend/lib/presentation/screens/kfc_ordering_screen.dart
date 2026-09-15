@@ -136,6 +136,11 @@ class _KfcOrderingScreenState extends State<KfcOrderingScreen> {
       appBar: AppBar(
         title: const Text('ATU Cafeteria'),
         actions: [
+          IconButton(
+            tooltip: 'Group order',
+            icon: const Icon(Icons.groups_outlined),
+            onPressed: () => Navigator.pushNamed(context, '/group-order'),
+          ),
           Consumer<CartProvider>(builder: (_, cart, __) => Badge(
             isLabelVisible: cart.itemCount > 0,
             label: Text(cart.itemCount.toString()),
@@ -247,6 +252,18 @@ class _KfcOrderingScreenState extends State<KfcOrderingScreen> {
                   selected: _category == categories[i],
                   onSelected: (_) => setState(() => _category = categories[i]),
                 ),
+              ),
+            ),
+            const SizedBox(height: 14),
+            Card(
+              child: ListTile(
+                leading: CircleAvatar(
+                  child: Icon(Icons.groups_rounded, color: Theme.of(context).colorScheme.primary),
+                ),
+                title: const Text('Order together', style: TextStyle(fontWeight: FontWeight.w900)),
+                subtitle: const Text('Invite friends and checkout one shared order.'),
+                trailing: const Icon(Icons.arrow_forward_ios_rounded, size: 16),
+                onTap: () => Navigator.pushNamed(context, '/group-order'),
               ),
             ),
             const SizedBox(height: 14),
