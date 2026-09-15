@@ -124,7 +124,7 @@ class _KfcOrderingScreenState extends State<KfcOrderingScreen> {
     final seenRecentIds = <int>{};
     for (final order in cafe.customerOrders.reversed) {
       final foodId = order.foodItemId;
-      if (foodId == null || seenRecentIds.contains(foodId)) continue;
+      if (seenRecentIds.contains(foodId)) continue;
       final matches = all.where((item) => item.id == foodId);
       if (matches.isEmpty) continue;
       recentItems.add(matches.first);
