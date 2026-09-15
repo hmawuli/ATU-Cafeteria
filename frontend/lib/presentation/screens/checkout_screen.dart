@@ -321,14 +321,15 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
         'estimated_pickup_time': _fulfilment == 'Schedule pickup' && _scheduledPickup != null ? _scheduledPickup!.toIso8601String() : 'Calculating...',
         if (_noteController.text.trim().isNotEmpty) 'note': _noteController.text.trim(),
       });
-      if (!mounted) return;
+      if (!context.mounted) return;
+      final pageContext = context;
       final orderId = result is Map
           ? (result['order'] is Map ? (result['order']['id'] ?? result['id']) : result['id'])
           : null;
       cart.clear();
       final pickupPin = result is Map ? result['pickup_pin']?.toString() : null;
       await showDialog<void>(
-        context: context,
+        context: pageContext,
         builder: (ctx) => AlertDialog(
           icon: const Icon(Icons.verified_outlined, size: 48),
           title: const Text('Payment confirmed'),
@@ -422,7 +423,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
       return;
     }
 
-    if (!mounted) return;
+    if (!context.mounted) return;
     final ok = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
@@ -458,6 +459,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
       final message = result is Map && result['message'] != null
           ? result['message'].toString()
           : 'Your order has been placed successfully.';
+      if (!mounted) return;
       await showDialog<void>(
         context: context,
         builder: (ctx) => AlertDialog(
@@ -470,7 +472,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                 Navigator.pop(ctx);
                 if (orderId != null) {
                   Navigator.pushReplacementNamed(
-                    context,
+                    ctx,
                     '/order-tracking',
                     arguments: orderId is int ? orderId : int.tryParse(orderId.toString()),
                   );
