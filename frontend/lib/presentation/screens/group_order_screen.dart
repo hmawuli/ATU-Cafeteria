@@ -99,7 +99,7 @@ class _GroupOrderScreenState extends State<GroupOrderScreen> {
   Future<void> _loadMenu(int? vendorId) async {
     if (vendorId == null) return;
     try {
-      final data = await _api.get('/menu-items/vendor/' + vendorId.toString());
+      final data = await _api.get('/menu-items/vendor/$vendorId');
       final raw = data is List ? data : (data is Map ? data['menu_items'] : null);
       if (raw is List && mounted) setState(() => _menu = List<dynamic>.from(raw));
     } catch (_) {}
