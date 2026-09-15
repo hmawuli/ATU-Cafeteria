@@ -213,12 +213,43 @@ class CafeteriaProvider extends ChangeNotifier {
     }
   }
 
+  Future<void> _syncRemoteVendorFoodItems() async {
+    if (_authToken == null || _currentUser?.id == null || _currentUser?.role != 'VENDOR') {
+      return;
+    }
+
+    try {
+      final response = await http.get(
+        Uri.parse('$_laravelBaseUrl/api/vendor/my-menu'),
+        headers: {
+          'Accept': 'application/json',
+          'Authorization': 'Bearer $_authToken',
+        },
+      ).timeout(const Duration(seconds: 10));
+
+      if (response.statusCode != 200 || response.body.isEmpty) return;
+      final decoded = jsonDecode(response.body);
+      if (decoded is! List) return;
+
+      for (final raw in decoded) {
+        if (raw is! Map) continue;
+        try {
+          await _upsertLocalFoodItem(FoodItem.fromJson(Map<String, dynamic>.from(raw)));
+        } catch (e) {
+          debugPrint('Skipping malformed vendor menu item: $e');
+        }
+      }
+    } catch (e) {
+      debugPrint('Vendor menu sync skipped: $e');
+    }
+  }
   Future<void> refreshAllData() async {
     // The Laravel database is the source of truth for the live menu.
     // Keep SQLite as an offline cache, but always synchronize food items
     // when the API is reachable so vendor/kiosk views never depend on stale
     // local demo data.
     await _syncRemoteFoodItems();
+    await _syncRemoteVendorFoodItems();
 
     if (_authToken != null) {
       await fetchAndCacheFeedback();
@@ -237,7 +268,12 @@ class CafeteriaProvider extends ChangeNotifier {
         _customerOrders = await _db.getOrdersForCustomer(_currentUser!.id!);
       } else if (_currentUser!.role == 'VENDOR') {
         _vendorOrders = await _db.getOrdersForVendor(_currentUser!.id!);
-        _vendorFoodItems = await _db.getFoodItemsByVendor(_currentUser!.id!);
+        final remoteVendorItems = _allFoodItems
+            .where((item) => item.vendorId == _currentUser!.id!)
+            .toList();
+        _vendorFoodItems = remoteVendorItems.isNotEmpty
+            ? remoteVendorItems
+            : await _db.getFoodItemsByVendor(_currentUser!.id!);
         _vendorFeedback = await _db.getFeedbackForVendor(_currentUser!.id!);
       }
     }
@@ -1514,51 +1550,96 @@ class CafeteriaProvider extends ChangeNotifier {
 
   Future<void> updateFoodAvailability(FoodItem item, bool isAvailable) async {
     final updated = item.copyWith(isAvailable: isAvailable);
-    await _db.updateFoodItem(updated);
 
-    final now = DateTime.now();
-    final timeStr =
-        "${now.hour.toString().padLeft(2, '0')}:${now.minute.toString().padLeft(2, '0')}";
-    final alertMsg = isAvailable
-        ? "🟢 '${item.name}' is now BACK IN STOCK!"
-        : "🔴 '${item.name}' is TEMPORARILY SOLD OUT!";
-    _liveAlerts.insert(0, "[$timeStr] $alertMsg");
-    if (_liveAlerts.length > 5) {
-      _liveAlerts.removeLast();
+    if (_authToken != null && item.id != null) {
+      try {
+        final response = await http.put(
+          Uri.parse('$_laravelBaseUrl/api/food-items/' + item.id.toString()),
+          headers: {
+            'Accept': 'application/json',
+            'Content-Type': 'application/json',
+            'Authorization': 'Bearer $_authToken',
+          },
+          body: jsonEncode({'is_available': isAvailable}),
+        ).timeout(const Duration(seconds: 10));
+        if (response.statusCode != 200) {
+          debugPrint('Remote availability update failed: ' + response.body);
+        }
+      } catch (e) {
+        debugPrint('Remote availability update failed: $e');
+      }
+    }
+
+    await _db.updateFoodItem(updated);
+    _liveAlerts.insert(0, isAvailable
+        ? "🟢 '${item.name}' is now available."
+        : "🔴 '${item.name}' is temporarily unavailable.");
+    if (_liveAlerts.length > 5) _liveAlerts.removeLast();
+    await refreshAllData();
+  }
+
+  Future<void> addVendorFoodItem(String name, double price, String category, String description) async {
+    if (_currentUser == null || name.trim().isEmpty || price <= 0) return;
+    final vendorId = _currentUser!.id!;
+    final cleanName = name.trim();
+    final cleanDescription = description.trim().isEmpty ? 'Freshly prepared on campus.' : description.trim();
+
+    if (_authToken != null) {
+      try {
+        final response = await http.post(
+          Uri.parse('$_laravelBaseUrl/api/food-items'),
+          headers: {
+            'Accept': 'application/json',
+            'Content-Type': 'application/json',
+            'Authorization': 'Bearer $_authToken',
+          },
+          body: jsonEncode({
+            'vendor_id': vendorId,
+            'name': cleanName,
+            'price': price,
+            'category': category,
+            'description': cleanDescription,
+            'image_url': '',
+            'initial_stock': 50,
+            'low_stock_threshold': 10,
+          }),
+        ).timeout(const Duration(seconds: 10));
+        if (response.statusCode != 201) {
+          debugPrint('Remote menu creation failed: ' + response.body);
+          return;
+        }
+      } catch (e) {
+        debugPrint('Remote menu creation failed: $e');
+        return;
+      }
     }
 
     await refreshAllData();
   }
 
-  Future<void> addVendorFoodItem(
-      String name, double price, String category, String description) async {
-    if (_currentUser == null || name.isEmpty || price <= 0) return;
-
-    final newItem = FoodItem(
-      vendorId: _currentUser!.id!,
-      name: name,
-      price: price,
-      category: category,
-      imageUrl: "",
-      description: description,
-    );
-
-    await _db.insertFoodItem(newItem);
-    await _db.insertAuditLog(AuditLog(
-      userId: _currentUser!.id!,
-      action: "MENU_UPDATE",
-      details: "Added new menu item: $name (GH₵ ${price.toStringAsFixed(2)}).",
-      timestamp: DateTime.now().millisecondsSinceEpoch,
-    ));
-    await refreshAllData();
-  }
-
   Future<void> deleteVendorFoodItem(FoodItem item) async {
     if (item.id == null) return;
+    if (_authToken != null) {
+      try {
+        final response = await http.delete(
+          Uri.parse('$_laravelBaseUrl/api/food-items/' + item.id.toString()),
+          headers: {
+            'Accept': 'application/json',
+            'Authorization': 'Bearer $_authToken',
+          },
+        ).timeout(const Duration(seconds: 10));
+        if (response.statusCode != 200) {
+          debugPrint('Remote menu deletion failed: ' + response.body);
+          return;
+        }
+      } catch (e) {
+        debugPrint('Remote menu deletion failed: $e');
+        return;
+      }
+    }
     await _db.deleteFoodItem(item.id!);
     await refreshAllData();
   }
-
   Future<void> updateOrderStatus(int orderId, String newStatus) async {
     await _db.updateOrderStatus(orderId, newStatus);
 
