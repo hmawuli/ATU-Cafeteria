@@ -164,7 +164,7 @@ class _MealCard extends StatelessWidget {
                     ? Image.network(
                         item.imageUrl,
                         fit: BoxFit.cover,
-                        errorBuilder: (_, __, ___) => _KioskImagePlaceholder(),
+                        errorBuilder: (_, __, ___) => const _KioskImagePlaceholder(),
                       )
                     : const _KioskImagePlaceholder(),
               ),
