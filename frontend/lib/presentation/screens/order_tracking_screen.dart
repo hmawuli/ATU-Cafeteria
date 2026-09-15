@@ -280,7 +280,7 @@ class _OrderTrackingScreenState extends State<OrderTrackingScreen> {
               Text(_error ?? 'Unable to load order tracking.', textAlign: TextAlign.center),
               const SizedBox(height: 14),
               FilledButton.icon(
-                onPressed: () => _load(),
+                onPressed: _load,
                 icon: const Icon(Icons.refresh_rounded),
                 label: const Text('Try again'),
               ),
