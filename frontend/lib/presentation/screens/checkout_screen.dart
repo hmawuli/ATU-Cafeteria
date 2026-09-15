@@ -315,7 +315,6 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
       final result = await _api.post('/student/cart-checkout', body: {
         'items': cart.toCheckoutPayload(),
         'payment_method': 'momo',
-        if (points > 0) 'points_to_redeem': points,
         'payment_reference': reference,
         if (points > 0) 'points_to_redeem': points,
         'estimated_pickup_time': _fulfilment == 'Schedule pickup' && _scheduledPickup != null ? _scheduledPickup!.toIso8601String() : 'Calculating...',
@@ -432,9 +431,11 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
     try {
       final result = await _api.post('/student/cart-checkout', body: {
         'items': cart.toCheckoutPayload(),
+        if (points > 0) 'points_to_redeem': points,
         if (_noteController.text.trim().isNotEmpty)
           'note': _noteController.text.trim(),
         'payment_method': _method.toLowerCase(),
+        'estimated_pickup_time': _fulfilment == 'Schedule pickup' && _scheduledPickup != null ? _scheduledPickup!.toIso8601String() : 'Calculating...',
       });
       if (!context.mounted) return;
       cart.clear();
