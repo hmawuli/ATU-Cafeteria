@@ -19,6 +19,95 @@ class _KfcOrderingScreenState extends State<KfcOrderingScreen> {
   @override
   void dispose() { _search.dispose(); super.dispose(); }
 
+  Future<void> _showMealDetails(FoodItem item) async {
+    if (!item.isAvailable) return;
+    int quantity = 1;
+    final add = await showModalBottomSheet<bool>(
+      context: context,
+      isScrollControlled: true,
+      showDragHandle: true,
+      builder: (sheetContext) => StatefulBuilder(
+        builder: (context, setSheetState) {
+          final scheme = Theme.of(context).colorScheme;
+          return SafeArea(
+            child: Padding(
+              padding: EdgeInsets.fromLTRB(20, 0, 20, 20 + MediaQuery.of(context).viewInsets.bottom),
+              child: SingleChildScrollView(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    ClipRRect(
+                      borderRadius: BorderRadius.circular(20),
+                      child: SizedBox(
+                        width: double.infinity,
+                        height: 220,
+                        child: item.imageUrl.trim().isEmpty
+                            ? Container(color: scheme.primaryContainer, child: Icon(Icons.restaurant_rounded, size: 80, color: scheme.primary))
+                            : Image.network(item.imageUrl, fit: BoxFit.cover,
+                                errorBuilder: (_, __, ___) => Container(
+                                  color: scheme.primaryContainer,
+                                  child: Icon(Icons.restaurant_rounded, size: 80, color: scheme.primary),
+                                )),
+                      ),
+                    ),
+                    const SizedBox(height: 18),
+                    Text(item.category, style: TextStyle(color: scheme.primary, fontWeight: FontWeight.w800)),
+                    const SizedBox(height: 4),
+                    Text(item.name, style: Theme.of(context).textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.w900)),
+                    const SizedBox(height: 8),
+                    Text(item.description.isEmpty ? 'Freshly prepared and available for campus ordering.' : item.description,
+                        style: Theme.of(context).textTheme.bodyLarge?.copyWith(height: 1.45)),
+                    const SizedBox(height: 14),
+                    Wrap(spacing: 8, runSpacing: 8, children: [
+                      Chip(avatar: const Icon(Icons.local_fire_department, size: 18), label: Text('${item.calories} kcal')),
+                      Chip(avatar: const Icon(Icons.info_outline, size: 18), label: Text('Allergens: ${item.allergens}')),
+                    ]),
+                    const SizedBox(height: 18),
+                    Row(children: [
+                      Text('GH₵ ${item.price.toStringAsFixed(2)}',
+                          style: TextStyle(fontSize: 22, fontWeight: FontWeight.w900, color: scheme.primary)),
+                      const Spacer(),
+                      DecoratedBox(
+                        decoration: BoxDecoration(border: Border.all(color: scheme.outlineVariant), borderRadius: BorderRadius.circular(14)),
+                        child: Row(children: [
+                          IconButton(onPressed: quantity > 1 ? () => setSheetState(() => quantity--) : null, icon: const Icon(Icons.remove_rounded)),
+                          SizedBox(width: 30, child: Text('${quantity}', textAlign: TextAlign.center, style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 17))),
+                          IconButton(onPressed: () => setSheetState(() => quantity++), icon: const Icon(Icons.add_rounded)),
+                        ]),
+                      ),
+                    ]),
+                    const SizedBox(height: 18),
+                    SizedBox(
+                      width: double.infinity,
+                      height: 52,
+                      child: FilledButton.icon(
+                        onPressed: () => Navigator.pop(sheetContext, true),
+                        icon: const Icon(Icons.add_shopping_cart),
+                        label: Text('Add ${quantity} ${quantity == 1 ? 'item' : 'items'} • GH₵ ${(item.price * quantity).toStringAsFixed(2)}'),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          );
+        },
+      ),
+    );
+    if (add == true && mounted) {
+      final cart = context.read<CartProvider>();
+      for (var i = 0; i < quantity; i++) {
+        cart.add(item);
+      }
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('${item.name} added to your order.'),
+          action: SnackBarAction(label: 'VIEW CART', onPressed: () => Navigator.pushNamed(context, '/cart')),
+        ),
+      );
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final cafe = context.watch<CafeteriaProvider>();
@@ -79,12 +168,7 @@ class _KfcOrderingScreenState extends State<KfcOrderingScreen> {
             const SizedBox(height: 14),
             KfcOrderingSections(
               items: items,
-              onAdd: (FoodItem item) {
-                context.read<CartProvider>().add(item);
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(content: Text(item.name + ' added to your order')),
-                );
-              },
+              onAdd: _showMealDetails,
             ),
             const SizedBox(height: 22),
             FilledButton.icon(
