@@ -13,12 +13,16 @@ class CheckoutScreen extends StatefulWidget {
 
 class _CheckoutScreenState extends State<CheckoutScreen> {
   String _method = 'Wallet';
+  String _fulfilment = 'Pickup now';
+  DateTime? _scheduledPickup;
+  final TextEditingController _pointsController = TextEditingController();
   final TextEditingController _noteController = TextEditingController();
   bool _submitting = false;
   final ApiClient _api = ApiClient();
   @override
   void dispose() {
     _noteController.dispose();
+    _pointsController.dispose();
     _api.close();
     super.dispose();
   }
@@ -27,6 +31,9 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
   Widget build(BuildContext context) {
     final cart = context.watch<CartProvider>();
     final total = cart.subtotal;
+    final points = int.tryParse(_pointsController.text.trim()) ?? 0;
+    final discount = points * 0.10;
+    final finalTotal = (total - discount).clamp(0.0, double.infinity).toDouble();
     return Scaffold(
       appBar: AppBar(title: const Text('Checkout')),
       body: cart.isEmpty
@@ -95,6 +102,28 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                         child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
+                              const Text('Use loyalty points',
+                                  style: TextStyle(fontWeight: FontWeight.w800)),
+                              const SizedBox(height: 8),
+                              const Text('10 points = GH₵ 1.00 discount.'),
+                              const SizedBox(height: 8),
+                              TextField(
+                                controller: _pointsController,
+                                keyboardType: TextInputType.number,
+                                onChanged: (_) => setState(() {}),
+                                decoration: const InputDecoration(
+                                  labelText: 'Points to redeem',
+                                  prefixIcon: Icon(Icons.stars_outlined),
+                                ),
+                              ),
+                            ])),
+                const SizedBox(height: 18),
+                Card(
+                    child: Padding(
+                        padding: const EdgeInsets.all(16),
+                        child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
                               const Text('Order note (optional)',
                                   style:
                                       TextStyle(fontWeight: FontWeight.w800)),
@@ -118,13 +147,17 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                             const Spacer(),
                             Text('GH₵ ${total.toStringAsFixed(2)}')
                           ]),
+                          if (discount > 0) ...[
+                            const SizedBox(height: 8),
+                            Row(children: [const Text('Loyalty discount'), const Spacer(), Text('- GH₵ ${discount.toStringAsFixed(2)}')]),
+                          ]),
                           const Divider(height: 28),
                           Row(children: [
                             const Text('Total',
                                 style: TextStyle(
                                     fontSize: 18, fontWeight: FontWeight.w900)),
                             const Spacer(),
-                            Text('GH₵ ${total.toStringAsFixed(2)}',
+                            Text('GH₵ ${finalTotal.toStringAsFixed(2)}',
                                 style: TextStyle(
                                     fontSize: 20,
                                     fontWeight: FontWeight.w900,
@@ -150,6 +183,49 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
     );
   }
 
+  Widget _fulfilmentCard(BuildContext context) => Card(
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            const Text('Pickup options', style: TextStyle(fontWeight: FontWeight.w800)),
+            RadioGroup<String>(
+              groupValue: _fulfilment,
+              onChanged: (value) => setState(() => _fulfilment = value!),
+              child: const Column(children: [
+                RadioListTile<String>(value: 'Pickup now', title: Text('Pickup when ready'), subtitle: Text('Collect from the vendor when your order is ready.'), secondary: Icon(Icons.storefront_outlined)),
+                RadioListTile<String>(value: 'Schedule pickup', title: Text('Schedule pickup'), subtitle: Text('Choose a future pickup time.'), secondary: Icon(Icons.schedule_outlined)),
+              ]),
+            ),
+            if (_fulfilment == 'Schedule pickup')
+              OutlinedButton.icon(
+                onPressed: _pickSchedule,
+                icon: const Icon(Icons.event_outlined),
+                label: Text(_scheduledPickup == null ? 'Choose pickup time' : _formatDateTime(_scheduledPickup!)),
+              ),
+          ]),
+        ),
+      );
+
+  Future<void> _pickSchedule() async {
+    final now = DateTime.now();
+    final date = await showDatePicker(context: context, firstDate: now, lastDate: now.add(const Duration(days: 14)), initialDate: _scheduledPickup ?? now);
+    if (date == null || !mounted) return;
+    final time = await showTimePicker(context: context, initialTime: _scheduledPickup == null ? TimeOfDay.fromDateTime(now.add(const Duration(hours: 1))) : TimeOfDay.fromDateTime(_scheduledPickup!));
+    if (time == null || !mounted) return;
+    final chosen = DateTime(date.year, date.month, date.day, time.hour, time.minute);
+    if (chosen.isBefore(now.add(const Duration(minutes: 10)))) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Please choose a pickup time at least 10 minutes from now.')));
+      return;
+    }
+    setState(() => _scheduledPickup = chosen);
+  }
+
+  String _formatDateTime(DateTime value) {
+    final hour = value.hour == 0 ? 12 : (value.hour > 12 ? value.hour - 12 : value.hour);
+    final minute = value.minute.toString().padLeft(2, '0');
+    final period = value.hour >= 12 ? 'PM' : 'AM';
+    return value.day.toString() + '/' + value.month.toString() + '/' + value.year.toString() + ' at ' + hour.toString() + ':' + minute + ' ' + period;
+  }
   Future<void> _payOnline(BuildContext context, CafeteriaProvider auth, CartProvider cart) async {
     final user = auth.currentUser;
     final email = user?.email;
@@ -163,7 +239,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
     setState(() => _submitting = true);
     try {
       final init = await auth.initializePaystackPayment(
-        amount: cart.subtotal,
+        amount: finalTotal,
         email: email.trim(),
         purpose: 'DIRECT_ORDER_PAY',
       );
@@ -238,6 +314,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
       final result = await _api.post('/student/cart-checkout', body: {
         'items': cart.toCheckoutPayload(),
         'payment_method': 'momo',
+        if (points > 0) 'points_to_redeem': points,
         'payment_reference': reference,
         if (_noteController.text.trim().isNotEmpty) 'note': _noteController.text.trim(),
       });
