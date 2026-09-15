@@ -361,6 +361,7 @@ class _StudentDashboardScreenState extends State<StudentDashboardScreen> {
                       name: item.name,
                       description: item.description,
                       category: item.category,
+                      imageUrl: item.imageUrl,
                       price: item.price,
                       available: item.isAvailable,
                       onAdd: () {
