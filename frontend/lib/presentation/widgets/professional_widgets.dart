@@ -171,7 +171,7 @@ class AppStatusChip extends StatelessWidget {
 }
 
 class FoodCard extends StatelessWidget {
-  final String name, description, category;
+  final String name, description, category, imageUrl;
   final double price;
   final bool available;
   final VoidCallback? onAdd, onFavorite;
@@ -206,7 +206,37 @@ class FoodCard extends StatelessWidget {
                   decoration: BoxDecoration(
                       color: scheme.primary.withValues(alpha: .09),
                       borderRadius: BorderRadius.circular(14)),
-                  child: Icon(_icon(), size: 38, color: scheme.primary)),
+                  child: imageUrl.trim().isNotEmpty
+                      ? ClipRRect(
+                          borderRadius: BorderRadius.circular(14),
+                          child: Image.network(
+                            imageUrl,
+                            fit: BoxFit.cover,
+                            errorBuilder: (_, __, ___) => Icon(
+                              _icon(),
+                              size: 38,
+                              color: scheme.primary,
+                            ),
+                            loadingBuilder: (context, child, progress) =>
+                                progress == null
+                                    ? child
+                                    : Center(
+                                        child: SizedBox(
+                                          width: 22,
+                                          height: 22,
+                                          child: CircularProgressIndicator(
+                                            strokeWidth: 2,
+                                            value: progress.expectedTotalBytes !=
+                                                    null
+                                                ? progress.cumulativeBytesLoaded /
+                                                    progress.expectedTotalBytes!
+                                                : null,
+                                          ),
+                                        ),
+                                      ),
+                          ),
+                        )
+                      : Icon(_icon(), size: 38, color: scheme.primary)),
               const SizedBox(width: 14),
               Expanded(
                   child: Column(
