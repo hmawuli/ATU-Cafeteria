@@ -135,7 +135,7 @@ class _OrderTrackingScreenState extends State<OrderTrackingScreen> {
         actions: [
           IconButton(
             tooltip: 'Refresh',
-            onPressed: _loading ? null : () => _load(),
+            onPressed: _loading ? null : _load,
             icon: const Icon(Icons.refresh_rounded),
           ),
         ],
@@ -234,7 +234,7 @@ class _OrderTrackingScreenState extends State<OrderTrackingScreen> {
                       ),
                       const SizedBox(height: 18),
                       if (status.toUpperCase() == 'READY')
-                        Card(
+                        const Card(
                           child: ListTile(
                             leading: const Icon(Icons.pin_outlined),
                             title: const Text('Ready for pickup'),
