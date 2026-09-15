@@ -71,7 +71,7 @@ class _KfcOrderingScreenState extends State<KfcOrderingScreen> {
                         decoration: BoxDecoration(border: Border.all(color: scheme.outlineVariant), borderRadius: BorderRadius.circular(14)),
                         child: Row(children: [
                           IconButton(onPressed: quantity > 1 ? () => setSheetState(() => quantity--) : null, icon: const Icon(Icons.remove_rounded)),
-                          SizedBox(width: 30, child: Text('${quantity}', textAlign: TextAlign.center, style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 17))),
+                          SizedBox(width: 30, child: Text('$quantity', textAlign: TextAlign.center, style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 17))),
                           IconButton(onPressed: () => setSheetState(() => quantity++), icon: const Icon(Icons.add_rounded)),
                         ]),
                       ),
@@ -83,7 +83,7 @@ class _KfcOrderingScreenState extends State<KfcOrderingScreen> {
                       child: FilledButton.icon(
                         onPressed: () => Navigator.pop(sheetContext, true),
                         icon: const Icon(Icons.add_shopping_cart),
-                        label: Text('Add ${quantity} ${quantity == 1 ? 'item' : 'items'} • GH₵ ${(item.price * quantity).toStringAsFixed(2)}'),
+                        label: Text('Add $quantity ${quantity == 1 ? 'item' : 'items'} • GH₵ ${(item.price * quantity).toStringAsFixed(2)}'),
                       ),
                     ),
                   ],
