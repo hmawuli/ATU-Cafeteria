@@ -180,6 +180,7 @@ class FoodCard extends StatelessWidget {
       required this.name,
       required this.description,
       required this.category,
+      required this.imageUrl,
       required this.price,
       this.available = true,
       this.onAdd,
