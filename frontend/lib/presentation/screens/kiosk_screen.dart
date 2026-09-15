@@ -158,10 +158,15 @@ class _MealCard extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              Expanded(
-                child: Icon(Icons.restaurant_rounded,
-                    size: 58,
-                    color: Theme.of(context).colorScheme.primary),
+              SizedBox(
+                height: 105,
+                child: item.imageUrl.trim().isNotEmpty
+                    ? Image.network(
+                        item.imageUrl,
+                        fit: BoxFit.cover,
+                        errorBuilder: (_, __, ___) => _KioskImagePlaceholder(),
+                      )
+                    : const _KioskImagePlaceholder(),
               ),
               Text(item.name,
                   maxLines: 2,
@@ -181,6 +186,24 @@ class _MealCard extends StatelessWidget {
             ],
           ),
         ),
+      ),
+    );
+  }
+}
+
+
+class _KioskImagePlaceholder extends StatelessWidget {
+  const _KioskImagePlaceholder();
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      color: Theme.of(context).colorScheme.primaryContainer,
+      alignment: Alignment.center,
+      child: Icon(
+        Icons.restaurant_rounded,
+        size: 48,
+        color: Theme.of(context).colorScheme.primary,
       ),
     );
   }
