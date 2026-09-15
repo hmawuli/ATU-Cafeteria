@@ -225,7 +225,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
     final hour = value.hour == 0 ? 12 : (value.hour > 12 ? value.hour - 12 : value.hour);
     final minute = value.minute.toString().padLeft(2, '0');
     final period = value.hour >= 12 ? 'PM' : 'AM';
-    return value.day.toString() + '/' + value.month.toString() + '/' + value.year.toString() + ' at ' + hour.toString() + ':' + minute + ' ' + period;
+    return '${value.day}/${value.month}/${value.year} at $hour:$minute $period';
   }
   Future<void> _payOnline(BuildContext context, CafeteriaProvider auth, CartProvider cart, int points, double finalTotal) async {
     final user = auth.currentUser;
@@ -417,10 +417,12 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
       }
     }
     if (_method == 'Online') {
+      if (!mounted) return;
       await _payOnline(context, auth, cart, points, finalTotal);
       return;
     }
 
+    if (!mounted) return;
     final ok = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
