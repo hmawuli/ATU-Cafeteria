@@ -236,9 +236,9 @@ class _OrderTrackingScreenState extends State<OrderTrackingScreen> {
                       if (status.toUpperCase() == 'READY')
                         const Card(
                           child: ListTile(
-                            leading: const Icon(Icons.pin_outlined),
-                            title: const Text('Ready for pickup'),
-                            subtitle: const Text('Use the pickup PIN shown after checkout at the vendor counter.'),
+                            leading: Icon(Icons.pin_outlined),
+                            title: Text('Ready for pickup'),
+                            subtitle: Text('Use the pickup PIN shown after checkout at the vendor counter.'),
                           ),
                         ),
                       if (const {'PENDING', 'ORDER_PLACED', 'PREPARING'}.contains(status.toUpperCase()))
