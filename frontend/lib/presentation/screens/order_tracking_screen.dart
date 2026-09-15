@@ -38,7 +38,9 @@ class _OrderTrackingScreenState extends State<OrderTrackingScreen> {
     try {
       final value = await _api.get('/orders/${widget.orderId}/tracking');
       if (!mounted) return;
-      final data = value is Map ? Map<String, dynamic>.from(value) : {};
+      final data = value is Map
+          ? Map<String, dynamic>.from(value)
+          : <String, dynamic>{};
       setState(() {
         _order = data;
         _stages = data['stages'] is List ? List<dynamic>.from(data['stages']) : const [];

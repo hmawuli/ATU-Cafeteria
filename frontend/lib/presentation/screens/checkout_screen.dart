@@ -117,7 +117,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                                   prefixIcon: Icon(Icons.stars_outlined),
                                 ),
                               ),
-                            ])),
+                            ]))),
                 const SizedBox(height: 18),
                 Card(
                     child: Padding(
