@@ -1554,7 +1554,7 @@ class CafeteriaProvider extends ChangeNotifier {
     if (_authToken != null && item.id != null) {
       try {
         final response = await http.put(
-          Uri.parse('$_laravelBaseUrl/api/food-items/' + item.id.toString()),
+          Uri.parse('$_laravelBaseUrl/api/food-items/${item.id}'),
           headers: {
             'Accept': 'application/json',
             'Content-Type': 'application/json',
@@ -1563,7 +1563,7 @@ class CafeteriaProvider extends ChangeNotifier {
           body: jsonEncode({'is_available': isAvailable}),
         ).timeout(const Duration(seconds: 10));
         if (response.statusCode != 200) {
-          debugPrint('Remote availability update failed: ' + response.body);
+          debugPrint('Remote availability update failed: ${response.body}');
         }
       } catch (e) {
         debugPrint('Remote availability update failed: $e');
@@ -1605,7 +1605,7 @@ class CafeteriaProvider extends ChangeNotifier {
           }),
         ).timeout(const Duration(seconds: 10));
         if (response.statusCode != 201) {
-          debugPrint('Remote menu creation failed: ' + response.body);
+          debugPrint('Remote menu creation failed: ${response.body}');
           return;
         }
       } catch (e) {
@@ -1622,14 +1622,14 @@ class CafeteriaProvider extends ChangeNotifier {
     if (_authToken != null) {
       try {
         final response = await http.delete(
-          Uri.parse('$_laravelBaseUrl/api/food-items/' + item.id.toString()),
+          Uri.parse('$_laravelBaseUrl/api/food-items/${item.id}'),
           headers: {
             'Accept': 'application/json',
             'Authorization': 'Bearer $_authToken',
           },
         ).timeout(const Duration(seconds: 10));
         if (response.statusCode != 200) {
-          debugPrint('Remote menu deletion failed: ' + response.body);
+          debugPrint('Remote menu deletion failed: ${response.body}');
           return;
         }
       } catch (e) {
