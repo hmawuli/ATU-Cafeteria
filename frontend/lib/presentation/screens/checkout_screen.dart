@@ -232,7 +232,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
     final email = user?.email;
     if (email == null || email.trim().isEmpty) {
       if (!mounted) return;
-      ScaffoldMessenger.of(this.context).showSnackBar(
+      ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('A valid email address is required for online payment.')),
       );
       return;
@@ -262,7 +262,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
 
         if (!mounted) return;
         final verified = await showDialog<bool>(
-          context: this.context,
+          context: context,
           barrierDismissible: false,
           builder: (ctx) => AlertDialog(
             title: const Text('Complete your payment'),
@@ -285,7 +285,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
       } else {
         if (!mounted) return;
         final proceed = await showDialog<bool>(
-          context: this.context,
+          context: context,
           builder: (ctx) => AlertDialog(
             title: const Text('Payment simulation'),
             content: Text(
@@ -328,7 +328,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
       cart.clear();
       final pickupPin = result is Map ? result['pickup_pin']?.toString() : null;
       await showDialog<void>(
-        context: this.context,
+        context: context,
         builder: (ctx) => AlertDialog(
           icon: const Icon(Icons.verified_outlined, size: 48),
           title: const Text('Payment confirmed'),
@@ -343,7 +343,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                 Navigator.pop(ctx);
                 if (orderId != null) {
                   Navigator.pushReplacementNamed(
-                    this.context,
+                    context,
                     '/order-tracking',
                     arguments: orderId is int ? orderId : int.tryParse(orderId.toString()),
                   );
@@ -357,11 +357,10 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
         ),
       );
     } catch (e) {
-      if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text(e.toString().replaceFirst('Exception: ', ''))),
-        );
-      }
+      );
     } finally {
       if (mounted) setState(() => _submitting = false);
     }
@@ -425,7 +424,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
 
     if (!mounted) return;
     final ok = await showDialog<bool>(
-      context: this.context,
+      context: context,
       builder: (ctx) => AlertDialog(
         title: const Text('Confirm order'),
         content: Text(
