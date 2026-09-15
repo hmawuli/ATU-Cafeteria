@@ -42,14 +42,14 @@ class _GroupOrderScreenState extends State<GroupOrderScreen> {
           builder: (ctx, setDialog) => AlertDialog(
             title: const Text('Start a group order'),
             content: DropdownButtonFormField<int>(
-              value: value,
+              initialValue: value,
               decoration: const InputDecoration(
                 labelText: 'Cafeteria vendor',
                 prefixIcon: Icon(Icons.storefront_outlined),
               ),
               items: vendorIds.map((id) {
                 final vendor = cafe.allVendors.where((v) => v.id == id);
-                final name = vendor.isEmpty ? 'Vendor #' + id.toString() : vendor.first.fullName;
+                final name = vendor.isEmpty ? 'Vendor #$id' : vendor.first.fullName;
                 return DropdownMenuItem(value: id, child: Text(name));
               }).toList(),
               onChanged: (v) => setDialog(() => value = v ?? value),
@@ -67,7 +67,7 @@ class _GroupOrderScreenState extends State<GroupOrderScreen> {
         'duration_minutes': 30,
       });
       await _openSession(data['session_code']?.toString() ?? '');
-      if (mounted) _message('Group order created. Share code ' + (_code ?? '') + ' with your friends.');
+      if (mounted) _message('Group order created. Share code ${_code ?? ''} with your friends.');
     });
   }
 
@@ -83,7 +83,7 @@ class _GroupOrderScreenState extends State<GroupOrderScreen> {
   Future<void> _openSession(String code) async {
     if (code.isEmpty) return;
     await _run(() async {
-      final data = await _api.get('/student/group-order/' + code);
+      final data = await _api.get('/student/group-order/$code');
       final session = Map<String, dynamic>.from(data['session'] as Map);
       setState(() {
         _code = code;
@@ -118,7 +118,7 @@ class _GroupOrderScreenState extends State<GroupOrderScreen> {
           content: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Text('GH₵ ' + _price(item).toStringAsFixed(2)),
+              Text('GH₵ ${_price(item).toStringAsFixed(2)}'),
               Row(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
@@ -158,7 +158,7 @@ class _GroupOrderScreenState extends State<GroupOrderScreen> {
     notes.dispose();
 
     await _run(() async {
-      await _api.post('/student/group-order/' + _code! + '/contribute', body: {
+      await _api.post('/student/group-order/${_code!}/contribute', body: {
         'menu_item_id': id,
         'quantity': quantity,
         'custom_notes': note.isEmpty ? null : note,
@@ -196,7 +196,7 @@ class _GroupOrderScreenState extends State<GroupOrderScreen> {
     points.dispose();
 
     await _run(() async {
-      await _api.post('/student/group-order/' + _code! + '/checkout', body: {'points_to_redeem': value});
+      await _api.post('/student/group-order/${_code!}/checkout', body: {'points_to_redeem': value});
       if (mounted) {
         _message('Group order submitted successfully.');
         Navigator.pop(context);
@@ -330,7 +330,7 @@ class _GroupOrderScreenState extends State<GroupOrderScreen> {
                   const SizedBox(height: 5),
                   SelectableText(_code ?? '', style: TextStyle(fontSize: 30, fontWeight: FontWeight.w900, color: Theme.of(context).colorScheme.primary)),
                   const SizedBox(height: 8),
-                  Text((_session?['vendor_name'] ?? 'Cafeteria').toString() + ' • ' + (_session?['payment_mode'] == 'INDIVIDUAL' ? 'Split payment' : 'Host pays')),
+                  Text('${_session?['vendor_name'] ?? 'Cafeteria'} • ${_session?['payment_mode'] == 'INDIVIDUAL' ? 'Split payment' : 'Host pays'}'),
                 ],
               ),
             ),
@@ -342,7 +342,7 @@ class _GroupOrderScreenState extends State<GroupOrderScreen> {
               const SizedBox(width: 10),
               Expanded(child: _stat('People', _contributors.length.toString(), Icons.people_outline)),
               const SizedBox(width: 10),
-              Expanded(child: _stat('Total', 'GH₵ ' + total.toStringAsFixed(2), Icons.payments_outlined)),
+              Expanded(child: _stat('Total', 'GH₵ ${total.toStringAsFixed(2)}', Icons.payments_outlined)),
             ],
           ),
           const SizedBox(height: 18),
@@ -356,7 +356,7 @@ class _GroupOrderScreenState extends State<GroupOrderScreen> {
                 child: ListTile(
                   leading: CircleAvatar(child: Text(name.substring(0, 1).toUpperCase())),
                   title: Text(name),
-                  subtitle: Text('GH₵ ' + _price(map).toStringAsFixed(2)),
+                  subtitle: Text('GH₵ ${_price(map).toStringAsFixed(2)}'),
                   trailing: IconButton(
                     onPressed: _busy ? null : () => _addItem(map),
                     icon: const Icon(Icons.add_circle_rounded),
@@ -374,8 +374,8 @@ class _GroupOrderScreenState extends State<GroupOrderScreen> {
             ..._items.map((item) => ListTile(
                   leading: const Icon(Icons.fastfood_outlined),
                   title: Text(item['food_name']?.toString() ?? 'Meal'),
-                  subtitle: Text('Added by ' + (item['added_by']?['name'] ?? 'student').toString() + ' • Qty ' + (item['quantity'] ?? 1).toString()),
-                  trailing: Text('GH₵ ' + (double.tryParse((item['subtotal'] ?? 0).toString()) ?? 0).toStringAsFixed(2)),
+                  subtitle: Text('Added by ${item['added_by']?['name'] ?? 'student'} • Qty ${item['quantity'] ?? 1}'),
+                  trailing: Text('GH₵ ${(double.tryParse((item['subtotal'] ?? 0).toString()) ?? 0).toStringAsFixed(2)}'),
                 )),
           const SizedBox(height: 18),
           Text('Contributors', style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w900)),
@@ -383,15 +383,15 @@ class _GroupOrderScreenState extends State<GroupOrderScreen> {
           ..._contributors.map((person) => ListTile(
                 leading: const CircleAvatar(child: Icon(Icons.person_outline)),
                 title: Text(person['username']?.toString() ?? 'Student'),
-                subtitle: Text((person['total_items'] ?? 0).toString() + ' items'),
-                trailing: Text('GH₵ ' + (double.tryParse((person['total_cost'] ?? 0).toString()) ?? 0).toStringAsFixed(2)),
+                subtitle: Text('${person['total_items'] ?? 0} items'),
+                trailing: Text('GH₵ ${(double.tryParse((person['total_cost'] ?? 0).toString()) ?? 0).toStringAsFixed(2)}'),
               )),
           const SizedBox(height: 18),
           if (open)
             FilledButton.icon(
               onPressed: _busy ? null : _checkout,
               icon: const Icon(Icons.lock_open_rounded),
-              label: Text('Checkout group • GH₵ ' + total.toStringAsFixed(2)),
+              label: Text('Checkout group • GH₵ ${total.toStringAsFixed(2)}'),
             )
           else
             const Card(child: Padding(padding: EdgeInsets.all(16), child: Text('This group order is locked or expired.'))),
