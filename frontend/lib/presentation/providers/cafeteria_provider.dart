@@ -197,9 +197,11 @@ class CafeteriaProvider extends ChangeNotifier {
 
   Future<void> _upsertLocalFoodItem(FoodItem item) async {
     try {
-      final existing = item.id == null
-          ? null
-          : (await _db.getAllFoodItems()).where((f) => f.id == item.id).firstOrNull;
+      final cachedItems = await _db.getAllFoodItems();
+      final matches = item.id == null
+          ? <FoodItem>[]
+          : cachedItems.where((f) => f.id == item.id).toList();
+      final existing = matches.isEmpty ? null : matches.first;
 
       if (existing == null) {
         await _db.insertFoodItem(item);
