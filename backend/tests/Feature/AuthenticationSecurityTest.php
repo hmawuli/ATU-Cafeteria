@@ -38,12 +38,17 @@ class AuthenticationSecurityTest extends TestCase
 
             return true;
         });
+        if (!$notification instanceof AuthenticationCodeNotification) {
+            throw new \UnexpectedValueException('Authentication notification was not captured.');
+        }
         $ref = new \ReflectionClass($notification);
         $prop = $ref->getProperty('code');
         $prop->setAccessible(true);
         $code = $prop->getValue($notification);
         $this->postJson('/api/password/reset', ['username' => $user->username, 'code' => $code, 'pin' => '5678'])->assertOk();
         $this->assertDatabaseCount('personal_access_tokens', 0);
-        $this->assertTrue(Hash::check('5678', $user->fresh()->password));
+        if (!Hash::check('5678', $user->fresh()->password)) {
+            throw new \UnexpectedValueException('The password reset did not persist the new PIN.');
+        }
     }
 }
