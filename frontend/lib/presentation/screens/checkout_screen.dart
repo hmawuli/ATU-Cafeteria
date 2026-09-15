@@ -321,6 +321,9 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
         if (_noteController.text.trim().isNotEmpty) 'note': _noteController.text.trim(),
       });
       if (!context.mounted) return;
+      final orderId = result is Map
+          ? (result['order'] is Map ? (result['order']['id'] ?? result['id']) : result['id'])
+          : null;
       cart.clear();
       final pickupPin = result is Map ? result['pickup_pin']?.toString() : null;
       await showDialog<void>(
@@ -337,7 +340,15 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
             FilledButton(
               onPressed: () {
                 Navigator.pop(ctx);
-                Navigator.pushReplacementNamed(context, '/student');
+                if (orderId != null) {
+                  Navigator.pushReplacementNamed(
+                    context,
+                    '/order-tracking',
+                    arguments: orderId is int ? orderId : int.tryParse(orderId.toString()),
+                  );
+                } else {
+                  Navigator.pushReplacementNamed(context, '/student');
+                }
               },
               child: const Text('View order'),
             ),
@@ -438,6 +449,9 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
         'estimated_pickup_time': _fulfilment == 'Schedule pickup' && _scheduledPickup != null ? _scheduledPickup!.toIso8601String() : 'Calculating...',
       });
       if (!context.mounted) return;
+      final orderId = result is Map
+          ? (result['order'] is Map ? (result['order']['id'] ?? result['id']) : result['id'])
+          : null;
       cart.clear();
       final message = result is Map && result['message'] != null
           ? result['message'].toString()
@@ -452,7 +466,15 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
             FilledButton(
               onPressed: () {
                 Navigator.pop(ctx);
-                Navigator.pushReplacementNamed(ctx, '/student');
+                if (orderId != null) {
+                  Navigator.pushReplacementNamed(
+                    context,
+                    '/order-tracking',
+                    arguments: orderId is int ? orderId : int.tryParse(orderId.toString()),
+                  );
+                } else {
+                  Navigator.pushReplacementNamed(ctx, '/student');
+                }
               },
               child: const Text('View dashboard'),
             ),
