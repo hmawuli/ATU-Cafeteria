@@ -227,7 +227,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
     final period = value.hour >= 12 ? 'PM' : 'AM';
     return value.day.toString() + '/' + value.month.toString() + '/' + value.year.toString() + ' at ' + hour.toString() + ':' + minute + ' ' + period;
   }
-  Future<void> _payOnline(BuildContext context, CafeteriaProvider auth, CartProvider cart) async {
+  Future<void> _payOnline(BuildContext context, CafeteriaProvider auth, CartProvider cart, int points, double finalTotal) async {
     final user = auth.currentUser;
     final email = user?.email;
     if (email == null || email.trim().isEmpty) {
@@ -288,7 +288,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
           builder: (ctx) => AlertDialog(
             title: const Text('Payment simulation'),
             content: Text(
-              'The backend is using its local Paystack simulation. Continue as a simulated successful payment of GH₵ ${cart.subtotal.toStringAsFixed(2)}?',
+              'The backend is using its local Paystack simulation. Continue as a simulated successful payment of GH₵ ${finalTotal.toStringAsFixed(2)}?',
             ),
             actions: [
               TextButton(
@@ -307,7 +307,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
 
       final confirmed = await auth.verifyPaystackPayment(
         reference: reference,
-        amount: cart.subtotal,
+        amount: finalTotal,
         purpose: 'DIRECT_ORDER_PAY',
       );
       if (!confirmed) throw Exception('Payment has not been confirmed by Paystack.');
@@ -317,6 +317,8 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
         'payment_method': 'momo',
         if (points > 0) 'points_to_redeem': points,
         'payment_reference': reference,
+        if (points > 0) 'points_to_redeem': points,
+        'estimated_pickup_time': _fulfilment == 'Schedule pickup' && _scheduledPickup != null ? _scheduledPickup!.toIso8601String() : 'Calculating...',
         if (_noteController.text.trim().isNotEmpty) 'note': _noteController.text.trim(),
       });
       if (!context.mounted) return;
@@ -385,8 +387,27 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
 
     final cart = context.read<CartProvider>();
     if (cart.isEmpty) return;
+    if (_fulfilment == 'Schedule pickup' && _scheduledPickup == null) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Choose a pickup time first.')));
+      return;
+    }
+    final points = int.tryParse(_pointsController.text.trim()) ?? 0;
+    if (points < 0) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Loyalty points cannot be negative.')));
+      return;
+    }
+    final total = cart.subtotal;
+    final finalTotal = (total - (points * 0.10)).clamp(0.0, double.infinity).toDouble();
+    if (points > 0) {
+      try {
+        await _api.post('/student/loyalty/preview-discount', body: {'points_to_redeem': points});
+      } on ApiException catch (e) {
+        if (context.mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.message)));
+        return;
+      }
+    }
     if (_method == 'Online') {
-      await _payOnline(context, auth, cart);
+      await _payOnline(context, auth, cart, points, finalTotal);
       return;
     }
 
@@ -395,7 +416,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
       builder: (ctx) => AlertDialog(
         title: const Text('Confirm order'),
         content: Text(
-            'Place this order for GH₵ ${cart.subtotal.toStringAsFixed(2)} using your cafeteria wallet?'),
+            'Place this order for GH₵ ${finalTotal.toStringAsFixed(2)} using your cafeteria wallet?'),
         actions: [
           TextButton(
               onPressed: () => Navigator.pop(ctx, false),
