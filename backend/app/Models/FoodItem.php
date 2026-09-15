@@ -35,7 +35,7 @@ class FoodItem extends Model
      */
     public function getInitialStockAttribute($value)
     {
-        return $value !== null ? (int)$value : 50;
+        return $value !== null ? (int) $value : 50;
     }
 
     /**
@@ -43,7 +43,7 @@ class FoodItem extends Model
      */
     public function getLowStockThresholdAttribute($value)
     {
-        return $value !== null ? (int)$value : 10;
+        return $value !== null ? (int) $value : 10;
     }
 
     /**

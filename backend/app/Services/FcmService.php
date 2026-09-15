@@ -13,7 +13,8 @@ class FcmService
     public static function sendPush($recipientToken, $title, $body, array $data = [])
     {
         if (empty($recipientToken)) {
-            Log::warning("FCM: Recipient token is empty. Skipping push notification.");
+            Log::warning('FCM: Recipient token is empty. Skipping push notification.');
+
             return false;
         }
 
@@ -26,7 +27,7 @@ class FcmService
         if ($serverKey) {
             try {
                 $response = Http::withHeaders([
-                    'Authorization' => 'key=' . $serverKey,
+                    'Authorization' => 'key='.$serverKey,
                     'Content-Type' => 'application/json',
                 ])->post('https://fcm.googleapis.com/fcm/send', [
                     'to' => $recipientToken,
@@ -39,18 +40,19 @@ class FcmService
                 ]);
 
                 if ($response->successful()) {
-                    Log::info("FCM Legacy send success: " . $response->body());
+                    Log::info('FCM Legacy send success: '.$response->body());
+
                     return true;
                 } else {
-                    Log::error("FCM Legacy send failed with status {$response->status()}: " . $response->body());
+                    Log::error("FCM Legacy send failed with status {$response->status()}: ".$response->body());
                 }
             } catch (\Exception $e) {
-                Log::error("FCM Legacy exception: " . $e->getMessage());
+                Log::error('FCM Legacy exception: '.$e->getMessage());
             }
         }
 
         // 2. HTTP v1 implementation if project ID is available
-        Log::info("FCM JSON Payload (v1 Standard): " . json_encode([
+        Log::info('FCM JSON Payload (v1 Standard): '.json_encode([
             'message' => [
                 'token' => $recipientToken,
                 'notification' => [
@@ -58,7 +60,7 @@ class FcmService
                     'body' => $body,
                 ],
                 'data' => array_map('strval', $data),
-            ]
+            ],
         ], JSON_PRETTY_PRINT));
 
         return true;

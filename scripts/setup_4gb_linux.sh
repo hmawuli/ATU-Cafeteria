@@ -33,7 +33,7 @@ cd "$BACKEND"
 [ -f .env ] || cp .env.example .env
 mkdir -p database bootstrap/cache storage/framework/cache storage/framework/sessions storage/framework/views storage/logs
 touch database/database.sqlite
-composer install --no-dev --prefer-dist --optimize-autoloader
+composer install --prefer-dist --optimize-autoloader
 php artisan key:generate --force
 
 echo

@@ -4,9 +4,9 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\User;
-use App\Services\VendorPerformanceReportService;
-use App\Services\SimplePdfWriter;
 use App\Notifications\WeeklyPerformanceReportNotification;
+use App\Services\SimplePdfWriter;
+use App\Services\VendorPerformanceReportService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
 
@@ -32,16 +32,16 @@ class WeeklyReportCronController extends Controller
                 // Generate the previous week's performance report data
                 $reportData = $this->reportService->generateVendorReport($vendor->id);
 
-                if (!empty($reportData)) {
+                if (! empty($reportData)) {
                     // Create reports directory if it doesn't exist
                     $reportsDir = storage_path('app/reports');
-                    if (!file_exists($reportsDir)) {
+                    if (! file_exists($reportsDir)) {
                         mkdir($reportsDir, 0755, true);
                     }
 
                     // Generate PDF Report via SimplePdfWriter
-                    $pdfPath = $reportsDir . '/weekly-performance-vendor-' . $vendor->id . '.pdf';
-                    $pdfWriter = new SimplePdfWriter();
+                    $pdfPath = $reportsDir.'/weekly-performance-vendor-'.$vendor->id.'.pdf';
+                    $pdfWriter = new SimplePdfWriter;
                     $pdfContent = $pdfWriter->generate(
                         $vendor->fullName ?: $vendor->username,
                         $reportData['source_metrics'] ?? $reportData,
@@ -62,14 +62,14 @@ class WeeklyReportCronController extends Controller
                         'vendor_name' => $vendor->fullName ?: $vendor->username,
                         'email' => $vendor->email,
                         'pdf_saved_to' => $pdfPath,
-                        'status' => 'SENT'
+                        'status' => 'SENT',
                     ];
                 } else {
                     $sentReports[] = [
                         'vendor_id' => $vendor->id,
                         'vendor_name' => $vendor->fullName ?: $vendor->username,
                         'email' => $vendor->email,
-                        'status' => 'SKIPPED_NO_DATA'
+                        'status' => 'SKIPPED_NO_DATA',
                     ];
                 }
             }
@@ -79,15 +79,16 @@ class WeeklyReportCronController extends Controller
                 'message' => 'Weekly performance report summary emails with PDF attachments sent successfully to registered vendors.',
                 'timestamp' => date('Y-m-d H:i:s'),
                 'vendors_processed' => count($vendors),
-                'reports_sent' => $sentReports
+                'reports_sent' => $sentReports,
             ], 200);
 
         } catch (\Exception $e) {
-            Log::error("WeeklyReportCronController: Cron execution failed: " . $e->getMessage());
+            Log::error('WeeklyReportCronController: Cron execution failed: '.$e->getMessage());
+
             return response()->json([
                 'success' => false,
                 'message' => 'Failed to execute weekly performance report cron job.',
-                'error' => $e->getMessage()
+                'error' => $e->getMessage(),
             ], 500);
         }
     }
@@ -98,10 +99,10 @@ class WeeklyReportCronController extends Controller
     public function downloadWeeklyReportPdf(Request $request, $vendorId = null)
     {
         $user = $request->user();
-        if (!$user) {
+        if (! $user) {
             return response()->json([
                 'success' => false,
-                'message' => 'Unauthenticated.'
+                'message' => 'Unauthenticated.',
             ], 401);
         }
 
@@ -109,48 +110,48 @@ class WeeklyReportCronController extends Controller
         if ($role !== 'VENDOR' && $role !== 'ADMIN') {
             return response()->json([
                 'success' => false,
-                'message' => 'Unauthorized. Only vendors or administrators can download performance report PDFs.'
+                'message' => 'Unauthorized. Only vendors or administrators can download performance report PDFs.',
             ], 403);
         }
 
         if ($role === 'ADMIN') {
-            if (!$vendorId) {
+            if (! $vendorId) {
                 return response()->json([
                     'success' => false,
-                    'message' => 'Vendor ID is required for administrative downloads.'
+                    'message' => 'Vendor ID is required for administrative downloads.',
                 ], 400);
             }
-            $targetVendorId = (int)$vendorId;
+            $targetVendorId = (int) $vendorId;
         } else {
             $targetVendorId = $user->id;
         }
 
         $vendor = User::find($targetVendorId);
-        if (!$vendor) {
+        if (! $vendor) {
             return response()->json([
                 'success' => false,
-                'message' => 'Vendor not found.'
+                'message' => 'Vendor not found.',
             ], 404);
         }
 
-        $pdfPath = storage_path('app/reports/weekly-performance-vendor-' . $targetVendorId . '.pdf');
+        $pdfPath = storage_path('app/reports/weekly-performance-vendor-'.$targetVendorId.'.pdf');
 
         // If PDF doesn't exist, generate it dynamically
-        if (!file_exists($pdfPath)) {
+        if (! file_exists($pdfPath)) {
             $reportData = $this->reportService->generateVendorReport($targetVendorId);
             if (empty($reportData)) {
                 return response()->json([
                     'success' => false,
-                    'message' => 'Could not compile metrics for this vendor profile.'
+                    'message' => 'Could not compile metrics for this vendor profile.',
                 ], 400);
             }
 
             $reportsDir = storage_path('app/reports');
-            if (!file_exists($reportsDir)) {
+            if (! file_exists($reportsDir)) {
                 mkdir($reportsDir, 0755, true);
             }
 
-            $pdfWriter = new SimplePdfWriter();
+            $pdfWriter = new SimplePdfWriter;
             $pdfContent = $pdfWriter->generate(
                 $vendor->fullName ?: $vendor->username,
                 $reportData['source_metrics'] ?? $reportData,
@@ -161,6 +162,7 @@ class WeeklyReportCronController extends Controller
         }
 
         $cleanName = str_replace(' ', '-', $vendor->fullName ?: $vendor->username);
+
         return response()->download($pdfPath, "Weekly-Performance-Report-{$cleanName}.pdf", [
             'Content-Type' => 'application/pdf',
         ]);

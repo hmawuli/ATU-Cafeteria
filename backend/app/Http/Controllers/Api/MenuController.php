@@ -3,14 +3,15 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
-use App\Models\Menu;
-use App\Models\MenuItem;
-use App\Models\AuditLog;
 use App\Http\Requests\StoreMenuRequest;
 use App\Http\Requests\UpdateMenuRequest;
+use App\Models\AuditLog;
+use App\Models\FoodItem;
+use App\Models\Menu;
+use App\Models\MenuItem;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Validator;
 
 class MenuController extends Controller
 {
@@ -24,9 +25,10 @@ class MenuController extends Controller
             $query->where('vendor_id', $request->query('vendor_id'));
         }
         $menus = $query->get();
+
         return response()->json([
             'success' => true,
-            'menus' => $menus
+            'menus' => $menus,
         ], 200);
     }
 
@@ -42,7 +44,7 @@ class MenuController extends Controller
         return response()->json([
             'success' => true,
             'vendor_id' => $vendorId,
-            'menus' => $menus
+            'menus' => $menus,
         ], 200);
     }
 
@@ -57,15 +59,15 @@ class MenuController extends Controller
         if ($vendorId != $user->id && strtoupper($user->role) !== 'ADMIN') {
             return response()->json([
                 'success' => false,
-                'message' => 'Unauthorized. You cannot register menu items for another vendor.'
+                'message' => 'Unauthorized. You cannot register menu items for another vendor.',
             ], 403);
         }
 
-        $foodItem = \App\Models\FoodItem::find($request->input('food_item_id'));
-        if (!$foodItem || ($foodItem->vendor_id !== $user->id && strtoupper($user->role) !== 'ADMIN')) {
+        $foodItem = FoodItem::find($request->input('food_item_id'));
+        if (! $foodItem || ($foodItem->vendor_id !== $user->id && strtoupper($user->role) !== 'ADMIN')) {
             return response()->json([
                 'success' => false,
-                'message' => 'Unauthorized. This food item does not belong to you.'
+                'message' => 'Unauthorized. This food item does not belong to you.',
             ], 403);
         }
 
@@ -73,12 +75,12 @@ class MenuController extends Controller
             $menuEntry = Menu::updateOrCreate(
                 [
                     'vendor_id' => $request->input('vendor_id'),
-                    'food_item_id' => $request->input('food_item_id')
+                    'food_item_id' => $request->input('food_item_id'),
                 ],
                 [
                     'price' => $request->input('price'),
                     'description' => $request->input('description') ?? '',
-                    'is_available' => $request->input('is_available', true)
+                    'is_available' => $request->input('is_available', true),
                 ]
             );
 
@@ -98,7 +100,7 @@ class MenuController extends Controller
         return response()->json([
             'success' => true,
             'message' => 'Menu item successfully registered.',
-            'menu' => $menu
+            'menu' => $menu,
         ], 201);
     }
 
@@ -108,10 +110,10 @@ class MenuController extends Controller
     public function update(UpdateMenuRequest $request, $id)
     {
         $menu = Menu::find($id);
-        if (!$menu) {
+        if (! $menu) {
             return response()->json([
                 'success' => false,
-                'message' => 'Menu entry not found.'
+                'message' => 'Menu entry not found.',
             ], 404);
         }
 
@@ -119,7 +121,7 @@ class MenuController extends Controller
         if ($menu->vendor_id !== $user->id && strtoupper($user->role) !== 'ADMIN') {
             return response()->json([
                 'success' => false,
-                'message' => 'Unauthorized. You do not own this menu entry.'
+                'message' => 'Unauthorized. You do not own this menu entry.',
             ], 403);
         }
 
@@ -131,7 +133,7 @@ class MenuController extends Controller
                 'user_id' => $request->user()->id ?? $menu->vendor_id,
                 'timestamp' => time() * 1000,
                 'action' => 'MENU_ITEM_UPDATED',
-                'details' => "Updated vendor menu entry (availability: " . ($menu->is_available ? 'Yes' : 'No') . ", price: GH₵{$menu->price}).",
+                'details' => 'Updated vendor menu entry (availability: '.($menu->is_available ? 'Yes' : 'No').", price: GH₵{$menu->price}).",
             ]);
 
             return $menu;
@@ -140,7 +142,7 @@ class MenuController extends Controller
         return response()->json([
             'success' => true,
             'message' => 'Menu item updated successfully.',
-            'menu' => $menu
+            'menu' => $menu,
         ], 200);
     }
 
@@ -150,10 +152,10 @@ class MenuController extends Controller
     public function destroy($id)
     {
         $menu = Menu::find($id);
-        if (!$menu) {
+        if (! $menu) {
             return response()->json([
                 'success' => false,
-                'message' => 'Menu entry not found.'
+                'message' => 'Menu entry not found.',
             ], 404);
         }
 
@@ -161,7 +163,7 @@ class MenuController extends Controller
         if ($menu->vendor_id !== $user->id && strtoupper($user->role) !== 'ADMIN') {
             return response()->json([
                 'success' => false,
-                'message' => 'Unauthorized. You do not own this menu entry.'
+                'message' => 'Unauthorized. You do not own this menu entry.',
             ], 403);
         }
 
@@ -178,7 +180,7 @@ class MenuController extends Controller
 
         return response()->json([
             'success' => true,
-            'message' => 'Menu entry deleted from vendor configuration.'
+            'message' => 'Menu entry deleted from vendor configuration.',
         ], 200);
     }
 
@@ -196,9 +198,10 @@ class MenuController extends Controller
             $query->where('vendor_id', $request->query('vendor_id'));
         }
         $items = $query->get();
+
         return response()->json([
             'success' => true,
-            'menu_items' => $items
+            'menu_items' => $items,
         ], 200);
     }
 
@@ -208,10 +211,11 @@ class MenuController extends Controller
     public function getVendorMenuItems($vendorId)
     {
         $items = MenuItem::where('vendor_id', $vendorId)->get();
+
         return response()->json([
             'success' => true,
             'vendor_id' => $vendorId,
-            'menu_items' => $items
+            'menu_items' => $items,
         ], 200);
     }
 
@@ -226,7 +230,7 @@ class MenuController extends Controller
         if ($vendorId != $user->id && strtoupper($user->role) !== 'ADMIN') {
             return response()->json([
                 'success' => false,
-                'message' => 'Unauthorized. You cannot create standalone menu items for another vendor.'
+                'message' => 'Unauthorized. You cannot create standalone menu items for another vendor.',
             ], 403);
         }
 
@@ -241,7 +245,7 @@ class MenuController extends Controller
         if ($validator->fails()) {
             return response()->json([
                 'success' => false,
-                'errors' => $validator->errors()
+                'errors' => $validator->errors(),
             ], 400);
         }
 
@@ -251,7 +255,7 @@ class MenuController extends Controller
                 'name' => $request->input('name'),
                 'price' => $request->input('price'),
                 'description' => $request->input('description') ?? '',
-                'is_available' => $request->input('is_available', true)
+                'is_available' => $request->input('is_available', true),
             ]);
 
             AuditLog::create([
@@ -266,7 +270,7 @@ class MenuController extends Controller
 
         return response()->json([
             'success' => true,
-            'menu_item' => $item
+            'menu_item' => $item,
         ], 201);
     }
 
@@ -279,7 +283,7 @@ class MenuController extends Controller
 
         // Filter by Category
         if ($request->has('category') && $request->input('category') !== '') {
-            $query->where('category', 'like', '%' . $request->input('category') . '%');
+            $query->where('category', 'like', '%'.$request->input('category').'%');
         }
 
         // Filter by Min Price
@@ -295,11 +299,11 @@ class MenuController extends Controller
         // General search query (on food_name, description, category)
         if ($request->has('q') && $request->input('q') !== '') {
             $search = $request->input('q');
-            $query->where(function($q) use ($search) {
-                $q->where('food_name', 'like', '%' . $search . '%')
-                  ->orWhere('name', 'like', '%' . $search . '%')
-                  ->orWhere('description', 'like', '%' . $search . '%')
-                  ->orWhere('category', 'like', '%' . $search . '%');
+            $query->where(function ($q) use ($search) {
+                $q->where('food_name', 'like', '%'.$search.'%')
+                    ->orWhere('name', 'like', '%'.$search.'%')
+                    ->orWhere('description', 'like', '%'.$search.'%')
+                    ->orWhere('category', 'like', '%'.$search.'%');
             });
         }
 
@@ -307,7 +311,7 @@ class MenuController extends Controller
 
         return response()->json([
             'success' => true,
-            'menu_items' => $items
+            'menu_items' => $items,
         ], 200);
     }
 }

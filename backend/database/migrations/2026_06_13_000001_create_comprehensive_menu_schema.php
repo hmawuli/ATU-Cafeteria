@@ -50,18 +50,18 @@ return new class extends Migration
             $table->decimal('discount_price', 10, 2)->nullable(); // promotional pricing
             $table->string('image_url')->nullable();
             $table->integer('preparation_time_minutes')->default(15);
-            
+
             // Dietary & Compliance Properties (ATU Health standards)
             $table->boolean('is_halal')->default(true);
             $table->boolean('is_vegetarian')->default(false);
             $table->boolean('is_vegan')->default(false);
             $table->string('allergens_notice')->nullable(); // e.g., "Contains peanuts, fish"
-            
+
             // Stock & Delivery variables
             $table->boolean('is_available')->default(true);
             $table->integer('daily_stock_limit')->default(-1); // -1 for unlimited
             $table->integer('current_stock_count')->default(0);
-            
+
             $table->timestamps();
 
             $table->foreign('menu_id')->references('id')->on('vendor_menus')->onDelete('cascade');

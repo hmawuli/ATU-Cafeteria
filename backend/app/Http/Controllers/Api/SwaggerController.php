@@ -13,7 +13,7 @@ class SwaggerController extends Controller
      */
     public function index(): Response
     {
-        $html = <<<HTML
+        $html = <<<'HTML'
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -107,7 +107,7 @@ class SwaggerController extends Controller
 HTML;
 
         return response($html, 200, [
-            'Content-Type' => 'text/html'
+            'Content-Type' => 'text/html',
         ]);
     }
 
@@ -124,14 +124,14 @@ HTML;
                 'version' => '1.0.0',
                 'contact' => [
                     'name' => 'ATU QA Directorate & Software Engineering Team',
-                    'email' => 'emmanuel.kaku@atu.edu.gh'
-                ]
+                    'email' => 'emmanuel.kaku@atu.edu.gh',
+                ],
             ],
             'servers' => [
                 [
                     'url' => '/api',
-                    'description' => 'Local/Relative API Gateway'
-                ]
+                    'description' => 'Local/Relative API Gateway',
+                ],
             ],
             'paths' => [
                 '/login' => [
@@ -148,11 +148,11 @@ HTML;
                                         'required' => ['username', 'password'],
                                         'properties' => [
                                             'username' => ['type' => 'string', 'example' => 'student'],
-                                            'password' => ['type' => 'string', 'description' => 'SHA-256 pre-hashed PIN', 'example' => '1234 (Pre-hashed as SHA-256)']
-                                        ]
-                                    ]
-                                ]
-                            ]
+                                            'password' => ['type' => 'string', 'description' => 'SHA-256 pre-hashed PIN', 'example' => '1234 (Pre-hashed as SHA-256)'],
+                                        ],
+                                    ],
+                                ],
+                            ],
                         ],
                         'responses' => [
                             '200' => [
@@ -168,17 +168,17 @@ HTML;
                                                 'role' => 'STUDENT',
                                                 'fullName' => 'Daniel Mensah',
                                                 'balance' => 250.00,
-                                                'loyalty_points' => 120
-                                            ]
-                                        ]
-                                    ]
-                                ]
+                                                'loyalty_points' => 120,
+                                            ],
+                                        ],
+                                    ],
+                                ],
                             ],
                             '401' => [
-                                'description' => 'Invalid credentials or failed validation'
-                            ]
-                        ]
-                    ]
+                                'description' => 'Invalid credentials or failed validation',
+                            ],
+                        ],
+                    ],
                 ],
                 '/student/login' => [
                     'post' => [
@@ -194,16 +194,16 @@ HTML;
                                         'required' => ['username', 'password'],
                                         'properties' => [
                                             'username' => ['type' => 'string', 'example' => 'student'],
-                                            'password' => ['type' => 'string', 'example' => '1234 (SHA-256 pre-hashed)']
-                                        ]
-                                    ]
-                                ]
-                            ]
+                                            'password' => ['type' => 'string', 'example' => '1234 (SHA-256 pre-hashed)'],
+                                        ],
+                                    ],
+                                ],
+                            ],
                         ],
                         'responses' => [
-                            '200' => ['description' => 'Successful Sanctum session init']
-                        ]
-                    ]
+                            '200' => ['description' => 'Successful Sanctum session init'],
+                        ],
+                    ],
                 ],
                 '/vendor/login' => [
                     'post' => [
@@ -219,16 +219,16 @@ HTML;
                                         'required' => ['username', 'password'],
                                         'properties' => [
                                             'username' => ['type' => 'string', 'example' => 'maryjoint'],
-                                            'password' => ['type' => 'string', 'example' => '1111 (SHA-256 pre-hashed)']
-                                        ]
-                                    ]
-                                ]
-                            ]
+                                            'password' => ['type' => 'string', 'example' => '1111 (SHA-256 pre-hashed)'],
+                                        ],
+                                    ],
+                                ],
+                            ],
                         ],
                         'responses' => [
-                            '200' => ['description' => 'Successful Sanctum session init']
-                        ]
-                    ]
+                            '200' => ['description' => 'Successful Sanctum session init'],
+                        ],
+                    ],
                 ],
                 '/menus' => [
                     'get' => [
@@ -237,10 +237,10 @@ HTML;
                         'description' => 'Retrieves list of active categories and current daily offerings.',
                         'responses' => [
                             '200' => [
-                                'description' => 'Array of menus returned'
-                            ]
-                        ]
-                    ]
+                                'description' => 'Array of menus returned',
+                            ],
+                        ],
+                    ],
                 ],
                 '/menu-items' => [
                     'get' => [
@@ -249,10 +249,10 @@ HTML;
                         'description' => 'Returns list of individual food choices and side elements.',
                         'responses' => [
                             '200' => [
-                                'description' => 'List of menu items'
-                            ]
-                        ]
-                    ]
+                                'description' => 'List of menu items',
+                            ],
+                        ],
+                    ],
                 ],
                 '/menu-items/search' => [
                     'get' => [
@@ -265,20 +265,20 @@ HTML;
                                 'in' => 'query',
                                 'required' => false,
                                 'schema' => ['type' => 'string'],
-                                'example' => 'Jollof'
+                                'example' => 'Jollof',
                             ],
                             [
                                 'name' => 'category',
                                 'in' => 'query',
                                 'required' => false,
                                 'schema' => ['type' => 'string'],
-                                'example' => 'Drinks'
-                            ]
+                                'example' => 'Drinks',
+                            ],
                         ],
                         'responses' => [
-                            '200' => ['description' => 'Filtered results returned']
-                        ]
-                    ]
+                            '200' => ['description' => 'Filtered results returned'],
+                        ],
+                    ],
                 ],
                 '/orders' => [
                     'get' => [
@@ -286,8 +286,8 @@ HTML;
                         'summary' => 'Get All Orders',
                         'description' => 'Public tracking feed of current system pre-orders (Administrator or general tracking dashboard use).',
                         'responses' => [
-                            '200' => ['description' => 'Collection of orders']
-                        ]
+                            '200' => ['description' => 'Collection of orders'],
+                        ],
                     ],
                     'post' => [
                         'tags' => ['Orders'],
@@ -305,17 +305,17 @@ HTML;
                                             'vendor_id' => ['type' => 'integer', 'example' => 10],
                                             'food_item_id' => ['type' => 'integer', 'example' => 101],
                                             'quantity' => ['type' => 'integer', 'example' => 1],
-                                            'pickup_time' => ['type' => 'string', 'example' => 'In 15 Mins']
-                                        ]
-                                    ]
-                                ]
-                            ]
+                                            'pickup_time' => ['type' => 'string', 'example' => 'In 15 Mins'],
+                                        ],
+                                    ],
+                                ],
+                            ],
                         ],
                         'responses' => [
                             '201' => ['description' => 'Order created and payment deducted from wallet.'],
-                            '400' => ['description' => 'Insufficient balance or stock limitation.']
-                        ]
-                    ]
+                            '400' => ['description' => 'Insufficient balance or stock limitation.'],
+                        ],
+                    ],
                 ],
                 '/orders/{id}' => [
                     'get' => [
@@ -328,13 +328,13 @@ HTML;
                                 'in' => 'path',
                                 'required' => true,
                                 'schema' => ['type' => 'integer'],
-                                'example' => 1001
-                            ]
+                                'example' => 1001,
+                            ],
                         ],
                         'responses' => [
-                            '200' => ['description' => 'Order details returned']
-                        ]
-                    ]
+                            '200' => ['description' => 'Order details returned'],
+                        ],
+                    ],
                 ],
                 '/wallet/balance' => [
                     'get' => [
@@ -349,13 +349,13 @@ HTML;
                                     'application/json' => [
                                         'example' => [
                                             'success' => true,
-                                            'balance' => 250.00
-                                        ]
-                                    ]
-                                ]
-                            ]
-                        ]
-                    ]
+                                            'balance' => 250.00,
+                                        ],
+                                    ],
+                                ],
+                            ],
+                        ],
+                    ],
                 ],
                 '/wallet/transactions' => [
                     'get' => [
@@ -364,9 +364,9 @@ HTML;
                         'description' => 'Retrieve chronological list of ledger items (deposits, purchases, refunds) for the user (Requires Bearer Token).',
                         'security' => [['bearerAuth' => []]],
                         'responses' => [
-                            '200' => ['description' => 'Wallet history ledger collection']
-                        ]
-                    ]
+                            '200' => ['description' => 'Wallet history ledger collection'],
+                        ],
+                    ],
                 ],
                 '/chats/conversation/{otherUserId}' => [
                     'get' => [
@@ -380,13 +380,13 @@ HTML;
                                 'in' => 'path',
                                 'required' => true,
                                 'schema' => ['type' => 'integer'],
-                                'example' => 10
-                            ]
+                                'example' => 10,
+                            ],
                         ],
                         'responses' => [
-                            '200' => ['description' => 'Conversation timeline details']
-                        ]
-                    ]
+                            '200' => ['description' => 'Conversation timeline details'],
+                        ],
+                    ],
                 ],
                 '/system/status' => [
                     'get' => [
@@ -402,13 +402,13 @@ HTML;
                                             'status' => 'OK',
                                             'database' => 'connected',
                                             'cached_items_count' => 12,
-                                            'timestamp' => '2026-07-13T09:55:18'
-                                        ]
-                                    ]
-                                ]
-                            ]
-                        ]
-                    ]
+                                            'timestamp' => '2026-07-13T09:55:18',
+                                        ],
+                                    ],
+                                ],
+                            ],
+                        ],
+                    ],
                 ],
                 '/health' => [
                     'get' => [
@@ -422,14 +422,14 @@ HTML;
                                     'application/json' => [
                                         'example' => [
                                             'status' => 'healthy',
-                                            'framework' => 'Laravel 11.x'
-                                        ]
-                                    ]
-                                ]
-                            ]
-                        ]
-                    ]
-                ]
+                                            'framework' => 'Laravel 11.x',
+                                        ],
+                                    ],
+                                ],
+                            ],
+                        ],
+                    ],
+                ],
             ],
             'components' => [
                 'securitySchemes' => [
@@ -437,14 +437,14 @@ HTML;
                         'type' => 'http',
                         'scheme' => 'bearer',
                         'bearerFormat' => 'JWT',
-                        'description' => 'Input your JWT Token (obtained from /login response) or Sanctum Access Token to authorize requests.'
-                    ]
-                ]
-            ]
+                        'description' => 'Input your JWT Token (obtained from /login response) or Sanctum Access Token to authorize requests.',
+                    ],
+                ],
+            ],
         ];
 
         return response()->json($spec, 200, [
-            'Access-Control-Allow-Origin' => '*'
+            'Access-Control-Allow-Origin' => '*',
         ]);
     }
 }

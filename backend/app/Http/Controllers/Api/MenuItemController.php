@@ -3,11 +3,12 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
-use App\Models\MenuItem;
+use App\Http\Requests\StoreMenuItemRequest;
 use App\Models\AuditLog;
+use App\Models\MenuItem;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Validator;
 
 class MenuItemController extends Controller
 {
@@ -21,9 +22,10 @@ class MenuItemController extends Controller
             $query->where('vendor_id', $request->query('vendor_id'));
         }
         $items = $query->get();
+
         return response()->json([
             'success' => true,
-            'menu_items' => $items
+            'menu_items' => $items,
         ], 200);
     }
 
@@ -33,31 +35,31 @@ class MenuItemController extends Controller
     public function show($id)
     {
         $item = MenuItem::with('vendor')->find($id);
-        if (!$item) {
+        if (! $item) {
             return response()->json([
                 'success' => false,
-                'message' => 'Menu item not found.'
+                'message' => 'Menu item not found.',
             ], 404);
         }
 
         return response()->json([
             'success' => true,
-            'menu_item' => $item
+            'menu_item' => $item,
         ], 200);
     }
 
     /**
      * Store/create a new menu item.
      */
-    public function store(\App\Http\Requests\StoreMenuItemRequest $request)
+    public function store(StoreMenuItemRequest $request)
     {
         $user = $request->user();
-        
+
         // Ensure user is VENDOR or ADMIN
         if (strtoupper($user->role) !== 'VENDOR' && strtoupper($user->role) !== 'ADMIN') {
             return response()->json([
                 'success' => false,
-                'message' => 'Only vendors and admins are authorized to add menu items.'
+                'message' => 'Only vendors and admins are authorized to add menu items.',
             ], 403);
         }
 
@@ -69,7 +71,7 @@ class MenuItemController extends Controller
 
         $item = DB::transaction(function () use ($request, $vendorId) {
             $foodName = $request->input('food_name');
-            
+
             $createdItem = MenuItem::create([
                 'vendor_id' => $vendorId,
                 'food_name' => $foodName,
@@ -77,7 +79,7 @@ class MenuItemController extends Controller
                 'price' => $request->input('price'),
                 'description' => $request->input('description') ?? '',
                 'category' => $request->input('category'),
-                'is_available' => $request->input('is_available', true)
+                'is_available' => $request->input('is_available', true),
             ]);
 
             AuditLog::create([
@@ -93,7 +95,7 @@ class MenuItemController extends Controller
         return response()->json([
             'success' => true,
             'message' => 'Menu item successfully created.',
-            'menu_item' => $item
+            'menu_item' => $item,
         ], 201);
     }
 
@@ -103,10 +105,10 @@ class MenuItemController extends Controller
     public function update(Request $request, $id)
     {
         $item = MenuItem::find($id);
-        if (!$item) {
+        if (! $item) {
             return response()->json([
                 'success' => false,
-                'message' => 'Menu item not found.'
+                'message' => 'Menu item not found.',
             ], 404);
         }
 
@@ -114,7 +116,7 @@ class MenuItemController extends Controller
         if ($item->vendor_id !== $user->id && strtoupper($user->role) !== 'ADMIN') {
             return response()->json([
                 'success' => false,
-                'message' => 'Unauthorized. You do not own this menu item.'
+                'message' => 'Unauthorized. You do not own this menu item.',
             ], 403);
         }
 
@@ -130,7 +132,7 @@ class MenuItemController extends Controller
         if ($validator->fails()) {
             return response()->json([
                 'success' => false,
-                'errors' => $validator->errors()
+                'errors' => $validator->errors(),
             ], 400);
         }
 
@@ -159,7 +161,7 @@ class MenuItemController extends Controller
         return response()->json([
             'success' => true,
             'message' => 'Menu item updated successfully.',
-            'menu_item' => $updated
+            'menu_item' => $updated,
         ], 200);
     }
 
@@ -169,10 +171,10 @@ class MenuItemController extends Controller
     public function destroy(Request $request, $id)
     {
         $item = MenuItem::find($id);
-        if (!$item) {
+        if (! $item) {
             return response()->json([
                 'success' => false,
-                'message' => 'Menu item not found.'
+                'message' => 'Menu item not found.',
             ], 404);
         }
 
@@ -180,7 +182,7 @@ class MenuItemController extends Controller
         if ($item->vendor_id !== $user->id && strtoupper($user->role) !== 'ADMIN') {
             return response()->json([
                 'success' => false,
-                'message' => 'Unauthorized. You do not own this menu item.'
+                'message' => 'Unauthorized. You do not own this menu item.',
             ], 403);
         }
 
@@ -197,7 +199,7 @@ class MenuItemController extends Controller
 
         return response()->json([
             'success' => true,
-            'message' => 'Menu item deleted successfully.'
+            'message' => 'Menu item deleted successfully.',
         ], 200);
     }
 
@@ -207,18 +209,18 @@ class MenuItemController extends Controller
     public function destroyAdmin(Request $request, $id)
     {
         $item = MenuItem::find($id);
-        if (!$item) {
+        if (! $item) {
             return response()->json([
                 'success' => false,
-                'message' => 'Menu item not found.'
+                'message' => 'Menu item not found.',
             ], 404);
         }
 
         $user = $request->user();
-        if (!$user || strtoupper($user->role) !== 'ADMIN') {
+        if (! $user || strtoupper($user->role) !== 'ADMIN') {
             return response()->json([
                 'success' => false,
-                'message' => 'Unauthorized. Only administrative personnel can delete menu items.'
+                'message' => 'Unauthorized. Only administrative personnel can delete menu items.',
             ], 403);
         }
 
@@ -235,7 +237,7 @@ class MenuItemController extends Controller
 
         return response()->json([
             'success' => true,
-            'message' => 'Menu item deleted successfully.'
+            'message' => 'Menu item deleted successfully.',
         ], 200);
     }
 }

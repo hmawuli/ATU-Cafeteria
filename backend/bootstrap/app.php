@@ -1,8 +1,16 @@
 <?php
 
+use App\Http\Middleware\AuditAndSanitizeOrderMiddleware;
+use App\Http\Middleware\EnsureSecureTransport;
+use App\Http\Middleware\PermissionMiddleware;
+use App\Http\Middleware\RequestPerformanceLogMiddleware;
+use App\Http\Middleware\RoleMiddleware;
+use App\Http\Middleware\SecureHeadersMiddleware;
+use App\Http\Middleware\SystemErrorLoggerMiddleware;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
+use Illuminate\Http\Middleware\HandleCors;
 
 return Application::configure(basePath: dirname(__DIR__))
     ->withRouting(
@@ -19,28 +27,28 @@ return Application::configure(basePath: dirname(__DIR__))
 
         $middleware->api(append: [
             'throttle:api',
-            \App\Http\Middleware\EnsureSecureTransport::class,
+            EnsureSecureTransport::class,
         ]);
 
         $middleware->alias([
-            'role' => \App\Http\Middleware\RoleMiddleware::class,
-            'permission' => \App\Http\Middleware\PermissionMiddleware::class,
+            'role' => RoleMiddleware::class,
+            'permission' => PermissionMiddleware::class,
         ]);
-        
+
         // Add CORS support
-        $middleware->append(\Illuminate\Http\Middleware\HandleCors::class);
+        $middleware->append(HandleCors::class);
 
         // Security headers middleware
-        $middleware->append(\App\Http\Middleware\SecureHeadersMiddleware::class);
+        $middleware->append(SecureHeadersMiddleware::class);
 
         // Request performance logging middleware
-        $middleware->append(\App\Http\Middleware\RequestPerformanceLogMiddleware::class);
+        $middleware->append(RequestPerformanceLogMiddleware::class);
 
         // System error database logger middleware
-        $middleware->append(\App\Http\Middleware\SystemErrorLoggerMiddleware::class);
+        $middleware->append(SystemErrorLoggerMiddleware::class);
 
         // Audit and sanitize incoming order requests middleware
-        $middleware->append(\App\Http\Middleware\AuditAndSanitizeOrderMiddleware::class);
+        $middleware->append(AuditAndSanitizeOrderMiddleware::class);
     })
     ->withExceptions(function (Exceptions $exceptions) {
         //

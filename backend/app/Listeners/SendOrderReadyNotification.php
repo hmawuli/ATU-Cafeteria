@@ -5,13 +5,13 @@ namespace App\Listeners;
 use App\Events\OrderStatusReady;
 use App\Models\User;
 use App\Notifications\OrderReadyNotification;
+use App\Services\FcmService;
 
 class SendOrderReadyNotification
 {
     /**
      * Handle the event.
      *
-     * @param  \App\Events\OrderStatusReady  $event
      * @return void
      */
     public function handle(OrderStatusReady $event)
@@ -32,11 +32,11 @@ class SendOrderReadyNotification
                 }
 
                 // Fallback token for simulation/development testing
-                if (!$fcmToken) {
+                if (! $fcmToken) {
                     $fcmToken = "simulated-fcm-token-student-id-{$student->id}";
                 }
 
-                $title = "Order Ready for Pickup! 🍔";
+                $title = 'Order Ready for Pickup! 🍔';
                 $body = "Your order #{$order->id} ('{$order->food_name}') is ready! Pickup PIN: {$order->pickup_pin}.";
                 $data = [
                     'order_id' => strval($order->id),
@@ -44,7 +44,7 @@ class SendOrderReadyNotification
                     'status' => 'READY',
                 ];
 
-                \App\Services\FcmService::sendPush($fcmToken, $title, $body, $data);
+                FcmService::sendPush($fcmToken, $title, $body, $data);
             }
         }
     }

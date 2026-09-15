@@ -3,9 +3,10 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
-use App\Models\User;
 use App\Models\FoodItem;
+use App\Models\MenuItem;
 use App\Models\Order;
+use App\Models\User;
 use App\Notifications\LowStockAlertNotification;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -29,7 +30,7 @@ class InventoryCronController extends Controller
 
             foreach ($vendors as $vendor) {
                 $vendorsAnalyzed++;
-                
+
                 // 1. Audit core FoodItem table (standard menu items)
                 $foodItems = FoodItem::where('vendor_id', $vendor->id)
                     ->where('is_available', true)
@@ -50,7 +51,7 @@ class InventoryCronController extends Controller
                         ->whereNotIn(DB::raw('UPPER(status)'), ['CANCELLED', 'DECLINED'])
                         ->where('order_timestamp', '>=', (time() - 12 * 60 * 60) * 1000) // Today's cycle
                         ->sum('quantity');
-                    
+
                     $startingLimit = $item->initial_stock ?? 50;
                     $remainingStock = max(0, $startingLimit - $totalTodaySum);
 
@@ -68,10 +69,11 @@ class InventoryCronController extends Controller
                             ->get()
                             ->contains(function ($notif) use ($item) {
                                 $data = json_decode($notif->data, true);
+
                                 return isset($data['item_id']) && $data['item_id'] == $item->id;
                             });
 
-                        if (!$alreadyAlerted) {
+                        if (! $alreadyAlerted) {
                             $notif = new LowStockAlertNotification(
                                 $item->name,
                                 $item->id,
@@ -95,7 +97,7 @@ class InventoryCronController extends Controller
                                 'remaining_stock' => $remainingStock,
                                 'frequency_24h' => $orderFrequency24h,
                                 'threshold_limit' => $lowStockThreshold,
-                                'type' => 'food_items'
+                                'type' => 'food_items',
                             ];
                         }
                     }
@@ -134,10 +136,11 @@ class InventoryCronController extends Controller
                                 ->get()
                                 ->contains(function ($notif) use ($item) {
                                     $data = json_decode($notif->data, true);
+
                                     return isset($data['item_id']) && $data['item_id'] == $item->id;
                                 });
 
-                            if (!$alreadyAlerted) {
+                            if (! $alreadyAlerted) {
                                 $notif = new LowStockAlertNotification(
                                     $item->name,
                                     $item->id,
@@ -161,7 +164,7 @@ class InventoryCronController extends Controller
                                     'remaining_stock' => $remainingStock,
                                     'frequency_24h' => $orderFrequency24h,
                                     'threshold_limit' => $lowStockThreshold,
-                                    'type' => 'vendor_menu_items'
+                                    'type' => 'vendor_menu_items',
                                 ];
                             }
                         }
@@ -170,7 +173,7 @@ class InventoryCronController extends Controller
 
                 // 3. Audit standard menu_items (VendorMenuItem CRUD list)
                 if (Schema::hasTable('menu_items')) {
-                    $menuItems = \App\Models\MenuItem::where('vendor_id', $vendor->id)
+                    $menuItems = MenuItem::where('vendor_id', $vendor->id)
                         ->where('is_available', true)
                         ->get();
 
@@ -196,10 +199,11 @@ class InventoryCronController extends Controller
                                 ->get()
                                 ->contains(function ($notif) use ($item) {
                                     $data = json_decode($notif->data, true);
+
                                     return isset($data['item_id']) && $data['item_id'] == $item->id && isset($data['type']) && $data['type'] == 'menu_items';
                                 });
 
-                            if (!$alreadyAlerted) {
+                            if (! $alreadyAlerted) {
                                 $notif = new LowStockAlertNotification(
                                     $item->food_name ?: $item->name,
                                     $item->id,
@@ -223,7 +227,7 @@ class InventoryCronController extends Controller
                                     'remaining_stock' => $remainingStock,
                                     'frequency_24h' => $orderFrequency24h,
                                     'threshold_limit' => $lowStockThreshold,
-                                    'type' => 'menu_items'
+                                    'type' => 'menu_items',
                                 ];
                             }
                         }
@@ -238,9 +242,9 @@ class InventoryCronController extends Controller
                 'metrics' => [
                     'vendors_analyzed' => $vendorsAnalyzed,
                     'items_checked' => $checkedCount,
-                    'new_low_stock_alerts_fired' => count($alertsTriggered)
+                    'new_low_stock_alerts_fired' => count($alertsTriggered),
                 ],
-                'fired_alerts' => $alertsTriggered
+                'fired_alerts' => $alertsTriggered,
             ], 200);
 
         } catch (\Exception $e) {
@@ -248,7 +252,7 @@ class InventoryCronController extends Controller
                 'success' => false,
                 'message' => 'Cron execution failed with errors.',
                 'error' => $e->getMessage(),
-                'trace' => $e->getTraceAsString()
+                'trace' => $e->getTraceAsString(),
             ], 500);
         }
     }
@@ -263,10 +267,10 @@ class InventoryCronController extends Controller
             $itemType = $request->input('item_type', 'food_items'); // food_items or vendor_menu_items
             $definedThreshold = $request->input('threshold'); // optional custom threshold
 
-            if (!$itemId) {
+            if (! $itemId) {
                 return response()->json([
                     'success' => false,
-                    'message' => 'Please provide a valid item_id parameter.'
+                    'message' => 'Please provide a valid item_id parameter.',
                 ], 400);
             }
 
@@ -278,10 +282,10 @@ class InventoryCronController extends Controller
 
             if ($itemType === 'food_items') {
                 $item = FoodItem::find($itemId);
-                if (!$item) {
+                if (! $item) {
                     return response()->json([
                         'success' => false,
-                        'message' => 'Specific food item not found.'
+                        'message' => 'Specific food item not found.',
                     ], 404);
                 }
 
@@ -303,7 +307,7 @@ class InventoryCronController extends Controller
 
                 $startingLimit = $item->initial_stock ?? 35;
                 $remainingStock = max(0, $startingLimit - $totalTodaySum);
-                
+
                 // If custom threshold is defined, use it. Otherwise use model threshold or dynamic threshold
                 if (is_numeric($definedThreshold)) {
                     $lowStockThreshold = (int) $definedThreshold;
@@ -318,10 +322,10 @@ class InventoryCronController extends Controller
                     ->select('vendor_menu_items.*', 'vendor_menus.vendor_id')
                     ->first();
 
-                if (!$item) {
+                if (! $item) {
                     return response()->json([
                         'success' => false,
-                        'message' => 'Specific vendor menu item not found.'
+                        'message' => 'Specific vendor menu item not found.',
                     ], 404);
                 }
 
@@ -342,11 +346,11 @@ class InventoryCronController extends Controller
                     $lowStockThreshold = max(5, (int) round($orderFrequency24h * 0.45));
                 }
             } elseif ($itemType === 'menu_items') {
-                $item = \App\Models\MenuItem::find($itemId);
-                if (!$item) {
+                $item = MenuItem::find($itemId);
+                if (! $item) {
                     return response()->json([
                         'success' => false,
-                        'message' => 'Specific menu item not found.'
+                        'message' => 'Specific menu item not found.',
                     ], 404);
                 }
 
@@ -369,15 +373,15 @@ class InventoryCronController extends Controller
             } else {
                 return response()->json([
                     'success' => false,
-                    'message' => 'Unsupported item_type or table not found. Supported: food_items, vendor_menu_items, menu_items.'
+                    'message' => 'Unsupported item_type or table not found. Supported: food_items, vendor_menu_items, menu_items.',
                 ], 400);
             }
 
             $vendor = User::find($vendorId);
-            if (!$vendor) {
+            if (! $vendor) {
                 return response()->json([
                     'success' => false,
-                    'message' => 'Vendor associated with this item does not exist.'
+                    'message' => 'Vendor associated with this item does not exist.',
                 ], 404);
             }
 
@@ -410,22 +414,22 @@ class InventoryCronController extends Controller
                 'alert_fired' => $alertFired,
                 'message' => $message,
                 'details' => [
-                    'item_id' => (int)$itemId,
+                    'item_id' => (int) $itemId,
                     'item_name' => $itemName,
                     'item_type' => $itemType,
                     'remaining_stock' => $remainingStock,
                     'low_stock_threshold' => $lowStockThreshold,
                     'order_frequency_24h' => $orderFrequency24h,
                     'vendor_id' => $vendor->id,
-                    'vendor_name' => $vendor->fullName
-                ]
+                    'vendor_name' => $vendor->fullName,
+                ],
             ], 200);
 
         } catch (\Exception $e) {
             return response()->json([
                 'success' => false,
                 'message' => 'Failed to perform inventory check.',
-                'error' => $e->getMessage()
+                'error' => $e->getMessage(),
             ], 500);
         }
     }

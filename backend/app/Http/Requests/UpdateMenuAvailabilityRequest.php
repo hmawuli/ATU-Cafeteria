@@ -2,8 +2,9 @@
 
 namespace App\Http\Requests;
 
-use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Contracts\Validation\ValidationRule;
 use Illuminate\Contracts\Validation\Validator;
+use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Http\Exceptions\HttpResponseException;
 
 class UpdateMenuAvailabilityRequest extends FormRequest
@@ -14,13 +15,14 @@ class UpdateMenuAvailabilityRequest extends FormRequest
     public function authorize(): bool
     {
         $user = $this->user();
+
         return $user && (strtoupper($user->role) === 'VENDOR' || strtoupper($user->role) === 'ADMIN');
     }
 
     /**
      * Get the validation rules that apply to the request.
      *
-     * @return array<string, \Illuminate\Contracts\Validation\ValidationRule|array<mixed>|string>
+     * @return array<string, ValidationRule|array<mixed>|string>
      */
     public function rules(): array
     {
@@ -43,7 +45,7 @@ class UpdateMenuAvailabilityRequest extends FormRequest
             response()->json([
                 'success' => false,
                 'message' => 'Validation failed for availability update request.',
-                'errors' => $validator->errors()
+                'errors' => $validator->errors(),
             ], 400)
         );
     }

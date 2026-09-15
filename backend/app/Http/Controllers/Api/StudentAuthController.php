@@ -3,12 +3,12 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
-use App\Models\User;
 use App\Models\AuditLog;
+use App\Models\User;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Validator;
-use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Validator;
 
 class StudentAuthController extends Controller
 {
@@ -103,7 +103,7 @@ class StudentAuthController extends Controller
             ->where('role', 'STUDENT')
             ->first();
 
-        if (!$user || !Hash::check((string) $request->input('pin'), (string) $user->password)) {
+        if (! $user || ! Hash::check((string) $request->input('pin'), (string) $user->password)) {
             if ($user) {
                 AuditLog::create([
                     'user_id' => $user->id,
@@ -112,10 +112,11 @@ class StudentAuthController extends Controller
                     'details' => 'Failed student username/PIN login attempt.',
                 ]);
             }
+
             return response()->json(['success' => false, 'message' => 'Invalid student username or PIN.'], 401);
         }
 
-        if (!$user->isActive()) {
+        if (! $user->isActive()) {
             return response()->json(['success' => false, 'message' => 'Your account is not active.'], 403);
         }
 

@@ -3,11 +3,11 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
-use App\Models\MenuItem;
 use App\Models\AuditLog;
+use App\Models\MenuItem;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Validator;
 
 class VendorMenuItemController extends Controller
 {
@@ -20,7 +20,7 @@ class VendorMenuItemController extends Controller
         if (strtoupper($user->role) !== 'VENDOR') {
             return response()->json([
                 'success' => false,
-                'message' => 'Unauthorized. Only vendors can perform this action.'
+                'message' => 'Unauthorized. Only vendors can perform this action.',
             ], 403);
         }
 
@@ -28,7 +28,7 @@ class VendorMenuItemController extends Controller
 
         return response()->json([
             'success' => true,
-            'menu_items' => $items
+            'menu_items' => $items,
         ], 200);
     }
 
@@ -41,7 +41,7 @@ class VendorMenuItemController extends Controller
         if (strtoupper($user->role) !== 'VENDOR') {
             return response()->json([
                 'success' => false,
-                'message' => 'Unauthorized. Only vendors can perform this action.'
+                'message' => 'Unauthorized. Only vendors can perform this action.',
             ], 403);
         }
 
@@ -57,13 +57,13 @@ class VendorMenuItemController extends Controller
             return response()->json([
                 'success' => false,
                 'message' => 'Validation error.',
-                'errors' => $validator->errors()
+                'errors' => $validator->errors(),
             ], 400);
         }
 
         $item = DB::transaction(function () use ($request, $user) {
             $foodName = $request->input('food_name');
-            
+
             $createdItem = MenuItem::create([
                 'vendor_id' => $user->id,
                 'food_name' => $foodName,
@@ -71,7 +71,7 @@ class VendorMenuItemController extends Controller
                 'price' => $request->input('price'),
                 'description' => $request->input('description') ?? '',
                 'category' => $request->input('category'),
-                'is_available' => $request->input('is_available', true)
+                'is_available' => $request->input('is_available', true),
             ]);
 
             AuditLog::create([
@@ -87,7 +87,7 @@ class VendorMenuItemController extends Controller
         return response()->json([
             'success' => true,
             'message' => 'Menu item successfully created.',
-            'menu_item' => $item
+            'menu_item' => $item,
         ], 201);
     }
 
@@ -100,28 +100,28 @@ class VendorMenuItemController extends Controller
         if (strtoupper($user->role) !== 'VENDOR') {
             return response()->json([
                 'success' => false,
-                'message' => 'Unauthorized. Only vendors can perform this action.'
+                'message' => 'Unauthorized. Only vendors can perform this action.',
             ], 403);
         }
 
         $item = MenuItem::find($id);
-        if (!$item) {
+        if (! $item) {
             return response()->json([
                 'success' => false,
-                'message' => 'Menu item not found.'
+                'message' => 'Menu item not found.',
             ], 404);
         }
 
         if ($item->vendor_id !== $user->id) {
             return response()->json([
                 'success' => false,
-                'message' => 'Unauthorized. You do not own this menu item.'
+                'message' => 'Unauthorized. You do not own this menu item.',
             ], 403);
         }
 
         return response()->json([
             'success' => true,
-            'menu_item' => $item
+            'menu_item' => $item,
         ], 200);
     }
 
@@ -134,22 +134,22 @@ class VendorMenuItemController extends Controller
         if (strtoupper($user->role) !== 'VENDOR') {
             return response()->json([
                 'success' => false,
-                'message' => 'Unauthorized. Only vendors can perform this action.'
+                'message' => 'Unauthorized. Only vendors can perform this action.',
             ], 403);
         }
 
         $item = MenuItem::find($id);
-        if (!$item) {
+        if (! $item) {
             return response()->json([
                 'success' => false,
-                'message' => 'Menu item not found.'
+                'message' => 'Menu item not found.',
             ], 404);
         }
 
         if ($item->vendor_id !== $user->id) {
             return response()->json([
                 'success' => false,
-                'message' => 'Unauthorized. You do not own this menu item.'
+                'message' => 'Unauthorized. You do not own this menu item.',
             ], 403);
         }
 
@@ -165,7 +165,7 @@ class VendorMenuItemController extends Controller
             return response()->json([
                 'success' => false,
                 'message' => 'Validation error.',
-                'errors' => $validator->errors()
+                'errors' => $validator->errors(),
             ], 400);
         }
 
@@ -194,7 +194,7 @@ class VendorMenuItemController extends Controller
         return response()->json([
             'success' => true,
             'message' => 'Menu item updated successfully.',
-            'menu_item' => $updated
+            'menu_item' => $updated,
         ], 200);
     }
 
@@ -207,22 +207,22 @@ class VendorMenuItemController extends Controller
         if (strtoupper($user->role) !== 'VENDOR') {
             return response()->json([
                 'success' => false,
-                'message' => 'Unauthorized. Only vendors can perform this action.'
+                'message' => 'Unauthorized. Only vendors can perform this action.',
             ], 403);
         }
 
         $item = MenuItem::find($id);
-        if (!$item) {
+        if (! $item) {
             return response()->json([
                 'success' => false,
-                'message' => 'Menu item not found.'
+                'message' => 'Menu item not found.',
             ], 404);
         }
 
         if ($item->vendor_id !== $user->id) {
             return response()->json([
                 'success' => false,
-                'message' => 'Unauthorized. You do not own this menu item.'
+                'message' => 'Unauthorized. You do not own this menu item.',
             ], 403);
         }
 
@@ -239,7 +239,7 @@ class VendorMenuItemController extends Controller
 
         return response()->json([
             'success' => true,
-            'message' => 'Menu item deleted successfully.'
+            'message' => 'Menu item deleted successfully.',
         ], 200);
     }
 }

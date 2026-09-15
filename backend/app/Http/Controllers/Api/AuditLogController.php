@@ -15,6 +15,7 @@ class AuditLogController extends Controller
     public function index()
     {
         $logs = AuditLog::orderBy('timestamp', 'desc')->get();
+
         return response()->json($logs, 200);
     }
 
@@ -33,7 +34,7 @@ class AuditLogController extends Controller
             return response()->json([
                 'success' => false,
                 'message' => 'Audit structure validation failed.',
-                'errors' => $validator->errors()
+                'errors' => $validator->errors(),
             ], 400);
         }
 
@@ -53,18 +54,18 @@ class AuditLogController extends Controller
     public function destroy($id)
     {
         $log = AuditLog::find($id);
-        if (!$log) {
+        if (! $log) {
             return response()->json([
                 'success' => false,
-                'message' => 'Audit log record not found.'
+                'message' => 'Audit log record not found.',
             ], 404);
         }
 
         $user = request()->user();
-        if (!$user || strtoupper($user->role) !== 'ADMIN') {
+        if (! $user || strtoupper($user->role) !== 'ADMIN') {
             return response()->json([
                 'success' => false,
-                'message' => 'Unauthorized. This endpoint requires ADMIN privileges.'
+                'message' => 'Unauthorized. This endpoint requires ADMIN privileges.',
             ], 403);
         }
 
@@ -72,7 +73,7 @@ class AuditLogController extends Controller
 
         return response()->json([
             'success' => true,
-            'message' => 'Audit log record deleted successfully.'
+            'message' => 'Audit log record deleted successfully.',
         ], 200);
     }
 }

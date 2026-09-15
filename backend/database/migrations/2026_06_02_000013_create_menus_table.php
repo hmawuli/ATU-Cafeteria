@@ -22,7 +22,7 @@ return new class extends Migration
 
             $table->foreign('vendor_id')->references('id')->on('vendors')->onDelete('cascade');
             $table->foreign('food_item_id')->references('id')->on('food_items')->onDelete('cascade');
-            
+
             // Unique index to prevent duplicate associations of same food item to same vendor menu
             $table->unique(['vendor_id', 'food_item_id']);
         });

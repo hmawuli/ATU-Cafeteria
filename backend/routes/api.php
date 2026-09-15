@@ -1,50 +1,57 @@
 <?php
 
-use Illuminate\Support\Facades\Route;
-use Illuminate\Support\Facades\Event;
-use App\Http\Controllers\Api\AuthController;
-use App\Http\Controllers\Api\StudentAuthController;
-use App\Http\Controllers\Api\VendorAuthController;
-use App\Http\Controllers\Api\FoodItemController;
-use App\Http\Controllers\Api\OrderController;
-use App\Http\Controllers\Api\FeedbackController;
-use App\Http\Controllers\Api\FoodItemFeedbackController;
+use App\Events\OrderStatusCompleted;
+use App\Events\OrderStatusReady;
+use App\Http\Controllers\Api\AdminManagementController;
+use App\Http\Controllers\Api\AdminReportController;
 use App\Http\Controllers\Api\AuditLogController;
-use App\Http\Controllers\Api\VendorController;
-use App\Http\Controllers\Api\WalletController;
-use App\Http\Controllers\Api\VendorPerformanceController;
-use App\Http\Controllers\Api\MenuController;
+use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\ChatController;
-use App\Http\Controllers\Api\PaystackPaymentController;
-use App\Http\Controllers\Api\VendorSpecificController;
 use App\Http\Controllers\Api\DailyRevenueController;
-use App\Http\Controllers\Api\MenuItemController;
-use App\Http\Controllers\Api\InventoryCronController;
-use App\Http\Controllers\Api\WeeklyReportCronController;
 use App\Http\Controllers\Api\DeliveredOrderReviewController;
+use App\Http\Controllers\Api\FavoriteMenuItemController;
+use App\Http\Controllers\Api\FeedbackController;
+use App\Http\Controllers\Api\FoodItemController;
+use App\Http\Controllers\Api\FoodItemFeedbackController;
+use App\Http\Controllers\Api\GroupOrderController;
+use App\Http\Controllers\Api\HealthController;
+use App\Http\Controllers\Api\InventoryCronController;
+use App\Http\Controllers\Api\LoyaltyController;
+use App\Http\Controllers\Api\MenuController;
+use App\Http\Controllers\Api\MenuItemController;
+use App\Http\Controllers\Api\OrderController;
 use App\Http\Controllers\Api\OrderItemMetricsController;
+use App\Http\Controllers\Api\PaystackPaymentController;
+use App\Http\Controllers\Api\SmartCafeteriaController;
+use App\Http\Controllers\Api\StudentAuthController;
+use App\Http\Controllers\Api\StudentBudgetController;
+use App\Http\Controllers\Api\SwaggerController;
+use App\Http\Controllers\Api\VendorAuthController;
+use App\Http\Controllers\Api\VendorController;
 use App\Http\Controllers\Api\VendorMenuItemController;
 use App\Http\Controllers\Api\VendorMetricsController;
-use App\Http\Controllers\Api\FavoriteMenuItemController;
-use App\Http\Controllers\Api\StudentBudgetController;
-use App\Http\Controllers\Api\LoyaltyController;
-use App\Http\Controllers\Api\GroupOrderController;
-use App\Http\Controllers\Api\AdminReportController;
-use App\Http\Controllers\Api\HealthController;
-use App\Http\Controllers\Api\SwaggerController;
-use App\Http\Controllers\Api\AdminManagementController;
-use App\Http\Controllers\Api\SmartCafeteriaController;
+use App\Http\Controllers\Api\VendorPerformanceController;
+use App\Http\Controllers\Api\VendorSpecificController;
+use App\Http\Controllers\Api\WalletController;
+use App\Http\Controllers\Api\WeeklyReportCronController;
+use App\Http\Middleware\InactivityTimeout;
+use App\Listeners\SendOrderCompletedNotification;
+use App\Listeners\SendOrderReadyNotification;
+use App\Models\Order;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Event;
+use Illuminate\Support\Facades\Route;
 
 // Register explicit listeners for OrderStatusCompleted event
 Event::listen(
-    \App\Events\OrderStatusCompleted::class,
-    \App\Listeners\SendOrderCompletedNotification::class
+    OrderStatusCompleted::class,
+    SendOrderCompletedNotification::class
 );
 
 // Register explicit listeners for OrderStatusReady event
 Event::listen(
-    \App\Events\OrderStatusReady::class,
-    \App\Listeners\SendOrderReadyNotification::class
+    OrderStatusReady::class,
+    SendOrderReadyNotification::class
 );
 
 /*
@@ -75,10 +82,9 @@ Route::get('/docs/openapi.json', [SwaggerController::class, 'openapiJson']);
 // API Health Check Route for Railway monitoring
 Route::get('/health', [HealthController::class, 'check']);
 
-
 // Define role checks for Student vs Vendor
 // Protected authenticated endpoints. Sanctum is the single API authentication mechanism.
-Route::middleware(['auth:sanctum', \App\Http\Middleware\InactivityTimeout::class])->group(function () {
+Route::middleware(['auth:sanctum', InactivityTimeout::class])->group(function () {
     // Smart cafeteria services: queue, recommendations, demand, waste and security.
     Route::get('/orders/{orderId}/queue', [SmartCafeteriaController::class, 'queue']);
     Route::middleware('role:STUDENT')->get('/student/recommendations', [SmartCafeteriaController::class, 'recommendations']);
@@ -138,6 +144,7 @@ Route::middleware(['auth:sanctum', \App\Http\Middleware\InactivityTimeout::class
         Route::get('/student/orders', [OrderController::class, 'getAuthenticatedStudentOrders']);
         Route::get('/student/order-history', [OrderController::class, 'getPersonalOrderHistory']);
         Route::post('/student/orders', [OrderController::class, 'storeAuthenticatedStudentOrder']);
+        Route::post('/v1/student/orders', [OrderController::class, 'storeAuthenticatedStudentOrder']);
         Route::post('/student/cart-checkout', [OrderController::class, 'cartCheckout']);
         Route::get('/student/orders/poll-ready', [OrderController::class, 'pollOrderStatusReady']);
         Route::get('/student/orders/stream-ready', [OrderController::class, 'streamOrderStatusReady']);
@@ -167,9 +174,9 @@ Route::middleware(['auth:sanctum', \App\Http\Middleware\InactivityTimeout::class
 
     // --- Vendor-Only Routes ---
     Route::middleware('role:VENDOR,ADMIN')->group(function () {
-        Route::get('/vendor/orders/unread-count', function (\Illuminate\Http\Request $request) {
+        Route::get('/vendor/orders/unread-count', function (Request $request) {
             $vendorId = $request->user()->id;
-            $orders = \App\Models\Order::where('vendor_id', $vendorId)
+            $orders = Order::where('vendor_id', $vendorId)
                 ->whereIn('status', ['PENDING', 'ORDER_PLACED'])
                 ->orderByDesc('id')
                 ->get();
@@ -210,79 +217,80 @@ Route::middleware(['auth:sanctum', \App\Http\Middleware\InactivityTimeout::class
         Route::get('/vendor/daily-revenue', [DailyRevenueController::class, 'getDailyRevenue']);
         Route::get('/vendor/{vendorId}/daily-sales-revenue', [DailyRevenueController::class, 'getVendorDailyRevenue']);
         Route::post('/vendor/toggle-status', [VendorController::class, 'toggleStatus']);
-        });
-        // Order Items Dashboard Metrics Endpoints
-        Route::get('/vendor/order-items-metrics', [OrderItemMetricsController::class, 'getDashboardMetrics']);
-        Route::get('/vendor/order-items-revenue', [OrderItemMetricsController::class, 'getDailyRevenueMetrics']);
-        Route::get('/vendor/order-items-menu-metrics', [OrderItemMetricsController::class, 'getMenuItemMetrics']);
-
-        // System diagnostics logs routes
-        Route::get('/system/logs', [VendorController::class, 'getDiagnosticLogs']);
-        Route::post('/system/logs/clear', [VendorController::class, 'clearDiagnosticLogs']);
-
-        // Vendor Specific endpoints
-        Route::get('/vendor/analytics/trends', [VendorSpecificController::class, 'getAnalyticsTrends']);
-        Route::put('/vendor/menu/availability', [VendorSpecificController::class, 'updateMenuAvailability']);
-        Route::get('/vendor/orders/summary', [VendorSpecificController::class, 'getOrderSummary']);
-        Route::post('/vendor/menu/bulk-update', [VendorSpecificController::class, 'bulkUpdateMenu']);
-        Route::post('/vendor/menu/bulk-upload', [VendorSpecificController::class, 'bulkUpdateMenu']);
-
-        // Vendor Menu Management Protected Endpoints
-        Route::post('/menus', [MenuController::class, 'store']);
-        Route::put('/menus/{id}', [MenuController::class, 'update']);
-        Route::delete('/menus/{id}', [MenuController::class, 'destroy']);
-        Route::post('/menu-items', [MenuController::class, 'storeMenuItem']);
-        
-        // Dedicated CRUD endpoints for Menu Items
-        Route::post('/vendors/menu-items', [MenuItemController::class, 'store']);
-        Route::put('/vendors/menu-items/{id}', [MenuItemController::class, 'update']);
-        Route::delete('/vendors/menu-items/{id}', [MenuItemController::class, 'destroy']);
-
-        // Standard Resource route for Vendors to manage their specific MenuItems
-        Route::apiResource('vendor-menu-items', VendorMenuItemController::class);
     });
+    // Order Items Dashboard Metrics Endpoints
+    Route::get('/vendor/order-items-metrics', [OrderItemMetricsController::class, 'getDashboardMetrics']);
+    Route::get('/vendor/order-items-revenue', [OrderItemMetricsController::class, 'getDailyRevenueMetrics']);
+    Route::get('/vendor/order-items-menu-metrics', [OrderItemMetricsController::class, 'getMenuItemMetrics']);
 
-    // --- Common Authenticated Routes ---
-    // Digital Wallet & Core Transactions Subsystem
-    Route::get('/wallet/balance', [WalletController::class, 'getBalance']);
-    Route::get('/wallet/transactions', [WalletController::class, 'getTransactions']);
-    Route::post('/wallet/deposit', [WalletController::class, 'deposit']);
-    Route::post('/wallet/transfer', [WalletController::class, 'transfer']);
-    Route::post('/wallet/payout', [WalletController::class, 'requestPayout']);
+    // System diagnostics logs routes
+    Route::get('/system/logs', [VendorController::class, 'getDiagnosticLogs']);
+    Route::post('/system/logs/clear', [VendorController::class, 'clearDiagnosticLogs']);
 
-    // Database Notifications Subsystem
-    Route::get('/notifications', function (\Illuminate\Http\Request $request) {
-        return response()->json([
-            'success' => true,
-            'notifications' => $request->user()->notifications()->orderBy('created_at', 'desc')->get()
-        ]);
-    });
-    Route::post('/notifications/mark-read', function (\Illuminate\Http\Request $request) {
-        $request->user()->unreadNotifications->markAsRead();
-        return response()->json([
-            'success' => true,
-            'message' => 'All database notifications marked as read.'
-        ]);
-    });
+    // Vendor Specific endpoints
+    Route::get('/vendor/analytics/trends', [VendorSpecificController::class, 'getAnalyticsTrends']);
+    Route::put('/vendor/menu/availability', [VendorSpecificController::class, 'updateMenuAvailability']);
+    Route::get('/vendor/orders/summary', [VendorSpecificController::class, 'getOrderSummary']);
+    Route::post('/vendor/menu/bulk-update', [VendorSpecificController::class, 'bulkUpdateMenu']);
+    Route::post('/vendor/menu/bulk-upload', [VendorSpecificController::class, 'bulkUpdateMenu']);
 
-    // Chat Conversation Protected Endpoints
-    Route::get('/chats/conversation/{otherUserId}', [ChatController::class, 'getConversation']);
-    Route::post('/chats/send', [ChatController::class, 'sendMessage']);
-    Route::get('/chats/recent', [ChatController::class, 'getRecentChats']);
+    // Vendor Menu Management Protected Endpoints
+    Route::post('/menus', [MenuController::class, 'store']);
+    Route::put('/menus/{id}', [MenuController::class, 'update']);
+    Route::delete('/menus/{id}', [MenuController::class, 'destroy']);
+    Route::post('/menu-items', [MenuController::class, 'storeMenuItem']);
 
-    // Authenticated order and transaction endpoints
-    Route::get('/orders', [OrderController::class, 'index']);
-    Route::get('/orders/{id}', [OrderController::class, 'show']);
-    Route::get('/orders/{id}/receipt', [OrderController::class, 'downloadReceipt']);
-    Route::get('/orders/customer/{customerId}', [OrderController::class, 'getCustomerOrders']);
-    Route::get('/orders/student/{studentId}', [OrderController::class, 'getCustomerOrders']);
-    Route::get('/orders/history/{studentId}', [OrderController::class, 'getCustomerOrders']);
-    Route::get('/orders/vendor/{vendorId}', [OrderController::class, 'getVendorOrders']);
-    Route::post('/orders', [OrderController::class, 'store']);
+    // Dedicated CRUD endpoints for Menu Items
+    Route::post('/vendors/menu-items', [MenuItemController::class, 'store']);
+    Route::put('/vendors/menu-items/{id}', [MenuItemController::class, 'update']);
+    Route::delete('/vendors/menu-items/{id}', [MenuItemController::class, 'destroy']);
 
-    // Paystack Payment Integration Protected Endpoints
-    Route::post('/paystack/initialize', [PaystackPaymentController::class, 'initialize']);
-    Route::get('/paystack/verify/{reference}', [PaystackPaymentController::class, 'verify']);
+    // Standard Resource route for Vendors to manage their specific MenuItems
+    Route::apiResource('vendor-menu-items', VendorMenuItemController::class);
+});
+
+// --- Common Authenticated Routes ---
+// Digital Wallet & Core Transactions Subsystem
+Route::get('/wallet/balance', [WalletController::class, 'getBalance']);
+Route::get('/wallet/transactions', [WalletController::class, 'getTransactions']);
+Route::post('/wallet/deposit', [WalletController::class, 'deposit']);
+Route::post('/wallet/transfer', [WalletController::class, 'transfer']);
+Route::post('/wallet/payout', [WalletController::class, 'requestPayout']);
+
+// Database Notifications Subsystem
+Route::get('/notifications', function (Request $request) {
+    return response()->json([
+        'success' => true,
+        'notifications' => $request->user()->notifications()->orderBy('created_at', 'desc')->get(),
+    ]);
+});
+Route::post('/notifications/mark-read', function (Request $request) {
+    $request->user()->unreadNotifications->markAsRead();
+
+    return response()->json([
+        'success' => true,
+        'message' => 'All database notifications marked as read.',
+    ]);
+});
+
+// Chat Conversation Protected Endpoints
+Route::get('/chats/conversation/{otherUserId}', [ChatController::class, 'getConversation']);
+Route::post('/chats/send', [ChatController::class, 'sendMessage']);
+Route::get('/chats/recent', [ChatController::class, 'getRecentChats']);
+
+// Authenticated order and transaction endpoints
+Route::get('/orders', [OrderController::class, 'index']);
+Route::get('/orders/{id}', [OrderController::class, 'show']);
+Route::get('/orders/{id}/receipt', [OrderController::class, 'downloadReceipt']);
+Route::get('/orders/customer/{customerId}', [OrderController::class, 'getCustomerOrders']);
+Route::get('/orders/student/{studentId}', [OrderController::class, 'getCustomerOrders']);
+Route::get('/orders/history/{studentId}', [OrderController::class, 'getCustomerOrders']);
+Route::get('/orders/vendor/{vendorId}', [OrderController::class, 'getVendorOrders']);
+Route::post('/orders', [OrderController::class, 'store']);
+
+// Paystack Payment Integration Protected Endpoints
+Route::post('/paystack/initialize', [PaystackPaymentController::class, 'initialize']);
+Route::get('/paystack/verify/{reference}', [PaystackPaymentController::class, 'verify']);
 
 // Automated Inventory & Availability Cron Checker routes
 Route::match(['get', 'post'], '/cron/check-availability', [InventoryCronController::class, 'checkAndNotify']);
@@ -333,8 +341,8 @@ Route::get('/audit-logs', [AuditLogController::class, 'index']);
 Route::post('/audit-logs', [AuditLogController::class, 'store']);
 
 // Admin Reporting & CSV Export Endpoints
-Route::middleware(['auth:sanctum','role:ADMIN','permission:reports.view'])->get('/admin/export-sales-csv', [AdminReportController::class, 'exportVendorSalesAndOrdersCsv']);
-Route::middleware(['auth:sanctum','role:ADMIN','permission:reports.view'])->get('/admin/export-student-orders-csv', [AdminReportController::class, 'exportStudentOrdersCsv']);
+Route::middleware(['auth:sanctum', 'role:ADMIN', 'permission:reports.view'])->get('/admin/export-sales-csv', [AdminReportController::class, 'exportVendorSalesAndOrdersCsv']);
+Route::middleware(['auth:sanctum', 'role:ADMIN', 'permission:reports.view'])->get('/admin/export-student-orders-csv', [AdminReportController::class, 'exportStudentOrdersCsv']);
 
 // System Status Monitoring (JSON health check of DB & Cache)
 Route::get('/system/status', [VendorController::class, 'getSystemHealth']);

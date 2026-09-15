@@ -2,27 +2,24 @@
 
 namespace App\Services;
 
-use App\Models\User;
-use App\Models\Order;
-use App\Models\Feedback;
 use App\Models\AuditLog;
+use App\Models\Feedback;
+use App\Models\Order;
+use App\Models\User;
 use Illuminate\Support\Facades\DB;
 
 class PerformanceAnalyticsService
 {
     /**
      * Generate a robust performance analytics report for a single vendor.
-     *
-     * @param int $vendorId
-     * @return array
      */
     public function getVendorReport(int $vendorId): array
     {
         $vendor = User::find($vendorId);
-        if (!$vendor) {
+        if (! $vendor) {
             return [
                 'success' => false,
-                'message' => 'Vendor not found.'
+                'message' => 'Vendor not found.',
             ];
         }
 
@@ -43,7 +40,7 @@ class PerformanceAnalyticsService
 
         $completedOrdersCount = $orderBreakdown['COMPLETED'];
         $declinedOrdersCount = $orderBreakdown['DECLINED'];
-        
+
         // Calculate completion rate (completed / (total - declined))
         $denominator = $totalOrders - $declinedOrdersCount;
         $completionRate = $denominator > 0 ? round(($completedOrdersCount / $denominator) * 100, 1) : 0.0;
@@ -175,9 +172,6 @@ class PerformanceAnalyticsService
 
     /**
      * Helper to formatted duration string from total seconds.
-     *
-     * @param float $seconds
-     * @return string
      */
     private function formatDuration(float $seconds): string
     {
@@ -190,6 +184,7 @@ class PerformanceAnalyticsService
         if ($mins > 0) {
             return "{$mins}m {$secs}s";
         }
+
         return "{$secs}s";
     }
 

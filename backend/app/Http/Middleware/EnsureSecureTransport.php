@@ -10,13 +10,14 @@ final class EnsureSecureTransport
 {
     public function handle(Request $request, Closure $next): Response
     {
-        if (app()->environment('production') && !$request->secure()) {
+        if (app()->environment('production') && ! $request->secure()) {
             return response()->json([
                 'success' => false,
                 'message' => 'Secure HTTPS transport is required.',
                 'error_code' => 'HTTPS_REQUIRED',
             ], 426);
         }
+
         return $next($request);
     }
 }

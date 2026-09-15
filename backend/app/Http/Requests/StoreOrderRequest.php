@@ -2,8 +2,8 @@
 
 namespace App\Http\Requests;
 
-use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Contracts\Validation\Validator;
+use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Http\Exceptions\HttpResponseException;
 
 class StoreOrderRequest extends FormRequest
@@ -21,9 +21,9 @@ class StoreOrderRequest extends FormRequest
      */
     protected function prepareForValidation()
     {
-        if ($this->has('student_id') && !$this->has('customer_id')) {
+        if ($this->has('student_id') && ! $this->has('customer_id')) {
             $this->merge(['customer_id' => $this->input('student_id')]);
-        } elseif ($this->has('customer_id') && !$this->has('student_id')) {
+        } elseif ($this->has('customer_id') && ! $this->has('student_id')) {
             $this->merge(['student_id' => $this->input('customer_id')]);
         }
     }
@@ -55,7 +55,7 @@ class StoreOrderRequest extends FormRequest
             response()->json([
                 'success' => false,
                 'message' => 'Input parameters invalid or missing.',
-                'errors' => $validator->errors()
+                'errors' => $validator->errors(),
             ], 400)
         );
     }

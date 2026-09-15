@@ -2,8 +2,8 @@
 
 namespace App\Http\Requests;
 
-use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Contracts\Validation\Validator;
+use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Http\Exceptions\HttpResponseException;
 
 class CreateOrderRequest extends FormRequest
@@ -21,9 +21,9 @@ class CreateOrderRequest extends FormRequest
      */
     protected function prepareForValidation(): void
     {
-        if ($this->has('student_id') && !$this->has('customer_id')) {
+        if ($this->has('student_id') && ! $this->has('customer_id')) {
             $this->merge(['customer_id' => $this->input('student_id')]);
-        } elseif ($this->has('customer_id') && !$this->has('student_id')) {
+        } elseif ($this->has('customer_id') && ! $this->has('student_id')) {
             $this->merge(['student_id' => $this->input('customer_id')]);
         }
     }
@@ -71,7 +71,7 @@ class CreateOrderRequest extends FormRequest
                 'success' => false,
                 'message' => 'Order request validation failed.',
                 'errors' => $validator->errors(),
-                'status_code' => 422
+                'status_code' => 422,
             ], 422)
         );
     }

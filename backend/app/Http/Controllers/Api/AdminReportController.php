@@ -3,10 +3,9 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
-use Illuminate\Http\Request;
 use App\Models\Order;
-use App\Models\User;
 use App\Models\Vendor;
+use Illuminate\Http\Request;
 
 class AdminReportController extends Controller
 {
@@ -40,19 +39,19 @@ class AdminReportController extends Controller
 
         $orders = $query->orderBy('created_at', 'desc')->get();
 
-        $fileName = 'ATU_Sales_And_Orders_Report_' . date('Y_m_d_His') . '.csv';
+        $fileName = 'ATU_Sales_And_Orders_Report_'.date('Y_m_d_His').'.csv';
 
         $headers = [
-            "Content-Type" => "text/csv; charset=UTF-8",
-            "Content-Disposition" => "attachment; filename=\"$fileName\"",
-            "Pragma" => "no-cache",
-            "Cache-Control" => "must-revalidate, post-check=0, pre-check=0",
-            "Expires" => "0"
+            'Content-Type' => 'text/csv; charset=UTF-8',
+            'Content-Disposition' => "attachment; filename=\"$fileName\"",
+            'Pragma' => 'no-cache',
+            'Cache-Control' => 'must-revalidate, post-check=0, pre-check=0',
+            'Expires' => '0',
         ];
 
-        $callback = function() use ($orders) {
+        $callback = function () use ($orders) {
             $file = fopen('php://output', 'w');
-            
+
             // UTF-8 BOM for Excel compatibility
             fprintf($file, chr(0xEF).chr(0xBB).chr(0xBF));
 
@@ -67,20 +66,20 @@ class AdminReportController extends Controller
                 'Payment Method',
                 'Status',
                 'Items Summary',
-                'Created At'
+                'Created At',
             ]);
 
             foreach ($orders as $order) {
                 $itemsSummary = [];
                 if ($order->orderItems) {
                     foreach ($order->orderItems as $item) {
-                        $itemsSummary[] = ($item->item_name ?? 'Item') . ' x' . ($item->quantity ?? 1);
+                        $itemsSummary[] = ($item->item_name ?? 'Item').' x'.($item->quantity ?? 1);
                     }
                 }
 
                 fputcsv($file, [
                     $order->id,
-                    $order->reference_code ?? $order->order_code ?? ('ORD-' . $order->id),
+                    $order->reference_code ?? $order->order_code ?? ('ORD-'.$order->id),
                     $order->user->name ?? $order->customer_name ?? 'Student',
                     $order->user->email ?? 'N/A',
                     $order->vendor->name ?? $order->vendor_name ?? 'ATU Vendor',
@@ -88,7 +87,7 @@ class AdminReportController extends Controller
                     $order->payment_method ?? 'Mobile Money',
                     strtoupper($order->status ?? 'PLACED'),
                     implode(' | ', $itemsSummary),
-                    $order->created_at ? $order->created_at->toDateTimeString() : date('Y-m-d H:i:s')
+                    $order->created_at ? $order->created_at->toDateTimeString() : date('Y-m-d H:i:s'),
                 ]);
             }
 
@@ -111,17 +110,17 @@ class AdminReportController extends Controller
         }
 
         $orders = $query->orderBy('created_at', 'desc')->get();
-        $fileName = 'Student_Orders_History_' . ($id ?? 'All') . '_' . date('Y_m_d') . '.csv';
+        $fileName = 'Student_Orders_History_'.($id ?? 'All').'_'.date('Y_m_d').'.csv';
 
         $headers = [
-            "Content-Type" => "text/csv; charset=UTF-8",
-            "Content-Disposition" => "attachment; filename=\"$fileName\"",
-            "Pragma" => "no-cache",
-            "Cache-Control" => "must-revalidate, post-check=0, pre-check=0",
-            "Expires" => "0"
+            'Content-Type' => 'text/csv; charset=UTF-8',
+            'Content-Disposition' => "attachment; filename=\"$fileName\"",
+            'Pragma' => 'no-cache',
+            'Cache-Control' => 'must-revalidate, post-check=0, pre-check=0',
+            'Expires' => '0',
         ];
 
-        $callback = function() use ($orders) {
+        $callback = function () use ($orders) {
             $file = fopen('php://output', 'w');
             fprintf($file, chr(0xEF).chr(0xBB).chr(0xBF));
 
@@ -131,7 +130,7 @@ class AdminReportController extends Controller
                 'Total Amount (GHS)',
                 'Payment Status',
                 'Order Status',
-                'Date'
+                'Date',
             ]);
 
             foreach ($orders as $order) {
@@ -141,7 +140,7 @@ class AdminReportController extends Controller
                     number_format($order->total_amount ?? 0.00, 2),
                     $order->payment_status ?? 'PAID',
                     $order->status ?? 'PLACED',
-                    $order->created_at ? $order->created_at->toDateTimeString() : date('Y-m-d H:i:s')
+                    $order->created_at ? $order->created_at->toDateTimeString() : date('Y-m-d H:i:s'),
                 ]);
             }
 

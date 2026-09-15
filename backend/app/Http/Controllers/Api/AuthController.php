@@ -3,18 +3,14 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
-use App\Models\User;
 use App\Models\AuditLog;
-use App\Models\SecurityAlert;
-use Illuminate\Support\Facades\Hash;
-use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Validator;
-
-use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\RateLimiter;
-use Illuminate\Support\Str;
 use App\Models\AuthVerificationCode;
+use App\Models\User;
 use App\Notifications\AuthenticationCodeNotification;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Validator;
 
 class AuthController extends Controller
 {
@@ -30,6 +26,7 @@ class AuthController extends Controller
         if (Hash::check($legacySha256, $stored) || hash_equals($stored, $legacySha256)) {
             $user->password = Hash::make($credential);
             $user->saveQuietly();
+
             return true;
         }
 
@@ -52,6 +49,7 @@ class AuthController extends Controller
             'expires_at' => now()->addMinutes(10),
         ]);
         $user->notify(new AuthenticationCodeNotification($purpose, $code));
+
         return $code;
     }
 
@@ -62,10 +60,15 @@ class AuthController extends Controller
             ->whereNull('used_at')
             ->where('expires_at', '>', now())
             ->latest()->first();
-        if (!$record || $record->attempts >= 5) return null;
+        if (! $record || $record->attempts >= 5) {
+            return null;
+        }
         $record->increment('attempts');
-        if (!Hash::check($code, $record->code_hash)) return null;
+        if (! Hash::check($code, $record->code_hash)) {
+            return null;
+        }
         $record->update(['used_at' => now()]);
+
         return $record;
     }
 
@@ -121,7 +124,7 @@ class AuthController extends Controller
             return $user;
         });
 
-        $token = $user->createToken(strtolower($user->role) . '_token', [strtolower($user->role)])->plainTextToken;
+        $token = $user->createToken(strtolower($user->role).'_token', [strtolower($user->role)])->plainTextToken;
 
         return response()->json([
             'success' => true,
@@ -152,7 +155,7 @@ class AuthController extends Controller
         $username = trim((string) $request->input('username'));
         $user = User::whereRaw('LOWER(username) = ?', [strtolower($username)])->first();
 
-        if (!$user || !$this->verifyCredential($user, (string) $request->input('pin'))) {
+        if (! $user || ! $this->verifyCredential($user, (string) $request->input('pin'))) {
             if ($user) {
                 AuditLog::create([
                     'user_id' => $user->id,
@@ -161,10 +164,11 @@ class AuthController extends Controller
                     'details' => 'Failed username/PIN login attempt.',
                 ]);
             }
+
             return response()->json(['success' => false, 'message' => 'Invalid username or PIN.'], 401);
         }
 
-        if (!$user->isActive()) {
+        if (! $user->isActive()) {
             return response()->json(['success' => false, 'message' => 'Your account is not active.'], 403);
         }
 
@@ -176,6 +180,7 @@ class AuthController extends Controller
                 'action' => 'AUTH_2FA_CHALLENGE',
                 'details' => 'Admin login requires two-factor verification.',
             ]);
+
             return response()->json([
                 'success' => true,
                 'requires_2fa' => true,
@@ -198,6 +203,7 @@ class AuthController extends Controller
             'user_id' => $user->id, 'timestamp' => time() * 1000,
             'action' => 'USER_AUTHENTICATION', 'details' => 'Successful login via Sanctum.',
         ]);
+
         return response()->json([
             'success' => true, 'message' => 'Login successful.',
             'user' => $user, 'token' => $token,
@@ -210,11 +216,18 @@ class AuthController extends Controller
             'username' => 'required|string|max:255',
             'code' => 'required|digits:6',
         ]);
-        if ($data->fails()) return response()->json(['success'=>false,'message'=>'A valid six-digit code is required.','errors'=>$data->errors()],422);
-        $user = User::where('username', trim($request->username))->where('role','ADMIN')->first();
-        if (!$user || !$user->isActive() || !$user->two_factor_enabled) return response()->json(['success'=>false,'message'=>'Invalid verification request.'],403);
-        if (!$this->verifyCode($user->username, 'ADMIN_2FA', $request->code)) return response()->json(['success'=>false,'message'=>'Invalid or expired verification code.'],401);
-        AuditLog::create(['user_id'=>$user->id,'timestamp'=>time()*1000,'action'=>'AUTH_2FA_SUCCESS','details'=>'Administrator completed two-factor verification.']);
+        if ($data->fails()) {
+            return response()->json(['success' => false, 'message' => 'A valid six-digit code is required.', 'errors' => $data->errors()], 422);
+        }
+        $user = User::where('username', trim($request->username))->where('role', 'ADMIN')->first();
+        if (! $user || ! $user->isActive() || ! $user->two_factor_enabled) {
+            return response()->json(['success' => false, 'message' => 'Invalid verification request.'], 403);
+        }
+        if (! $this->verifyCode($user->username, 'ADMIN_2FA', $request->code)) {
+            return response()->json(['success' => false, 'message' => 'Invalid or expired verification code.'], 401);
+        }
+        AuditLog::create(['user_id' => $user->id, 'timestamp' => time() * 1000, 'action' => 'AUTH_2FA_SUCCESS', 'details' => 'Administrator completed two-factor verification.']);
+
         return $this->issueSession($user);
     }
 
@@ -258,8 +271,8 @@ class AuthController extends Controller
         $username = trim((string) $request->input('username'));
         $user = User::whereRaw('LOWER(username) = ?', [strtolower($username)])->first();
 
-        if (!$user || !$user->isActive() ||
-            !$this->verifyCode($user->username, 'PASSWORD_RESET', $request->input('code'))) {
+        if (! $user || ! $user->isActive() ||
+            ! $this->verifyCode($user->username, 'PASSWORD_RESET', $request->input('code'))) {
             return response()->json(['success' => false, 'message' => 'Invalid or expired reset code.'], 401);
         }
 
@@ -280,62 +293,83 @@ class AuthController extends Controller
     public function requestEmailVerification(Request $request)
     {
         $user = $request->user();
-        if (!$user || !$user->isActive()) {
+        if (! $user || ! $user->isActive()) {
             return response()->json(['success' => false, 'message' => 'Authenticated active account required.'], 401);
         }
         $email = $user->emailAddress();
-        if (!$email) {
+        if (! $email) {
             return response()->json(['success' => false, 'message' => 'Add a valid email address to your profile first.'], 422);
         }
         if ($user->email_verified_at) {
             return response()->json(['success' => true, 'message' => 'Email address is already verified.']);
         }
         $this->issueCode($user, 'EMAIL_VERIFY');
-        AuditLog::create(['user_id'=>$user->id,'timestamp'=>time()*1000,'action'=>'EMAIL_VERIFICATION_REQUESTED','details'=>'Email verification code requested.']);
-        return response()->json(['success'=>true,'message'=>'A verification code has been sent to your email address.']);
+        AuditLog::create(['user_id' => $user->id, 'timestamp' => time() * 1000, 'action' => 'EMAIL_VERIFICATION_REQUESTED', 'details' => 'Email verification code requested.']);
+
+        return response()->json(['success' => true, 'message' => 'A verification code has been sent to your email address.']);
     }
 
     public function verifyEmail(Request $request)
     {
-        $request->validate(['code'=>'required|digits:6']);
+        $request->validate(['code' => 'required|digits:6']);
         $user = $request->user();
-        if (!$user || !$user->isActive()) return response()->json(['success'=>false,'message'=>'Authenticated active account required.'],401);
-        if (!$this->verifyCode($user->username,'EMAIL_VERIFY',$request->code)) return response()->json(['success'=>false,'message'=>'Invalid or expired verification code.'],401);
+        if (! $user || ! $user->isActive()) {
+            return response()->json(['success' => false, 'message' => 'Authenticated active account required.'], 401);
+        }
+        if (! $this->verifyCode($user->username, 'EMAIL_VERIFY', $request->code)) {
+            return response()->json(['success' => false, 'message' => 'Invalid or expired verification code.'], 401);
+        }
         $user->email_verified_at = now();
         $user->saveQuietly();
-        AuditLog::create(['user_id'=>$user->id,'timestamp'=>time()*1000,'action'=>'EMAIL_VERIFIED','details'=>'User email address verified.']);
-        return response()->json(['success'=>true,'message'=>'Email address verified successfully.','user'=>$user]);
+        AuditLog::create(['user_id' => $user->id, 'timestamp' => time() * 1000, 'action' => 'EMAIL_VERIFIED', 'details' => 'User email address verified.']);
+
+        return response()->json(['success' => true, 'message' => 'Email address verified successfully.', 'user' => $user]);
     }
 
     public function requestTwoFactorEnable(Request $request)
     {
-        $user=$request->user();
-        if (!$user || strtoupper((string)$user->role)!=='ADMIN') return response()->json(['success'=>false,'message'=>'Administrator access required.'],403);
-        $this->issueCode($user,'ADMIN_2FA_ENABLE');
-        return response()->json(['success'=>true,'message'=>'A verification code has been sent to your administrator email address.']);
+        $user = $request->user();
+        if (! $user || strtoupper((string) $user->role) !== 'ADMIN') {
+            return response()->json(['success' => false, 'message' => 'Administrator access required.'], 403);
+        }
+        $this->issueCode($user, 'ADMIN_2FA_ENABLE');
+
+        return response()->json(['success' => true, 'message' => 'A verification code has been sent to your administrator email address.']);
     }
 
     public function enableTwoFactor(Request $request)
     {
-        $request->validate(['code'=>'required|digits:6']);
-        $user=$request->user();
-        if (!$user || strtoupper((string)$user->role)!=='ADMIN') return response()->json(['success'=>false,'message'=>'Administrator access required.'],403);
-        if (!$this->verifyCode($user->username,'ADMIN_2FA_ENABLE',$request->code)) return response()->json(['success'=>false,'message'=>'Invalid or expired verification code.'],401);
-        $user->two_factor_enabled=true; $user->saveQuietly();
-        AuditLog::create(['user_id'=>$user->id,'timestamp'=>time()*1000,'action'=>'2FA_ENABLED','details'=>'Administrator enabled two-factor authentication.']);
-        return response()->json(['success'=>true,'message'=>'Two-factor authentication is now enabled.']);
+        $request->validate(['code' => 'required|digits:6']);
+        $user = $request->user();
+        if (! $user || strtoupper((string) $user->role) !== 'ADMIN') {
+            return response()->json(['success' => false, 'message' => 'Administrator access required.'], 403);
+        }
+        if (! $this->verifyCode($user->username, 'ADMIN_2FA_ENABLE', $request->code)) {
+            return response()->json(['success' => false, 'message' => 'Invalid or expired verification code.'], 401);
+        }
+        $user->two_factor_enabled = true;
+        $user->saveQuietly();
+        AuditLog::create(['user_id' => $user->id, 'timestamp' => time() * 1000, 'action' => '2FA_ENABLED', 'details' => 'Administrator enabled two-factor authentication.']);
+
+        return response()->json(['success' => true, 'message' => 'Two-factor authentication is now enabled.']);
     }
 
     public function disableTwoFactor(Request $request)
     {
-        $request->validate(['pin'=>'required|string|min:4|max:128']);
-        $user=$request->user();
-        if (!$user || !$user->isSuperAdmin()) return response()->json(['success'=>false,'message'=>'Only the Super Admin can disable administrator two-factor authentication.'],403);
-        $valid=$this->verifyCredential($user,(string)$request->pin);
-        if (!$valid) return response()->json(['success'=>false,'message'=>'Invalid credentials.'],401);
-        $user->two_factor_enabled=false; $user->saveQuietly();
-        AuditLog::create(['user_id'=>$user->id,'timestamp'=>time()*1000,'action'=>'2FA_DISABLED','details'=>'Super Admin disabled administrator two-factor authentication.']);
-        return response()->json(['success'=>true,'message'=>'Two-factor authentication disabled.']);
+        $request->validate(['pin' => 'required|string|min:4|max:128']);
+        $user = $request->user();
+        if (! $user || ! $user->isSuperAdmin()) {
+            return response()->json(['success' => false, 'message' => 'Only the Super Admin can disable administrator two-factor authentication.'], 403);
+        }
+        $valid = $this->verifyCredential($user, (string) $request->pin);
+        if (! $valid) {
+            return response()->json(['success' => false, 'message' => 'Invalid credentials.'], 401);
+        }
+        $user->two_factor_enabled = false;
+        $user->saveQuietly();
+        AuditLog::create(['user_id' => $user->id, 'timestamp' => time() * 1000, 'action' => '2FA_DISABLED', 'details' => 'Super Admin disabled administrator two-factor authentication.']);
+
+        return response()->json(['success' => true, 'message' => 'Two-factor authentication disabled.']);
     }
 
     private function permissionsFor(User $user): array|string
@@ -343,16 +377,21 @@ class AuthController extends Controller
         $role = strtoupper((string) $user->role);
         if ($role === 'ADMIN') {
             $level = strtoupper((string) ($user->admin_level ?? 'CAFETERIA_ADMIN'));
+
             return config("permissions.roles.$level", []);
         }
+
         return config('permissions.'.strtolower($role), []);
     }
 
     public function me(Request $request)
     {
         $user = $request->user();
-        if (!$user || !$user->isActive()) return response()->json(['success'=>false,'message'=>'Unauthenticated.'],401);
-        return response()->json(['success'=>true,'user'=>$user,'permissions'=>$this->permissionsFor($user)]);
+        if (! $user || ! $user->isActive()) {
+            return response()->json(['success' => false, 'message' => 'Unauthenticated.'], 401);
+        }
+
+        return response()->json(['success' => true, 'user' => $user, 'permissions' => $this->permissionsFor($user)]);
     }
 
     /**
@@ -361,6 +400,7 @@ class AuthController extends Controller
     public function getAllUsers()
     {
         $users = User::all();
+
         return response()->json($users, 200);
     }
 
@@ -370,10 +410,10 @@ class AuthController extends Controller
     public function deleteUser($id)
     {
         $user = User::find($id);
-        if (!$user) {
+        if (! $user) {
             return response()->json([
                 'success' => false,
-                'message' => 'User not found.'
+                'message' => 'User not found.',
             ], 404);
         }
 
@@ -382,7 +422,7 @@ class AuthController extends Controller
 
         return response()->json([
             'success' => true,
-            'message' => "User '{$fullName}' has been erased successfully."
+            'message' => "User '{$fullName}' has been erased successfully.",
         ], 200);
     }
 
@@ -400,14 +440,16 @@ class AuthController extends Controller
             } catch (\Exception $e) {
                 // Ignore exception if using stateless JWT
             }
+
             return response()->json([
                 'success' => true,
-                'message' => 'Secure Token invalidated successfully.'
+                'message' => 'Secure Token invalidated successfully.',
             ], 200);
         }
+
         return response()->json([
             'success' => false,
-            'message' => 'No active authenticated session.'
+            'message' => 'No active authenticated session.',
         ], 401);
     }
 
@@ -417,10 +459,10 @@ class AuthController extends Controller
     public function updateProfile(Request $request)
     {
         $user = auth()->user();
-        if (!$user) {
+        if (! $user) {
             return response()->json([
                 'success' => false,
-                'message' => 'Unauthorized or no active session found.'
+                'message' => 'Unauthorized or no active session found.',
             ], 401);
         }
 
@@ -439,16 +481,16 @@ class AuthController extends Controller
             return response()->json([
                 'success' => false,
                 'message' => 'Profile validation failed.',
-                'errors' => $validator->errors()
+                'errors' => $validator->errors(),
             ], 400);
         }
 
         // Fetch user with write-safety
         $dbUser = User::find($user->id);
-        if (!$dbUser) {
+        if (! $dbUser) {
             return response()->json([
                 'success' => false,
-                'message' => 'User not found in system.'
+                'message' => 'User not found in system.',
             ], 404);
         }
 
@@ -486,7 +528,7 @@ class AuthController extends Controller
         return response()->json([
             'success' => true,
             'message' => 'Profile updated successfully.',
-            'user' => $dbUser
+            'user' => $dbUser,
         ], 200);
     }
 }

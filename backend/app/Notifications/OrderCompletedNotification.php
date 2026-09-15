@@ -11,14 +11,12 @@ class OrderCompletedNotification extends Notification
     use Queueable;
 
     /**
-     * @var \App\Models\Order
+     * @var Order
      */
     protected $order;
 
     /**
      * Create a new notification instance.
-     *
-     * @param  \App\Models\Order  $order
      */
     public function __construct(Order $order)
     {

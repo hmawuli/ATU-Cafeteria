@@ -3,10 +3,10 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Models\Order;
+use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
-use App\Models\User;
-use App\Models\Order;
 
 class LoyaltyController extends Controller
 {
@@ -16,10 +16,10 @@ class LoyaltyController extends Controller
     public function getLoyaltySummary(Request $request)
     {
         $user = $request->user();
-        if (!$user) {
+        if (! $user) {
             return response()->json([
                 'success' => false,
-                'message' => 'Unauthenticated.'
+                'message' => 'Unauthenticated.',
             ], 401);
         }
 
@@ -27,12 +27,12 @@ class LoyaltyController extends Controller
         if ($role !== 'STUDENT' && $role !== 'ADMIN') {
             return response()->json([
                 'success' => false,
-                'message' => 'Unauthorized. Loyalty rewards program is restricted to students.'
+                'message' => 'Unauthorized. Loyalty rewards program is restricted to students.',
             ], 403);
         }
 
-        $points = (int)($user->loyalty_points ?? 0);
-        $totalSpent = (double)($user->total_spent ?? 0.00);
+        $points = (int) ($user->loyalty_points ?? 0);
+        $totalSpent = (float) ($user->total_spent ?? 0.00);
 
         // Calculate cashback conversion: 10 points = GH₵ 1.00 (i.e. 1 point = GH₵ 0.10)
         $cashbackRate = 0.10;
@@ -42,7 +42,7 @@ class LoyaltyController extends Controller
         $tier = 'Bronze member';
         $nextTier = 'Silver Elite';
         $pointsNeededForNext = 100 - $points;
-        
+
         if ($points >= 500) {
             $tier = 'Platinum Legends';
             $nextTier = 'Max Tier Reached';
@@ -59,10 +59,10 @@ class LoyaltyController extends Controller
 
         // Fetch user orders to compile a dynamic history of earning and redemption events
         $orders = Order::where(function ($query) use ($user) {
-                $query->where('customer_id', $user->id)
-                      ->orWhere('student_id', $user->id)
-                      ->orWhere('user_id', $user->id);
-            })
+            $query->where('customer_id', $user->id)
+                ->orWhere('student_id', $user->id)
+                ->orWhere('user_id', $user->id);
+        })
             ->whereIn(DB::raw('upper(status)'), ['COMPLETED', 'DELIVERED', 'READY', 'PENDING'])
             ->orderBy('order_timestamp', 'desc')
             ->get();
@@ -80,11 +80,11 @@ class LoyaltyController extends Controller
                     'food_name' => $order->food_name,
                     'type' => 'REDEMPTION',
                     'points' => -$order->points_redeemed,
-                    'discount_applied' => (double)$order->discount_applied,
-                    'description' => "Redeemed {$order->points_redeemed} points for GH₵ " . number_format($order->discount_applied, 2) . " discount on '{$order->food_name}'",
+                    'discount_applied' => (float) $order->discount_applied,
+                    'description' => "Redeemed {$order->points_redeemed} points for GH₵ ".number_format($order->discount_applied, 2)." discount on '{$order->food_name}'",
                     'status' => 'COMPLETED',
                     'date' => $formattedDate,
-                    'timestamp_ms' => $order->order_timestamp
+                    'timestamp_ms' => $order->order_timestamp,
                 ];
             }
 
@@ -98,10 +98,10 @@ class LoyaltyController extends Controller
                         'type' => 'EARNED',
                         'points' => $earned,
                         'discount_applied' => 0.00,
-                        'description' => "Earned {$earned} points from order #{$order->id} (Paid GH₵ " . number_format($order->total_price, 2) . ")",
+                        'description' => "Earned {$earned} points from order #{$order->id} (Paid GH₵ ".number_format($order->total_price, 2).')',
                         'status' => 'COMPLETED',
                         'date' => $formattedDate,
-                        'timestamp_ms' => $order->order_timestamp
+                        'timestamp_ms' => $order->order_timestamp,
                     ];
                 }
             }
@@ -123,7 +123,7 @@ class LoyaltyController extends Controller
             'conversion_rule' => '10 Loyalty Points = GH₵ 1.00 Discount',
             'earning_rule' => 'Earn 1 Loyalty Point for every GH₵ 1.00 spent on completed orders',
             'history' => $history,
-            'generated_at' => date('c')
+            'generated_at' => date('c'),
         ], 200);
     }
 
@@ -133,21 +133,21 @@ class LoyaltyController extends Controller
     public function previewDiscount(Request $request)
     {
         $user = $request->user();
-        if (!$user) {
+        if (! $user) {
             return response()->json(['success' => false, 'message' => 'Unauthenticated.'], 401);
         }
 
         $request->validate([
-            'points_to_redeem' => 'required|integer|min:1'
+            'points_to_redeem' => 'required|integer|min:1',
         ]);
 
         $pointsToRedeem = intval($request->input('points_to_redeem'));
-        $balance = (int)($user->loyalty_points ?? 0);
+        $balance = (int) ($user->loyalty_points ?? 0);
 
         if ($balance < $pointsToRedeem) {
             return response()->json([
                 'success' => false,
-                'message' => "Insufficient loyalty points balance. You have {$balance} points, but requested to redeem {$pointsToRedeem}."
+                'message' => "Insufficient loyalty points balance. You have {$balance} points, but requested to redeem {$pointsToRedeem}.",
             ], 400);
         }
 
@@ -159,7 +159,7 @@ class LoyaltyController extends Controller
             'points_to_redeem' => $pointsToRedeem,
             'discount_value' => $discount,
             'currency' => 'GH₵',
-            'remaining_points' => $balance - $pointsToRedeem
+            'remaining_points' => $balance - $pointsToRedeem,
         ], 200);
     }
 }

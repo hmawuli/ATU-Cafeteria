@@ -17,12 +17,14 @@ final class InactivityTimeout
             $timeout = max(60, (int) env('STUDENT_SESSION_TIMEOUT_SECONDS', 900));
             if ($last && (time() - $last) > $timeout) {
                 $user->tokens()->delete();
+
                 return response()->json(['success' => false, 'message' => 'Session expired due to inactivity. Please log in again.'], 401);
             }
             $profile['last_activity_at'] = time();
             $user->profile_info = $profile;
             $user->saveQuietly();
         }
+
         return $next($request);
     }
 }

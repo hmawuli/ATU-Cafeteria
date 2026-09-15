@@ -3,19 +3,18 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
-use App\Models\FoodItem;
-use App\Models\MenuItem;
-use App\Models\Menu;
-use App\Models\Order;
-use App\Models\Feedback;
+use App\Http\Requests\UpdateMenuAvailabilityRequest;
 use App\Models\AuditLog;
+use App\Models\Feedback;
+use App\Models\FoodItem;
+use App\Models\Menu;
+use App\Models\MenuItem;
+use App\Models\Order;
 use App\Models\VendorMenuAvailability;
 use App\Models\VendorOrderSummary;
-use App\Http\Requests\UpdateMenuAvailabilityRequest;
-use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Validator;
-use Illuminate\Support\Facades\DB;
 use Carbon\Carbon;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 
 class VendorSpecificController extends Controller
 {
@@ -32,7 +31,7 @@ class VendorSpecificController extends Controller
         $isAvailable = filter_var($request->input('is_available'), FILTER_VALIDATE_BOOLEAN);
 
         $itemName = '';
-        
+
         DB::beginTransaction();
         try {
             // 1. Update the primary items availability
@@ -41,11 +40,12 @@ class VendorSpecificController extends Controller
                     ->where('vendor_id', $user->id)
                     ->first();
 
-                if (!$item) {
+                if (! $item) {
                     DB::rollBack();
+
                     return response()->json([
                         'success' => false,
-                        'message' => 'Food Item not found or does not belong to vendor.'
+                        'message' => 'Food Item not found or does not belong to vendor.',
                     ], 404);
                 }
 
@@ -58,11 +58,12 @@ class VendorSpecificController extends Controller
                     ->where('vendor_id', $user->id)
                     ->first();
 
-                if (!$item) {
+                if (! $item) {
                     DB::rollBack();
+
                     return response()->json([
                         'success' => false,
-                        'message' => 'Menu Item not found or does not belong to vendor.'
+                        'message' => 'Menu Item not found or does not belong to vendor.',
                     ], 404);
                 }
 
@@ -93,26 +94,27 @@ class VendorSpecificController extends Controller
                 'user_id' => $user->id,
                 'timestamp' => time() * 1000,
                 'action' => 'MENU_AVAILABILITY_UPDATED',
-                'details' => "Updated availability of item '{$itemName}' ({$itemType}) to " . ($isAvailable ? 'AVAILABLE' : 'UNAVAILABLE') . ".",
+                'details' => "Updated availability of item '{$itemName}' ({$itemType}) to ".($isAvailable ? 'AVAILABLE' : 'UNAVAILABLE').'.',
             ]);
 
             DB::commit();
 
             return response()->json([
                 'success' => true,
-                'message' => "Successfully updated availability of '{$itemName}' to " . ($isAvailable ? 'Available' : 'Unavailable') . ".",
+                'message' => "Successfully updated availability of '{$itemName}' to ".($isAvailable ? 'Available' : 'Unavailable').'.',
                 'item_id' => $itemId,
                 'item_type' => $itemType,
                 'is_available' => $isAvailable,
-                'schedule_rule' => $scheduledRule
+                'schedule_rule' => $scheduledRule,
             ], 200);
 
         } catch (\Exception $e) {
             DB::rollBack();
+
             return response()->json([
                 'success' => false,
                 'message' => 'Server error while updating menu availability.',
-                'error' => $e->getMessage()
+                'error' => $e->getMessage(),
             ], 500);
         }
     }
@@ -125,10 +127,10 @@ class VendorSpecificController extends Controller
     {
         $user = $request->user();
 
-        if (!$user || (strtoupper($user->role) !== 'VENDOR' && strtoupper($user->role) !== 'ADMIN')) {
+        if (! $user || (strtoupper($user->role) !== 'VENDOR' && strtoupper($user->role) !== 'ADMIN')) {
             return response()->json([
                 'success' => false,
-                'message' => 'Unauthorized. This endpoint requires VENDOR or ADMIN privileges.'
+                'message' => 'Unauthorized. This endpoint requires VENDOR or ADMIN privileges.',
             ], 403);
         }
 
@@ -163,7 +165,7 @@ class VendorSpecificController extends Controller
 
             // Calculate active vendor overall ratings
             $feedbackScores = Feedback::where('vendor_id', $user->id)->get();
-            $avgRating = $feedbackScores->count() > 0 
+            $avgRating = $feedbackScores->count() > 0
                 ? round($feedbackScores->average('rating_food_quality'), 2)
                 : 5.00;
 
@@ -171,7 +173,7 @@ class VendorSpecificController extends Controller
             $cachedSummary = VendorOrderSummary::updateOrCreate(
                 [
                     'vendor_id' => $user->id,
-                    'summary_date' => $today
+                    'summary_date' => $today,
                 ],
                 [
                     'total_orders' => $todayOrders->count(),
@@ -204,7 +206,7 @@ class VendorSpecificController extends Controller
 
                 $startingLimit = 35;
                 $remainingStock = max(0, $startingLimit - $totalTodaySum);
-                
+
                 // Dynamic threshold
                 $lowStockThreshold = max(4, (int) round($orderFrequency24h * 0.40));
 
@@ -217,7 +219,7 @@ class VendorSpecificController extends Controller
                         'remaining_stock' => $remainingStock,
                         'order_frequency_24h' => $orderFrequency24h,
                         'threshold' => $lowStockThreshold,
-                        'warning' => $remainingStock === 0 ? 'SOLD_OUT' : 'LOW_STOCK'
+                        'warning' => $remainingStock === 0 ? 'SOLD_OUT' : 'LOW_STOCK',
                     ];
                 }
             }
@@ -229,9 +231,9 @@ class VendorSpecificController extends Controller
                 'cached_summary_id' => $cachedSummary->id,
                 'metrics' => [
                     'today_orders_count' => $todayOrders->count(),
-                    'today_revenue' => (double)$todayRevenue,
-                    'historic_revenue' => (double)$totalRevenueHistoric,
-                    'average_rating' => (double)$avgRating,
+                    'today_revenue' => (float) $todayRevenue,
+                    'historic_revenue' => (float) $totalRevenueHistoric,
+                    'average_rating' => (float) $avgRating,
                     'today_status_breakdown' => $statusCountsToday,
                 ],
                 'notifications' => [
@@ -239,14 +241,14 @@ class VendorSpecificController extends Controller
                     'active_preparing_count' => $statusCountsToday['PREPARING'],
                     'ready_pickup_count' => $statusCountsToday['READY'],
                 ],
-                'low_stock_warnings' => $lowStockItems
+                'low_stock_warnings' => $lowStockItems,
             ], 200);
 
         } catch (\Exception $e) {
             return response()->json([
                 'success' => false,
                 'message' => 'Error capturing current order summaries.',
-                'error' => $e->getMessage()
+                'error' => $e->getMessage(),
             ], 500);
         }
     }
@@ -259,10 +261,10 @@ class VendorSpecificController extends Controller
     {
         $user = $request->user();
 
-        if (!$user || (strtoupper($user->role) !== 'VENDOR' && strtoupper($user->role) !== 'ADMIN')) {
+        if (! $user || (strtoupper($user->role) !== 'VENDOR' && strtoupper($user->role) !== 'ADMIN')) {
             return response()->json([
                 'success' => false,
-                'message' => 'Unauthorized. This endpoint requires VENDOR or ADMIN privileges.'
+                'message' => 'Unauthorized. This endpoint requires VENDOR or ADMIN privileges.',
             ], 403);
         }
 
@@ -276,7 +278,7 @@ class VendorSpecificController extends Controller
             if (json_last_error() !== JSON_ERROR_NONE) {
                 return response()->json([
                     'success' => false,
-                    'message' => 'Invalid JSON file structure.'
+                    'message' => 'Invalid JSON file structure.',
                 ], 400);
             }
         } else {
@@ -287,10 +289,10 @@ class VendorSpecificController extends Controller
             }
         }
 
-        if (empty($itemsData) || !is_array($itemsData)) {
+        if (empty($itemsData) || ! is_array($itemsData)) {
             return response()->json([
                 'success' => false,
-                'message' => 'No item data found. Please upload a valid JSON file or JSON array.'
+                'message' => 'No item data found. Please upload a valid JSON file or JSON array.',
             ], 400);
         }
 
@@ -307,19 +309,22 @@ class VendorSpecificController extends Controller
         try {
             foreach ($itemsData as $index => $itemData) {
                 $itemId = $itemData['id'] ?? $itemData['item_id'] ?? null;
-                if (!$itemId) {
+                if (! $itemId) {
                     $errors[] = "Item at index {$index} missing 'id' or 'item_id'.";
+
                     continue;
                 }
 
                 $food = FoodItem::where('id', $itemId)->first();
-                if (!$food) {
+                if (! $food) {
                     $errors[] = "Food item with ID {$itemId} not found.";
+
                     continue;
                 }
 
                 if ($food->vendor_id !== $user->id && strtoupper($user->role) !== 'ADMIN') {
                     $errors[] = "Food item width ID {$itemId} does not belong to your vendor profile.";
+
                     continue;
                 }
 
@@ -342,14 +347,14 @@ class VendorSpecificController extends Controller
                     if ($newAvail !== $oldAvail) {
                         $food->is_available = $newAvail;
                         $hasChanges = true;
-                        $changedFields[] = "availability from " . ($oldAvail ? "Active" : "Inactive") . " to " . ($newAvail ? "Active" : "Inactive");
+                        $changedFields[] = 'availability from '.($oldAvail ? 'Active' : 'Inactive').' to '.($newAvail ? 'Active' : 'Inactive');
                     }
                 }
 
                 if ($hasChanges) {
                     $food->save();
                     $updatedCount++;
-                    $updatesLog[] = "{$food->name} (ID {$itemId}) updated: " . implode(', ', $changedFields);
+                    $updatesLog[] = "{$food->name} (ID {$itemId}) updated: ".implode(', ', $changedFields);
                 }
             }
 
@@ -359,7 +364,7 @@ class VendorSpecificController extends Controller
                     'user_id' => $user->id,
                     'timestamp' => time() * 1000,
                     'action' => 'BULK_MENU_UPLOAD',
-                    'details' => "Bulk updated {$updatedCount} menu item(s) properties via JSON upload: " . implode('; ', $updatesLog),
+                    'details' => "Bulk updated {$updatedCount} menu item(s) properties via JSON upload: ".implode('; ', $updatesLog),
                 ]);
             }
 
@@ -370,18 +375,19 @@ class VendorSpecificController extends Controller
                 'message' => "Successfully processed JSON upload. Updated {$updatedCount} menu item(s).",
                 'updated_count' => $updatedCount,
                 'errors' => $errors,
-                'updates_log' => $updatesLog
+                'updates_log' => $updatesLog,
             ], 200);
 
-         } catch (\Exception $e) {
-             DB::rollBack();
-             return response()->json([
-                 'success' => false,
-                 'message' => 'Server error while performing bulk update from JSON.',
-                 'error' => $e->getMessage()
-             ], 500);
-         }
-     }
+        } catch (\Exception $e) {
+            DB::rollBack();
+
+            return response()->json([
+                'success' => false,
+                'message' => 'Server error while performing bulk update from JSON.',
+                'error' => $e->getMessage(),
+            ], 500);
+        }
+    }
 
     /**
      * Get dynamic sales and revenue trends for Chart.js based on date range.
@@ -389,10 +395,10 @@ class VendorSpecificController extends Controller
     public function getAnalyticsTrends(Request $request)
     {
         $user = $request->user();
-        if (!$user) {
+        if (! $user) {
             return response()->json([
                 'success' => false,
-                'message' => 'Unauthenticated.'
+                'message' => 'Unauthenticated.',
             ], 401);
         }
 
@@ -405,7 +411,7 @@ class VendorSpecificController extends Controller
         $startDateStr = $request->input('start_date');
         $endDateStr = $request->input('end_date');
 
-        if (!$startDateStr || !$endDateStr) {
+        if (! $startDateStr || ! $endDateStr) {
             // Default to last 30 days
             $startDate = now()->subDays(29)->startOfDay();
             $endDate = now()->endOfDay();
@@ -416,7 +422,7 @@ class VendorSpecificController extends Controller
             } catch (\Exception $e) {
                 return response()->json([
                     'success' => false,
-                    'message' => 'Invalid date format. Use Y-m-d.'
+                    'message' => 'Invalid date format. Use Y-m-d.',
                 ], 400);
             }
         }
@@ -425,7 +431,7 @@ class VendorSpecificController extends Controller
         if ($startDate->diffInDays($endDate) > 365) {
             return response()->json([
                 'success' => false,
-                'message' => 'Date range cannot exceed 365 days.'
+                'message' => 'Date range cannot exceed 365 days.',
             ], 400);
         }
 
@@ -439,7 +445,7 @@ class VendorSpecificController extends Controller
                 'date' => $dateStr,
                 'label' => $dayLabel,
                 'sales' => 0.0,
-                'order_count' => 0
+                'order_count' => 0,
             ];
             $currentDate->addDay();
         }
@@ -459,15 +465,21 @@ class VendorSpecificController extends Controller
         foreach ($orders as $orderSales) {
             $dateKey = $orderSales->date_val;
             if (isset($trends[$dateKey])) {
-                $trends[$dateKey]['sales'] = (float)$orderSales->total_sales;
-                $trends[$dateKey]['order_count'] = (int)$orderSales->total_orders;
+                $trends[$dateKey]['sales'] = (float) $orderSales->total_sales;
+                $trends[$dateKey]['order_count'] = (int) $orderSales->total_orders;
             }
         }
 
         $trendsList = array_values($trends);
-        $labels = array_map(function ($item) { return $item['label']; }, $trendsList);
-        $sales = array_map(function ($item) { return $item['sales']; }, $trendsList);
-        $orderCounts = array_map(function ($item) { return $item['order_count']; }, $trendsList);
+        $labels = array_map(function ($item) {
+            return $item['label'];
+        }, $trendsList);
+        $sales = array_map(function ($item) {
+            return $item['sales'];
+        }, $trendsList);
+        $orderCounts = array_map(function ($item) {
+            return $item['order_count'];
+        }, $trendsList);
 
         return response()->json([
             'success' => true,
@@ -476,7 +488,7 @@ class VendorSpecificController extends Controller
             'labels' => $labels,
             'sales' => $sales,
             'order_counts' => $orderCounts,
-            'raw_trends' => $trendsList
+            'raw_trends' => $trendsList,
         ], 200);
     }
 }

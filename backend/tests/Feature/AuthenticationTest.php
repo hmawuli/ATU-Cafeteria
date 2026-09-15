@@ -16,7 +16,7 @@ class AuthenticationTest extends TestCase
         User::factory()->create([
             'username' => 'student-test', 'password' => Hash::make('1234'), 'role' => 'STUDENT',
         ]);
-        $response = $this->postJson('/api/login', ['username' => 'student-test', 'pin' => hash('sha256', '1234')]);
+        $response = $this->postJson('/api/login', ['username' => 'student-test', 'pin' => '1234']);
         $response->assertOk()->assertJsonPath('success', true)->assertJsonStructure(['user', 'token']);
     }
 

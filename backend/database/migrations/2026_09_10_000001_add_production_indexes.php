@@ -4,7 +4,8 @@ use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
 
-return new class extends Migration {
+return new class extends Migration
+{
     public function up(): void
     {
         $indexes = [
@@ -17,12 +18,18 @@ return new class extends Migration {
             'feedback' => [['vendor_id', 'created_at'], ['customer_id', 'created_at']],
         ];
         foreach ($indexes as $table => $sets) {
-            if (!Schema::hasTable($table)) continue;
+            if (! Schema::hasTable($table)) {
+                continue;
+            }
             foreach ($sets as $columns) {
                 $name = $table.'_'.implode('_', $columns).'_idx';
-                try { Schema::table($table, fn (Blueprint $t) => $t->index($columns, $name)); } catch (\Throwable) {}
+                try {
+                    Schema::table($table, fn (Blueprint $t) => $t->index($columns, $name));
+                } catch (Throwable) {
+                }
             }
         }
     }
+
     public function down(): void {}
 };

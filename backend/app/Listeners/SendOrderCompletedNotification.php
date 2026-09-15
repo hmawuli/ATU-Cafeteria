@@ -3,6 +3,7 @@
 namespace App\Listeners;
 
 use App\Events\OrderStatusCompleted;
+use App\Models\AuditLog;
 use App\Models\User;
 use App\Notifications\OrderCompletedNotification;
 
@@ -11,7 +12,6 @@ class SendOrderCompletedNotification
     /**
      * Handle the event.
      *
-     * @param  \App\Events\OrderStatusCompleted  $event
      * @return void
      */
     public function handle(OrderStatusCompleted $event)
@@ -34,7 +34,7 @@ class SendOrderCompletedNotification
                     $student->save();
 
                     // Log audit entry
-                    \App\Models\AuditLog::create([
+                    AuditLog::create([
                         'user_id' => $student->id,
                         'timestamp' => time() * 1000,
                         'action' => 'LOYALTY_POINTS_EARNED',

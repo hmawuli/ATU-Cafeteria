@@ -3,11 +3,9 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Models\Order;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
-use App\Models\OrderItem;
-use App\Models\Order;
-use App\Models\User;
 
 class OrderItemMetricsController extends Controller
 {
@@ -34,7 +32,7 @@ class OrderItemMetricsController extends Controller
         if ($driver === 'sqlite') {
             $dateExpr = "strftime('%Y-%m-%d', datetime(order_items.created_at, 'localtime'))";
         } else {
-            $dateExpr = "CAST(order_items.created_at AS DATE)";
+            $dateExpr = 'CAST(order_items.created_at AS DATE)';
         }
 
         // --- 1. Daily Revenue Aggregated via order_items ---
@@ -42,9 +40,9 @@ class OrderItemMetricsController extends Controller
             ->join('orders', 'order_items.order_id', '=', 'orders.id')
             ->select([
                 DB::raw("$dateExpr as order_date"),
-                DB::raw("SUM(order_items.total_price) as daily_revenue"),
-                DB::raw("COUNT(DISTINCT order_items.order_id) as total_orders"),
-                DB::raw("SUM(order_items.quantity) as total_items_sold")
+                DB::raw('SUM(order_items.total_price) as daily_revenue'),
+                DB::raw('COUNT(DISTINCT order_items.order_id) as total_orders'),
+                DB::raw('SUM(order_items.quantity) as total_items_sold'),
             ]);
 
         if ($vendorId) {
@@ -69,7 +67,7 @@ class OrderItemMetricsController extends Controller
                     'date' => $row->order_date,
                     'revenue' => round(floatval($row->daily_revenue), 2),
                     'orders_count' => intval($row->total_orders),
-                    'items_sold_count' => intval($row->total_items_sold)
+                    'items_sold_count' => intval($row->total_items_sold),
                 ];
             });
 
@@ -79,10 +77,10 @@ class OrderItemMetricsController extends Controller
             ->select([
                 'order_items.food_item_id',
                 'order_items.name as item_name',
-                DB::raw("COUNT(DISTINCT order_items.order_id) as orders_count"),
-                DB::raw("SUM(order_items.quantity) as total_quantity_sold"),
-                DB::raw("SUM(order_items.total_price) as total_revenue"),
-                DB::raw("AVG(order_items.unit_price) as average_unit_price")
+                DB::raw('COUNT(DISTINCT order_items.order_id) as orders_count'),
+                DB::raw('SUM(order_items.quantity) as total_quantity_sold'),
+                DB::raw('SUM(order_items.total_price) as total_revenue'),
+                DB::raw('AVG(order_items.unit_price) as average_unit_price'),
             ]);
 
         if ($vendorId) {
@@ -109,7 +107,7 @@ class OrderItemMetricsController extends Controller
                     'orders_count' => intval($row->orders_count),
                     'total_quantity_sold' => intval($row->total_quantity_sold),
                     'total_revenue' => round(floatval($row->total_revenue), 2),
-                    'average_unit_price' => round(floatval($row->average_unit_price), 2)
+                    'average_unit_price' => round(floatval($row->average_unit_price), 2),
                 ];
             });
 
@@ -126,17 +124,17 @@ class OrderItemMetricsController extends Controller
                 'vendor_id' => $vendorId ? intval($vendorId) : null,
                 'start_date' => $startDate,
                 'end_date' => $endDate,
-                'status' => $status
+                'status' => $status,
             ],
             'kpis' => [
                 'total_revenue' => round($totalRevenueSum, 2),
                 'total_orders' => intval($totalOrdersCount),
                 'total_items_sold' => intval($totalItemsSoldSum),
-                'average_order_value' => $averageOrderValue
+                'average_order_value' => $averageOrderValue,
             ],
             'daily_revenue' => $dailyRevenue,
             'menu_item_metrics' => $itemMetrics,
-            'generated_at' => date('Y-m-d H:i:s')
+            'generated_at' => date('Y-m-d H:i:s'),
         ], 200);
     }
 
@@ -156,14 +154,14 @@ class OrderItemMetricsController extends Controller
         if ($driver === 'sqlite') {
             $dateExpr = "strftime('%Y-%m-%d', datetime(order_items.created_at, 'localtime'))";
         } else {
-            $dateExpr = "CAST(order_items.created_at AS DATE)";
+            $dateExpr = 'CAST(order_items.created_at AS DATE)';
         }
 
         $query = DB::table('order_items')
             ->join('orders', 'order_items.order_id', '=', 'orders.id')
             ->select([
                 DB::raw("$dateExpr as order_date"),
-                DB::raw("SUM(order_items.total_price) as daily_revenue")
+                DB::raw('SUM(order_items.total_price) as daily_revenue'),
             ])
             ->where('orders.status', 'COMPLETED');
 
@@ -177,14 +175,14 @@ class OrderItemMetricsController extends Controller
             ->map(function ($row) {
                 return [
                     'date' => $row->order_date,
-                    'revenue' => round(floatval($row->daily_revenue), 2)
+                    'revenue' => round(floatval($row->daily_revenue), 2),
                 ];
             });
 
         return response()->json([
             'success' => true,
             'data' => $results,
-            'generated_at' => date('Y-m-d H:i:s')
+            'generated_at' => date('Y-m-d H:i:s'),
         ], 200);
     }
 
@@ -205,8 +203,8 @@ class OrderItemMetricsController extends Controller
             ->select([
                 'order_items.food_item_id',
                 'order_items.name as item_name',
-                DB::raw("COUNT(DISTINCT order_items.order_id) as orders_count"),
-                DB::raw("SUM(order_items.quantity) as total_quantity_sold")
+                DB::raw('COUNT(DISTINCT order_items.order_id) as orders_count'),
+                DB::raw('SUM(order_items.quantity) as total_quantity_sold'),
             ])
             ->where('orders.status', 'COMPLETED');
 
@@ -222,14 +220,14 @@ class OrderItemMetricsController extends Controller
                     'food_item_id' => intval($row->food_item_id),
                     'item_name' => $row->item_name,
                     'orders_count' => intval($row->orders_count),
-                    'total_quantity_sold' => intval($row->total_quantity_sold)
+                    'total_quantity_sold' => intval($row->total_quantity_sold),
                 ];
             });
 
         return response()->json([
             'success' => true,
             'data' => $results,
-            'generated_at' => date('Y-m-d H:i:s')
+            'generated_at' => date('Y-m-d H:i:s'),
         ], 200);
     }
 }

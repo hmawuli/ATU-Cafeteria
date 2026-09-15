@@ -2,10 +2,8 @@
 
 namespace Database\Seeders;
 
-use Illuminate\Database\Seeder;
-use Illuminate\Support\Str;
-use App\Models\User;
 use App\Models\Vendor;
+use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\DB;
 
 class MenuCategoryAndVendorSeeder extends Seeder
@@ -63,7 +61,7 @@ class MenuCategoryAndVendorSeeder extends Seeder
 
         // 2. Seed Test Vendor Users and Vendor Profiles
         $vendorHash = hash('sha256', 'vendor123');
-        
+
         $vendorUsers = [
             [
                 'id' => 20,
@@ -76,7 +74,7 @@ class MenuCategoryAndVendorSeeder extends Seeder
                     'outlet_name' => 'Campus Delight',
                     'location' => 'Block F Annex Booth 2',
                     'telephone' => '+233 24 555 7777',
-                    'primary_category' => 'Local Dishes'
+                    'primary_category' => 'Local Dishes',
                 ],
                 'info' => 'Campus Delight',
             ],
@@ -91,7 +89,7 @@ class MenuCategoryAndVendorSeeder extends Seeder
                     'outlet_name' => 'Quick Bites',
                     'location' => 'Main Gate Kiosk B',
                     'telephone' => '+233 20 888 9999',
-                    'primary_category' => 'Snacks & Drinks'
+                    'primary_category' => 'Snacks & Drinks',
                 ],
                 'info' => 'Quick Bites',
             ],
@@ -122,7 +120,7 @@ class MenuCategoryAndVendorSeeder extends Seeder
                     'operational_status' => 'active',
                     'store_name' => $vUser['profile_info']['outlet_name'],
                     'location_within_campus' => $vUser['profile_info']['location'],
-                    'contact_email' => $vUser['username'] . '@atu.edu.gh',
+                    'contact_email' => $vUser['username'].'@atu.edu.gh',
                     'operational_hours' => '08:00 AM - 06:00 PM',
                     'created_at' => now(),
                     'updated_at' => now(),

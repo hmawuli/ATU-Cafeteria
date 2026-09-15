@@ -3,13 +3,13 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
-use App\Models\User;
 use App\Models\AuditLog;
+use App\Models\User;
 use App\Models\WalletTransaction;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Validator;
 
 class PaystackPaymentController extends Controller
 {
@@ -36,37 +36,38 @@ class PaystackPaymentController extends Controller
             return response()->json([
                 'success' => false,
                 'message' => 'Invalid payment inputs.',
-                'errors' => $validator->errors()
+                'errors' => $validator->errors(),
             ], 400);
         }
 
         $email = $request->input('email');
-        $amountInPesewas = (int)($request->input('amount') * 100); // Paystack uses sub-units (kobo/pesewas)
-        $reference = 'ATU-PAY-' . uniqid() . '-' . time();
+        $amountInPesewas = (int) ($request->input('amount') * 100); // Paystack uses sub-units (kobo/pesewas)
+        $reference = 'ATU-PAY-'.uniqid().'-'.time();
         $purpose = $request->input('purpose');
 
         $secretKey = $this->getSecretKey();
 
         // If secret key is mock, we bypass external HTTP request to avoid connection blocks
         if (strpos($secretKey, 'sk_test_mock') !== false) {
-            $mockUrl = "https://checkout.paystack.com/mock-gateway-redirect?ref=" . $reference;
+            $mockUrl = 'https://checkout.paystack.com/mock-gateway-redirect?ref='.$reference;
+
             return response()->json([
                 'success' => true,
                 'message' => 'Paystack transaction simulation initialized successfully.',
                 'data' => [
                     'authorization_url' => $mockUrl,
-                    'access_code' => 'MOCK_AC_' . uniqid(),
+                    'access_code' => 'MOCK_AC_'.uniqid(),
                     'reference' => $reference,
                     'amount' => $request->input('amount'),
-                    'is_simulated' => true
-                ]
+                    'is_simulated' => true,
+                ],
             ], 200);
         }
 
         try {
             // Real API integration
             $response = Http::withHeaders([
-                'Authorization' => 'Bearer ' . $secretKey,
+                'Authorization' => 'Bearer '.$secretKey,
                 'Content-Type' => 'application/json',
             ])->post('https://api.paystack.co/transaction/initialize', [
                 'email' => $email,
@@ -74,30 +75,31 @@ class PaystackPaymentController extends Controller
                 'reference' => $reference,
                 'metadata' => [
                     'purpose' => $purpose,
-                    'user_id' => $request->user()->id ?? null
-                ]
+                    'user_id' => $request->user()->id ?? null,
+                ],
             ]);
 
             if ($response->successful()) {
                 $paystackData = $response->json();
+
                 return response()->json([
                     'success' => true,
                     'message' => 'Paystack transaction initialized.',
-                    'data' => $paystackData['data']
+                    'data' => $paystackData['data'],
                 ], 200);
             }
 
             return response()->json([
                 'success' => false,
                 'message' => 'Failed to initialize Paystack gateway API.',
-                'error' => $response->body()
+                'error' => $response->body(),
             ], 500);
 
         } catch (\Exception $e) {
             return response()->json([
                 'success' => false,
                 'message' => 'Payment gateway execution issue occurred.',
-                'details' => $e->getMessage()
+                'details' => $e->getMessage(),
             ], 500);
         }
     }
@@ -117,12 +119,12 @@ class PaystackPaymentController extends Controller
         if ($isMock) {
             // Simulated Success - always resolves beautifully for demo/emulator purposes
             $paymentSuccess = true;
-            $amountPaid = $request->input('amount') ? (double)$request->input('amount') : 10.0; // default/validated value
+            $amountPaid = $request->input('amount') ? (float) $request->input('amount') : 10.0; // default/validated value
             $metadata = ['purpose' => $request->input('purpose', 'WALLET_TOPUP')];
         } else {
             try {
                 $response = Http::withHeaders([
-                    'Authorization' => 'Bearer ' . $secretKey,
+                    'Authorization' => 'Bearer '.$secretKey,
                 ])->get("https://api.paystack.co/transaction/verify/{$reference}");
 
                 if ($response->successful()) {
@@ -133,7 +135,7 @@ class PaystackPaymentController extends Controller
                         if ($expectedAmount > 0 && abs($amountPaid - $expectedAmount) > 0.01) {
                             return response()->json([
                                 'success' => false,
-                                'message' => 'The payment amount does not match the order total.'
+                                'message' => 'The payment amount does not match the order total.',
                             ], 409);
                         }
                         $paymentSuccess = true;
@@ -144,24 +146,24 @@ class PaystackPaymentController extends Controller
                 return response()->json([
                     'success' => false,
                     'message' => 'Unable to connect to Paystack billing nodes.',
-                    'error' => $e->getMessage()
+                    'error' => $e->getMessage(),
                 ], 500);
             }
         }
 
-        if (!$paymentSuccess) {
+        if (! $paymentSuccess) {
             return response()->json([
                 'success' => false,
-                'message' => 'Paystack transaction not completed or signature validation failed.'
+                'message' => 'Paystack transaction not completed or signature validation failed.',
             ], 402);
         }
 
         // Process ledger update
         $user = $request->user();
-        if (!$user) {
+        if (! $user) {
             return response()->json([
                 'success' => false,
-                'message' => 'Authenticated user required to clear ledger assets.'
+                'message' => 'Authenticated user required to clear ledger assets.',
             ], 401);
         }
 
@@ -169,15 +171,16 @@ class PaystackPaymentController extends Controller
         try {
             // Check if transaction was already processed (avoid double-credit)
             $existingTransaction = WalletTransaction::where('reference', $reference)
-                ->orWhere('details', 'LIKE', '%' . $reference . '%')
+                ->orWhere('details', 'LIKE', '%'.$reference.'%')
                 ->first();
 
             if ($existingTransaction) {
                 DB::rollBack();
+
                 return response()->json([
                     'success' => true,
                     'message' => 'Transaction was already ledgered and processed.',
-                    'amount' => $amountPaid
+                    'amount' => $amountPaid,
                 ], 200);
             }
 
@@ -201,7 +204,7 @@ class PaystackPaymentController extends Controller
                     'type' => 'DEPOSIT',
                     'status' => 'SUCCESS',
                     'reference' => $reference,
-                    'details' => "Deposited via Paystack Gateway. Ref: {$reference} ({$purpose})"
+                    'details' => "Deposited via Paystack Gateway. Ref: {$reference} ({$purpose})",
                 ]);
 
                 // Record audit log
@@ -217,7 +220,7 @@ class PaystackPaymentController extends Controller
                     'user_id' => $user->id,
                     'timestamp' => time() * 1000,
                     'action' => 'PAYSTACK_DIRECT_PAY',
-                    'details' => "Cleared GH₵ " . number_format($amountPaid, 2) . " for direct order fulfillment via secure Paystack gateway. Ref: {$reference}.",
+                    'details' => 'Cleared GH₵ '.number_format($amountPaid, 2)." for direct order fulfillment via secure Paystack gateway. Ref: {$reference}.",
                 ]);
             }
 
@@ -228,15 +231,16 @@ class PaystackPaymentController extends Controller
                 'message' => 'Paystack signature validated and funds ledgered successfully.',
                 'reference' => $reference,
                 'amount' => $amountPaid,
-                'purpose' => $purpose
+                'purpose' => $purpose,
             ], 200);
 
         } catch (\Exception $e) {
             DB::rollBack();
+
             return response()->json([
                 'success' => false,
                 'message' => 'Database exception during financial clearing operations.',
-                'error' => $e->getMessage()
+                'error' => $e->getMessage(),
             ], 500);
         }
     }

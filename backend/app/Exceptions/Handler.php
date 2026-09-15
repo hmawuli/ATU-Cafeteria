@@ -2,23 +2,24 @@
 
 namespace App\Exceptions;
 
-use Illuminate\Foundation\Exceptions\Handler as ExceptionHandler;
-use Throwable;
-use Illuminate\Database\QueryException;
-use Illuminate\Validation\ValidationException;
-use Illuminate\Auth\AuthenticationException;
 use Illuminate\Auth\Access\AuthorizationException;
-use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
+use Illuminate\Auth\AuthenticationException;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
-use Symfony\Component\HttpKernel\Exception\HttpExceptionInterface;
+use Illuminate\Database\QueryException;
+use Illuminate\Foundation\Exceptions\Handler as ExceptionHandler;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Validation\ValidationException;
+use Psr\Log\LogLevel;
+use Symfony\Component\HttpKernel\Exception\HttpExceptionInterface;
+use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
+use Throwable;
 
 class Handler extends ExceptionHandler
 {
     /**
      * A list of exception types with their corresponding custom log levels.
      *
-     * @var array<class-string<Throwable>, \Psr\Log\LogLevel::*>
+     * @var array<class-string<Throwable>, LogLevel::*>
      */
     protected $levels = [
         //
@@ -101,10 +102,10 @@ class Handler extends ExceptionHandler
             $statusCode = 500;
             $errorCode = 'DATABASE_QUERY_ERROR';
             $message = 'A database operation failed. Please verify entity parameters.';
-            Log::error('API Query Exception: ' . $e->getMessage(), ['sql' => $e->getSql()]);
+            Log::error('API Query Exception: '.$e->getMessage(), ['sql' => $e->getSql()]);
         } elseif ($e instanceof HttpExceptionInterface) {
             $statusCode = $e->getStatusCode();
-            $errorCode = 'HTTP_EXCEPTION_' . $statusCode;
+            $errorCode = 'HTTP_EXCEPTION_'.$statusCode;
             $message = $e->getMessage() ?: 'HTTP Request Error';
         } else {
             if (config('app.debug')) {
@@ -122,7 +123,7 @@ class Handler extends ExceptionHandler
                 'exception' => get_class($e),
                 'file' => $e->getFile(),
                 'line' => $e->getLine(),
-                'trace' => array_slice(explode("\n", $e->getTraceAsString()), 0, 5)
+                'trace' => array_slice(explode("\n", $e->getTraceAsString()), 0, 5),
             ] : null,
         ], $statusCode);
     }

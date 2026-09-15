@@ -3,12 +3,12 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Models\AuditLog;
 use App\Models\FoodItemFeedback;
 use App\Models\Order;
-use App\Models\AuditLog;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Validator;
 
 class FoodItemFeedbackController extends Controller
 {
@@ -20,6 +20,7 @@ class FoodItemFeedbackController extends Controller
         $feedbacks = FoodItemFeedback::with(['customer', 'foodItem'])
             ->orderBy('timestamp', 'desc')
             ->get();
+
         return response()->json($feedbacks, 200);
     }
 
@@ -32,6 +33,7 @@ class FoodItemFeedbackController extends Controller
             ->with(['customer'])
             ->orderBy('timestamp', 'desc')
             ->get();
+
         return response()->json($feedbacks, 200);
     }
 
@@ -52,16 +54,16 @@ class FoodItemFeedbackController extends Controller
             return response()->json([
                 'success' => false,
                 'message' => 'Input rating validation failed.',
-                'errors' => $validator->errors()
+                'errors' => $validator->errors(),
             ], 400);
         }
 
         // Verify order is completed before permitting food item feedback
         $order = Order::find($request->input('order_id'));
-        if (!$order || strtoupper($order->status) !== 'COMPLETED') {
+        if (! $order || strtoupper($order->status) !== 'COMPLETED') {
             return response()->json([
                 'success' => false,
-                'message' => 'Feedback can only be left on successfully COMPLETED orders.'
+                'message' => 'Feedback can only be left on successfully COMPLETED orders.',
             ], 400);
         }
 
@@ -69,7 +71,7 @@ class FoodItemFeedbackController extends Controller
         if ($order->customer_id != $request->input('customer_id') || $order->food_item_id != $request->input('food_item_id')) {
             return response()->json([
                 'success' => false,
-                'message' => 'The specified order details do not match the food item or customer.'
+                'message' => 'The specified order details do not match the food item or customer.',
             ], 400);
         }
 

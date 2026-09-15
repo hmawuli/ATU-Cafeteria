@@ -17,15 +17,15 @@ return new class extends Migration
             $table->unsignedBigInteger('student_id');
             $table->unsignedBigInteger('vendor_id');
             $table->unsignedBigInteger('food_item_id')->nullable();
-            
+
             // Vendor review details
             $table->integer('vendor_rating')->nullable(); // 1 to 5 stars
             $table->text('vendor_comment')->nullable();
-            
+
             // Food item review details
             $table->integer('food_rating')->nullable(); // 1 to 5 stars
             $table->text('food_comment')->nullable();
-            
+
             $table->timestamps();
 
             // Setup foreign key constraints

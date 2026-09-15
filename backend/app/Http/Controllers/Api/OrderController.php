@@ -2,14 +2,21 @@
 
 namespace App\Http\Controllers\Api;
 
-use App\Http\Controllers\Controller;
-use App\Models\Order;
-use App\Models\AuditLog;
-use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Validator;
-use Illuminate\Support\Facades\DB;
 use App\Events\OrderStatusCompleted;
+use App\Events\OrderStatusReady;
+use App\Events\OrderStatusUpdatedBroadcast;
+use App\Http\Controllers\Controller;
+use App\Http\Requests\StoreOrderRequest;
 use App\Http\Resources\OrderResource;
+use App\Models\AuditLog;
+use App\Models\MenuItem;
+use App\Models\Order;
+use App\Notifications\NewIncomingOrderNotification;
+use App\Notifications\OrderStatusChangedNotification;
+use App\Services\ReceiptPdfWriter;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Validator;
 
 class OrderController extends Controller
 {
@@ -20,10 +27,15 @@ class OrderController extends Controller
     {
         $query = Order::with(['customer', 'vendor', 'foodItem', 'menuItem', 'feedback'])->orderBy('order_timestamp', 'desc');
         $user = $request->user();
-        if (strtoupper((string)$user->role) === 'STUDENT') $query->where(fn($q) => $q->where('customer_id',$user->id)->orWhere('student_id',$user->id)->orWhere('user_id',$user->id));
-        elseif (strtoupper((string)$user->role) === 'VENDOR') $query->where('vendor_id',$user->id);
-        elseif (strtoupper((string)$user->role) !== 'ADMIN') abort(403);
+        if (strtoupper((string) $user->role) === 'STUDENT') {
+            $query->where(fn ($q) => $q->where('customer_id', $user->id)->orWhere('student_id', $user->id)->orWhere('user_id', $user->id));
+        } elseif (strtoupper((string) $user->role) === 'VENDOR') {
+            $query->where('vendor_id', $user->id);
+        } elseif (strtoupper((string) $user->role) !== 'ADMIN') {
+            abort(403);
+        }
         $orders = $query->get();
+
         return response()->json(OrderResource::collection($orders)->resolve(), 200);
     }
 
@@ -33,13 +45,14 @@ class OrderController extends Controller
     public function show($id)
     {
         $order = Order::with(['customer', 'vendor', 'foodItem', 'menuItem', 'feedback'])->find($id);
-        if (!$order) {
+        if (! $order) {
             return response()->json(['success' => false, 'message' => 'Order not found.'], 404);
         }
         $user = request()->user();
-        $role = strtoupper((string)$user->role);
-        $allowed = $role === 'ADMIN' || ($role === 'VENDOR' && (int)$order->vendor_id === (int)$user->id) || ($role === 'STUDENT' && in_array((int)$user->id, [(int)$order->customer_id,(int)$order->student_id,(int)$order->user_id], true));
+        $role = strtoupper((string) $user->role);
+        $allowed = $role === 'ADMIN' || ($role === 'VENDOR' && (int) $order->vendor_id === (int) $user->id) || ($role === 'STUDENT' && in_array((int) $user->id, [(int) $order->customer_id, (int) $order->student_id, (int) $order->user_id], true));
         abort_unless($allowed, 403, 'You are not authorized to view this order.');
+
         return response()->json(new OrderResource($order), 200);
     }
 
@@ -49,25 +62,25 @@ class OrderController extends Controller
     public function downloadReceipt($id)
     {
         $order = Order::with(['customer', 'vendor', 'foodItem', 'menuItem'])->find($id);
-        if (!$order) {
+        if (! $order) {
             return response()->json(['success' => false, 'message' => 'Order not found.'], 404);
         }
         $user = request()->user();
-        $role = strtoupper((string)$user->role);
-        $allowed = $role === 'ADMIN' || ($role === 'VENDOR' && (int)$order->vendor_id === (int)$user->id) || ($role === 'STUDENT' && in_array((int)$user->id, [(int)$order->customer_id,(int)$order->student_id,(int)$order->user_id], true));
+        $role = strtoupper((string) $user->role);
+        $allowed = $role === 'ADMIN' || ($role === 'VENDOR' && (int) $order->vendor_id === (int) $user->id) || ($role === 'STUDENT' && in_array((int) $user->id, [(int) $order->customer_id, (int) $order->student_id, (int) $order->user_id], true));
         abort_unless($allowed, 403, 'You are not authorized to access this receipt.');
 
-        $pdfWriter = new \App\Services\ReceiptPdfWriter();
+        $pdfWriter = new ReceiptPdfWriter;
         $pdfContent = $pdfWriter->generate($order);
 
         $fileName = "receipt-order-{$id}.pdf";
 
         return response($pdfContent, 200, [
             'Content-Type' => 'application/pdf',
-            'Content-Disposition' => 'attachment; filename="' . $fileName . '"',
+            'Content-Disposition' => 'attachment; filename="'.$fileName.'"',
             'Content-Length' => strlen($pdfContent),
             'Cache-Control' => 'private, max-age=0, must-revalidate',
-            'Pragma' => 'public'
+            'Pragma' => 'public',
         ]);
     }
 
@@ -78,12 +91,16 @@ class OrderController extends Controller
     public function getCustomerOrders(Request $request, $customerId)
     {
         $user = $request->user();
-        $role = strtoupper((string)$user->role);
-        if ($role === 'STUDENT' && (int)$user->id !== (int)$customerId) abort(403, 'You may only view your own orders.');
-        if (!in_array($role, ['STUDENT','ADMIN'], true)) abort(403, 'You are not authorized to view student orders.');
+        $role = strtoupper((string) $user->role);
+        if ($role === 'STUDENT' && (int) $user->id !== (int) $customerId) {
+            abort(403, 'You may only view your own orders.');
+        }
+        if (! in_array($role, ['STUDENT', 'ADMIN'], true)) {
+            abort(403, 'You are not authorized to view student orders.');
+        }
         $ordersQuery = Order::where(function ($query) use ($customerId) {
             $query->where('customer_id', $customerId)
-                  ->orWhere('student_id', $customerId);
+                ->orWhere('student_id', $customerId);
         });
 
         // 1. Filter by Status
@@ -102,13 +119,14 @@ class OrderController extends Controller
         $search = $request->input('search');
         if ($search && $search !== '') {
             $ordersQuery->where(function ($query) use ($search) {
-                $query->where('food_name', 'like', '%' . $search . '%')
-                      ->orWhere('id', 'like', '%' . $search . '%')
-                      ->orWhere('status', 'like', '%' . $search . '%');
+                $query->where('food_name', 'like', '%'.$search.'%')
+                    ->orWhere('id', 'like', '%'.$search.'%')
+                    ->orWhere('status', 'like', '%'.$search.'%');
             });
         }
 
         $orders = $ordersQuery->orderBy('order_timestamp', 'desc')->get();
+
         return response()->json($orders, 200);
     }
 
@@ -119,9 +137,13 @@ class OrderController extends Controller
     public function getVendorOrders(Request $request, $vendorId)
     {
         $user = $request->user();
-        $role = strtoupper((string)$user->role);
-        if ($role === 'VENDOR' && (int)$user->id !== (int)$vendorId) abort(403, 'You may only view your own vendor orders.');
-        if (!in_array($role, ['VENDOR','ADMIN'], true)) abort(403, 'You are not authorized to view vendor orders.');
+        $role = strtoupper((string) $user->role);
+        if ($role === 'VENDOR' && (int) $user->id !== (int) $vendorId) {
+            abort(403, 'You may only view your own vendor orders.');
+        }
+        if (! in_array($role, ['VENDOR', 'ADMIN'], true)) {
+            abort(403, 'You are not authorized to view vendor orders.');
+        }
         $ordersQuery = Order::where('vendor_id', $vendorId);
 
         // 1. Filter by Status
@@ -140,12 +162,12 @@ class OrderController extends Controller
         $startDate = $request->input('start_date');
         if ($startDate && $startDate !== '') {
             if (is_numeric($startDate)) {
-                $startMs = (double) $startDate;
+                $startMs = (float) $startDate;
                 if ($startMs < 10000000000) {
                     $startMs *= 1000;
                 }
             } else {
-                $startMs = strtotime($startDate . ' 00:00:00') * 1000;
+                $startMs = strtotime($startDate.' 00:00:00') * 1000;
             }
             if ($startMs) {
                 $ordersQuery->where('order_timestamp', '>=', $startMs);
@@ -155,12 +177,12 @@ class OrderController extends Controller
         $endDate = $request->input('end_date');
         if ($endDate && $endDate !== '') {
             if (is_numeric($endDate)) {
-                $endMs = (double) $endDate;
+                $endMs = (float) $endDate;
                 if ($endMs < 10000000001) {
                     $endMs *= 1000;
                 }
             } else {
-                $endMs = strtotime($endDate . ' 23:59:59') * 1000;
+                $endMs = strtotime($endDate.' 23:59:59') * 1000;
             }
             if ($endMs) {
                 $ordersQuery->where('order_timestamp', '<=', $endMs);
@@ -175,36 +197,37 @@ class OrderController extends Controller
                     $query->where('customer_id', $studentIdentifier);
                 } else {
                     $query->whereHas('customer', function ($q) use ($studentIdentifier) {
-                        $q->where('fullName', 'like', '%' . $studentIdentifier . '%')
-                          ->orWhere('username', 'like', '%' . $studentIdentifier . '%')
-                          ->orWhere('info', 'like', '%' . $studentIdentifier . '%');
+                        $q->where('fullName', 'like', '%'.$studentIdentifier.'%')
+                            ->orWhere('username', 'like', '%'.$studentIdentifier.'%')
+                            ->orWhere('info', 'like', '%'.$studentIdentifier.'%');
                     });
                 }
             });
         }
 
         $orders = $ordersQuery->orderBy('order_timestamp', 'desc')->get();
+
         return response()->json($orders, 200);
     }
 
     /**
      * Place a new pre-order order.
      */
-    public function store(\App\Http\Requests\StoreOrderRequest $request)
+    public function store(StoreOrderRequest $request)
     {
         // Fetch menu item to validate availability, ownership, and calculate total price
-        $menuItem = \App\Models\MenuItem::find($request->input('menu_item_id'));
-        if (!$menuItem) {
+        $menuItem = MenuItem::find($request->input('menu_item_id'));
+        if (! $menuItem) {
             return response()->json([
                 'success' => false,
-                'message' => 'The selected menu item does not exist.'
+                'message' => 'The selected menu item does not exist.',
             ], 404);
         }
 
-        if (!$menuItem->is_available) {
+        if (! $menuItem->is_available) {
             return response()->json([
                 'success' => false,
-                'message' => 'The selected menu item is currently unavailable.'
+                'message' => 'The selected menu item is currently unavailable.',
             ], 400);
         }
 
@@ -212,7 +235,7 @@ class OrderController extends Controller
         if ($menuItem->vendor_id != $request->input('vendor_id')) {
             return response()->json([
                 'success' => false,
-                'message' => 'The selected menu item does not belong to the specified vendor.'
+                'message' => 'The selected menu item does not belong to the specified vendor.',
             ], 400);
         }
 
@@ -220,7 +243,7 @@ class OrderController extends Controller
         $quantity = intval($request->input('quantity'));
         $expectedUnitPrice = round($menuItem->price, 2);
         $expectedTotalPrice = round($expectedUnitPrice * $quantity, 2);
-        
+
         $unitPriceInput = round($request->input('unit_price'), 2);
         $totalPriceInput = round($request->input('total_price'), 2);
 
@@ -229,7 +252,7 @@ class OrderController extends Controller
                 'success' => false,
                 'message' => 'Validation error: unit_price does not match the actual menu item price.',
                 'expected' => $expectedUnitPrice,
-                'received' => $unitPriceInput
+                'received' => $unitPriceInput,
             ], 400);
         }
 
@@ -238,7 +261,7 @@ class OrderController extends Controller
                 'success' => false,
                 'message' => 'Validation error: total_price is incorrect based on menu item price and quantity.',
                 'expected' => $expectedTotalPrice,
-                'received' => $totalPriceInput
+                'received' => $totalPriceInput,
             ], 400);
         }
 
@@ -288,9 +311,9 @@ class OrderController extends Controller
             $vendor = \App\Models\User::find($order->vendor_id);
             if ($vendor) {
                 try {
-                    $vendor->notify(new \App\Notifications\NewIncomingOrderNotification($order));
+                    $vendor->notify(new NewIncomingOrderNotification($order));
                 } catch (\Exception $e) {
-                    \Illuminate\Support\Facades\Log::error("Failed to notify vendor {$order->vendor_id} of new order #{$order->id}: " . $e->getMessage());
+                    \Illuminate\Support\Facades\Log::error("Failed to notify vendor {$order->vendor_id} of new order #{$order->id}: ".$e->getMessage());
                 }
             }
         }
@@ -304,18 +327,18 @@ class OrderController extends Controller
     public function patchStatus(Request $request, $id)
     {
         $order = Order::find($id);
-        if (!$order) {
+        if (! $order) {
             return response()->json([
                 'success' => false,
-                'message' => 'Order not found.'
+                'message' => 'Order not found.',
             ], 404);
         }
 
         $user = $request->user();
-        if (!$user) {
+        if (! $user) {
             return response()->json([
                 'success' => false,
-                'message' => 'Unauthenticated.'
+                'message' => 'Unauthenticated.',
             ], 401);
         }
 
@@ -323,14 +346,14 @@ class OrderController extends Controller
         if ($role !== 'VENDOR' && $role !== 'ADMIN') {
             return response()->json([
                 'success' => false,
-                'message' => 'Unauthorized. Only vendors and administrators can perform this action.'
+                'message' => 'Unauthorized. Only vendors and administrators can perform this action.',
             ], 403);
         }
 
         if ($role === 'VENDOR' && $order->vendor_id !== $user->id) {
             return response()->json([
                 'success' => false,
-                'message' => 'Unauthorized. You do not own this order.'
+                'message' => 'Unauthorized. You do not own this order.',
             ], 403);
         }
 
@@ -342,12 +365,12 @@ class OrderController extends Controller
             return response()->json([
                 'success' => false,
                 'message' => 'Validation failed.',
-                'errors' => $validator->errors()
+                'errors' => $validator->errors(),
             ], 400);
         }
 
         $statusInput = strtoupper(trim($request->input('status')));
-        
+
         // Map user/vendor friendly values to DB enum
         if ($statusInput === 'PREPARING') {
             $normalizedStatus = 'PREPARING';
@@ -368,7 +391,7 @@ class OrderController extends Controller
         } else {
             return response()->json([
                 'success' => false,
-                'message' => 'Invalid order status. Allowed values: preparing, ready, delivered, out_for_delivery, completed, cancelled, declined, pending.'
+                'message' => 'Invalid order status. Allowed values: preparing, ready, delivered, out_for_delivery, completed, cancelled, declined, pending.',
             ], 400);
         }
 
@@ -383,7 +406,9 @@ class OrderController extends Controller
             if (isset($timestampColumns[$normalizedStatus]) && $timestampColumns[$normalizedStatus]) {
                 $order->{$timestampColumns[$normalizedStatus]} = now();
             }
-            if ($normalizedStatus === 'PREPARING' && !$order->accepted_at) $order->accepted_at = now();
+            if ($normalizedStatus === 'PREPARING' && ! $order->accepted_at) {
+                $order->accepted_at = now();
+            }
             $order->save();
 
             // Register Audit Log
@@ -403,10 +428,10 @@ class OrderController extends Controller
             $student = \App\Models\User::find($studentId);
             if ($student) {
                 try {
-                    $student->notify(new \App\Notifications\OrderStatusChangedNotification($updatedOrder, $oldStatus, $normalizedStatus));
-                    event(new \App\Events\OrderStatusUpdatedBroadcast($updatedOrder, $oldStatus, $normalizedStatus));
+                    $student->notify(new OrderStatusChangedNotification($updatedOrder, $oldStatus, $normalizedStatus));
+                    event(new OrderStatusUpdatedBroadcast($updatedOrder, $oldStatus, $normalizedStatus));
                 } catch (\Exception $e) {
-                    \Illuminate\Support\Facades\Log::error("Failed to notify student {$studentId} of order status patched to {$normalizedStatus}: " . $e->getMessage());
+                    \Illuminate\Support\Facades\Log::error("Failed to notify student {$studentId} of order status patched to {$normalizedStatus}: ".$e->getMessage());
                 }
             }
         }
@@ -418,7 +443,7 @@ class OrderController extends Controller
         return response()->json([
             'success' => true,
             'message' => 'Order status updated successfully.',
-            'order' => $updatedOrder
+            'order' => $updatedOrder,
         ], 200);
     }
 
@@ -429,19 +454,19 @@ class OrderController extends Controller
     public function updateStatus(Request $request, $id)
     {
         $order = Order::find($id);
-        if (!$order) {
+        if (! $order) {
             return response()->json([
                 'success' => false,
-                'message' => 'Pre-order ticket not found.'
+                'message' => 'Pre-order ticket not found.',
             ], 404);
         }
 
         // Authenticated vendor/admin security check
         $user = $request->user();
-        if (!$user) {
+        if (! $user) {
             return response()->json([
                 'success' => false,
-                'message' => 'Unauthenticated.'
+                'message' => 'Unauthenticated.',
             ], 401);
         }
 
@@ -449,21 +474,21 @@ class OrderController extends Controller
         if ($role !== 'VENDOR' && $role !== 'ADMIN' && $role !== 'STUDENT') {
             return response()->json([
                 'success' => false,
-                'message' => 'Unauthorized. This resource requires STUDENT, VENDOR or ADMIN privileges.'
+                'message' => 'Unauthorized. This resource requires STUDENT, VENDOR or ADMIN privileges.',
             ], 403);
         }
 
         if ($role === 'VENDOR' && $order->vendor_id !== $user->id) {
             return response()->json([
                 'success' => false,
-                'message' => 'Unauthorized. You do not own this order.'
+                'message' => 'Unauthorized. You do not own this order.',
             ], 403);
         }
 
         if ($role === 'STUDENT' && $order->customer_id !== $user->id) {
             return response()->json([
                 'success' => false,
-                'message' => 'Unauthorized. You do not own this order.'
+                'message' => 'Unauthorized. You do not own this order.',
             ], 403);
         }
 
@@ -500,7 +525,7 @@ class OrderController extends Controller
             return response()->json([
                 'success' => false,
                 'message' => 'Valid status is required.',
-                'errors' => $validator->errors()
+                'errors' => $validator->errors(),
             ], 400);
         }
 
@@ -508,14 +533,14 @@ class OrderController extends Controller
         if ($role === 'STUDENT' && $request->input('status') !== 'CANCELLED') {
             return response()->json([
                 'success' => false,
-                'message' => 'Unauthorized status transition. Students can only cancel orders.'
+                'message' => 'Unauthorized status transition. Students can only cancel orders.',
             ], 403);
         }
 
         if ($role === 'STUDENT' && $order->status !== 'PENDING' && $order->status !== 'ORDER_PLACED' && $request->input('status') === 'CANCELLED') {
             return response()->json([
                 'success' => false,
-                'message' => 'Completed or active orders cannot be cancelled.'
+                'message' => 'Completed or active orders cannot be cancelled.',
             ], 400);
         }
 
@@ -535,19 +560,26 @@ class OrderController extends Controller
             'DECLINED' => [],
             'CANCELLED' => [],
         ];
-        if ($role !== 'ADMIN' && !in_array($newStatus, $allowedTransitions[$oldStatus] ?? [], true)) {
+        if ($role !== 'ADMIN' && ! in_array($newStatus, $allowedTransitions[$oldStatus] ?? [], true)) {
             return response()->json([
                 'success' => false,
                 'message' => "Invalid order transition from {$oldStatus} to {$newStatus}.",
             ], 409);
         }
 
-        $updatedOrder = DB::transaction(function () use ($order, $request, $vendorId, $oldStatus, $newStatus) {
+        $updatedOrder = DB::transaction(function () use ($order, $request, $oldStatus, $newStatus) {
             $order->status = $newStatus;
             $order->order_status = $newStatus;
-            if ($newStatus === 'PREPARING') { $order->preparing_at = now(); if (!$order->accepted_at) $order->accepted_at = now(); }
-            elseif ($newStatus === 'READY') { $order->ready_at = now(); }
-            elseif ($newStatus === 'COMPLETED') { $order->collected_at = now(); }
+            if ($newStatus === 'PREPARING') {
+                $order->preparing_at = now();
+                if (! $order->accepted_at) {
+                    $order->accepted_at = now();
+                }
+            } elseif ($newStatus === 'READY') {
+                $order->ready_at = now();
+            } elseif ($newStatus === 'COMPLETED') {
+                $order->collected_at = now();
+            }
             if ($request->has('estimated_pickup_time')) {
                 $order->estimated_pickup_time = $request->input('estimated_pickup_time');
             }
@@ -570,11 +602,11 @@ class OrderController extends Controller
             $student = \App\Models\User::find($studentId);
             if ($student) {
                 try {
-                    $student->notify(new \App\Notifications\OrderStatusChangedNotification($updatedOrder, $oldStatus, $newStatus));
+                    $student->notify(new OrderStatusChangedNotification($updatedOrder, $oldStatus, $newStatus));
                     // Fire real-time broadcast event to students
-                    event(new \App\Events\OrderStatusUpdatedBroadcast($updatedOrder, $oldStatus, $newStatus));
+                    event(new OrderStatusUpdatedBroadcast($updatedOrder, $oldStatus, $newStatus));
                 } catch (\Exception $e) {
-                    \Illuminate\Support\Facades\Log::error("Failed to notify student {$studentId} of order status updated to {$newStatus}: " . $e->getMessage());
+                    \Illuminate\Support\Facades\Log::error("Failed to notify student {$studentId} of order status updated to {$newStatus}: ".$e->getMessage());
                 }
             }
         }
@@ -584,7 +616,7 @@ class OrderController extends Controller
         }
 
         if ((strtoupper($oldStatus) === 'PENDING' || strtoupper($oldStatus) === 'ORDER_PLACED') && strtoupper($newStatus) === 'READY') {
-            event(new \App\Events\OrderStatusReady($updatedOrder));
+            event(new OrderStatusReady($updatedOrder));
         }
 
         return response()->json($updatedOrder, 200);
@@ -597,10 +629,10 @@ class OrderController extends Controller
     public function bulkUpdateStatus(Request $request)
     {
         $user = $request->user();
-        if (!$user) {
+        if (! $user) {
             return response()->json([
                 'success' => false,
-                'message' => 'Unauthenticated.'
+                'message' => 'Unauthenticated.',
             ], 401);
         }
 
@@ -608,7 +640,7 @@ class OrderController extends Controller
         if ($role !== 'VENDOR' && $role !== 'ADMIN') {
             return response()->json([
                 'success' => false,
-                'message' => 'Unauthorized. This resource requires VENDOR or ADMIN privileges.'
+                'message' => 'Unauthorized. This resource requires VENDOR or ADMIN privileges.',
             ], 403);
         }
 
@@ -645,7 +677,7 @@ class OrderController extends Controller
             return response()->json([
                 'success' => false,
                 'message' => 'Valid status and order IDs are required.',
-                'errors' => $validator->errors()
+                'errors' => $validator->errors(),
             ], 400);
         }
 
@@ -660,7 +692,7 @@ class OrderController extends Controller
                 if ($order->vendor_id !== $user->id) {
                     return response()->json([
                         'success' => false,
-                        'message' => 'Unauthorized. One or more selected orders do not belong to you.'
+                        'message' => 'Unauthorized. One or more selected orders do not belong to you.',
                     ], 403);
                 }
             }
@@ -675,7 +707,7 @@ class OrderController extends Controller
                 $order->save();
 
                 // Register Audit Log
-                \App\Models\AuditLog::create([
+                AuditLog::create([
                     'user_id' => $request->user()->id,
                     'timestamp' => time() * 1000,
                     'action' => 'ORDER_STATUS_CHANGED',
@@ -690,10 +722,10 @@ class OrderController extends Controller
                     $student = \App\Models\User::find($studentId);
                     if ($student) {
                         try {
-                            $student->notify(new \App\Notifications\OrderStatusChangedNotification($order, $oldStatus, $newStatus));
-                            event(new \App\Events\OrderStatusUpdatedBroadcast($order, $oldStatus, $newStatus));
+                            $student->notify(new OrderStatusChangedNotification($order, $oldStatus, $newStatus));
+                            event(new OrderStatusUpdatedBroadcast($order, $oldStatus, $newStatus));
                         } catch (\Exception $e) {
-                            \Illuminate\Support\Facades\Log::error("Failed to notify student {$studentId} in bulk status change: " . $e->getMessage());
+                            \Illuminate\Support\Facades\Log::error("Failed to notify student {$studentId} in bulk status change: ".$e->getMessage());
                         }
                     }
                 }
@@ -703,7 +735,7 @@ class OrderController extends Controller
                 }
 
                 if ((strtoupper($oldStatus) === 'PENDING' || strtoupper($oldStatus) === 'ORDER_PLACED') && strtoupper($newStatus) === 'READY') {
-                    event(new \App\Events\OrderStatusReady($order));
+                    event(new OrderStatusReady($order));
                 }
             }
         });
@@ -712,7 +744,7 @@ class OrderController extends Controller
             'success' => true,
             'message' => 'Bulk update completed successfully.',
             'updated_count' => count($updatedOrders),
-            'orders' => $updatedOrders
+            'orders' => $updatedOrders,
         ], 200);
     }
 
@@ -722,16 +754,16 @@ class OrderController extends Controller
     public function verifyAndCompletePickup(Request $request, $id)
     {
         $user = $request->user();
-        if (!$user) {
+        if (! $user) {
             return response()->json(['success' => false, 'message' => 'Unauthenticated.'], 401);
         }
 
-        if (!in_array(strtoupper($user->role), ['VENDOR', 'ADMIN'], true)) {
+        if (! in_array(strtoupper($user->role), ['VENDOR', 'ADMIN'], true)) {
             return response()->json(['success' => false, 'message' => 'Only an authorized vendor can verify pickup.'], 403);
         }
 
         $order = Order::find($id);
-        if (!$order) {
+        if (! $order) {
             return response()->json(['success' => false, 'message' => 'Order not found.'], 404);
         }
 
@@ -751,7 +783,7 @@ class OrderController extends Controller
             ], 422);
         }
 
-        if (!in_array($order->status, ['READY', 'OUT_FOR_DELIVERY'], true)) {
+        if (! in_array($order->status, ['READY', 'OUT_FOR_DELIVERY'], true)) {
             return response()->json([
                 'success' => false,
                 'message' => 'This order is not ready for pickup.',
@@ -761,7 +793,7 @@ class OrderController extends Controller
         $inputPin = (string) $request->input('pickup_pin');
 
         // Use a constant-time comparison and never accept a vendor_id supplied by the client.
-        if (!hash_equals((string) $order->pickup_pin, $inputPin)) {
+        if (! hash_equals((string) $order->pickup_pin, $inputPin)) {
             AuditLog::create([
                 'user_id' => $user->id,
                 'timestamp' => time() * 1000,
@@ -778,7 +810,7 @@ class OrderController extends Controller
         $updatedOrder = DB::transaction(function () use ($order, $user) {
             $locked = Order::whereKey($order->id)->lockForUpdate()->firstOrFail();
 
-            if (!in_array($locked->status, ['READY', 'OUT_FOR_DELIVERY'], true)) {
+            if (! in_array($locked->status, ['READY', 'OUT_FOR_DELIVERY'], true)) {
                 throw new \RuntimeException('This order is no longer ready for pickup.');
             }
 
@@ -802,10 +834,10 @@ class OrderController extends Controller
             $student = User::find($studentId);
             if ($student) {
                 try {
-                    $student->notify(new \App\Notifications\OrderStatusChangedNotification(
+                    $student->notify(new OrderStatusChangedNotification(
                         $updatedOrder, 'READY', 'COMPLETED'
                     ));
-                    event(new \App\Events\OrderStatusUpdatedBroadcast(
+                    event(new OrderStatusUpdatedBroadcast(
                         $updatedOrder, 'READY', 'COMPLETED'
                     ));
                 } catch (\Throwable $e) {
@@ -822,31 +854,32 @@ class OrderController extends Controller
             'order' => $updatedOrder,
         ], 200);
     }
+
     /**
      * Retrieve the authenticated student's personal order history, filtered by date.
      */
     public function getPersonalOrderHistory(Request $request)
     {
         $user = $request->user();
-        if (!$user) {
+        if (! $user) {
             return response()->json([
                 'success' => false,
-                'message' => 'Unauthenticated.'
+                'message' => 'Unauthenticated.',
             ], 401);
         }
 
         // Base query for the authenticated user's orders
         $ordersQuery = Order::where(function ($query) use ($user) {
             $query->where('customer_id', $user->id)
-                  ->orWhere('student_id', $user->id)
-                  ->orWhere('user_id', $user->id);
+                ->orWhere('student_id', $user->id)
+                ->orWhere('user_id', $user->id);
         });
 
         // 1. Single Date filter (format: YYYY-MM-DD)
         $date = $request->input('date');
         if ($date && $date !== '') {
-            $startTimestamp = strtotime($date . ' 00:00:00') * 1000;
-            $endTimestamp = strtotime($date . ' 23:59:59') * 1000;
+            $startTimestamp = strtotime($date.' 00:00:00') * 1000;
+            $endTimestamp = strtotime($date.' 23:59:59') * 1000;
             if ($startTimestamp && $endTimestamp) {
                 $ordersQuery->whereBetween('order_timestamp', [$startTimestamp, $endTimestamp]);
             }
@@ -856,12 +889,12 @@ class OrderController extends Controller
         $startDate = $request->input('start_date');
         if ($startDate && $startDate !== '') {
             if (is_numeric($startDate)) {
-                $startMs = (double) $startDate;
+                $startMs = (float) $startDate;
                 if ($startMs < 10000000000) {
                     $startMs *= 1000;
                 }
             } else {
-                $startMs = strtotime($startDate . ' 00:00:00') * 1000;
+                $startMs = strtotime($startDate.' 00:00:00') * 1000;
             }
             if ($startMs) {
                 $ordersQuery->where('order_timestamp', '>=', $startMs);
@@ -871,12 +904,12 @@ class OrderController extends Controller
         $endDate = $request->input('end_date');
         if ($endDate && $endDate !== '') {
             if (is_numeric($endDate)) {
-                $endMs = (double) $endDate;
+                $endMs = (float) $endDate;
                 if ($endMs < 10000000001) {
                     $endMs *= 1000;
                 }
             } else {
-                $endMs = strtotime($endDate . ' 23:59:59') * 1000;
+                $endMs = strtotime($endDate.' 23:59:59') * 1000;
             }
             if ($endMs) {
                 $ordersQuery->where('order_timestamp', '<=', $endMs);
@@ -888,7 +921,7 @@ class OrderController extends Controller
 
         return response()->json([
             'success' => true,
-            'orders' => $orders
+            'orders' => $orders,
         ], 200);
     }
 
@@ -898,10 +931,10 @@ class OrderController extends Controller
     public function getAuthenticatedStudentOrders(Request $request)
     {
         $user = $request->user();
-        if (!$user) {
+        if (! $user) {
             return response()->json([
                 'success' => false,
-                'message' => 'Unauthenticated.'
+                'message' => 'Unauthenticated.',
             ], 401);
         }
 
@@ -913,7 +946,7 @@ class OrderController extends Controller
 
         return response()->json([
             'success' => true,
-            'orders' => $orders
+            'orders' => $orders,
         ], 200);
     }
 
@@ -923,10 +956,10 @@ class OrderController extends Controller
     public function storeAuthenticatedStudentOrder(Request $request)
     {
         $user = $request->user();
-        if (!$user) {
+        if (! $user) {
             return response()->json([
                 'success' => false,
-                'message' => 'Unauthenticated.'
+                'message' => 'Unauthenticated.',
             ], 401);
         }
 
@@ -944,23 +977,23 @@ class OrderController extends Controller
             return response()->json([
                 'success' => false,
                 'message' => 'Validation failed.',
-                'errors' => $validator->errors()
+                'errors' => $validator->errors(),
             ], 400);
         }
 
         // Fetch menu item to validate availability, ownership, and calculate total price
-        $menuItem = \App\Models\MenuItem::find($request->input('menu_item_id'));
-        if (!$menuItem) {
+        $menuItem = MenuItem::find($request->input('menu_item_id'));
+        if (! $menuItem) {
             return response()->json([
                 'success' => false,
-                'message' => 'The selected menu item does not exist.'
+                'message' => 'The selected menu item does not exist.',
             ], 404);
         }
 
-        if (!$menuItem->is_available) {
+        if (! $menuItem->is_available) {
             return response()->json([
                 'success' => false,
-                'message' => 'The selected menu item is currently unavailable.'
+                'message' => 'The selected menu item is currently unavailable.',
             ], 400);
         }
 
@@ -968,7 +1001,7 @@ class OrderController extends Controller
         if ($menuItem->vendor_id != $request->input('vendor_id')) {
             return response()->json([
                 'success' => false,
-                'message' => 'The selected menu item does not belong to the specified vendor.'
+                'message' => 'The selected menu item does not belong to the specified vendor.',
             ], 400);
         }
 
@@ -976,7 +1009,7 @@ class OrderController extends Controller
         $quantity = intval($request->input('quantity'));
         $expectedUnitPrice = round($menuItem->price, 2);
         $expectedTotalPrice = round($expectedUnitPrice * $quantity, 2);
-        
+
         $unitPriceInput = round($request->input('unit_price'), 2);
         $totalPriceInput = round($request->input('total_price'), 2);
 
@@ -985,7 +1018,7 @@ class OrderController extends Controller
                 'success' => false,
                 'message' => 'Validation error: unit_price does not match the actual menu item price.',
                 'expected' => $expectedUnitPrice,
-                'received' => $unitPriceInput
+                'received' => $unitPriceInput,
             ], 400);
         }
 
@@ -994,7 +1027,7 @@ class OrderController extends Controller
                 'success' => false,
                 'message' => 'Validation error: total_price is incorrect based on menu item price and quantity.',
                 'expected' => $expectedTotalPrice,
-                'received' => $totalPriceInput
+                'received' => $totalPriceInput,
             ], 400);
         }
 
@@ -1005,7 +1038,7 @@ class OrderController extends Controller
             if (($user->loyalty_points ?? 0) < $pointsToRedeem) {
                 return response()->json([
                     'success' => false,
-                    'message' => 'Insufficient loyalty points balance. You have ' . ($user->loyalty_points ?? 0) . ' points.'
+                    'message' => 'Insufficient loyalty points balance. You have '.($user->loyalty_points ?? 0).' points.',
                 ], 400);
             }
             // 10 points = 1.00 GHS discount
@@ -1018,7 +1051,7 @@ class OrderController extends Controller
         if ($user->balance < $finalPrice) {
             return response()->json([
                 'success' => false,
-                'message' => 'Insufficient wallet balance. Please top up your wallet first.'
+                'message' => 'Insufficient wallet balance. Please top up your wallet first.',
             ], 400);
         }
 
@@ -1026,7 +1059,7 @@ class OrderController extends Controller
         $securePin = (string) random_int(1000, 9999);
 
         try {
-            $order = DB::transaction(function () use ($request, $user, $securePin, $totalPriceInput, $pointsToRedeem, $discount, $finalPrice, $menuItem) {
+            $order = DB::transaction(function () use ($request, $user, $securePin, $pointsToRedeem, $discount, $finalPrice, $menuItem) {
                 // Check and decrement stock
                 if ($menuItem->current_stock !== null) {
                     $qty = intval($request->input('quantity'));
@@ -1070,8 +1103,8 @@ class OrderController extends Controller
                     'type' => 'PAYMENT',
                     'amount' => -$finalPrice,
                     'status' => 'SUCCESS',
-                    'reference' => 'TXN-ORD-' . uniqid() . '-' . time(),
-                    'details' => "Paid for Pre-order #{$createdOrder->id} ('{$createdOrder->food_name}')" . ($discount > 0 ? " with GHS " . number_format($discount, 2) . " loyalty discount" : "")
+                    'reference' => 'TXN-ORD-'.uniqid().'-'.time(),
+                    'details' => "Paid for Pre-order #{$createdOrder->id} ('{$createdOrder->food_name}')".($discount > 0 ? ' with GHS '.number_format($discount, 2).' loyalty discount' : ''),
                 ]);
 
                 // Register Audit Log
@@ -1079,7 +1112,7 @@ class OrderController extends Controller
                     'user_id' => $user->id,
                     'timestamp' => time() * 1000,
                     'action' => 'ORDER_CREATED',
-                    'details' => "Pre-order #{$createdOrder->id} created securely for '{$createdOrder->food_name}' by Student {$user->fullName} with verification PIN: {$securePin}. Wallet debited: GHS {$finalPrice}." . ($discount > 0 ? " Redeemed {$pointsToRedeem} loyalty points for GHS {$discount} discount." : ""),
+                    'details' => "Pre-order #{$createdOrder->id} created securely for '{$createdOrder->food_name}' by Student {$user->fullName} with verification PIN: {$securePin}. Wallet debited: GHS {$finalPrice}.".($discount > 0 ? " Redeemed {$pointsToRedeem} loyalty points for GHS {$discount} discount." : ''),
                 ]);
 
                 return $createdOrder;
@@ -1090,9 +1123,9 @@ class OrderController extends Controller
                 $vendor = \App\Models\User::find($order->vendor_id);
                 if ($vendor) {
                     try {
-                        $vendor->notify(new \App\Notifications\NewIncomingOrderNotification($order));
+                        $vendor->notify(new NewIncomingOrderNotification($order));
                     } catch (\Exception $e) {
-                        \Illuminate\Support\Facades\Log::error("Failed to notify vendor {$order->vendor_id} of secure order #{$order->id}: " . $e->getMessage());
+                        \Illuminate\Support\Facades\Log::error("Failed to notify vendor {$order->vendor_id} of secure order #{$order->id}: ".$e->getMessage());
                     }
                 }
             }
@@ -1100,14 +1133,14 @@ class OrderController extends Controller
             return response()->json([
                 'success' => true,
                 'message' => 'Order placed successfully.',
-                'order' => $order
+                'order' => $order,
             ], 201);
 
         } catch (\Exception $e) {
             return response()->json([
                 'success' => false,
                 'message' => 'Failed to place order securely on server.',
-                'error' => $e->getMessage()
+                'error' => $e->getMessage(),
             ], 500);
         }
     }
@@ -1119,52 +1152,52 @@ class OrderController extends Controller
     public function cancel(Request $request, $id)
     {
         $order = Order::find($id);
-        if (!$order) {
+        if (! $order) {
             return response()->json([
                 'success' => false,
-                'message' => 'Order not found.'
+                'message' => 'Order not found.',
             ], 404);
         }
 
         $user = $request->user();
-        if (!$user) {
+        if (! $user) {
             return response()->json([
                 'success' => false,
-                'message' => 'Unauthenticated.'
+                'message' => 'Unauthenticated.',
             ], 401);
         }
 
         $role = strtoupper($user->role);
-        
+
         // Security check: Only the owning student, admin, or the assigned vendor can cancel.
         if ($role === 'STUDENT' && $order->customer_id !== $user->id && $order->user_id !== $user->id) {
             return response()->json([
                 'success' => false,
-                'message' => 'Unauthorized. You can only cancel your own orders.'
+                'message' => 'Unauthorized. You can only cancel your own orders.',
             ], 403);
         }
 
         if ($role === 'VENDOR' && $order->vendor_id !== $user->id) {
             return response()->json([
                 'success' => false,
-                'message' => 'Unauthorized. You do not own this order.'
+                'message' => 'Unauthorized. You do not own this order.',
             ], 403);
         }
 
         // Validate current order status (only pending / order_placed / ordered is cancellable)
         $currentStatus = strtoupper($order->status);
         $allowedCancelStatuses = ['PENDING', 'ORDER_PLACED', 'ORDERED'];
-        if ($role === 'STUDENT' && !in_array($currentStatus, $allowedCancelStatuses)) {
+        if ($role === 'STUDENT' && ! in_array($currentStatus, $allowedCancelStatuses)) {
             return response()->json([
                 'success' => false,
-                'message' => 'Students can only cancel orders if the current status is still pending or ordered.'
+                'message' => 'Students can only cancel orders if the current status is still pending or ordered.',
             ], 400);
         }
 
-        if (!in_array($currentStatus, $allowedCancelStatuses)) {
+        if (! in_array($currentStatus, $allowedCancelStatuses)) {
             return response()->json([
                 'success' => false,
-                'message' => 'Orders can only be cancelled if the current status is pending or ordered.'
+                'message' => 'Orders can only be cancelled if the current status is pending or ordered.',
             ], 400);
         }
 
@@ -1176,7 +1209,7 @@ class OrderController extends Controller
 
             // Restore stock if tracked
             if ($order->menu_item_id) {
-                $menuItem = \App\Models\MenuItem::find($order->menu_item_id);
+                $menuItem = MenuItem::find($order->menu_item_id);
                 if ($menuItem && $menuItem->current_stock !== null) {
                     $menuItem->current_stock += intval($order->quantity);
                     $menuItem->save();
@@ -1196,8 +1229,8 @@ class OrderController extends Controller
                     'type' => 'REFUND',
                     'amount' => floatval($order->total_price),
                     'status' => 'SUCCESS',
-                    'reference' => 'TXN-REF-' . uniqid() . '-' . time(),
-                    'details' => "Refund for cancelled Order #{$order->id} ('{$order->food_name}')"
+                    'reference' => 'TXN-REF-'.uniqid().'-'.time(),
+                    'details' => "Refund for cancelled Order #{$order->id} ('{$order->food_name}')",
                 ]);
             }
 
@@ -1206,7 +1239,7 @@ class OrderController extends Controller
                 'user_id' => $order->customer_id ?? ($order->student_id ?? $order->user_id),
                 'timestamp' => time() * 1000,
                 'action' => 'ORDER_CANCELLED',
-                'details' => "Order #{$order->id} was cancelled. Status updated to CANCELLED. Amount of GHS " . number_format($order->total_price, 2) . " was refunded to Student balance.",
+                'details' => "Order #{$order->id} was cancelled. Status updated to CANCELLED. Amount of GHS ".number_format($order->total_price, 2).' was refunded to Student balance.',
             ]);
 
             return $order;
@@ -1217,7 +1250,7 @@ class OrderController extends Controller
             $studentId = $order->user_id ?: $order->customer_id;
             $student = User::find($studentId);
             if ($student && $role !== 'STUDENT') {
-                $student->notify(new \App\Notifications\OrderStatusChangedNotification($updatedOrder, $currentStatus, 'CANCELLED'));
+                $student->notify(new OrderStatusChangedNotification($updatedOrder, $currentStatus, 'CANCELLED'));
             }
         } catch (\Exception $e) {
             // Ignore notification fallback errors
@@ -1226,7 +1259,7 @@ class OrderController extends Controller
         return response()->json([
             'success' => true,
             'message' => 'Order cancelled successfully.',
-            'order' => $updatedOrder
+            'order' => $updatedOrder,
         ], 200);
     }
 
@@ -1236,10 +1269,10 @@ class OrderController extends Controller
     public function trackOrderRealTime(Request $request, $id)
     {
         $order = Order::find($id);
-        if (!$order) {
+        if (! $order) {
             return response()->json([
                 'success' => false,
-                'message' => 'Order not found.'
+                'message' => 'Order not found.',
             ], 404);
         }
 
@@ -1250,9 +1283,9 @@ class OrderController extends Controller
                 // Periodically check for updates for up to 15 cycles (~30 seconds)
                 for ($i = 0; $i < 15; $i++) {
                     $order = Order::find($id);
-                    if (!$order) {
+                    if (! $order) {
                         echo "event: error\n";
-                        echo "data: " . json_encode(['message' => 'Order deleted']) . "\n\n";
+                        echo 'data: '.json_encode(['message' => 'Order deleted'])."\n\n";
                         ob_flush();
                         flush();
                         break;
@@ -1263,13 +1296,13 @@ class OrderController extends Controller
 
                     if ($currentStatus !== $lastStatus) {
                         echo "event: status_update\n";
-                        echo "data: " . json_encode([
+                        echo 'data: '.json_encode([
                             'id' => $order->id,
                             'status' => $currentStatus,
                             'estimated_pickup_time' => $order->estimated_pickup_time,
                             'stages' => $stages,
-                            'updated_at' => $order->updated_at ? $order->updated_at->toIso8601String() : null
-                        ]) . "\n\n";
+                            'updated_at' => $order->updated_at ? $order->updated_at->toIso8601String() : null,
+                        ])."\n\n";
                         ob_flush();
                         flush();
                         $lastStatus = $currentStatus;
@@ -1285,7 +1318,7 @@ class OrderController extends Controller
                 'Content-Type' => 'text/event-stream',
                 'Cache-Control' => 'no-cache',
                 'Connection' => 'keep-alive',
-                'X-Accel-Buffering' => 'no'
+                'X-Accel-Buffering' => 'no',
             ]);
         }
 
@@ -1295,7 +1328,7 @@ class OrderController extends Controller
             'id' => $order->id,
             'status' => $order->status,
             'estimated_pickup_time' => $order->estimated_pickup_time,
-            'stages' => $this->getTrackingStages($order->status)
+            'stages' => $this->getTrackingStages($order->status),
         ]);
     }
 
@@ -1305,7 +1338,7 @@ class OrderController extends Controller
     private function getTrackingStages($status)
     {
         $statusUpper = strtoupper($status);
-        
+
         $stages = [
             ['name' => 'Received', 'completed' => false, 'active' => false],
             ['name' => 'Preparing', 'completed' => false, 'active' => false],
@@ -1342,21 +1375,21 @@ class OrderController extends Controller
     public function pollOrderStatusReady(Request $request)
     {
         $user = $request->user();
-        if (!$user) {
+        if (! $user) {
             return response()->json([
                 'success' => false,
-                'message' => 'Unauthenticated.'
+                'message' => 'Unauthenticated.',
             ], 401);
         }
 
         $studentId = $user->id;
-        
+
         // Find any active orders that are in 'READY' status
         $readyOrders = Order::where(function ($query) use ($studentId) {
-                $query->where('customer_id', $studentId)
-                      ->orWhere('student_id', $studentId)
-                      ->orWhere('user_id', $studentId);
-            })
+            $query->where('customer_id', $studentId)
+                ->orWhere('student_id', $studentId)
+                ->orWhere('user_id', $studentId);
+        })
             ->where(DB::raw('upper(status)'), 'READY')
             ->get();
 
@@ -1381,10 +1414,10 @@ class OrderController extends Controller
             'ready_alerts' => $alerts,
             'active_orders_count' => Order::where(function ($query) use ($studentId) {
                 $query->where('customer_id', $studentId)
-                      ->orWhere('student_id', $studentId)
-                      ->orWhere('user_id', $studentId);
+                    ->orWhere('student_id', $studentId)
+                    ->orWhere('user_id', $studentId);
             })->whereNotIn(DB::raw('upper(status)'), ['COMPLETED', 'DELIVERED', 'CANCELLED', 'DECLINED'])->count(),
-            'polled_at' => date('c')
+            'polled_at' => date('c'),
         ], 200);
     }
 
@@ -1394,10 +1427,10 @@ class OrderController extends Controller
     public function streamOrderStatusReady(Request $request)
     {
         $user = $request->user();
-        if (!$user) {
+        if (! $user) {
             return response()->json([
                 'success' => false,
-                'message' => 'Unauthenticated.'
+                'message' => 'Unauthenticated.',
             ], 401);
         }
 
@@ -1405,27 +1438,27 @@ class OrderController extends Controller
 
         return response()->stream(function () use ($studentId) {
             $notifiedOrders = []; // Track already emitted ready order IDs in this session
-            
+
             // Loop for up to 20 cycles (approx 40 seconds) to maintain live stream connection
             for ($cycle = 0; $cycle < 20; $cycle++) {
                 $readyOrders = Order::where(function ($query) use ($studentId) {
-                        $query->where('customer_id', $studentId)
-                              ->orWhere('student_id', $studentId)
-                              ->orWhere('user_id', $studentId);
-                    })
+                    $query->where('customer_id', $studentId)
+                        ->orWhere('student_id', $studentId)
+                        ->orWhere('user_id', $studentId);
+                })
                     ->where(DB::raw('upper(status)'), 'READY')
                     ->get();
 
                 foreach ($readyOrders as $order) {
-                    if (!in_array($order->id, $notifiedOrders)) {
+                    if (! in_array($order->id, $notifiedOrders)) {
                         echo "event: order_ready_push\n";
-                        echo "data: " . json_encode([
+                        echo 'data: '.json_encode([
                             'order_id' => $order->id,
                             'food_name' => $order->food_name,
                             'pickup_pin' => $order->pickup_pin,
                             'message' => "Your order #{$order->id} ('{$order->food_name}') is ready for pickup!",
-                            'timestamp' => date('c')
-                        ]) . "\n\n";
+                            'timestamp' => date('c'),
+                        ])."\n\n";
                         ob_flush();
                         flush();
                         $notifiedOrders[] = $order->id;
@@ -1434,7 +1467,7 @@ class OrderController extends Controller
 
                 // Heartbeat to keep connection alive
                 echo "event: heartbeat\n";
-                echo "data: " . json_encode(['status' => 'listening', 'cycle' => $cycle]) . "\n\n";
+                echo 'data: '.json_encode(['status' => 'listening', 'cycle' => $cycle])."\n\n";
                 ob_flush();
                 flush();
 
@@ -1444,7 +1477,7 @@ class OrderController extends Controller
             'Content-Type' => 'text/event-stream',
             'Cache-Control' => 'no-cache',
             'Connection' => 'keep-alive',
-            'X-Accel-Buffering' => 'no'
+            'X-Accel-Buffering' => 'no',
         ]);
     }
 
@@ -1471,7 +1504,7 @@ class OrderController extends Controller
         }
 
         $user = $request->user();
-        if (!$user || !$user->isActive()) {
+        if (! $user || ! $user->isActive()) {
             return response()->json(['success' => false, 'message' => 'Your authenticated session is no longer valid.'], 401);
         }
 
@@ -1489,10 +1522,10 @@ class OrderController extends Controller
                     $menuItem = AppModelsMenuItem::whereKey((int) $input['menu_item_id'])
                         ->lockForUpdate()->first();
 
-                    if (!$menuItem) {
+                    if (! $menuItem) {
                         throw new \RuntimeException("Menu item at index {$index} is no longer available.");
                     }
-                    if (!$menuItem->is_available) {
+                    if (! $menuItem->is_available) {
                         throw new \RuntimeException("Menu item '{$menuItem->name}' is currently unavailable.");
                     }
 
@@ -1521,10 +1554,10 @@ class OrderController extends Controller
                     }
                     $verifiedPayment = AuditLog::where('user_id', $lockedUser->id)
                         ->where('action', 'PAYSTACK_DIRECT_PAY')
-                        ->where('details', 'like', '%' . $paymentReference . '%')
-                        ->where('details', 'like', 'Cleared GH₵ ' . number_format($finalTotal, 2) . '%')
+                        ->where('details', 'like', '%'.$paymentReference.'%')
+                        ->where('details', 'like', 'Cleared GH₵ '.number_format($finalTotal, 2).'%')
                         ->exists();
-                    if (!$verifiedPayment) {
+                    if (! $verifiedPayment) {
                         throw new \RuntimeException('The online payment could not be verified for this order total.');
                     }
                 } elseif ((float) $lockedUser->balance < $finalTotal) {
@@ -1615,37 +1648,39 @@ class OrderController extends Controller
             return response()->json(['success' => false, 'message' => $e->getMessage()], 400);
         } catch (\Throwable $e) {
             report($e);
+
             return response()->json([
                 'success' => false,
                 'message' => 'We could not complete your order. No payment was taken. Please try again.',
             ], 500);
         }
     }
+
     /**
      * Remove the specified order from storage (Admin only).
      */
     public function destroy(Request $request, $id)
     {
         $order = Order::find($id);
-        if (!$order) {
+        if (! $order) {
             return response()->json([
                 'success' => false,
-                'message' => 'Order not found.'
+                'message' => 'Order not found.',
             ], 404);
         }
 
         $user = $request->user();
-        if (!$user || strtoupper($user->role) !== 'ADMIN') {
+        if (! $user || strtoupper($user->role) !== 'ADMIN') {
             return response()->json([
                 'success' => false,
-                'message' => 'Unauthorized. Only administrative personnel can delete orders.'
+                'message' => 'Unauthorized. Only administrative personnel can delete orders.',
             ], 403);
         }
 
         DB::transaction(function () use ($order, $user) {
             $order->delete(); // Soft delete
 
-            \App\Models\AuditLog::create([
+            AuditLog::create([
                 'user_id' => $user->id,
                 'timestamp' => time() * 1000,
                 'action' => 'ORDER_DELETED',
@@ -1655,7 +1690,7 @@ class OrderController extends Controller
 
         return response()->json([
             'success' => true,
-            'message' => 'Order deleted successfully.'
+            'message' => 'Order deleted successfully.',
         ], 200);
     }
 
@@ -1665,9 +1700,9 @@ class OrderController extends Controller
     public function getVendorWaitTime(Request $request, $vendorId = null)
     {
         // If not specified in path, check query param or authenticated user
-        if (!$vendorId) {
+        if (! $vendorId) {
             if ($request->has('vendor_id')) {
-                $vendorId = (int)$request->input('vendor_id');
+                $vendorId = (int) $request->input('vendor_id');
             } else {
                 $user = $request->user();
                 if ($user && (strtoupper($user->role) === 'VENDOR' || strtoupper($user->role) === 'ADMIN')) {
@@ -1675,17 +1710,17 @@ class OrderController extends Controller
                 } else {
                     return response()->json([
                         'success' => false,
-                        'message' => 'Vendor ID is required.'
+                        'message' => 'Vendor ID is required.',
                     ], 400);
                 }
             }
         }
 
         $vendor = \App\Models\User::find($vendorId);
-        if (!$vendor) {
+        if (! $vendor) {
             return response()->json([
                 'success' => false,
-                'message' => 'Vendor not found.'
+                'message' => 'Vendor not found.',
             ], 444);
         }
 
@@ -1726,18 +1761,18 @@ class OrderController extends Controller
 
         return response()->json([
             'success' => true,
-            'vendor_id' => (int)$vendorId,
+            'vendor_id' => (int) $vendorId,
             'vendor_name' => $vendor->fullName,
             'queue_metrics' => [
                 'total_active_orders' => count($activeOrders),
                 'preparing_orders_count' => $preparingCount,
                 'pending_orders_count' => $pendingCount,
-                'total_queue_quantity' => (int)$activeOrders->sum('quantity'),
+                'total_queue_quantity' => (int) $activeOrders->sum('quantity'),
             ],
-            'estimated_wait_time_minutes' => (int)$estimatedMinutes,
+            'estimated_wait_time_minutes' => (int) $estimatedMinutes,
             'formatted_wait_time' => "{$estimatedMinutes} mins",
             'congestion_level' => $preparingCount >= 8 ? 'CRITICAL' : ($preparingCount >= 4 ? 'HIGH' : ($preparingCount >= 1 ? 'MODERATE' : 'LOW')),
-            'calculated_at' => date('c')
+            'calculated_at' => date('c'),
         ], 200);
     }
 }

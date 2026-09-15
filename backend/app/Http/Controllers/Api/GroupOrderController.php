@@ -3,16 +3,16 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Models\AuditLog;
+use App\Models\GroupOrder;
+use App\Models\GroupOrderItem;
+use App\Models\MenuItem;
+use App\Models\Order;
+use App\Models\User;
+use App\Models\WalletTransaction;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Validator;
-use App\Models\User;
-use App\Models\MenuItem;
-use App\Models\Order;
-use App\Models\GroupOrder;
-use App\Models\GroupOrderItem;
-use App\Models\AuditLog;
-use App\Models\WalletTransaction;
 
 class GroupOrderController extends Controller
 {
@@ -22,37 +22,37 @@ class GroupOrderController extends Controller
     public function createSession(Request $request)
     {
         $user = $request->user();
-        if (!$user) {
+        if (! $user) {
             return response()->json(['success' => false, 'message' => 'Unauthenticated.'], 401);
         }
 
         if (strtoupper($user->role) !== 'STUDENT') {
             return response()->json([
                 'success' => false,
-                'message' => 'Only registered students can initiate group order checkout sessions.'
+                'message' => 'Only registered students can initiate group order checkout sessions.',
             ], 403);
         }
 
         $validator = Validator::make($request->all(), [
             'vendor_id' => 'required|integer|exists:users,id',
             'payment_mode' => 'nullable|string|in:HOST_PAYS,INDIVIDUAL',
-            'duration_minutes' => 'nullable|integer|min:5|max:120'
+            'duration_minutes' => 'nullable|integer|min:5|max:120',
         ]);
 
         if ($validator->fails()) {
             return response()->json([
                 'success' => false,
                 'message' => 'Validation error.',
-                'errors' => $validator->errors()
+                'errors' => $validator->errors(),
             ], 400);
         }
 
         $vendorId = $request->input('vendor_id');
         $vendor = User::find($vendorId);
-        if (!$vendor || strtoupper($vendor->role) !== 'VENDOR') {
+        if (! $vendor || strtoupper($vendor->role) !== 'VENDOR') {
             return response()->json([
                 'success' => false,
-                'message' => 'Selected vendor ID is invalid or not registered as a food vendor.'
+                'message' => 'Selected vendor ID is invalid or not registered as a food vendor.',
             ], 400);
         }
 
@@ -63,7 +63,7 @@ class GroupOrderController extends Controller
         $code = '';
         $exists = true;
         while ($exists) {
-            $code = 'GP-' . strtoupper(bin2hex(random_bytes(3)));
+            $code = 'GP-'.strtoupper(bin2hex(random_bytes(3)));
             $exists = GroupOrder::where('code', $code)->exists();
         }
 
@@ -75,7 +75,7 @@ class GroupOrderController extends Controller
             'vendor_id' => $vendorId,
             'status' => 'OPEN',
             'payment_mode' => $paymentMode,
-            'expires_at' => $expiresAt
+            'expires_at' => $expiresAt,
         ]);
 
         // Register Audit Entry
@@ -98,7 +98,7 @@ class GroupOrderController extends Controller
             'payment_mode' => $paymentMode,
             'invitation_link' => $invitationLink,
             'expires_at' => $expiresAt->toIso8601String(),
-            'session' => $session->load(['creator', 'vendor'])
+            'session' => $session->load(['creator', 'vendor']),
         ], 201);
     }
 
@@ -108,15 +108,15 @@ class GroupOrderController extends Controller
     public function getSessionDetails(Request $request, $code)
     {
         $user = $request->user();
-        if (!$user) {
+        if (! $user) {
             return response()->json(['success' => false, 'message' => 'Unauthenticated.'], 401);
         }
 
         $session = GroupOrder::where('code', $code)->first();
-        if (!$session) {
+        if (! $session) {
             return response()->json([
                 'success' => false,
-                'message' => 'Group order session not found.'
+                'message' => 'Group order session not found.',
             ], 404);
         }
 
@@ -139,20 +139,20 @@ class GroupOrderController extends Controller
         foreach ($items as $item) {
             $price = floatval($item->menuItem->price);
             $subtotal = round($price * $item->quantity, 2);
-            
+
             $totalItemsCount += $item->quantity;
             $totalSessionCost += $subtotal;
 
             $cId = $item->user_id;
             $cName = $item->user->fullName ?: $item->user->username;
 
-            if (!isset($contributorCosts[$cId])) {
+            if (! isset($contributorCosts[$cId])) {
                 $contributorCosts[$cId] = [
                     'user_id' => $cId,
                     'username' => $cName,
                     'total_items' => 0,
                     'total_cost' => 0.00,
-                    'is_creator' => ($cId === $session->creator_id)
+                    'is_creator' => ($cId === $session->creator_id),
                 ];
             }
             $contributorCosts[$cId]['total_items'] += $item->quantity;
@@ -178,7 +178,7 @@ class GroupOrderController extends Controller
                 'expires_at' => $session->expires_at ? $session->expires_at->toIso8601String() : null,
                 'time_remaining_seconds' => $session->expires_at ? max(0, $session->expires_at->diffInSeconds(now(), false) * -1) : null,
                 'total_items' => $totalItemsCount,
-                'total_cost' => round($totalSessionCost, 2)
+                'total_cost' => round($totalSessionCost, 2),
             ],
             'contributors' => array_values($contributorCosts),
             'items' => $items->map(function ($item) {
@@ -186,16 +186,16 @@ class GroupOrderController extends Controller
                     'id' => $item->id,
                     'menu_item_id' => $item->menu_item_id,
                     'food_name' => $item->menuItem->name,
-                    'unit_price' => (double)$item->menuItem->price,
+                    'unit_price' => (float) $item->menuItem->price,
                     'quantity' => $item->quantity,
                     'subtotal' => round($item->menuItem->price * $item->quantity, 2),
                     'custom_notes' => $item->custom_notes,
                     'added_by' => [
                         'user_id' => $item->user_id,
-                        'name' => $item->user->fullName ?: $item->user->username
-                    ]
+                        'name' => $item->user->fullName ?: $item->user->username,
+                    ],
                 ];
-            })
+            }),
         ], 200);
     }
 
@@ -205,45 +205,46 @@ class GroupOrderController extends Controller
     public function contributeItem(Request $request, $code)
     {
         $user = $request->user();
-        if (!$user) {
+        if (! $user) {
             return response()->json(['success' => false, 'message' => 'Unauthenticated.'], 401);
         }
 
         $session = GroupOrder::where('code', $code)->first();
-        if (!$session) {
+        if (! $session) {
             return response()->json([
                 'success' => false,
-                'message' => 'Group order session not found.'
+                'message' => 'Group order session not found.',
             ], 404);
         }
 
         if ($session->status !== 'OPEN') {
             return response()->json([
                 'success' => false,
-                'message' => "Contributions are locked because this session is marked as {$session->status}."
+                'message' => "Contributions are locked because this session is marked as {$session->status}.",
             ], 400);
         }
 
         if ($session->expires_at && now()->greaterThan($session->expires_at)) {
             $session->status = 'CANCELLED';
             $session->save();
+
             return response()->json([
                 'success' => false,
-                'message' => 'This group order session has expired.'
+                'message' => 'This group order session has expired.',
             ], 400);
         }
 
         $validator = Validator::make($request->all(), [
             'menu_item_id' => 'required|integer|exists:menu_items,id',
             'quantity' => 'required|integer|min:1',
-            'custom_notes' => 'nullable|string|max:150'
+            'custom_notes' => 'nullable|string|max:150',
         ]);
 
         if ($validator->fails()) {
             return response()->json([
                 'success' => false,
                 'message' => 'Validation failed.',
-                'errors' => $validator->errors()
+                'errors' => $validator->errors(),
             ], 400);
         }
 
@@ -255,14 +256,14 @@ class GroupOrderController extends Controller
         if ($menuItem->vendor_id !== $session->vendor_id) {
             return response()->json([
                 'success' => false,
-                'message' => "The selected menu item '{$menuItem->name}' is sold by another vendor. Group items must belong to vendor ID {$session->vendor_id}."
+                'message' => "The selected menu item '{$menuItem->name}' is sold by another vendor. Group items must belong to vendor ID {$session->vendor_id}.",
             ], 400);
         }
 
-        if (!$menuItem->is_available) {
+        if (! $menuItem->is_available) {
             return response()->json([
                 'success' => false,
-                'message' => "Menu item '{$menuItem->name}' is currently out of stock."
+                'message' => "Menu item '{$menuItem->name}' is currently out of stock.",
             ], 400);
         }
 
@@ -275,8 +276,8 @@ class GroupOrderController extends Controller
         if ($existingContribution) {
             $existingContribution->quantity += $quantity;
             if ($notes) {
-                $existingContribution->custom_notes = $existingContribution->custom_notes 
-                    ? $existingContribution->custom_notes . " | " . $notes 
+                $existingContribution->custom_notes = $existingContribution->custom_notes
+                    ? $existingContribution->custom_notes.' | '.$notes
                     : $notes;
             }
             $existingContribution->save();
@@ -287,14 +288,14 @@ class GroupOrderController extends Controller
                 'user_id' => $user->id,
                 'menu_item_id' => $menuItemId,
                 'quantity' => $quantity,
-                'custom_notes' => $notes
+                'custom_notes' => $notes,
             ]);
         }
 
         return response()->json([
             'success' => true,
             'message' => "Added {$quantity} portions of '{$menuItem->name}' to group session {$code}.",
-            'contribution' => $contribution
+            'contribution' => $contribution,
         ], 200);
     }
 
@@ -304,24 +305,24 @@ class GroupOrderController extends Controller
     public function removeContribution(Request $request, $code, $itemId)
     {
         $user = $request->user();
-        if (!$user) {
+        if (! $user) {
             return response()->json(['success' => false, 'message' => 'Unauthenticated.'], 401);
         }
 
         $session = GroupOrder::where('code', $code)->first();
-        if (!$session) {
+        if (! $session) {
             return response()->json(['success' => false, 'message' => 'Session not found.'], 404);
         }
 
         if ($session->status !== 'OPEN') {
             return response()->json([
                 'success' => false,
-                'message' => 'Cannot modify items. This group order session is closed or locked.'
+                'message' => 'Cannot modify items. This group order session is closed or locked.',
             ], 400);
         }
 
         $item = GroupOrderItem::find($itemId);
-        if (!$item || $item->group_order_id !== $session->id) {
+        if (! $item || $item->group_order_id !== $session->id) {
             return response()->json(['success' => false, 'message' => 'Contribution item not found in this session.'], 404);
         }
 
@@ -329,7 +330,7 @@ class GroupOrderController extends Controller
         if ($user->id !== $session->creator_id && $user->id !== $item->user_id) {
             return response()->json([
                 'success' => false,
-                'message' => 'Unauthorized. Only the session creator or the original contributor can remove this item.'
+                'message' => 'Unauthorized. Only the session creator or the original contributor can remove this item.',
             ], 403);
         }
 
@@ -337,7 +338,7 @@ class GroupOrderController extends Controller
 
         return response()->json([
             'success' => true,
-            'message' => 'Contributed item successfully removed from group order session.'
+            'message' => 'Contributed item successfully removed from group order session.',
         ], 200);
     }
 
@@ -347,19 +348,19 @@ class GroupOrderController extends Controller
     public function lockSession(Request $request, $code)
     {
         $user = $request->user();
-        if (!$user) {
+        if (! $user) {
             return response()->json(['success' => false, 'message' => 'Unauthenticated.'], 401);
         }
 
         $session = GroupOrder::where('code', $code)->first();
-        if (!$session) {
+        if (! $session) {
             return response()->json(['success' => false, 'message' => 'Session not found.'], 404);
         }
 
         if ($user->id !== $session->creator_id) {
             return response()->json([
                 'success' => false,
-                'message' => 'Unauthorized. Only the group host can lock the checkout session.'
+                'message' => 'Unauthorized. Only the group host can lock the checkout session.',
             ], 403);
         }
 
@@ -369,7 +370,7 @@ class GroupOrderController extends Controller
         return response()->json([
             'success' => true,
             'message' => "Group session {$code} is now LOCKED. Pre-order checkout compiles next.",
-            'session' => $session
+            'session' => $session,
         ], 200);
     }
 
@@ -379,19 +380,19 @@ class GroupOrderController extends Controller
     public function cancelSession(Request $request, $code)
     {
         $user = $request->user();
-        if (!$user) {
+        if (! $user) {
             return response()->json(['success' => false, 'message' => 'Unauthenticated.'], 401);
         }
 
         $session = GroupOrder::where('code', $code)->first();
-        if (!$session) {
+        if (! $session) {
             return response()->json(['success' => false, 'message' => 'Session not found.'], 404);
         }
 
         if ($user->id !== $session->creator_id) {
             return response()->json([
                 'success' => false,
-                'message' => 'Unauthorized. Only the group host can cancel this session.'
+                'message' => 'Unauthorized. Only the group host can cancel this session.',
             ], 403);
         }
 
@@ -401,7 +402,7 @@ class GroupOrderController extends Controller
         return response()->json([
             'success' => true,
             'message' => 'Group order session cancelled successfully.',
-            'session' => $session
+            'session' => $session,
         ], 200);
     }
 
@@ -411,33 +412,33 @@ class GroupOrderController extends Controller
     public function checkoutSession(Request $request, $code)
     {
         $user = $request->user();
-        if (!$user) {
+        if (! $user) {
             return response()->json(['success' => false, 'message' => 'Unauthenticated.'], 401);
         }
 
         $session = GroupOrder::where('code', $code)->first();
-        if (!$session) {
+        if (! $session) {
             return response()->json(['success' => false, 'message' => 'Session not found.'], 404);
         }
 
         if ($user->id !== $session->creator_id) {
             return response()->json([
                 'success' => false,
-                'message' => 'Unauthorized. Only the group session host can trigger the final consolidated vendor checkout.'
+                'message' => 'Unauthorized. Only the group session host can trigger the final consolidated vendor checkout.',
             ], 403);
         }
 
         if ($session->status === 'COMPLETED') {
             return response()->json([
                 'success' => false,
-                'message' => 'This group order checkout session has already been completed.'
+                'message' => 'This group order checkout session has already been completed.',
             ], 400);
         }
 
         if ($session->status === 'CANCELLED') {
             return response()->json([
                 'success' => false,
-                'message' => 'Cannot checkout a cancelled or expired session.'
+                'message' => 'Cannot checkout a cancelled or expired session.',
             ], 400);
         }
 
@@ -448,7 +449,7 @@ class GroupOrderController extends Controller
         if ($items->isEmpty()) {
             return response()->json([
                 'success' => false,
-                'message' => 'Cannot checkout an empty group order. Please contribute food items first.'
+                'message' => 'Cannot checkout an empty group order. Please contribute food items first.',
             ], 400);
         }
 
@@ -458,17 +459,17 @@ class GroupOrderController extends Controller
 
         foreach ($items as $item) {
             $menuItem = $item->menuItem;
-            if (!$menuItem->is_available) {
+            if (! $menuItem->is_available) {
                 return response()->json([
                     'success' => false,
-                    'message' => "Menu item '{$menuItem->name}' is currently unavailable."
+                    'message' => "Menu item '{$menuItem->name}' is currently unavailable.",
                 ], 400);
             }
 
             if ($menuItem->current_stock !== null && $menuItem->current_stock < $item->quantity) {
                 return response()->json([
                     'success' => false,
-                    'message' => "Insufficient stock for '{$menuItem->name}'. Requested {$item->quantity}, but only {$menuItem->current_stock} remaining."
+                    'message' => "Insufficient stock for '{$menuItem->name}'. Requested {$item->quantity}, but only {$menuItem->current_stock} remaining.",
                 ], 400);
             }
 
@@ -478,7 +479,7 @@ class GroupOrderController extends Controller
             $totalCheckoutCost += $subtotal;
 
             $uId = $item->user_id;
-            if (!isset($contributorCosts[$uId])) {
+            if (! isset($contributorCosts[$uId])) {
                 $contributorCosts[$uId] = 0.00;
             }
             $contributorCosts[$uId] += $subtotal;
@@ -489,7 +490,7 @@ class GroupOrderController extends Controller
             if ($session->creator->balance < $totalCheckoutCost) {
                 return response()->json([
                     'success' => false,
-                    'message' => "Insufficient host wallet balance. Host balance is GH₵ " . number_format($session->creator->balance, 2) . ", but total group cost is GH₵ " . number_format($totalCheckoutCost, 2) . "."
+                    'message' => 'Insufficient host wallet balance. Host balance is GH₵ '.number_format($session->creator->balance, 2).', but total group cost is GH₵ '.number_format($totalCheckoutCost, 2).'.',
                 ], 400);
             }
         } else {
@@ -499,7 +500,7 @@ class GroupOrderController extends Controller
                 if ($contributor->balance < $reqCost) {
                     return response()->json([
                         'success' => false,
-                        'message' => "Checkout failed. Contributor '" . ($contributor->fullName ?: $contributor->username) . "' has insufficient wallet balance. Required: GH₵ " . number_format($reqCost, 2) . ", Available: GH₵ " . number_format($contributor->balance, 2) . "."
+                        'message' => "Checkout failed. Contributor '".($contributor->fullName ?: $contributor->username)."' has insufficient wallet balance. Required: GH₵ ".number_format($reqCost, 2).', Available: GH₵ '.number_format($contributor->balance, 2).'.',
                     ], 400);
                 }
             }
@@ -512,14 +513,14 @@ class GroupOrderController extends Controller
             if ($session->payment_mode !== 'HOST_PAYS') {
                 return response()->json([
                     'success' => false,
-                    'message' => 'Loyalty point discounts in group sessions are only available for Host Pays payment mode.'
+                    'message' => 'Loyalty point discounts in group sessions are only available for Host Pays payment mode.',
                 ], 400);
             }
 
             if (($session->creator->loyalty_points ?? 0) < $pointsToRedeem) {
                 return response()->json([
                     'success' => false,
-                    'message' => "Insufficient loyalty points. Host has only " . ($session->creator->loyalty_points ?? 0) . " points."
+                    'message' => 'Insufficient loyalty points. Host has only '.($session->creator->loyalty_points ?? 0).' points.',
                 ], 400);
             }
 
@@ -532,7 +533,7 @@ class GroupOrderController extends Controller
         if ($session->payment_mode === 'HOST_PAYS' && $session->creator->balance < $finalCheckoutCost) {
             return response()->json([
                 'success' => false,
-                'message' => "Insufficient wallet balance after loyalty points. Required: GH₵ " . number_format($finalCheckoutCost, 2) . ", host balance is GH₵ " . number_format($session->creator->balance, 2) . "."
+                'message' => 'Insufficient wallet balance after loyalty points. Required: GH₵ '.number_format($finalCheckoutCost, 2).', host balance is GH₵ '.number_format($session->creator->balance, 2).'.',
             ], 400);
         }
 
@@ -554,8 +555,8 @@ class GroupOrderController extends Controller
                         'type' => 'PAYMENT',
                         'amount' => -$finalCheckoutCost,
                         'status' => 'SUCCESS',
-                        'reference' => 'GRP-HOST-' . $session->code . '-' . time(),
-                        'details' => "Paid for Consolidated Group Order Pre-Order Session {$session->code}." . ($loyaltyDiscount > 0 ? " Redeemed {$pointsToRedeem} loyalty points for GH₵ {$loyaltyDiscount} discount." : "")
+                        'reference' => 'GRP-HOST-'.$session->code.'-'.time(),
+                        'details' => "Paid for Consolidated Group Order Pre-Order Session {$session->code}.".($loyaltyDiscount > 0 ? " Redeemed {$pointsToRedeem} loyalty points for GH₵ {$loyaltyDiscount} discount." : ''),
                     ]);
                 } else {
                     // INDIVIDUAL payment deduction
@@ -569,8 +570,8 @@ class GroupOrderController extends Controller
                             'type' => 'PAYMENT',
                             'amount' => -$reqCost,
                             'status' => 'SUCCESS',
-                            'reference' => 'GRP-INDIV-' . $session->code . '-' . time(),
-                            'details' => "Paid portion for Group Order Session {$session->code}."
+                            'reference' => 'GRP-INDIV-'.$session->code.'-'.time(),
+                            'details' => "Paid portion for Group Order Session {$session->code}.",
                         ]);
                     }
                 }
@@ -621,7 +622,7 @@ class GroupOrderController extends Controller
                         'menu_item_id' => $menuItem->id,
                         'food_name' => $menuItem->name,
                         'quantity' => $item->quantity,
-                        'unit_price' => (double)$menuItem->price,
+                        'unit_price' => (float) $menuItem->price,
                         'total_price' => $itemFinalTotalPrice,
                         'order_timestamp' => time() * 1000,
                         'status' => 'PENDING',
@@ -672,14 +673,14 @@ class GroupOrderController extends Controller
                 'total_cost' => round($totalCheckoutCost, 2),
                 'loyalty_discount_applied' => round($loyaltyDiscount, 2),
                 'final_checkout_paid' => round($finalCheckoutCost, 2),
-                'orders' => $createdOrders
+                'orders' => $createdOrders,
             ], 200);
 
         } catch (\Exception $e) {
             return response()->json([
                 'success' => false,
                 'message' => 'Group order checkout failed.',
-                'error' => $e->getMessage()
+                'error' => $e->getMessage(),
             ], 500);
         }
     }

@@ -11,7 +11,7 @@ class OrderStatusChangedNotification extends Notification
     use Queueable;
 
     /**
-     * @var \App\Models\Order
+     * @var Order
      */
     protected $order;
 
@@ -28,7 +28,6 @@ class OrderStatusChangedNotification extends Notification
     /**
      * Create a new notification instance.
      *
-     * @param  \App\Models\Order  $order
      * @param  string  $oldStatus
      * @param  string  $newStatus
      */
@@ -74,7 +73,8 @@ class OrderStatusChangedNotification extends Notification
     public function broadcastOn()
     {
         $studentId = $this->order->customer_id ?? $this->order->student_id;
-        return ['orders-student-' . $studentId];
+
+        return ['orders-student-'.$studentId];
     }
 
     /**
@@ -86,7 +86,7 @@ class OrderStatusChangedNotification extends Notification
     public function toDatabase($notifiable)
     {
         $statusMessage = "Your order #{$this->order->id} for '{$this->order->food_name}' has been updated to {$this->newStatus}.";
-        
+
         switch (strtoupper($this->newStatus)) {
             case 'ORDER_PLACED':
                 $statusMessage = "Your order #{$this->order->id} ('{$this->order->food_name}') has been successfully placed at the ATU Cafeteria!";

@@ -7,7 +7,6 @@ use App\Models\ChatMessage;
 use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Validator;
-use Illuminate\Support\Facades\DB;
 
 class ChatController extends Controller
 {
@@ -29,12 +28,12 @@ class ChatController extends Controller
         })->orWhere(function ($query) use ($userId, $otherUserId) {
             $query->where('sender_id', $otherUserId)->where('receiver_id', $userId);
         })
-        ->orderBy('created_at', 'asc')
-        ->get();
+            ->orderBy('created_at', 'asc')
+            ->get();
 
         return response()->json([
             'success' => true,
-            'messages' => $messages
+            'messages' => $messages,
         ], 200);
     }
 
@@ -54,16 +53,16 @@ class ChatController extends Controller
             return response()->json([
                 'success' => false,
                 'message' => 'Invalid parameters.',
-                'errors' => $validator->errors()
+                'errors' => $validator->errors(),
             ], 400);
         }
 
         $receiverId = $request->input('receiver_id');
 
-        if ($senderId === (int)$receiverId) {
+        if ($senderId === (int) $receiverId) {
             return response()->json([
                 'success' => false,
-                'message' => 'You cannot send a message to yourself.'
+                'message' => 'You cannot send a message to yourself.',
             ], 400);
         }
 
@@ -71,13 +70,13 @@ class ChatController extends Controller
             'sender_id' => $senderId,
             'receiver_id' => $receiverId,
             'message' => $request->input('message'),
-            'is_read' => false
+            'is_read' => false,
         ]);
 
         return response()->json([
             'success' => true,
             'message' => 'Message delivered.',
-            'chat_message' => $chatMessage
+            'chat_message' => $chatMessage,
         ], 201);
     }
 
@@ -110,8 +109,8 @@ class ChatController extends Controller
                 })->orWhere(function ($q) use ($userId, $partner) {
                     $q->where('sender_id', $partner->id)->where('receiver_id', $userId);
                 })
-                ->orderBy('created_at', 'desc')
-                ->first();
+                    ->orderBy('created_at', 'desc')
+                    ->first();
 
                 $unreadCount = ChatMessage::where('sender_id', $partner->id)
                     ->where('receiver_id', $userId)
@@ -130,7 +129,7 @@ class ChatController extends Controller
 
         return response()->json([
             'success' => true,
-            'chats' => $partners
+            'chats' => $partners,
         ], 200);
     }
 }

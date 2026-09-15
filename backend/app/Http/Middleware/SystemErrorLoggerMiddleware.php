@@ -2,21 +2,19 @@
 
 namespace App\Http\Middleware;
 
+use App\Models\SystemLog;
 use Closure;
 use Illuminate\Http\Request;
-use Symfony\Component\HttpFoundation\Response;
-use App\Models\SystemLog;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Log;
+use Symfony\Component\HttpFoundation\Response;
 
 class SystemErrorLoggerMiddleware
 {
     /**
      * Handle an incoming request and check response status for logging.
      *
-     * @param  \Illuminate\Http\Request  $request
-     * @param  \Closure(\Illuminate\Http\Request): (\Symfony\Component\HttpFoundation\Response)  $next
-     * @return \Symfony\Component\HttpFoundation\Response
+     * @param  Closure(Request): (Response)  $next
      */
     public function handle(Request $request, Closure $next): Response
     {
@@ -34,12 +32,12 @@ class SystemErrorLoggerMiddleware
                 $message = $exception->getMessage();
                 $stackTrace = $exception->getTraceAsString();
             } else {
-                $message = "HTTP Error {$statusCode} occurred on API route: " . $request->path();
+                $message = "HTTP Error {$statusCode} occurred on API route: ".$request->path();
                 // Attempt to pull message from JSON response content if possible
                 try {
                     $content = json_decode($response->getContent(), true);
                     if (is_array($content) && (isset($content['message']) || isset($content['error']))) {
-                        $message .= ' | Info: ' . ($content['message'] ?? $content['error']);
+                        $message .= ' | Info: '.($content['message'] ?? $content['error']);
                     }
                 } catch (\Throwable $e) {
                     // Ignore content extraction failures
@@ -74,7 +72,7 @@ class SystemErrorLoggerMiddleware
                     ],
                 ]);
             } catch (\Throwable $e) {
-                Log::error('Failed to log system error to database: ' . $e->getMessage());
+                Log::error('Failed to log system error to database: '.$e->getMessage());
             }
         }
 

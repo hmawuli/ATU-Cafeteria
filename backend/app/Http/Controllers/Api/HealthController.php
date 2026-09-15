@@ -3,10 +3,11 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Queue;
-use Illuminate\Support\Facades\Cache;
 
 class HealthController extends Controller
 {
@@ -14,7 +15,7 @@ class HealthController extends Controller
      * Perform system health check of the application.
      * Verifies database connectivity, cache functionality, and queue worker status.
      *
-     * @return \Illuminate\Http\JsonResponse
+     * @return JsonResponse
      */
     public function check(Request $request)
     {
@@ -26,8 +27,8 @@ class HealthController extends Controller
             // Force connection and run a simple query
             DB::connection()->getPdo();
             $dbCheck = DB::select('SELECT 1');
-            
-            if (!empty($dbCheck)) {
+
+            if (! empty($dbCheck)) {
                 $details['database'] = [
                     'status' => 'UP',
                     'message' => 'Database connection established successfully.',
@@ -48,12 +49,11 @@ class HealthController extends Controller
             ];
         }
 
-
         // 3. Check Cache Status
         try {
             Cache::put('health_check_key', 'OK', 10);
             $cacheVal = Cache::get('health_check_key');
-            
+
             if ($cacheVal === 'OK') {
                 $details['cache'] = [
                     'status' => 'UP',

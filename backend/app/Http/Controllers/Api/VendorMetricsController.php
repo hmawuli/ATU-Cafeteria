@@ -3,12 +3,13 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Models\DeliveredOrderReview;
+use App\Models\Order;
+use App\Models\Review;
+use App\Models\User;
+use App\Models\Vendor;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
-use App\Models\Order;
-use App\Models\User;
-use App\Models\Review;
-use App\Models\DeliveredOrderReview;
 
 class VendorMetricsController extends Controller
 {
@@ -22,13 +23,13 @@ class VendorMetricsController extends Controller
             ->whereRaw('upper(role) = ?', ['VENDOR'])
             ->first();
 
-        if (!$vendor) {
+        if (! $vendor) {
             // Also check 'vendors' table as a fallback
-            $vendorMeta = \App\Models\Vendor::find($vendorId);
-            if (!$vendorMeta) {
+            $vendorMeta = Vendor::find($vendorId);
+            if (! $vendorMeta) {
                 return response()->json([
                     'success' => false,
-                    'message' => 'Vendor not found.'
+                    'message' => 'Vendor not found.',
                 ], 404);
             }
             $vendorName = $vendorMeta->name;
@@ -39,7 +40,7 @@ class VendorMetricsController extends Controller
         // 1. Calculate Average Rating
         $reviewRatings = Review::where('vendor_id', $vendorId)->pluck('rating')->toArray();
         $deliveredRatings = DeliveredOrderReview::where('vendor_id', $vendorId)->pluck('vendor_rating')->toArray();
-        
+
         $allRatings = array_merge($reviewRatings, $deliveredRatings);
         $totalRatingsCount = count($allRatings);
         $avgRating = $totalRatingsCount > 0 ? round(array_sum($allRatings) / $totalRatingsCount, 2) : null;
@@ -60,7 +61,7 @@ class VendorMetricsController extends Controller
         foreach ($completedOrders as $order) {
             $createdTime = $order->order_timestamp ? ($order->order_timestamp / 1000) : strtotime($order->created_at);
             $completedTime = strtotime($order->updated_at);
-            
+
             $duration = $completedTime - $createdTime;
             if ($duration <= 0) {
                 // Fallback realistic duration between 5 to 15 minutes
@@ -69,13 +70,13 @@ class VendorMetricsController extends Controller
             $totalSpeedSeconds += $duration;
         }
 
-        $avgCompletionTimeMinutes = $completedCount > 0 
-            ? round(($totalSpeedSeconds / $completedCount) / 60, 2) 
+        $avgCompletionTimeMinutes = $completedCount > 0
+            ? round(($totalSpeedSeconds / $completedCount) / 60, 2)
             : round(10.0 + ($vendorId % 3), 2); // Fallback realistic speed
 
         return response()->json([
             'success' => true,
-            'vendor_id' => (int)$vendorId,
+            'vendor_id' => (int) $vendorId,
             'vendor_name' => $vendorName,
             'metrics' => [
                 'average_rating' => $avgRating,
@@ -83,7 +84,7 @@ class VendorMetricsController extends Controller
                 'average_completion_speed_minutes' => $avgCompletionTimeMinutes,
                 'average_completion_speed_display' => "{$avgCompletionTimeMinutes} mins",
                 'total_completed_orders' => $completedCount,
-            ]
+            ],
         ], 200);
     }
 
@@ -99,7 +100,7 @@ class VendorMetricsController extends Controller
             // 1. Calculate Average Rating
             $reviewRatings = Review::where('vendor_id', $vendor->id)->pluck('rating')->toArray();
             $deliveredRatings = DeliveredOrderReview::where('vendor_id', $vendor->id)->pluck('vendor_rating')->toArray();
-            
+
             $allRatings = array_merge($reviewRatings, $deliveredRatings);
             $totalRatingsCount = count($allRatings);
             $avgRating = $totalRatingsCount > 0 ? round(array_sum($allRatings) / $totalRatingsCount, 2) : null;
@@ -119,7 +120,7 @@ class VendorMetricsController extends Controller
             foreach ($completedOrders as $order) {
                 $createdTime = $order->order_timestamp ? ($order->order_timestamp / 1000) : strtotime($order->created_at);
                 $completedTime = strtotime($order->updated_at);
-                
+
                 $duration = $completedTime - $createdTime;
                 if ($duration <= 0) {
                     $duration = (($order->id % 11) + 5) * 60;
@@ -127,8 +128,8 @@ class VendorMetricsController extends Controller
                 $totalSpeedSeconds += $duration;
             }
 
-            $avgCompletionTimeMinutes = $completedCount > 0 
-                ? round(($totalSpeedSeconds / $completedCount) / 60, 2) 
+            $avgCompletionTimeMinutes = $completedCount > 0
+                ? round(($totalSpeedSeconds / $completedCount) / 60, 2)
                 : round(10.0 + ($vendor->id % 3), 2);
 
             $metricsBreakdown[] = [
@@ -145,7 +146,7 @@ class VendorMetricsController extends Controller
         return response()->json([
             'success' => true,
             'vendors_metrics' => $metricsBreakdown,
-            'generated_at' => date('Y-m-d H:i:s')
+            'generated_at' => date('Y-m-d H:i:s'),
         ], 200);
     }
 
@@ -155,10 +156,10 @@ class VendorMetricsController extends Controller
     public function getVendorSalesSummary(Request $request)
     {
         $user = $request->user();
-        if (!$user) {
+        if (! $user) {
             return response()->json([
                 'success' => false,
-                'message' => 'Unauthenticated.'
+                'message' => 'Unauthenticated.',
             ], 401);
         }
 
@@ -166,7 +167,7 @@ class VendorMetricsController extends Controller
         if ($role !== 'VENDOR' && $role !== 'ADMIN') {
             return response()->json([
                 'success' => false,
-                'message' => 'Unauthorized. Only vendors and administrators can retrieve sales summary.'
+                'message' => 'Unauthorized. Only vendors and administrators can retrieve sales summary.',
             ], 403);
         }
 
@@ -196,7 +197,7 @@ class VendorMetricsController extends Controller
             return in_array(strtoupper($o->status), ['COMPLETED', 'DELIVERED']);
         });
 
-        $dailyRevenue = (double) $dailyCompletedOrders->sum('total_price');
+        $dailyRevenue = (float) $dailyCompletedOrders->sum('total_price');
         $dailyOrdersCount = $dailyOrders->count();
         $dailyCompletedCount = $dailyCompletedOrders->count();
         $dailyCancelledCount = Order::where('vendor_id', $vendorId)
@@ -214,7 +215,7 @@ class VendorMetricsController extends Controller
             return in_array(strtoupper($o->status), ['COMPLETED', 'DELIVERED']);
         });
 
-        $weeklyRevenue = (double) $weeklyCompletedOrders->sum('total_price');
+        $weeklyRevenue = (float) $weeklyCompletedOrders->sum('total_price');
         $weeklyOrdersCount = $weeklyOrders->count();
         $weeklyCompletedCount = $weeklyCompletedOrders->count();
         $weeklyCancelledCount = Order::where('vendor_id', $vendorId)
@@ -261,7 +262,7 @@ class VendorMetricsController extends Controller
                 'top_selling_item_this_week' => $topMenuItem ? [
                     'item_name' => $topMenuItem->food_name,
                     'quantity_sold' => (int) $topMenuItem->total_quantity,
-                    'total_sales_revenue' => round((double)$topMenuItem->total_sales, 2),
+                    'total_sales_revenue' => round((float) $topMenuItem->total_sales, 2),
                 ] : null,
                 'weekly_order_status_distribution' => $statusBreakdown,
             ],
@@ -275,10 +276,10 @@ class VendorMetricsController extends Controller
     public function getVendorSalesTrend30Days(Request $request)
     {
         $user = $request->user();
-        if (!$user) {
+        if (! $user) {
             return response()->json([
                 'success' => false,
-                'message' => 'Unauthenticated.'
+                'message' => 'Unauthenticated.',
             ], 401);
         }
 
@@ -286,7 +287,7 @@ class VendorMetricsController extends Controller
         if ($role !== 'VENDOR' && $role !== 'ADMIN') {
             return response()->json([
                 'success' => false,
-                'message' => 'Unauthorized.'
+                'message' => 'Unauthorized.',
             ], 403);
         }
 
@@ -328,12 +329,12 @@ class VendorMetricsController extends Controller
 
             if (isset($trendData[$dateStr])) {
                 $status = strtoupper($order->status);
-                
+
                 // Track total orders count (excluding cancelled/declined for general metrics, or including them but categorizing)
                 $trendData[$dateStr]['orders_count']++;
 
                 if (in_array($status, ['COMPLETED', 'DELIVERED'])) {
-                    $trendData[$dateStr]['revenue'] += (double)$order->total_price;
+                    $trendData[$dateStr]['revenue'] += (float) $order->total_price;
                     $trendData[$dateStr]['completed_count']++;
                 } elseif (in_array($status, ['CANCELLED', 'DECLINED'])) {
                     $trendData[$dateStr]['cancelled_count']++;
@@ -354,7 +355,7 @@ class VendorMetricsController extends Controller
             'vendor_name' => $vendorName,
             'recharts_data' => $chartData,
             'timeframe' => 'Last 30 Days (Trailing)',
-            'generated_at' => date('c')
+            'generated_at' => date('c'),
         ], 200);
     }
 }

@@ -2,8 +2,8 @@
 
 namespace App\Http\Requests;
 
-use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Contracts\Validation\Validator;
+use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Http\Exceptions\HttpResponseException;
 use Illuminate\Validation\Rule;
 
@@ -31,7 +31,7 @@ class UpdateProfileRequest extends FormRequest
                 'string',
                 'min:3',
                 'max:50',
-                Rule::unique('users', 'username')->ignore($userId)
+                Rule::unique('users', 'username')->ignore($userId),
             ],
             'info' => 'nullable|string|max:255',
             'phoneNumber' => 'nullable|string|max:20',
@@ -62,7 +62,7 @@ class UpdateProfileRequest extends FormRequest
                 'success' => false,
                 'message' => 'Profile update validation failed.',
                 'errors' => $validator->errors(),
-                'status_code' => 422
+                'status_code' => 422,
             ], 422)
         );
     }

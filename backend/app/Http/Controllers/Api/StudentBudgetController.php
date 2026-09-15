@@ -3,10 +3,10 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Models\Order;
+use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
-use App\Models\User;
-use App\Models\Order;
 
 class StudentBudgetController extends Controller
 {
@@ -45,10 +45,10 @@ class StudentBudgetController extends Controller
     public function getBudgetAnalytics(Request $request)
     {
         $user = $request->user();
-        if (!$user) {
+        if (! $user) {
             return response()->json([
                 'success' => false,
-                'message' => 'Unauthenticated.'
+                'message' => 'Unauthenticated.',
             ], 401);
         }
 
@@ -57,23 +57,23 @@ class StudentBudgetController extends Controller
         if ($role !== 'STUDENT' && $role !== 'ADMIN') {
             return response()->json([
                 'success' => false,
-                'message' => 'Unauthorized. Budget tracking and spending summaries are restricted to students.'
+                'message' => 'Unauthorized. Budget tracking and spending summaries are restricted to students.',
             ], 403);
         }
 
         // Fetch completed/delivered orders
         $orders = Order::where(function ($query) use ($user) {
-                $query->where('customer_id', $user->id)
-                      ->orWhere('student_id', $user->id)
-                      ->orWhere('user_id', $user->id);
-            })
+            $query->where('customer_id', $user->id)
+                ->orWhere('student_id', $user->id)
+                ->orWhere('user_id', $user->id);
+        })
             ->whereIn(DB::raw('upper(status)'), ['COMPLETED', 'DELIVERED'])
             ->orderBy('order_timestamp', 'asc')
             ->get();
 
         // Get monthly budget limit from user profile (default to GH₵ 400.00 if unconfigured)
         $profile = $user->profile_info ?: [];
-        $monthlyBudgetLimit = isset($profile['monthly_budget_limit']) ? (double)$profile['monthly_budget_limit'] : 400.0;
+        $monthlyBudgetLimit = isset($profile['monthly_budget_limit']) ? (float) $profile['monthly_budget_limit'] : 400.0;
 
         // Structure 1: Monthly Aggregations for Recharts (e.g. BarChart)
         $monthlyAggregations = [];
@@ -88,7 +88,7 @@ class StudentBudgetController extends Controller
             $categoryAggregations[$cat] = [
                 'category' => $cat,
                 'total_spent' => 0.0,
-                'item_count' => 0
+                'item_count' => 0,
             ];
         }
 
@@ -96,24 +96,24 @@ class StudentBudgetController extends Controller
         $totalOrdersCount = count($orders);
 
         // Get current year and month
-        $currentYear = (int)date('Y');
-        $currentMonth = (int)date('n');
+        $currentYear = (int) date('Y');
+        $currentMonth = (int) date('n');
 
         $currentMonthSpent = 0.0;
 
         foreach ($orders as $order) {
             $timestampSec = $order->order_timestamp / 1000;
-            $year = (int)date('Y', $timestampSec);
-            $monthNum = (int)date('n', $timestampSec);
+            $year = (int) date('Y', $timestampSec);
+            $monthNum = (int) date('n', $timestampSec);
             $monthName = date('M Y', $timestampSec);
             $dayString = date('Y-m-d', $timestampSec);
 
-            $price = (double)$order->total_price;
+            $price = (float) $order->total_price;
             $totalSpentAllTime += $price;
 
             // 1. Accumulate Monthly
-            $monthKey = "{$year}-" . str_pad($monthNum, 2, '0', STR_PAD_LEFT);
-            if (!isset($monthlyAggregations[$monthKey])) {
+            $monthKey = "{$year}-".str_pad($monthNum, 2, '0', STR_PAD_LEFT);
+            if (! isset($monthlyAggregations[$monthKey])) {
                 $monthlyAggregations[$monthKey] = [
                     'key' => $monthKey,
                     'month' => $monthName,
@@ -122,7 +122,7 @@ class StudentBudgetController extends Controller
                     'total_spent' => 0.0,
                     'budget_limit' => $monthlyBudgetLimit,
                     'order_count' => 0,
-                    'average_order_value' => 0.0
+                    'average_order_value' => 0.0,
                 ];
             }
             $monthlyAggregations[$monthKey]['total_spent'] += $price;
@@ -140,12 +140,12 @@ class StudentBudgetController extends Controller
             // 3. Accumulate Daily (filter last 30 days only)
             $thirtyDaysAgoMs = (time() - (30 * 24 * 60 * 60)) * 1000;
             if ($order->order_timestamp >= $thirtyDaysAgoMs) {
-                if (!isset($dailyAggregations[$dayString])) {
+                if (! isset($dailyAggregations[$dayString])) {
                     $dailyAggregations[$dayString] = [
                         'date' => date('M d', $timestampSec),
                         'full_date' => $dayString,
                         'total_spent' => 0.0,
-                        'order_count' => 0
+                        'order_count' => 0,
                     ];
                 }
                 $dailyAggregations[$dayString]['total_spent'] += $price;
@@ -192,7 +192,7 @@ class StudentBudgetController extends Controller
             'monthly_budget_limit' => $monthlyBudgetLimit,
             'budget_consumption_percentage' => round($budgetPercent, 1),
             'budget_status_level' => $statusLevel,
-            'remaining_budget' => round(max(0.0, $monthlyBudgetLimit - $currentMonthSpent), 2)
+            'remaining_budget' => round(max(0.0, $monthlyBudgetLimit - $currentMonthSpent), 2),
         ];
 
         // Return deterministic budget analytics from verified transaction history.
@@ -211,7 +211,7 @@ class StudentBudgetController extends Controller
             'category_chart_data' => $finalCategories,
             'daily_trend_chart_data' => $finalDaily,
             'budget_advice' => $budgetAdvice,
-            'generated_at' => date('c')
+            'generated_at' => date('c'),
         ], 200);
     }
 
@@ -221,10 +221,10 @@ class StudentBudgetController extends Controller
     public function setBudgetLimit(Request $request)
     {
         $user = $request->user();
-        if (!$user) {
+        if (! $user) {
             return response()->json([
                 'success' => false,
-                'message' => 'Unauthenticated.'
+                'message' => 'Unauthenticated.',
             ], 401);
         }
 
@@ -232,19 +232,19 @@ class StudentBudgetController extends Controller
         if ($role !== 'STUDENT' && $role !== 'ADMIN') {
             return response()->json([
                 'success' => false,
-                'message' => 'Unauthorized. Only students can set personal budget limits.'
+                'message' => 'Unauthorized. Only students can set personal budget limits.',
             ], 403);
         }
 
         $request->validate([
-            'monthly_budget_limit' => 'required|numeric|min:1'
+            'monthly_budget_limit' => 'required|numeric|min:1',
         ]);
 
-        $limit = (double)$request->input('monthly_budget_limit');
+        $limit = (float) $request->input('monthly_budget_limit');
 
         $profile = $user->profile_info ?: [];
         $profile['monthly_budget_limit'] = $limit;
-        
+
         $user->profile_info = $profile;
         $user->save();
 
@@ -252,7 +252,7 @@ class StudentBudgetController extends Controller
             'success' => true,
             'message' => 'Monthly spending budget threshold updated successfully.',
             'monthly_budget_limit' => $limit,
-            'updated_at' => date('c')
+            'updated_at' => date('c'),
         ], 200);
     }
 
@@ -276,11 +276,11 @@ class StudentBudgetController extends Controller
 
         $statusSection = '';
         if ($metrics['budget_status_level'] === 'EXCEEDED') {
-            $statusSection = "⚠️ **Budget Warning**: You have fully consumed your budget of **GH₵ {$metrics['monthly_budget_limit']}** (currently at **" . $metrics['budget_consumption_percentage'] . "%**). Consider cooking simple meals or opting for budget staple pairings for the rest of the week.";
+            $statusSection = "⚠️ **Budget Warning**: You have fully consumed your budget of **GH₵ {$metrics['monthly_budget_limit']}** (currently at **".$metrics['budget_consumption_percentage'].'%**). Consider cooking simple meals or opting for budget staple pairings for the rest of the week.';
         } elseif ($metrics['budget_status_level'] === 'WARNING') {
-            $statusSection = "🔔 **Caution**: You have utilized **" . $metrics['budget_consumption_percentage'] . "%** of your budget. You only have **GH₵ {$metrics['remaining_budget']}** left. Slow down on premium fast foods to stay on track!";
+            $statusSection = '🔔 **Caution**: You have utilized **'.$metrics['budget_consumption_percentage']."%** of your budget. You only have **GH₵ {$metrics['remaining_budget']}** left. Slow down on premium fast foods to stay on track!";
         } else {
-            $statusSection = "🎉 **Excellent Discipline!**: You are currently safely within your budget limits. You have utilized only **" . $metrics['budget_consumption_percentage'] . "%** of your **GH₵ {$metrics['monthly_budget_limit']}** target. Great job managing your pocket money!";
+            $statusSection = '🎉 **Excellent Discipline!**: You are currently safely within your budget limits. You have utilized only **'.$metrics['budget_consumption_percentage']."%** of your **GH₵ {$metrics['monthly_budget_limit']}** target. Great job managing your pocket money!";
         }
 
         return "# 📊 Personal Student Savings & Budgeting Guide

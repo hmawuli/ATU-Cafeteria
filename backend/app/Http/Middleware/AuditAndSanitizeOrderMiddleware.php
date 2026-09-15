@@ -2,9 +2,9 @@
 
 namespace App\Http\Middleware;
 
+use App\Models\AuditLog;
 use Closure;
 use Illuminate\Http\Request;
-use App\Models\AuditLog;
 use Illuminate\Support\Facades\Log;
 
 class AuditAndSanitizeOrderMiddleware
@@ -12,15 +12,13 @@ class AuditAndSanitizeOrderMiddleware
     /**
      * Handle an incoming request.
      *
-     * @param  \Illuminate\Http\Request  $request
-     * @param  \Closure  $next
      * @return mixed
      */
     public function handle(Request $request, Closure $next)
     {
         // Identify if this is an order-related route or a post request with inputs
         $isOrderRoute = $request->is('*orders*') || $request->is('*order-item*');
-        
+
         if ($isOrderRoute && $request->isMethod('POST')) {
             $inputs = $request->all();
             $sanitizedInputs = [];
@@ -45,7 +43,7 @@ class AuditAndSanitizeOrderMiddleware
             try {
                 $user = $request->user();
                 $userId = $user ? $user->id : null;
-                
+
                 AuditLog::create([
                     'timestamp' => (int) (time() * 1000),
                     'user_id' => $userId,
@@ -55,10 +53,10 @@ class AuditAndSanitizeOrderMiddleware
                         'method' => $request->method(),
                         'ip' => $request->ip(),
                         'payload' => $this->maskSensitiveData($sanitizedInputs),
-                    ])
+                    ]),
                 ]);
             } catch (\Exception $e) {
-                Log::error("AuditAndSanitizeOrderMiddleware Log Error: " . $e->getMessage());
+                Log::error('AuditAndSanitizeOrderMiddleware Log Error: '.$e->getMessage());
             }
         }
 
@@ -77,6 +75,7 @@ class AuditAndSanitizeOrderMiddleware
                 $array[$key] = $this->sanitizeArray($value);
             }
         }
+
         return $array;
     }
 
@@ -91,6 +90,7 @@ class AuditAndSanitizeOrderMiddleware
                 $payload[$key] = '********';
             }
         }
+
         return $payload;
     }
 }

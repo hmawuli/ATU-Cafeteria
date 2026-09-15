@@ -11,7 +11,7 @@ final class PermissionMiddleware
     public function handle(Request $request, Closure $next, string ...$permissions): Response
     {
         $user = $request->user();
-        if (!$user) {
+        if (! $user) {
             return response()->json(['success' => false, 'message' => 'Unauthenticated.'], 401);
         }
 

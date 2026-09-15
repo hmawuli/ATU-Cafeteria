@@ -3,11 +3,11 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
-use App\Models\Feedback;
 use App\Models\AuditLog;
+use App\Models\Feedback;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Validator;
 
 class FeedbackController extends Controller
 {
@@ -17,6 +17,7 @@ class FeedbackController extends Controller
     public function index()
     {
         $feedbacks = Feedback::orderBy('timestamp', 'desc')->get();
+
         return response()->json($feedbacks, 200);
     }
 
@@ -28,6 +29,7 @@ class FeedbackController extends Controller
         $feedbacks = Feedback::where('vendor_id', $vendorId)
             ->orderBy('timestamp', 'desc')
             ->get();
+
         return response()->json($feedbacks, 200);
     }
 
@@ -51,7 +53,7 @@ class FeedbackController extends Controller
             return response()->json([
                 'success' => false,
                 'message' => 'Input metric scores validation failed.',
-                'errors' => $validator->errors()
+                'errors' => $validator->errors(),
             ], 400);
         }
 
@@ -89,18 +91,18 @@ class FeedbackController extends Controller
     public function destroy($id)
     {
         $feedback = Feedback::find($id);
-        if (!$feedback) {
+        if (! $feedback) {
             return response()->json([
                 'success' => false,
-                'message' => 'Feedback record not found.'
+                'message' => 'Feedback record not found.',
             ], 404);
         }
 
         $user = request()->user();
-        if (!$user || strtoupper($user->role) !== 'ADMIN') {
+        if (! $user || strtoupper($user->role) !== 'ADMIN') {
             return response()->json([
                 'success' => false,
-                'message' => 'Unauthorized. This endpoint requires ADMIN privileges.'
+                'message' => 'Unauthorized. This endpoint requires ADMIN privileges.',
             ], 403);
         }
 
@@ -118,7 +120,7 @@ class FeedbackController extends Controller
 
         return response()->json([
             'success' => true,
-            'message' => 'Feedback record deleted successfully.'
+            'message' => 'Feedback record deleted successfully.',
         ], 200);
     }
 
@@ -135,15 +137,15 @@ class FeedbackController extends Controller
             return response()->json([
                 'success' => false,
                 'message' => 'Validation failed.',
-                'errors' => $validator->errors()
+                'errors' => $validator->errors(),
             ], 400);
         }
 
         $feedback = Feedback::find($id);
-        if (!$feedback) {
+        if (! $feedback) {
             return response()->json([
                 'success' => false,
-                'message' => 'Feedback not found.'
+                'message' => 'Feedback not found.',
             ], 404);
         }
 
@@ -151,13 +153,13 @@ class FeedbackController extends Controller
         if ($feedback->vendor_id !== $user->id && strtoupper($user->role) !== 'ADMIN') {
             return response()->json([
                 'success' => false,
-                'message' => 'Unauthorized. You are not the vendor for this order.'
+                'message' => 'Unauthorized. You are not the vendor for this order.',
             ], 403);
         }
 
         DB::transaction(function () use ($feedback, $request, $user) {
             $feedback->update([
-                'vendor_reply' => $request->input('vendor_reply')
+                'vendor_reply' => $request->input('vendor_reply'),
             ]);
 
             AuditLog::create([
@@ -172,37 +174,50 @@ class FeedbackController extends Controller
     }
 
     /**
- * Return a transparent, database-backed feedback summary.
- * No external AI service is used.
- */
+     * Return a transparent, database-backed feedback summary.
+     * No external AI service is used.
+     */
     public function getFeedbackSentimentReport(Request $request, $vendorId = null)
     {
         $user = $request->user();
-        if (!$user) return response()->json(['success'=>false,'message'=>'Unauthenticated.'], 401);
-        $role = strtoupper($user->role);
-        if ($role !== 'VENDOR' && $role !== 'ADMIN') return response()->json(['success'=>false,'message'=>'Unauthorized.'], 403);
-        $targetVendorId = $role === 'VENDOR' ? (int)$user->id : ($vendorId ? (int)$vendorId : (int)$request->input('vendor_id'));
-        if (!$targetVendorId) return response()->json(['success'=>false,'message'=>'Vendor ID is required.'], 422);
-
-        $feedbacks = Feedback::where('vendor_id',$targetVendorId)->get();
-        $total = $feedbacks->count();
-        $average = fn(string $field) => $total ? round((float)$feedbacks->avg($field),2) : 0.0;
-        $positive=$neutral=$negative=0;
-        foreach($feedbacks as $feedback){
-            $score=((int)$feedback->rating_food_quality+(int)$feedback->rating_cleanliness+(int)$feedback->rating_service_speed+(int)$feedback->rating_price_value)/4;
-            if($score>=4)$positive++; elseif($score<=2.5)$negative++; else $neutral++;
+        if (! $user) {
+            return response()->json(['success' => false, 'message' => 'Unauthenticated.'], 401);
         }
+        $role = strtoupper($user->role);
+        if ($role !== 'VENDOR' && $role !== 'ADMIN') {
+            return response()->json(['success' => false, 'message' => 'Unauthorized.'], 403);
+        }
+        $targetVendorId = $role === 'VENDOR' ? (int) $user->id : ($vendorId ? (int) $vendorId : (int) $request->input('vendor_id'));
+        if (! $targetVendorId) {
+            return response()->json(['success' => false, 'message' => 'Vendor ID is required.'], 422);
+        }
+
+        $feedbacks = Feedback::where('vendor_id', $targetVendorId)->get();
+        $total = $feedbacks->count();
+        $average = fn (string $field) => $total ? round((float) $feedbacks->avg($field), 2) : 0.0;
+        $positive = $neutral = $negative = 0;
+        foreach ($feedbacks as $feedback) {
+            $score = ((int) $feedback->rating_food_quality + (int) $feedback->rating_cleanliness + (int) $feedback->rating_service_speed + (int) $feedback->rating_price_value) / 4;
+            if ($score >= 4) {
+                $positive++;
+            } elseif ($score <= 2.5) {
+                $negative++;
+            } else {
+                $neutral++;
+            }
+        }
+
         return response()->json([
-            'success'=>true,'vendor_id'=>$targetVendorId,'total_comments'=>$total,
-            'averages'=>['quality'=>$average('rating_food_quality'),'cleanliness'=>$average('rating_cleanliness'),'speed'=>$average('rating_service_speed'),'value'=>$average('rating_price_value')],
-            'distribution'=>[
-                'positive_percent'=>$total?round($positive/$total*100,1):0.0,
-                'neutral_percent'=>$total?round($neutral/$total*100,1):0.0,
-                'negative_percent'=>$total?round($negative/$total*100,1):0.0,
+            'success' => true, 'vendor_id' => $targetVendorId, 'total_comments' => $total,
+            'averages' => ['quality' => $average('rating_food_quality'), 'cleanliness' => $average('rating_cleanliness'), 'speed' => $average('rating_service_speed'), 'value' => $average('rating_price_value')],
+            'distribution' => [
+                'positive_percent' => $total ? round($positive / $total * 100, 1) : 0.0,
+                'neutral_percent' => $total ? round($neutral / $total * 100, 1) : 0.0,
+                'negative_percent' => $total ? round($negative / $total * 100, 1) : 0.0,
             ],
-            'message'=>'Feedback summary calculated from recorded student evaluations.',
-            'generated_at'=>date('c'),
-        ],200);
+            'message' => 'Feedback summary calculated from recorded student evaluations.',
+            'generated_at' => date('c'),
+        ], 200);
     }
 
     /**
@@ -214,9 +229,9 @@ class FeedbackController extends Controller
         $neuPercent = $metrics['distribution']['neutral_percent'];
         $negPercent = $metrics['distribution']['negative_percent'];
 
-        $posSample = count($posComments) > 0 ? "- *\"" . implode("\"*\n- *\"", array_slice($posComments, 0, 2)) . "\"*" : "None recorded yet.";
-        $negSample = count($negComments) > 0 ? "- *\"" . implode("\"*\n- *\"", array_slice($negComments, 0, 2)) . "\"*" : "None recorded yet.";
-        $neuSample = count($neuComments) > 0 ? "- *\"" . implode("\"*\n- *\"", array_slice($neuComments, 0, 2)) . "\"*" : "None recorded yet.";
+        $posSample = count($posComments) > 0 ? '- *"'.implode("\"*\n- *\"", array_slice($posComments, 0, 2)).'"*' : 'None recorded yet.';
+        $negSample = count($negComments) > 0 ? '- *"'.implode("\"*\n- *\"", array_slice($negComments, 0, 2)).'"*' : 'None recorded yet.';
+        $neuSample = count($neuComments) > 0 ? '- *"'.implode("\"*\n- *\"", array_slice($neuComments, 0, 2)).'"*' : 'None recorded yet.';
 
         return "# 📊 Sentiment Intelligence Report for **{$vendorName}**
 *(Local Smart Fallback Report — Analyzing Real Student Reviews)*

@@ -2,8 +2,8 @@
 
 namespace App\Http\Requests;
 
-use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Contracts\Validation\Validator;
+use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Http\Exceptions\HttpResponseException;
 
 class StoreMenuRequest extends FormRequest
@@ -14,6 +14,7 @@ class StoreMenuRequest extends FormRequest
     public function authorize(): bool
     {
         $user = $this->user();
+
         return $user && (strtoupper($user->role) === 'VENDOR' || strtoupper($user->role) === 'ADMIN');
     }
 
@@ -40,7 +41,7 @@ class StoreMenuRequest extends FormRequest
             response()->json([
                 'success' => false,
                 'message' => 'Validation error while registering menu item.',
-                'errors' => $validator->errors()
+                'errors' => $validator->errors(),
             ], 400)
         );
     }

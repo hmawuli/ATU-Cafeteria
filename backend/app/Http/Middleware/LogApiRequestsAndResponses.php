@@ -2,12 +2,12 @@
 
 namespace App\Http\Middleware;
 
-use Closure;
-use Illuminate\Http\Request;
-use Symfony\Component\HttpFoundation\Response;
 use App\Models\RequestPerformanceLog;
 use App\Models\SystemLog;
+use Closure;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
+use Symfony\Component\HttpFoundation\Response;
 
 class LogApiRequestsAndResponses
 {
@@ -28,7 +28,7 @@ class LogApiRequestsAndResponses
 
             // Filter out sensitive parameters from payload
             $requestPayload = $request->except(['password', 'password_confirmation', 'pin', 'token']);
-            $payloadJson = !empty($requestPayload) ? json_encode($requestPayload, JSON_UNESCAPED_SLASHES) : null;
+            $payloadJson = ! empty($requestPayload) ? json_encode($requestPayload, JSON_UNESCAPED_SLASHES) : null;
 
             // Capture response content preview (limit to 1000 chars)
             $responseContent = $response->getContent();
@@ -53,7 +53,7 @@ class LogApiRequestsAndResponses
                     SystemLog::create([
                         'level' => $statusCode >= 500 ? 'ERROR' : ($statusCode >= 400 ? 'WARNING' : 'INFO'),
                         'event' => 'API_REQUEST_LOG',
-                        'message' => sprintf("[%s] %s -> %d (%s ms)", $method, $path, $statusCode, $durationMs),
+                        'message' => sprintf('[%s] %s -> %d (%s ms)', $method, $path, $statusCode, $durationMs),
                         'context' => json_encode([
                             'ip' => $request->ip(),
                             'payload' => $requestPayload,
@@ -64,7 +64,7 @@ class LogApiRequestsAndResponses
                 }
             }
         } catch (\Throwable $e) {
-            Log::error('LogApiRequestsAndResponses error: ' . $e->getMessage());
+            Log::error('LogApiRequestsAndResponses error: '.$e->getMessage());
         }
 
         return $response;

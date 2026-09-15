@@ -3,11 +3,11 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
-use Illuminate\Http\Request;
 use App\Services\PerformanceAnalyticsService;
-use Illuminate\Support\Facades\Log;
-use Illuminate\Support\Facades\DB;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 
 class VendorController extends Controller
 {
@@ -21,7 +21,7 @@ class VendorController extends Controller
         if (strtoupper($user->role) !== 'VENDOR' && strtoupper($user->role) !== 'ADMIN') {
             return response()->json([
                 'success' => false,
-                'message' => 'Unauthorized. This resource requires VENDOR or ADMIN privileges.'
+                'message' => 'Unauthorized. This resource requires VENDOR or ADMIN privileges.',
             ], 403);
         }
 
@@ -40,7 +40,7 @@ class VendorController extends Controller
         if (strtoupper($user->role) !== 'VENDOR' && strtoupper($user->role) !== 'ADMIN') {
             return response()->json([
                 'success' => false,
-                'message' => 'Unauthorized. This resource requires VENDOR or ADMIN privileges.'
+                'message' => 'Unauthorized. This resource requires VENDOR or ADMIN privileges.',
             ], 403);
         }
 
@@ -59,11 +59,11 @@ class VendorController extends Controller
         if (strtoupper($user->role) !== 'VENDOR' && strtoupper($user->role) !== 'ADMIN') {
             return response()->json([
                 'success' => false,
-                'message' => 'Unauthorized. This resource requires VENDOR or ADMIN privileges.'
+                'message' => 'Unauthorized. This resource requires VENDOR or ADMIN privileges.',
             ], 403);
         }
 
-        $service = new PerformanceAnalyticsService();
+        $service = new PerformanceAnalyticsService;
         $report = $service->getVendorReport($user->id);
 
         return response()->json($report, 200);
@@ -74,19 +74,11 @@ class VendorController extends Controller
      */
     public function getComparativeAnalytics(Request $request)
     {
-        $service = new PerformanceAnalyticsService();
+        $service = new PerformanceAnalyticsService;
         $report = $service->getComparativeVendorsReport();
 
         return response()->json($report, 200);
     }
-
-    
-
-    
-
-    
-
-    
 
     /**
      * Toggle or explicitly set the authenticated vendor's open status (is_open).
@@ -98,7 +90,7 @@ class VendorController extends Controller
         if (strtoupper($user->role) !== 'VENDOR' && strtoupper($user->role) !== 'ADMIN') {
             return response()->json([
                 'success' => false,
-                'message' => 'Unauthorized. This resource requires VENDOR or ADMIN privileges.'
+                'message' => 'Unauthorized. This resource requires VENDOR or ADMIN privileges.',
             ], 403);
         }
 
@@ -106,7 +98,7 @@ class VendorController extends Controller
         if ($request->has('is_open')) {
             $user->is_open = filter_var($request->input('is_open'), FILTER_VALIDATE_BOOLEAN);
         } else {
-            $user->is_open = !$user->is_open;
+            $user->is_open = ! $user->is_open;
         }
 
         $user->save();
@@ -114,7 +106,7 @@ class VendorController extends Controller
         return response()->json([
             'success' => true,
             'is_open' => $user->is_open,
-            'message' => "Cafeteria open status updated to " . ($user->is_open ? 'OPEN' : 'CLOSED') . "."
+            'message' => 'Cafeteria open status updated to '.($user->is_open ? 'OPEN' : 'CLOSED').'.',
         ], 200);
     }
 
@@ -144,8 +136,9 @@ class VendorController extends Controller
 
         $diskFree = 'N/A';
         try {
-            $diskFree = round(disk_free_space('/') / 1024 / 1024 / 1024, 2) . ' GB';
-        } catch (\Exception $e) {}
+            $diskFree = round(disk_free_space('/') / 1024 / 1024 / 1024, 2).' GB';
+        } catch (\Exception $e) {
+        }
 
         $health = [
             'status' => ($dbStatus === 'OK' && $cacheStatus === 'OK') ? 'HEALTHY' : 'UNHEALTHY',
@@ -168,7 +161,7 @@ class VendorController extends Controller
             'diagnostics' => [
                 'memory_usage_mb' => round(memory_get_usage(true) / 1024 / 1024, 2),
                 'disk_free_space_gb' => $diskFree,
-            ]
+            ],
         ];
 
         return response()->json($health, $health['status'] === 'HEALTHY' ? 200 : 503);
@@ -180,39 +173,39 @@ class VendorController extends Controller
     public function getDiagnosticLogs(Request $request)
     {
         $logPath = storage_path('logs/laravel.log');
-        
-        if (!file_exists($logPath)) {
+
+        if (! file_exists($logPath)) {
             return response()->json([
                 'success' => true,
                 'logs' => [],
-                'message' => 'No log file found at storage/logs/laravel.log yet.'
+                'message' => 'No log file found at storage/logs/laravel.log yet.',
             ]);
         }
-        
+
         $fileSize = filesize($logPath);
         $maxBytes = 256 * 1024; // 256KB max to avoid memory overload
         $handle = fopen($logPath, 'r');
-        
+
         if ($fileSize > $maxBytes) {
             fseek($handle, -$maxBytes, SEEK_END);
         }
-        
+
         $content = fread($handle, $maxBytes);
         fclose($handle);
-        
+
         // Match standard [YYYY-MM-DD HH:MM:SS] level.ERROR: messages
         preg_match_all('/\[(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2})\]\s+([a-zA-Z0-9_-]+)\.([A-Z]+):\s+(.*?)(?=\n\[\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}\]|\z)/s', $content, $matches, PREG_SET_ORDER);
-        
+
         $logs = [];
         foreach ($matches as $match) {
             $timestamp = $match[1];
             $env = $match[2];
             $level = $match[3];
             $message = trim($match[4]);
-            
+
             $shortMessage = strtok($message, "\n");
             $hasStack = strpos($message, "\n") !== false;
-            
+
             $logs[] = [
                 'timestamp' => $timestamp,
                 'environment' => $env,
@@ -222,10 +215,10 @@ class VendorController extends Controller
                 'has_stack' => $hasStack,
             ];
         }
-        
+
         // Reverse logs to show the most recent entries first
         $logs = array_reverse($logs);
-        
+
         return response()->json([
             'success' => true,
             'file_size_kb' => round($fileSize / 1024, 2),
@@ -241,8 +234,10 @@ class VendorController extends Controller
         $logPath = storage_path('logs/laravel.log');
         if (file_exists($logPath)) {
             file_put_contents($logPath, '');
+
             return response()->json(['success' => true, 'message' => 'Log file cleared successfully.']);
         }
+
         return response()->json(['success' => false, 'message' => 'Log file does not exist.']);
     }
 }

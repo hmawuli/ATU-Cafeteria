@@ -11,14 +11,12 @@ class NewIncomingOrderNotification extends Notification
     use Queueable;
 
     /**
-     * @var \App\Models\Order
+     * @var Order
      */
     protected $order;
 
     /**
      * Create a new notification instance.
-     *
-     * @param  \App\Models\Order  $order
      */
     public function __construct(Order $order)
     {
@@ -59,7 +57,7 @@ class NewIncomingOrderNotification extends Notification
      */
     public function broadcastOn()
     {
-        return ['orders-vendor-' . $this->order->vendor_id];
+        return ['orders-vendor-'.$this->order->vendor_id];
     }
 
     /**
@@ -81,7 +79,7 @@ class NewIncomingOrderNotification extends Notification
             'food_name' => $this->order->food_name,
             'quantity' => $this->order->quantity,
             'total_price' => $this->order->total_price,
-            'message' => "New Order Alert! Pre-order #{$this->order->id} for '{$this->order->food_name}' (QTY: {$this->order->quantity}) placed by {$customerName}. Total: GH₵" . number_format($this->order->total_price, 2) . ".",
+            'message' => "New Order Alert! Pre-order #{$this->order->id} for '{$this->order->food_name}' (QTY: {$this->order->quantity}) placed by {$customerName}. Total: GH₵".number_format($this->order->total_price, 2).'.',
             'time' => date('Y-m-d H:i:s'),
         ];
     }

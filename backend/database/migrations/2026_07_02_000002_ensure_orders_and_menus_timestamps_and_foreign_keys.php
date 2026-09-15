@@ -14,10 +14,10 @@ return new class extends Migration
         // 1. Ensure 'orders' table is fully equipped with timestamps and foreign keys
         if (Schema::hasTable('orders')) {
             Schema::table('orders', function (Blueprint $table) {
-                if (!Schema::hasColumn('orders', 'created_at')) {
+                if (! Schema::hasColumn('orders', 'created_at')) {
                     $table->timestamps();
                 }
-                
+
                 // Ensure foreign key references if they don't already exist.
                 // In standard installations, dropping first or declaring with try-catch is safe.
             });
@@ -26,7 +26,7 @@ return new class extends Migration
         // 2. Ensure 'menus' table is fully equipped with timestamps and foreign keys
         if (Schema::hasTable('menus')) {
             Schema::table('menus', function (Blueprint $table) {
-                if (!Schema::hasColumn('menus', 'created_at')) {
+                if (! Schema::hasColumn('menus', 'created_at')) {
                     $table->timestamps();
                 }
             });

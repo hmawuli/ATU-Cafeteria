@@ -3,13 +3,13 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
-use App\Models\FoodItem;
-use App\Models\AuditLog;
 use App\Http\Requests\StoreFoodItemRequest;
 use App\Http\Requests\UpdateFoodItemRequest;
+use App\Models\AuditLog;
+use App\Models\FoodItem;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Validator;
 
 class FoodItemController extends Controller
 {
@@ -19,6 +19,7 @@ class FoodItemController extends Controller
     public function index()
     {
         $foods = FoodItem::all();
+
         return response()->json($foods, 200);
     }
 
@@ -28,6 +29,7 @@ class FoodItemController extends Controller
     public function getVendorFoodItems($vendorId)
     {
         $foods = FoodItem::where('vendor_id', $vendorId)->get();
+
         return response()->json($foods, 200);
     }
 
@@ -42,7 +44,7 @@ class FoodItemController extends Controller
         if ($vendorId != $user->id && strtoupper($user->role) !== 'ADMIN') {
             return response()->json([
                 'success' => false,
-                'message' => 'Unauthorized. You cannot create food items for another vendor.'
+                'message' => 'Unauthorized. You cannot create food items for another vendor.',
             ], 403);
         }
 
@@ -79,10 +81,10 @@ class FoodItemController extends Controller
     public function update(UpdateFoodItemRequest $request, $id)
     {
         $food = FoodItem::find($id);
-        if (!$food) {
+        if (! $food) {
             return response()->json([
                 'success' => false,
-                'message' => 'Food item not found.'
+                'message' => 'Food item not found.',
             ], 404);
         }
 
@@ -90,7 +92,7 @@ class FoodItemController extends Controller
         if ($food->vendor_id !== $user->id && strtoupper($user->role) !== 'ADMIN') {
             return response()->json([
                 'success' => false,
-                'message' => 'Unauthorized. You do not own this food item.'
+                'message' => 'Unauthorized. You do not own this food item.',
             ], 403);
         }
 
@@ -104,7 +106,7 @@ class FoodItemController extends Controller
                 'user_id' => $food->vendor_id,
                 'timestamp' => time() * 1000,
                 'action' => 'MENU_ITEM_UPDATED',
-                'details' => "Updated details of '{$food->name}' (Availability: " . ($food->is_available ? 'Yes' : 'No') . ") on Laravel API.",
+                'details' => "Updated details of '{$food->name}' (Availability: ".($food->is_available ? 'Yes' : 'No').') on Laravel API.',
             ]);
 
             return $food;
@@ -119,10 +121,10 @@ class FoodItemController extends Controller
     public function destroy($id)
     {
         $food = FoodItem::find($id);
-        if (!$food) {
+        if (! $food) {
             return response()->json([
                 'success' => false,
-                'message' => 'Food item not found.'
+                'message' => 'Food item not found.',
             ], 404);
         }
 
@@ -130,7 +132,7 @@ class FoodItemController extends Controller
         if ($food->vendor_id !== $user->id && strtoupper($user->role) !== 'ADMIN') {
             return response()->json([
                 'success' => false,
-                'message' => 'Unauthorized. You do not own this food item.'
+                'message' => 'Unauthorized. You do not own this food item.',
             ], 403);
         }
 
@@ -151,7 +153,7 @@ class FoodItemController extends Controller
 
         return response()->json([
             'success' => true,
-            'message' => 'Food item has been erased successfully.'
+            'message' => 'Food item has been erased successfully.',
         ], 200);
     }
 
@@ -169,7 +171,7 @@ class FoodItemController extends Controller
         if ($validator->fails()) {
             return response()->json([
                 'success' => false,
-                'errors' => $validator->errors()
+                'errors' => $validator->errors(),
             ], 400);
         }
 
@@ -183,7 +185,7 @@ class FoodItemController extends Controller
             if ($food->vendor_id !== $user->id && strtoupper($user->role) !== 'ADMIN') {
                 return response()->json([
                     'success' => false,
-                    'message' => "Unauthorized. You do not own the food item '{$food->name}'."
+                    'message' => "Unauthorized. You do not own the food item '{$food->name}'.",
                 ], 403);
             }
         }
@@ -193,7 +195,7 @@ class FoodItemController extends Controller
 
             $names = $foods->pluck('name')->implode(', ');
             $statusStr = $isAvailable ? 'Available' : 'Unavailable';
-            
+
             AuditLog::create([
                 'user_id' => $user->id,
                 'timestamp' => time() * 1000,
@@ -204,7 +206,7 @@ class FoodItemController extends Controller
 
         return response()->json([
             'success' => true,
-            'message' => 'Menu items updated successfully.'
+            'message' => 'Menu items updated successfully.',
         ], 200);
     }
 }

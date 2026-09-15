@@ -3,10 +3,12 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
-use Illuminate\Http\Request;
-use Illuminate\Support\Facades\DB;
 use App\Models\Order;
 use App\Models\User;
+use App\Models\Vendor;
+use Illuminate\Http\JsonResponse;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 
 class VendorPerformanceController extends Controller
 {
@@ -14,8 +16,7 @@ class VendorPerformanceController extends Controller
      * Fetch daily revenue and total order count per vendor.
      * Supports filtering by vendor_id, start_date (Y-m-d), and end_date (Y-m-d).
      *
-     * @param  \Illuminate\Http\Request  $request
-     * @return \Illuminate\Http\JsonResponse
+     * @return JsonResponse
      */
     public function getPerformance(Request $request)
     {
@@ -26,7 +27,7 @@ class VendorPerformanceController extends Controller
             if ($role !== 'VENDOR' && $role !== 'ADMIN') {
                 return response()->json([
                     'success' => false,
-                    'message' => 'Unauthorized. This resource requires VENDOR or ADMIN privileges.'
+                    'message' => 'Unauthorized. This resource requires VENDOR or ADMIN privileges.',
                 ], 403);
             }
 
@@ -100,10 +101,11 @@ class VendorPerformanceController extends Controller
             ->get()
             ->map(function ($row) {
                 $denominator = $row->total_orders - $row->declined_orders;
-                $row->completion_rate_percentage = $denominator > 0 
-                    ? round(($row->completed_orders / $denominator) * 100, 1) 
+                $row->completion_rate_percentage = $denominator > 0
+                    ? round(($row->completed_orders / $denominator) * 100, 1)
                     : 0.0;
                 $row->cumulative_revenue = round(floatval($row->cumulative_revenue), 2);
+
                 return $row;
             });
 
@@ -116,7 +118,7 @@ class VendorPerformanceController extends Controller
                 'end_date' => $endDate,
             ],
             'summary' => $vendorSummaries,
-            'daily_performance' => $dailyMetrics->map(function($metric) {
+            'daily_performance' => $dailyMetrics->map(function ($metric) {
                 return [
                     'vendor_id' => intval($metric->vendor_id),
                     'vendor_name' => $metric->vendor_name,
@@ -133,8 +135,7 @@ class VendorPerformanceController extends Controller
     /**
      * Calculate average order completion time and total sales for each vendor to support performance management.
      *
-     * @param  \Illuminate\Http\Request  $request
-     * @return \Illuminate\Http\JsonResponse
+     * @return JsonResponse
      */
     public function getVendorPerformanceMetrics(Request $request)
     {
@@ -168,7 +169,7 @@ class VendorPerformanceController extends Controller
                 $totalCompletionTimeSeconds += $duration;
             }
 
-            $avgCompletionTimeMinutes = $completedCount > 0 
+            $avgCompletionTimeMinutes = $completedCount > 0
                 ? round(($totalCompletionTimeSeconds / $completedCount) / 60, 1)
                 : 0.0;
 
@@ -178,8 +179,8 @@ class VendorPerformanceController extends Controller
             }
 
             $totalOrdersCount = Order::where('vendor_id', $vendor->id)->count();
-            $fulfillmentRate = $totalOrdersCount > 0 
-                ? round(($completedCount / $totalOrdersCount) * 100, 1) 
+            $fulfillmentRate = $totalOrdersCount > 0
+                ? round(($completedCount / $totalOrdersCount) * 100, 1)
                 : 100.0;
 
             // Fetch feedback ratings for this vendor
@@ -188,7 +189,7 @@ class VendorPerformanceController extends Controller
             $ratingCleanliness = 4.2;
             $ratingServiceSpeed = 4.3;
             $ratingPriceValue = 4.6;
-            
+
             if ($feedbacks->isNotEmpty()) {
                 $ratingFoodQuality = round($feedbacks->avg('rating_food_quality'), 1);
                 $ratingCleanliness = round($feedbacks->avg('rating_cleanliness'), 1);
@@ -211,11 +212,11 @@ class VendorPerformanceController extends Controller
                 ->orderBy('total_quantity', 'desc')
                 ->limit(4)
                 ->get()
-                ->map(function($item) {
+                ->map(function ($item) {
                     return [
                         'name' => $item->food_name ?? 'Unknown Item',
                         'quantity_sold' => intval($item->total_quantity),
-                        'sales' => round(floatval($item->total_sales), 2)
+                        'sales' => round(floatval($item->total_sales), 2),
                     ];
                 })->toArray();
 
@@ -224,12 +225,12 @@ class VendorPerformanceController extends Controller
                 $popularItems = [
                     ['name' => 'Jollof with Grilled Chicken', 'quantity_sold' => 45 + ($vendor->id * 3), 'sales' => (45 + ($vendor->id * 3)) * 15.0],
                     ['name' => 'Waakye Deluxe', 'quantity_sold' => 30 + ($vendor->id * 2), 'sales' => (30 + ($vendor->id * 2)) * 12.0],
-                    ['name' => 'Kelewele Box', 'quantity_sold' => 25 + ($vendor->id * 4), 'sales' => (25 + ($vendor->id * 4)) * 8.0]
+                    ['name' => 'Kelewele Box', 'quantity_sold' => 25 + ($vendor->id * 4), 'sales' => (25 + ($vendor->id * 4)) * 8.0],
                 ];
             }
 
             // Check if they are in the new vendors table to pull extra operational status / contact info if joined
-            $vendorMeta = \App\Models\Vendor::where('name', $vendor->fullName)
+            $vendorMeta = Vendor::where('name', $vendor->fullName)
                 ->orWhere('id', $vendor->id)
                 ->first();
 
@@ -242,21 +243,21 @@ class VendorPerformanceController extends Controller
                 'total_orders' => $totalOrdersCount,
                 'total_sales' => round($totalSales, 2),
                 'avg_completion_time_minutes' => $avgCompletionTimeMinutes,
-                'avg_completion_time_display' => $avgCompletionTimeMinutes > 0 ? "{$avgCompletionTimeMinutes} mins" : "N/A",
+                'avg_completion_time_display' => $avgCompletionTimeMinutes > 0 ? "{$avgCompletionTimeMinutes} mins" : 'N/A',
                 'average_delivery_time' => $avgCompletionTimeMinutes,
-                'average_delivery_time_display' => $avgCompletionTimeMinutes > 0 ? "{$avgCompletionTimeMinutes} mins" : "N/A",
+                'average_delivery_time_display' => $avgCompletionTimeMinutes > 0 ? "{$avgCompletionTimeMinutes} mins" : 'N/A',
                 'order_fulfillment_rate' => $fulfillmentRate,
                 'rating_food_quality' => $ratingFoodQuality,
                 'rating_cleanliness' => $ratingCleanliness,
                 'rating_service_speed' => $ratingServiceSpeed,
                 'rating_price_value' => $ratingPriceValue,
                 'rating_overall' => $ratingOverall,
-                'popular_menu_items' => $popularItems
+                'popular_menu_items' => $popularItems,
             ];
         }
 
         // 2. Also fetch from 'vendors' table directly to ensure no vendor is missed
-        $allDbVendors = \App\Models\Vendor::all();
+        $allDbVendors = Vendor::all();
         foreach ($allDbVendors as $dbVendor) {
             // Check if already in our array
             $exists = false;
@@ -267,7 +268,7 @@ class VendorPerformanceController extends Controller
                 }
             }
 
-            if (!$exists) {
+            if (! $exists) {
                 $ratingFoodQuality = round(4.0 + (($dbVendor->id % 5) * 0.2), 1);
                 $ratingCleanliness = round(3.8 + (($dbVendor->id % 4) * 0.3), 1);
                 $ratingServiceSpeed = round(4.1 + (($dbVendor->id % 3) * 0.3), 1);
@@ -276,7 +277,7 @@ class VendorPerformanceController extends Controller
 
                 $popularItems = [
                     ['name' => 'Fufu with Light Soup', 'quantity_sold' => 12, 'sales' => 180.0],
-                    ['name' => 'Banku and Grilled Tilapia', 'quantity_sold' => 9, 'sales' => 225.0]
+                    ['name' => 'Banku and Grilled Tilapia', 'quantity_sold' => 9, 'sales' => 225.0],
                 ];
 
                 $performanceData[] = [
@@ -297,7 +298,7 @@ class VendorPerformanceController extends Controller
                     'rating_service_speed' => $ratingServiceSpeed,
                     'rating_price_value' => $ratingPriceValue,
                     'rating_overall' => $ratingOverall,
-                    'popular_menu_items' => $popularItems
+                    'popular_menu_items' => $popularItems,
                 ];
             }
         }
@@ -306,7 +307,7 @@ class VendorPerformanceController extends Controller
             'success' => true,
             'message' => 'Vendor performance analysis calculated successfully.',
             'performance' => $performanceData,
-            'generated_at' => date('Y-m-d H:i:s')
+            'generated_at' => date('Y-m-d H:i:s'),
         ], 200);
     }
 
@@ -314,8 +315,7 @@ class VendorPerformanceController extends Controller
      * Export sales data in a JSON/Array format optimized for Recharts frontend visualization.
      * Provides group by date, group by vendor, and daily pivot schemas.
      *
-     * @param  \Illuminate\Http\Request  $request
-     * @return \Illuminate\Http\JsonResponse
+     * @return JsonResponse
      */
     public function exportSalesForRecharts(Request $request)
     {
@@ -351,13 +351,13 @@ class VendorPerformanceController extends Controller
 
         // Initialize default campus business hours (7 AM to 8 PM)
         for ($h = 7; $h <= 20; $h++) {
-            $timeLabel = date('g A', strtotime("2026-01-01 " . sprintf('%02d', $h) . ":00:00"));
+            $timeLabel = date('g A', strtotime('2026-01-01 '.sprintf('%02d', $h).':00:00'));
             $hourMap[$h] = [
                 'hour' => $h,
                 'time_label' => $timeLabel,
                 'orders' => 0,
                 'sales' => 0.0,
-                'is_peak' => false
+                'is_peak' => false,
             ];
         }
 
@@ -368,49 +368,49 @@ class VendorPerformanceController extends Controller
             $orderHour = intval(date('H', strtotime($order->created_at)));
 
             // 1. Timeline by date
-            if (!isset($byDateMap[$date])) {
+            if (! isset($byDateMap[$date])) {
                 $byDateMap[$date] = [
                     'date' => $date,
                     'sales' => 0.0,
-                    'orders' => 0
+                    'orders' => 0,
                 ];
             }
             $byDateMap[$date]['sales'] += $price;
             $byDateMap[$date]['orders'] += 1;
 
             // 2. Sales by Vendor
-            if (!isset($byVendorMap[$vendorName])) {
+            if (! isset($byVendorMap[$vendorName])) {
                 $byVendorMap[$vendorName] = [
                     'vendor_name' => $vendorName,
                     'sales' => 0.0,
-                    'orders' => 0
+                    'orders' => 0,
                 ];
             }
             $byVendorMap[$vendorName]['sales'] += $price;
             $byVendorMap[$vendorName]['orders'] += 1;
 
             // 3. Daily Pivot (dates and vendors stacked)
-            if (!isset($pivotMap[$date])) {
+            if (! isset($pivotMap[$date])) {
                 $pivotMap[$date] = [
                     'date' => $date,
-                    'Total' => 0.0
+                    'Total' => 0.0,
                 ];
             }
-            if (!isset($pivotMap[$date][$vendorName])) {
+            if (! isset($pivotMap[$date][$vendorName])) {
                 $pivotMap[$date][$vendorName] = 0.0;
             }
             $pivotMap[$date][$vendorName] += $price;
             $pivotMap[$date]['Total'] += $price;
 
             // 4. Hourly Peak Times
-            if (!isset($hourMap[$orderHour])) {
-                $timeLabel = date('g A', strtotime("2026-01-01 " . sprintf('%02d', $orderHour) . ":00:00"));
+            if (! isset($hourMap[$orderHour])) {
+                $timeLabel = date('g A', strtotime('2026-01-01 '.sprintf('%02d', $orderHour).':00:00'));
                 $hourMap[$orderHour] = [
                     'hour' => $orderHour,
                     'time_label' => $timeLabel,
                     'orders' => 0,
                     'sales' => 0.0,
-                    'is_peak' => false
+                    'is_peak' => false,
                 ];
             }
             $hourMap[$orderHour]['orders'] += 1;
@@ -428,6 +428,7 @@ class VendorPerformanceController extends Controller
         $peakHours = array_values(array_map(function ($item) use ($maxHourlyOrders) {
             $item['sales'] = round($item['sales'], 2);
             $item['is_peak'] = ($maxHourlyOrders > 0 && $item['orders'] >= max(1, floor($maxHourlyOrders * 0.7)));
+
             return $item;
         }, $hourMap));
 
@@ -459,11 +460,13 @@ class VendorPerformanceController extends Controller
         // Clean values & format keys
         $byDate = array_values(array_map(function ($item) {
             $item['sales'] = round($item['sales'], 2);
+
             return $item;
         }, $byDateMap));
 
         $byVendor = array_values(array_map(function ($item) {
             $item['sales'] = round($item['sales'], 2);
+
             return $item;
         }, $byVendorMap));
 
@@ -473,6 +476,7 @@ class VendorPerformanceController extends Controller
                     $item[$key] = round($val, 2);
                 }
             }
+
             return $item;
         }, $pivotMap));
 
@@ -483,9 +487,9 @@ class VendorPerformanceController extends Controller
                 'by_date' => $byDate,
                 'peak_hours' => $peakHours,
                 'by_vendor' => $byVendor,
-                'daily_pivot' => $dailyPivot
+                'daily_pivot' => $dailyPivot,
             ],
-            'generated_at' => date('Y-m-d H:i:s')
+            'generated_at' => date('Y-m-d H:i:s'),
         ], 200);
     }
 
@@ -493,8 +497,7 @@ class VendorPerformanceController extends Controller
      * Get aggregated vendor statistics, including total orders fulfilled and average order processing time.
      * Optionally filtered by vendor_id.
      *
-     * @param  \Illuminate\Http\Request  $request
-     * @return \Illuminate\Http\JsonResponse
+     * @return JsonResponse
      */
     public function getAggregatedStatistics(Request $request)
     {
@@ -514,10 +517,10 @@ class VendorPerformanceController extends Controller
 
         foreach ($completedOrders as $order) {
             $totalSales += floatval($order->total_price);
-            
+
             $createdTime = $order->order_timestamp ? ($order->order_timestamp / 1000) : strtotime($order->created_at);
             $completedTime = strtotime($order->updated_at);
-            
+
             $duration = $completedTime - $createdTime;
             if ($duration <= 0) {
                 // Fallback to a realistic duration (e.g. 5 to 15 minutes) based on order id
@@ -548,7 +551,7 @@ class VendorPerformanceController extends Controller
             foreach ($orders as $order) {
                 $createdTime = $order->order_timestamp ? ($order->order_timestamp / 1000) : strtotime($order->created_at);
                 $completedTime = strtotime($order->updated_at);
-                
+
                 $duration = $completedTime - $createdTime;
                 if ($duration <= 0) {
                     $duration = (($order->id % 11) + 5) * 60;
@@ -557,7 +560,7 @@ class VendorPerformanceController extends Controller
             }
 
             $vAvgDuration = $vCompleted > 0 ? ($vTotalDuration / $vCompleted) : 0;
-            
+
             // Get vendor details from order relation
             $vendorName = 'Unknown Vendor';
             if ($orders->isNotEmpty()) {
@@ -583,9 +586,9 @@ class VendorPerformanceController extends Controller
                 'average_processing_time_minutes' => $averageProcessingTimeMinutes,
                 'average_processing_time_seconds' => round($averageProcessingTimeSeconds, 0),
                 'vendor_id' => $vendorId ? intval($vendorId) : null,
-                'breakdown' => $vendorBreakdown
+                'breakdown' => $vendorBreakdown,
             ],
-            'generated_at' => date('Y-m-d H:i:s')
+            'generated_at' => date('Y-m-d H:i:s'),
         ], 200);
     }
 }

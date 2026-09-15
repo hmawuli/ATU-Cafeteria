@@ -4,10 +4,11 @@ use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
 
-return new class extends Migration {
+return new class extends Migration
+{
     public function up(): void
     {
-        if (!Schema::hasTable('food_waste_records')) {
+        if (! Schema::hasTable('food_waste_records')) {
             Schema::create('food_waste_records', function (Blueprint $table) {
                 $table->id();
                 $table->foreignId('vendor_id')->constrained('users')->cascadeOnDelete();
@@ -22,7 +23,7 @@ return new class extends Migration {
             });
         }
 
-        if (!Schema::hasTable('demand_forecasts')) {
+        if (! Schema::hasTable('demand_forecasts')) {
             Schema::create('demand_forecasts', function (Blueprint $table) {
                 $table->id();
                 $table->foreignId('vendor_id')->constrained('users')->cascadeOnDelete();
@@ -36,7 +37,7 @@ return new class extends Migration {
             });
         }
 
-        if (!Schema::hasTable('security_alerts')) {
+        if (! Schema::hasTable('security_alerts')) {
             Schema::create('security_alerts', function (Blueprint $table) {
                 $table->id();
                 $table->foreignId('user_id')->nullable()->constrained('users')->nullOnDelete();
@@ -53,14 +54,19 @@ return new class extends Migration {
 
         if (Schema::hasTable('orders')) {
             $missing = [];
-            foreach (['accepted_at','preparing_at','ready_at','collected_at','queue_position','estimated_wait_minutes'] as $column) {
-                if (!Schema::hasColumn('orders', $column)) $missing[] = $column;
+            foreach (['accepted_at', 'preparing_at', 'ready_at', 'collected_at', 'queue_position', 'estimated_wait_minutes'] as $column) {
+                if (! Schema::hasColumn('orders', $column)) {
+                    $missing[] = $column;
+                }
             }
             if ($missing) {
                 Schema::table('orders', function (Blueprint $table) use ($missing) {
                     foreach ($missing as $column) {
-                        if (in_array($column, ['queue_position','estimated_wait_minutes'], true)) $table->unsignedInteger($column)->nullable();
-                        else $table->timestamp($column)->nullable();
+                        if (in_array($column, ['queue_position', 'estimated_wait_minutes'], true)) {
+                            $table->unsignedInteger($column)->nullable();
+                        } else {
+                            $table->timestamp($column)->nullable();
+                        }
                     }
                 });
             }
@@ -74,8 +80,10 @@ return new class extends Migration {
         Schema::dropIfExists('food_waste_records');
         if (Schema::hasTable('orders')) {
             Schema::table('orders', function (Blueprint $table) {
-                foreach (['accepted_at','preparing_at','ready_at','collected_at','queue_position','estimated_wait_minutes'] as $column) {
-                    if (Schema::hasColumn('orders', $column)) $table->dropColumn($column);
+                foreach (['accepted_at', 'preparing_at', 'ready_at', 'collected_at', 'queue_position', 'estimated_wait_minutes'] as $column) {
+                    if (Schema::hasColumn('orders', $column)) {
+                        $table->dropColumn($column);
+                    }
                 }
             });
         }

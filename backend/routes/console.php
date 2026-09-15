@@ -1,30 +1,35 @@
 <?php
 
-use Illuminate\Foundation\Inspiring;
-use Illuminate\Support\Facades\Artisan;
-use Illuminate\Support\Facades\Schedule;
+use App\Models\Feedback;
 use App\Models\GroupOrder;
 use App\Models\GroupOrderItem;
+use App\Models\Order;
 use App\Models\RequestPerformanceLog;
 use App\Models\SystemLog;
+use App\Models\User;
+use App\Models\VendorPerformanceMetric;
+use Illuminate\Foundation\Inspiring;
+use Illuminate\Support\Facades\Artisan;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Schedule;
 
 Artisan::command('inspire', function () {
     $this->comment(Inspiring::quote());
 })->purpose('Display an inspiring quote');
 
 /**
- * Custom console command to clean up system logs, performance logs, 
+ * Custom console command to clean up system logs, performance logs,
  * and group order sessions older than 30 days.
  */
 Artisan::command('cleanup:database', function () {
     $this->info('Starting production database cleanup of records older than 30 days...');
-    
+
     $cutoffDate = now()->subDays(30);
 
     // 1. Delete associated group order items first to prevent constraint violations, then delete group orders
     $expiredGroupOrdersCount = GroupOrder::where('created_at', '<', $cutoffDate)->count();
-    
+
     if ($expiredGroupOrdersCount > 0) {
         GroupOrderItem::whereIn('group_order_id', function ($query) use ($cutoffDate) {
             $query->select('id')->from('group_orders')->where('created_at', '<', $cutoffDate);
@@ -64,96 +69,100 @@ Schedule::command('database:backup')->daily();
  */
 Artisan::command('database:backup', function () {
     $this->info('Starting database backup process...');
-    
+
     $connection = config('database.default');
     $config = config("database.connections.{$connection}");
-    
+
     $timestamp = now()->format('Y-m-d_H-i-s');
     $backupDir = storage_path('app/backups');
-    
-    if (!file_exists($backupDir)) {
+
+    if (! file_exists($backupDir)) {
         mkdir($backupDir, 0755, true);
     }
-    
+
     $fileName = "backup_{$connection}_{$timestamp}";
-    $filePath = "";
-    
+    $filePath = '';
+
     $this->info("Current active connection: {$connection}");
-    
+
     switch ($connection) {
         case 'sqlite':
             $dbPath = $config['database'];
-            if (!file_exists($dbPath)) {
+            if (! file_exists($dbPath)) {
                 $this->error("SQLite database file not found at: {$dbPath}");
+
                 return 1;
             }
-            $fileName .= ".sqlite";
+            $fileName .= '.sqlite';
             $filePath = "{$backupDir}/{$fileName}";
             copy($dbPath, $filePath);
             $this->info("SQLite database backed up to local path: {$filePath}");
             break;
-            
+
         case 'pgsql':
-            $fileName .= ".sql";
+            $fileName .= '.sql';
             $filePath = "{$backupDir}/{$fileName}";
-            
+
             $host = $config['host'] ?? '127.0.0.1';
             $port = $config['port'] ?? '5432';
             $db = $config['database'] ?? 'laravel';
             $user = $config['username'] ?? 'root';
             $password = $config['password'] ?? '';
-            
+
             // Set PGPASSWORD environment variable for pg_dump to avoid password prompt
             putenv("PGPASSWORD={$password}");
-            $cmd = "pg_dump -h {$host} -p {$port} -U {$user} -F c -b -v -f " . escapeshellarg($filePath) . " " . escapeshellarg($db);
-            
-            $this->info("Running pg_dump command...");
+            $cmd = "pg_dump -h {$host} -p {$port} -U {$user} -F c -b -v -f ".escapeshellarg($filePath).' '.escapeshellarg($db);
+
+            $this->info('Running pg_dump command...');
             exec($cmd, $output, $resultCode);
-            putenv("PGPASSWORD"); // Unset for security
-            
+            putenv('PGPASSWORD'); // Unset for security
+
             if ($resultCode !== 0) {
                 $this->error("pg_dump failed with exit code: {$resultCode}");
                 Log::error("Database backup failed for pgsql. Exit code: {$resultCode}");
+
                 return 1;
             }
             break;
-            
+
         case 'mysql':
-            $fileName .= ".sql";
+            $fileName .= '.sql';
             $filePath = "{$backupDir}/{$fileName}";
-            
+
             $host = $config['host'] ?? '127.0.0.1';
             $port = $config['port'] ?? '3306';
             $db = $config['database'] ?? 'laravel';
             $user = $config['username'] ?? 'root';
             $password = $config['password'] ?? '';
-            
-            $cmd = "mysqldump -h {$host} -P {$port} -u {$user} -p" . escapeshellarg($password) . " " . escapeshellarg($db) . " > " . escapeshellarg($filePath);
-            
-            $this->info("Running mysqldump command...");
+
+            $cmd = "mysqldump -h {$host} -P {$port} -u {$user} -p".escapeshellarg($password).' '.escapeshellarg($db).' > '.escapeshellarg($filePath);
+
+            $this->info('Running mysqldump command...');
             exec($cmd, $output, $resultCode);
-            
+
             if ($resultCode !== 0) {
                 $this->error("mysqldump failed with exit code: {$resultCode}");
                 Log::error("Database backup failed for mysql. Exit code: {$resultCode}");
+
                 return 1;
             }
             break;
-            
+
         default:
             $this->error("Unsupported database driver: {$connection}");
+
             return 1;
     }
-    
+
     // Check if backup file exists and has content
     if (file_exists($filePath) && filesize($filePath) > 0) {
         $fileSizeKb = round(filesize($filePath) / 1024, 2);
         $this->info("Backup file successfully generated: {$fileName} ({$fileSizeKb} KB)");
-        
+
         // Export to External Storage if configured or standard S3 disk
         $disk = env('BACKUP_DISK', 's3');
         $this->info("Checking upload availability to backup disk: {$disk}...");
-        
+
         try {
             if (config("filesystems.disks.{$disk}")) {
                 $fileStream = fopen($filePath, 'r');
@@ -163,25 +172,25 @@ Artisan::command('database:backup', function () {
             } else {
                 // Simulating uploading to external cloud storage bucket (AWS S3)
                 $this->comment("Cloud storage disk '{$disk}' not configured. Simulating secure AWS S3 cloud vault dump...");
-                $this->info("[SIMULATION] Establishing secure TLS 1.3 connection to S3 Bucket: " . env('AWS_BUCKET', 'atu-backups-bucket'));
+                $this->info('[SIMULATION] Establishing secure TLS 1.3 connection to S3 Bucket: '.env('AWS_BUCKET', 'atu-backups-bucket'));
                 $this->info("[SIMULATION] Streaming block payload of size {$fileSizeKb} KB...");
-                $this->info("[SIMULATION] Remote MD5 Verification successful. Backup stored in bucket: s3://" . env('AWS_BUCKET', 'atu-backups-bucket') . "/backups/{$fileName}");
+                $this->info('[SIMULATION] Remote MD5 Verification successful. Backup stored in bucket: s3://'.env('AWS_BUCKET', 'atu-backups-bucket')."/backups/{$fileName}");
             }
-            
+
             Log::info("Database daily backup completed successfully. File: {$fileName}, Size: {$fileSizeKb} KB, Transmitted to Cloud Storage: true");
-        } catch (\Throwable $e) {
-            $this->error("Error transferring to cloud storage: " . $e->getMessage());
-            Log::error("Backup cloud transfer failed: " . $e->getMessage());
+        } catch (Throwable $e) {
+            $this->error('Error transferring to cloud storage: '.$e->getMessage());
+            Log::error('Backup cloud transfer failed: '.$e->getMessage());
         }
-        
+
     } else {
-        $this->error("Backup file was not created or is empty.");
+        $this->error('Backup file was not created or is empty.');
+
         return 1;
     }
-    
+
     return 0;
 })->purpose('Backup active database schema and dump data to local folder and cloud storage');
-
 
 /**
  * Custom console command to calculate weekly vendor performance ratings based on order completion speed and customer feedback.
@@ -190,13 +199,13 @@ Artisan::command('vendor:calculate-weekly-metrics', function () {
     $this->info('Starting weekly vendor performance rating calculation...');
     Log::info('Vendor Weekly Metrics Cron: Started calculations.');
 
-    $vendors = \App\Models\User::where('role', 'VENDOR')->orWhere('role', 'vendor')->get();
+    $vendors = User::where('role', 'VENDOR')->orWhere('role', 'vendor')->get();
     $cutoffDate = now()->subDays(7);
     $processedCount = 0;
 
     foreach ($vendors as $vendor) {
         // 1. Gather Orders in the last 7 days
-        $ordersQuery = \App\Models\Order::where('vendor_id', $vendor->id)
+        $ordersQuery = Order::where('vendor_id', $vendor->id)
             ->where('created_at', '>=', $cutoffDate);
 
         $totalOrders = $ordersQuery->count();
@@ -205,7 +214,7 @@ Artisan::command('vendor:calculate-weekly-metrics', function () {
 
         // Fallback to all-time stats if zero activity in the last 7 days to avoid blank metric fields
         if ($totalOrders === 0) {
-            $ordersQueryAllTime = \App\Models\Order::where('vendor_id', $vendor->id);
+            $ordersQueryAllTime = Order::where('vendor_id', $vendor->id);
             $totalOrders = $ordersQueryAllTime->count();
             $completedOrdersCount = (clone $ordersQueryAllTime)->where('status', 'COMPLETED')->count();
             $totalSales = (clone $ordersQueryAllTime)->where('status', 'COMPLETED')->sum('total_price');
@@ -215,13 +224,13 @@ Artisan::command('vendor:calculate-weekly-metrics', function () {
         $fulfillmentRate = $totalOrders > 0 ? round(($completedOrdersCount / $totalOrders) * 100, 2) : 100.0;
 
         // Calculate average completion time in minutes (updated_at - created_at)
-        $completedOrders = \App\Models\Order::where('vendor_id', $vendor->id)
+        $completedOrders = Order::where('vendor_id', $vendor->id)
             ->where('status', 'COMPLETED')
             ->where('created_at', '>=', $cutoffDate)
             ->get();
 
         if ($completedOrders->isEmpty()) {
-            $completedOrders = \App\Models\Order::where('vendor_id', $vendor->id)
+            $completedOrders = Order::where('vendor_id', $vendor->id)
                 ->where('status', 'COMPLETED')
                 ->get();
         }
@@ -239,11 +248,11 @@ Artisan::command('vendor:calculate-weekly-metrics', function () {
         $avgCompletionTime = $completionCount > 0 ? round($totalMinutes / $completionCount, 2) : 12.5;
 
         // 2. Gather Customer Feedback in the last 7 days (fallback to all time)
-        $feedbackQuery = \App\Models\Feedback::where('vendor_id', $vendor->id)
+        $feedbackQuery = Feedback::where('vendor_id', $vendor->id)
             ->where('created_at', '>=', $cutoffDate);
 
         if ($feedbackQuery->count() === 0) {
-            $feedbackQuery = \App\Models\Feedback::where('vendor_id', $vendor->id);
+            $feedbackQuery = Feedback::where('vendor_id', $vendor->id);
         }
 
         $avgFoodQuality = round($feedbackQuery->avg('rating_food_quality') ?? 4.0, 1);
@@ -255,9 +264,9 @@ Artisan::command('vendor:calculate-weekly-metrics', function () {
         $avgOverall = round(($avgFoodQuality + $avgCleanliness + $avgServiceSpeed + $avgPriceValue) / 4, 1);
 
         // 3. Gather top popular menu items
-        $popularItems = \App\Models\Order::where('vendor_id', $vendor->id)
+        $popularItems = Order::where('vendor_id', $vendor->id)
             ->where('status', 'COMPLETED')
-            ->select('food_name', \Illuminate\Support\Facades\DB::raw('COUNT(*) as order_count'))
+            ->select('food_name', DB::raw('COUNT(*) as order_count'))
             ->groupBy('food_name')
             ->orderBy('order_count', 'desc')
             ->limit(3)
@@ -265,7 +274,7 @@ Artisan::command('vendor:calculate-weekly-metrics', function () {
             ->toArray();
 
         // 4. Save metrics report record
-        \App\Models\VendorPerformanceMetric::create([
+        VendorPerformanceMetric::create([
             'vendor_id' => $vendor->id,
             'total_orders' => $totalOrders,
             'total_completed_orders' => $completedOrdersCount,
@@ -291,5 +300,3 @@ Artisan::command('vendor:calculate-weekly-metrics', function () {
 
 // Schedule the weekly performance rating calculator to run every week
 Schedule::command('vendor:calculate-weekly-metrics')->weekly();
-
-

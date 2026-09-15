@@ -13,5 +13,9 @@
     "**/.gradle/**": true,
     "**/vendor/**": true,
     "**/node_modules/**": true
-  }
+  },
+  "cSpell.words": [
+    "Centralised",
+    "Paystack"
+  ]
 }

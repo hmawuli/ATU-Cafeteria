@@ -2,8 +2,8 @@
 
 namespace App\Http\Requests;
 
-use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Contracts\Validation\Validator;
+use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Http\Exceptions\HttpResponseException;
 
 class UpdateFoodItemRequest extends FormRequest
@@ -14,6 +14,7 @@ class UpdateFoodItemRequest extends FormRequest
     public function authorize(): bool
     {
         $user = $this->user();
+
         return $user && (strtoupper($user->role) === 'VENDOR' || strtoupper($user->role) === 'ADMIN');
     }
 
@@ -43,7 +44,7 @@ class UpdateFoodItemRequest extends FormRequest
             response()->json([
                 'success' => false,
                 'message' => 'Input validations failed.',
-                'errors' => $validator->errors()
+                'errors' => $validator->errors(),
             ], 400)
         );
     }

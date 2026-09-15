@@ -12,11 +12,15 @@ class AuthenticationCodeNotification extends Notification
 
     public function __construct(private readonly string $purpose, private readonly string $code) {}
 
-    public function via(object $notifiable): array { return ['mail']; }
+    public function via(object $notifiable): array
+    {
+        return ['mail'];
+    }
 
     public function toMail(object $notifiable): MailMessage
     {
         $label = $this->purpose === 'ADMIN_2FA' ? 'Admin security verification' : 'Password reset';
+
         return (new MailMessage)
             ->subject("ATU Cafeteria - {$label}")
             ->greeting('ATU Cafeteria Security')

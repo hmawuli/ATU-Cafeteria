@@ -3,12 +3,12 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
-use App\Models\Order;
-use App\Models\DeliveredOrderReview;
 use App\Models\AuditLog;
+use App\Models\DeliveredOrderReview;
+use App\Models\Order;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Validator;
 
 class DeliveredOrderReviewController extends Controller
 {
@@ -29,7 +29,7 @@ class DeliveredOrderReviewController extends Controller
             return response()->json([
                 'success' => false,
                 'message' => 'Review validation failed.',
-                'errors' => $validator->errors()
+                'errors' => $validator->errors(),
             ], 400);
         }
 
@@ -37,10 +37,10 @@ class DeliveredOrderReviewController extends Controller
         $order = Order::find($orderId);
 
         // Check if order exists (already verified by validator, but safe-keeping)
-        if (!$order) {
+        if (! $order) {
             return response()->json([
                 'success' => false,
-                'message' => 'Order not found.'
+                'message' => 'Order not found.',
             ], 404);
         }
 
@@ -51,10 +51,10 @@ class DeliveredOrderReviewController extends Controller
 
         $isEligible = in_array($currentStatus, $allowedStatuses) || in_array($currentOrderStatus, $allowedStatuses);
 
-        if (!$isEligible) {
+        if (! $isEligible) {
             return response()->json([
                 'success' => false,
-                'message' => "Order #{$orderId} cannot be reviewed yet. It must be delivered or completed first. Current status: " . ($order->status ?: 'PENDING')
+                'message' => "Order #{$orderId} cannot be reviewed yet. It must be delivered or completed first. Current status: ".($order->status ?: 'PENDING'),
             ], 400);
         }
 
@@ -63,7 +63,7 @@ class DeliveredOrderReviewController extends Controller
         if ($existingReview) {
             return response()->json([
                 'success' => false,
-                'message' => 'You have already submitted a review for this order.'
+                'message' => 'You have already submitted a review for this order.',
             ], 400);
         }
 
@@ -94,7 +94,7 @@ class DeliveredOrderReviewController extends Controller
         return response()->json([
             'success' => true,
             'message' => 'Your review and rating have been registered successfully.',
-            'review' => $review
+            'review' => $review,
         ], 201);
     }
 
@@ -115,7 +115,7 @@ class DeliveredOrderReviewController extends Controller
             'vendor_id' => (int) $vendorId,
             'average_vendor_rating' => $averageRating,
             'reviews_count' => count($reviews),
-            'reviews' => $reviews
+            'reviews' => $reviews,
         ], 200);
     }
 
@@ -137,7 +137,7 @@ class DeliveredOrderReviewController extends Controller
             'food_item_id' => (int) $foodItemId,
             'average_food_rating' => $averageRating,
             'reviews_count' => count($reviews),
-            'reviews' => $reviews
+            'reviews' => $reviews,
         ], 200);
     }
 
@@ -152,7 +152,7 @@ class DeliveredOrderReviewController extends Controller
 
         return response()->json([
             'success' => true,
-            'reviews' => $reviews
+            'reviews' => $reviews,
         ], 200);
     }
 }

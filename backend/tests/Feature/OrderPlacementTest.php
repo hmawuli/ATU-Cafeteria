@@ -3,20 +3,20 @@
 namespace Tests\Feature;
 
 use App\Models\MenuItem;
-use App\Models\User;
 use App\Models\Order;
-use App\Models\AuditLog;
-use App\Models\WalletTransaction;
+use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
-use Tests\TestCase;
 use Laravel\Sanctum\Sanctum;
+use Tests\TestCase;
 
 class OrderPlacementTest extends TestCase
 {
     use RefreshDatabase;
 
     protected $student;
+
     protected $vendor;
+
     protected $menuItem;
 
     protected function setUp(): void
@@ -92,7 +92,7 @@ class OrderPlacementTest extends TestCase
                 'total_price',
                 'status',
                 'pickup_pin',
-            ]
+            ],
         ]);
 
         // Verify balance was deducted
@@ -144,7 +144,7 @@ class OrderPlacementTest extends TestCase
             'food_name',
             'quantity',
             'unit_price',
-            'total_price'
+            'total_price',
         ]);
     }
 
@@ -168,7 +168,7 @@ class OrderPlacementTest extends TestCase
         $response->assertStatus(400);
         $response->assertJsonPath('success', false);
         $response->assertJsonFragment([
-            'message' => 'Validation error: unit_price does not match the actual menu item price.'
+            'message' => 'Validation error: unit_price does not match the actual menu item price.',
         ]);
 
         // Wrong total price
@@ -184,7 +184,7 @@ class OrderPlacementTest extends TestCase
         $response2->assertStatus(400);
         $response2->assertJsonPath('success', false);
         $response2->assertJsonFragment([
-            'message' => 'Validation error: total_price is incorrect based on menu item price and quantity.'
+            'message' => 'Validation error: total_price is incorrect based on menu item price and quantity.',
         ]);
     }
 
@@ -210,7 +210,7 @@ class OrderPlacementTest extends TestCase
         $response->assertStatus(500); // Because Db transaction throws exception and it triggers 500
         $response->assertJsonPath('success', false);
         $response->assertJsonFragment([
-            'message' => 'Failed to place order securely on server.'
+            'message' => 'Failed to place order securely on server.',
         ]);
     }
 
@@ -236,7 +236,7 @@ class OrderPlacementTest extends TestCase
         $response->assertStatus(400);
         $response->assertJsonPath('success', false);
         $response->assertJsonFragment([
-            'message' => 'Insufficient wallet balance. Please top up your wallet first.'
+            'message' => 'Insufficient wallet balance. Please top up your wallet first.',
         ]);
     }
 
@@ -261,7 +261,7 @@ class OrderPlacementTest extends TestCase
         $response->assertStatus(400);
         $response->assertJsonPath('success', false);
         $response->assertJsonFragment([
-            'message' => 'The selected menu item is currently unavailable.'
+            'message' => 'The selected menu item is currently unavailable.',
         ]);
     }
 }

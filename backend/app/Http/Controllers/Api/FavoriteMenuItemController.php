@@ -3,9 +3,9 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
-use Illuminate\Http\Request;
 use App\Models\FavoriteMenuItem;
 use App\Models\MenuItem;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Validator;
 
 class FavoriteMenuItemController extends Controller
@@ -16,10 +16,10 @@ class FavoriteMenuItemController extends Controller
     public function index(Request $request)
     {
         $user = $request->user();
-        if (!$user) {
+        if (! $user) {
             return response()->json([
                 'success' => false,
-                'message' => 'Unauthenticated.'
+                'message' => 'Unauthenticated.',
             ], 401);
         }
 
@@ -29,9 +29,10 @@ class FavoriteMenuItemController extends Controller
 
         // Map and extract menu items with safety checks for deleted items
         $items = $favorites->map(function ($fav) {
-            if (!$fav->menuItem) {
+            if (! $fav->menuItem) {
                 return null;
             }
+
             return [
                 'favorite_id' => $fav->id,
                 'menu_item_id' => $fav->menu_item_id,
@@ -50,7 +51,7 @@ class FavoriteMenuItemController extends Controller
         return response()->json([
             'success' => true,
             'favorites' => $items,
-            'count' => count($items)
+            'count' => count($items),
         ], 200);
     }
 
@@ -60,22 +61,22 @@ class FavoriteMenuItemController extends Controller
     public function store(Request $request)
     {
         $user = $request->user();
-        if (!$user) {
+        if (! $user) {
             return response()->json([
                 'success' => false,
-                'message' => 'Unauthenticated.'
+                'message' => 'Unauthenticated.',
             ], 401);
         }
 
         $validator = Validator::make($request->all(), [
-            'menu_item_id' => 'required|integer'
+            'menu_item_id' => 'required|integer',
         ]);
 
         if ($validator->fails()) {
             return response()->json([
                 'success' => false,
                 'message' => 'Validation error.',
-                'errors' => $validator->errors()
+                'errors' => $validator->errors(),
             ], 422);
         }
 
@@ -83,10 +84,10 @@ class FavoriteMenuItemController extends Controller
 
         // Verify MenuItem exists
         $menuItem = MenuItem::find($menuItemId);
-        if (!$menuItem) {
+        if (! $menuItem) {
             return response()->json([
                 'success' => false,
-                'message' => 'Menu item not found.'
+                'message' => 'Menu item not found.',
             ], 444); // Consistent with 404 but using standard error message
         }
 
@@ -99,13 +100,13 @@ class FavoriteMenuItemController extends Controller
             return response()->json([
                 'success' => true,
                 'message' => 'Menu item is already in favorites.',
-                'favorite_id' => $existing->id
+                'favorite_id' => $existing->id,
             ], 200);
         }
 
         $fav = FavoriteMenuItem::create([
             'user_id' => $user->id,
-            'menu_item_id' => $menuItemId
+            'menu_item_id' => $menuItemId,
         ]);
 
         return response()->json([
@@ -116,7 +117,7 @@ class FavoriteMenuItemController extends Controller
                 'id' => $menuItem->id,
                 'name' => $menuItem->name ?: $menuItem->food_name,
                 'price' => $menuItem->price,
-            ]
+            ],
         ], 201);
     }
 
@@ -126,10 +127,10 @@ class FavoriteMenuItemController extends Controller
     public function destroy(Request $request, $id)
     {
         $user = $request->user();
-        if (!$user) {
+        if (! $user) {
             return response()->json([
                 'success' => false,
-                'message' => 'Unauthenticated.'
+                'message' => 'Unauthenticated.',
             ], 401);
         }
 
@@ -137,14 +138,14 @@ class FavoriteMenuItemController extends Controller
         $favorite = FavoriteMenuItem::where('user_id', $user->id)
             ->where(function ($query) use ($id) {
                 $query->where('id', $id)
-                      ->orWhere('menu_item_id', $id);
+                    ->orWhere('menu_item_id', $id);
             })
             ->first();
 
-        if (!$favorite) {
+        if (! $favorite) {
             return response()->json([
                 'success' => false,
-                'message' => 'Favorite record not found.'
+                'message' => 'Favorite record not found.',
             ], 404);
         }
 
@@ -152,7 +153,7 @@ class FavoriteMenuItemController extends Controller
 
         return response()->json([
             'success' => true,
-            'message' => 'Menu item removed from favorites successfully.'
+            'message' => 'Menu item removed from favorites successfully.',
         ], 200);
     }
 }

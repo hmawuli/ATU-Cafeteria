@@ -13,15 +13,16 @@ class OrderStatusUpdatedBroadcast implements ShouldBroadcastNow
     use Dispatchable, SerializesModels;
 
     public $order;
+
     public $oldStatus;
+
     public $newStatus;
 
     /**
      * Create a new event instance.
      *
-     * @param Order $order
-     * @param string $oldStatus
-     * @param string $newStatus
+     * @param  string  $oldStatus
+     * @param  string  $newStatus
      */
     public function __construct(Order $order, $oldStatus, $newStatus)
     {
@@ -33,12 +34,13 @@ class OrderStatusUpdatedBroadcast implements ShouldBroadcastNow
     /**
      * Get the channels the event should broadcast on.
      *
-     * @return \Illuminate\Broadcasting\Channel|array
+     * @return Channel|array
      */
     public function broadcastOn()
     {
         $studentId = $this->order->customer_id ?? $this->order->student_id;
-        return new Channel('orders-student-' . $studentId);
+
+        return new Channel('orders-student-'.$studentId);
     }
 
     /**
@@ -59,7 +61,7 @@ class OrderStatusUpdatedBroadcast implements ShouldBroadcastNow
     public function broadcastWith()
     {
         $statusMessage = "Your order #{$this->order->id} for '{$this->order->food_name}' has been updated to {$this->newStatus}.";
-        
+
         switch (strtoupper($this->newStatus)) {
             case 'PREPARING':
                 $statusMessage = "Chef is preparing your order #{$this->order->id} ('{$this->order->food_name}')! It will be ready soon.";
@@ -93,7 +95,7 @@ class OrderStatusUpdatedBroadcast implements ShouldBroadcastNow
             'message' => $statusMessage,
             'pickup_pin' => $this->order->pickup_pin,
             'estimated_pickup_time' => $this->order->estimated_pickup_time,
-            'timestamp' => time() * 1000
+            'timestamp' => time() * 1000,
         ];
     }
 }

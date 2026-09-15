@@ -3,23 +3,21 @@
 namespace App\Notifications;
 
 use Illuminate\Bus\Queueable;
-use Illuminate\Notifications\Notification;
 use Illuminate\Notifications\Messages\MailMessage;
+use Illuminate\Notifications\Notification;
 
 class WeeklyPerformanceReportNotification extends Notification
 {
     use Queueable;
 
     protected array $reportData;
+
     protected string $vendorName;
+
     protected ?string $pdfPath;
 
     /**
      * Create a new notification instance.
-     *
-     * @param string $vendorName
-     * @param array $reportData
-     * @param string|null $pdfPath
      */
     public function __construct(string $vendorName, array $reportData, ?string $pdfPath = null)
     {
@@ -48,20 +46,20 @@ class WeeklyPerformanceReportNotification extends Notification
         $totalCompleted = $metrics['order_metrics']['completed_orders_all_time'] ?? $metrics['completed_orders'] ?? 0;
         $totalRevenue = $metrics['order_metrics']['total_completed_revenue'] ?? $metrics['total_revenue'] ?? 0.00;
         $completionRate = $metrics['order_metrics']['completion_rate'] ?? 100.0;
-        
+
         $mail = (new MailMessage)
             ->subject("Weekly Performance Summary Report - {$this->vendorName}")
             ->greeting("Hello {$this->vendorName},")
-            ->line("Here is your consolidated Weekly Performance Summary Report for ATU Cafeteria Hub.")
-            ->line("Your food booth performance was evaluated across key operations, customer ratings, and logistics metrics:")
+            ->line('Here is your consolidated Weekly Performance Summary Report for ATU Cafeteria Hub.')
+            ->line('Your food booth performance was evaluated across key operations, customer ratings, and logistics metrics:')
             ->line("• Total Completed Orders: {$totalCompleted}")
-            ->line("• Weekly Sales Revenue: GH₵ " . number_format($totalRevenue, 2))
+            ->line('• Weekly Sales Revenue: GH₵ '.number_format($totalRevenue, 2))
             ->line("• Order Completion Success Rate: {$completionRate}%");
 
         // Top dishes
         $topDishes = $metrics['order_metrics']['top_dishes'] ?? [];
-        if (!empty($topDishes)) {
-            $mail->line("Top Performing Dishes/Meals this week:");
+        if (! empty($topDishes)) {
+            $mail->line('Top Performing Dishes/Meals this week:');
             foreach (array_slice($topDishes, 0, 3) as $dish) {
                 $name = $dish['food_name'] ?? 'Dish';
                 $cnt = $dish['order_count'] ?? $dish['total_qty'] ?? 0;
@@ -69,9 +67,9 @@ class WeeklyPerformanceReportNotification extends Notification
             }
         }
 
-        $mail->line("Performance Summary & Recommendations:")
-             ->line($this->reportData['report_content'] ?? 'Review weekly sales, order completion and customer feedback metrics.')
-              ->line('Keep up the great work in serving the Accra Technical University community! For support or inventory requests, please coordinate with cafeteria administrators.');
+        $mail->line('Performance Summary & Recommendations:')
+            ->line($this->reportData['report_content'] ?? 'Review weekly sales, order completion and customer feedback metrics.')
+            ->line('Keep up the great work in serving the Accra Technical University community! For support or inventory requests, please coordinate with cafeteria administrators.');
 
         if ($this->pdfPath && file_exists($this->pdfPath)) {
             $mail->attach($this->pdfPath, [
@@ -100,7 +98,7 @@ class WeeklyPerformanceReportNotification extends Notification
             'total_completed_orders' => $totalCompleted,
             'weekly_revenue' => $totalRevenue,
             'generated_at' => date('Y-m-d H:i:s'),
-            'message' => "Your weekly performance summary is ready! Total Revenue: GH₵ " . number_format($totalRevenue, 2) . " with {$totalCompleted} completed orders."
+            'message' => 'Your weekly performance summary is ready! Total Revenue: GH₵ '.number_format($totalRevenue, 2)." with {$totalCompleted} completed orders.",
         ];
     }
 }

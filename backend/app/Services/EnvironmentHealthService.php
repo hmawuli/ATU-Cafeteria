@@ -4,7 +4,6 @@ namespace App\Services;
 
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\File;
-use Illuminate\Support\Facades\Log;
 
 class EnvironmentHealthService
 {
@@ -35,7 +34,6 @@ class EnvironmentHealthService
                 $recommendations[] = 'Run chmod -R 775 storage bootstrap/cache.';
             }
 
-
         }
 
         // Test Database connection dynamically
@@ -48,7 +46,7 @@ class EnvironmentHealthService
         } catch (\Exception $e) {
             $dbStatus = 'ERROR';
             $dbDetails = $e->getMessage();
-            $foundErrors[] = 'Live DB Connection Error: ' . $e->getMessage();
+            $foundErrors[] = 'Live DB Connection Error: '.$e->getMessage();
             $recommendations[] = 'Check DB_CONNECTION configuration in .env and verify database file or host availability.';
         }
 
@@ -60,7 +58,7 @@ class EnvironmentHealthService
             'recommended_resolutions' => array_unique($recommendations),
             'log_file_present' => File::exists($logPath),
             'environment' => config('app.env'),
-            'app_key_set' => !empty(config('app.key')),
+            'app_key_set' => ! empty(config('app.key')),
             'timestamp' => date('Y-m-d H:i:s'),
         ];
     }

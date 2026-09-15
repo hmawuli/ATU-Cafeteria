@@ -2,11 +2,11 @@
 
 namespace App\Http\Middleware;
 
+use App\Models\RequestPerformanceLog;
 use Closure;
 use Illuminate\Http\Request;
-use Symfony\Component\HttpFoundation\Response;
-use App\Models\RequestPerformanceLog;
 use Illuminate\Support\Facades\Log;
+use Symfony\Component\HttpFoundation\Response;
 
 class RequestPerformanceLogMiddleware
 {
@@ -20,9 +20,7 @@ class RequestPerformanceLogMiddleware
     /**
      * Handle an incoming request.
      *
-     * @param  \Illuminate\Http\Request  $request
-     * @param  \Closure(\Illuminate\Http\Request): (\Symfony\Component\HttpFoundation\Response)  $next
-     * @return \Symfony\Component\HttpFoundation\Response
+     * @param  Closure(Request): (Response)  $next
      */
     public function handle(Request $request, Closure $next): Response
     {
@@ -34,10 +32,6 @@ class RequestPerformanceLogMiddleware
 
     /**
      * Handle tasks after the response has been sent to the browser.
-     *
-     * @param  \Illuminate\Http\Request  $request
-     * @param  \Symfony\Component\HttpFoundation\Response  $response
-     * @return void
      */
     public function terminate(Request $request, Response $response): void
     {
@@ -51,7 +45,7 @@ class RequestPerformanceLogMiddleware
 
             // Filter out sensitive data from request payload for security
             $payload = $request->except(['password', 'password_confirmation', 'token']);
-            $payloadJson = !empty($payload) ? json_encode($payload, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE) : null;
+            $payloadJson = ! empty($payload) ? json_encode($payload, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE) : null;
 
             // Log performance metrics to the database table
             RequestPerformanceLog::create([
@@ -76,7 +70,7 @@ class RequestPerformanceLogMiddleware
             }
         } catch (\Throwable $e) {
             // Safe fallback logging to file if database insertion fails
-            Log::error('Performance logging failed: ' . $e->getMessage());
+            Log::error('Performance logging failed: '.$e->getMessage());
         }
     }
 }

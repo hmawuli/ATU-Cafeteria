@@ -2,10 +2,10 @@
 
 namespace App\Models;
 
-use Laravel\Sanctum\HasApiTokens;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
+use Laravel\Sanctum\HasApiTokens;
 
 class User extends Authenticatable
 {
@@ -64,10 +64,10 @@ class User extends Authenticatable
 
     protected $appends = ['email'];
 
-
     public function getEmailAttribute($value): ?string
     {
         $profile = is_array($this->profile_info) ? $this->profile_info : [];
+
         return filter_var($profile['email'] ?? $value, FILTER_VALIDATE_EMAIL) ? ($profile['email'] ?? $value) : null;
     }
 
@@ -75,6 +75,7 @@ class User extends Authenticatable
     {
         $profile = is_array($this->profile_info) ? $this->profile_info : [];
         $email = $profile['email'] ?? null;
+
         return filter_var($email, FILTER_VALIDATE_EMAIL) ? $email : null;
     }
 
@@ -89,10 +90,12 @@ class User extends Authenticatable
         if ($role === 'ADMIN') {
             $level = strtoupper((string) ($this->admin_level ?? 'CAFETERIA_ADMIN'));
             $permissions = config("permissions.roles.$level", []);
+
             return $permissions === '*' || in_array($permission, $permissions, true);
         }
 
         $permissions = config('permissions.'.strtolower($role), []);
+
         return in_array($permission, $permissions, true);
     }
 
@@ -145,10 +148,10 @@ class User extends Authenticatable
     /**
      * Feedback received by this vendor user
      */
-     public function receivedFeedback()
-     {
-         return $this->hasMany(Feedback::class, 'vendor_id');
-     }
+    public function receivedFeedback()
+    {
+        return $this->hasMany(Feedback::class, 'vendor_id');
+    }
 
     /**
      * Wallet transactions registered under this user account
@@ -166,6 +169,7 @@ class User extends Authenticatable
         if (filter_var($this->username, FILTER_VALIDATE_EMAIL)) {
             return $this->username;
         }
-        return $this->username . '@atu.edu.gh';
+
+        return $this->username.'@atu.edu.gh';
     }
 }

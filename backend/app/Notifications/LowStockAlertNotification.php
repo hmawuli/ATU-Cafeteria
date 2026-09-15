@@ -10,19 +10,23 @@ class LowStockAlertNotification extends Notification
     use Queueable;
 
     protected $itemName;
+
     protected $itemId;
+
     protected $remainingStock;
+
     protected $orderFrequency24h;
+
     protected $sourceTable;
 
     /**
      * Create a new notification instance.
      *
-     * @param string $itemName
-     * @param int $itemId
-     * @param int $remainingStock
-     * @param int $orderFrequency24h
-     * @param string $sourceTable
+     * @param  string  $itemName
+     * @param  int  $itemId
+     * @param  int  $remainingStock
+     * @param  int  $orderFrequency24h
+     * @param  string  $sourceTable
      */
     public function __construct($itemName, $itemId, $remainingStock, $orderFrequency24h, $sourceTable = 'food_items')
     {
@@ -44,6 +48,7 @@ class LowStockAlertNotification extends Notification
         if (isset($notifiable->role) && strtoupper($notifiable->role) === 'ADMIN') {
             return ['mail', 'database', 'broadcast'];
         }
+
         return ['database', 'broadcast'];
     }
 
@@ -52,16 +57,17 @@ class LowStockAlertNotification extends Notification
      */
     public function toMail($notifiable)
     {
-        $statusStr = $this->remainingStock <= 0 ? "OUT OF STOCK" : "CRITICALLY LOW ({$this->remainingStock} left)";
+        $statusStr = $this->remainingStock <= 0 ? 'OUT OF STOCK' : "CRITICALLY LOW ({$this->remainingStock} left)";
+
         return (new MailMessage)
-                    ->subject("INVENTORY ALERT: {$this->itemName} is {$statusStr}")
-                    ->greeting("Hello " . ($notifiable->fullName ?: 'Administrator') . ",")
-                    ->line("Automated inventory monitoring has detected critical ingredient levels in the cafeteria.")
-                    ->line("Item: {$this->itemName}")
-                    ->line("Remaining Stock: {$this->remainingStock}")
-                    ->line("24h Order Velocity: {$this->orderFrequency24h} orders")
-                    ->action('View Admin Dashboard', url('/admin/dashboard'))
-                    ->line('Please coordinate immediate replenishment with cafeteria vendors.');
+            ->subject("INVENTORY ALERT: {$this->itemName} is {$statusStr}")
+            ->greeting('Hello '.($notifiable->fullName ?: 'Administrator').',')
+            ->line('Automated inventory monitoring has detected critical ingredient levels in the cafeteria.')
+            ->line("Item: {$this->itemName}")
+            ->line("Remaining Stock: {$this->remainingStock}")
+            ->line("24h Order Velocity: {$this->orderFrequency24h} orders")
+            ->action('View Admin Dashboard', url('/admin/dashboard'))
+            ->line('Please coordinate immediate replenishment with cafeteria vendors.');
     }
 
     /**
@@ -88,9 +94,9 @@ class LowStockAlertNotification extends Notification
     public function broadcastOn()
     {
         return [
-            'orders-vendor-' . $this->itemId,
+            'orders-vendor-'.$this->itemId,
             'orders-admin-1',
-            'orders-admin'
+            'orders-admin',
         ];
     }
 

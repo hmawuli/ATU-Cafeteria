@@ -30,9 +30,9 @@ class MenuItem extends Model
         parent::boot();
 
         static::saving(function ($model) {
-            if (empty($model->name) && !empty($model->food_name)) {
+            if (empty($model->name) && ! empty($model->food_name)) {
                 $model->name = $model->food_name;
-            } elseif (empty($model->food_name) && !empty($model->name)) {
+            } elseif (empty($model->food_name) && ! empty($model->name)) {
                 $model->food_name = $model->name;
             }
         });

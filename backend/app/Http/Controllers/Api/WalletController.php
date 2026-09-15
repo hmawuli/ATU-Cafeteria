@@ -3,9 +3,9 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Models\AuditLog;
 use App\Models\User;
 use App\Models\WalletTransaction;
-use App\Models\AuditLog;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Validator;
@@ -19,18 +19,18 @@ class WalletController extends Controller
     public function getBalance(Request $request)
     {
         $user = $request->user();
-        if (!$user) {
+        if (! $user) {
             return response()->json([
                 'success' => false,
-                'message' => 'Unauthorized access.'
+                'message' => 'Unauthorized access.',
             ], 401);
         }
 
         return response()->json([
             'success' => true,
-            'balance' => (double)$user->balance,
+            'balance' => (float) $user->balance,
             'username' => $user->username,
-            'fullName' => $user->fullName
+            'fullName' => $user->fullName,
         ]);
     }
 
@@ -40,10 +40,10 @@ class WalletController extends Controller
     public function getTransactions(Request $request)
     {
         $user = $request->user();
-        if (!$user) {
+        if (! $user) {
             return response()->json([
                 'success' => false,
-                'message' => 'Unauthorized.'
+                'message' => 'Unauthorized.',
             ], 401);
         }
 
@@ -53,7 +53,7 @@ class WalletController extends Controller
 
         return response()->json([
             'success' => true,
-            'transactions' => $transactions
+            'transactions' => $transactions,
         ]);
     }
 
@@ -63,24 +63,24 @@ class WalletController extends Controller
     public function deposit(Request $request)
     {
         $user = $request->user();
-        if (!$user) {
+        if (! $user) {
             return response()->json(['success' => false, 'message' => 'Unauthorized.'], 401);
         }
 
         $validator = Validator::make($request->all(), [
             'amount' => 'required|numeric|min:1',
-            'details' => 'nullable|string'
+            'details' => 'nullable|string',
         ]);
 
         if ($validator->fails()) {
             return response()->json([
                 'success' => false,
                 'message' => 'Validation error.',
-                'errors' => $validator->errors()
+                'errors' => $validator->errors(),
             ], 422);
         }
 
-        $amount = (double) $request->input('amount');
+        $amount = (float) $request->input('amount');
         $details = $request->input('details', 'Loaded via Mobile Money Gateway');
 
         try {
@@ -92,14 +92,14 @@ class WalletController extends Controller
             $dbUser->save();
 
             // Create Transaction record
-            $ref = 'TXN-' . strtoupper(Str::random(10));
+            $ref = 'TXN-'.strtoupper(Str::random(10));
             $transaction = WalletTransaction::create([
                 'user_id' => $dbUser->id,
                 'type' => 'DEPOSIT',
                 'amount' => $amount,
                 'status' => 'SUCCESS',
                 'reference' => $ref,
-                'details' => $details
+                'details' => $details,
             ]);
 
             // Add to system Audit Logs
@@ -107,22 +107,23 @@ class WalletController extends Controller
                 'user_id' => $dbUser->id,
                 'timestamp' => time() * 1000,
                 'action' => 'WALLET_DEPOSIT',
-                'details' => "Securely deposited GH₵ " . number_format($amount, 2) . " via MoMo. Ref: $ref."
+                'details' => 'Securely deposited GH₵ '.number_format($amount, 2)." via MoMo. Ref: $ref.",
             ]);
 
             DB::commit();
 
             return response()->json([
                 'success' => true,
-                'message' => 'GH₵ ' . number_format($amount, 2) . ' loaded successfully!',
-                'balance' => (double)$dbUser->balance,
-                'transaction' => $transaction
+                'message' => 'GH₵ '.number_format($amount, 2).' loaded successfully!',
+                'balance' => (float) $dbUser->balance,
+                'transaction' => $transaction,
             ]);
         } catch (\Exception $e) {
             DB::rollBack();
+
             return response()->json([
                 'success' => false,
-                'message' => 'Transaction failure: ' . $e->getMessage()
+                'message' => 'Transaction failure: '.$e->getMessage(),
             ], 500);
         }
     }
@@ -133,28 +134,28 @@ class WalletController extends Controller
     public function transfer(Request $request)
     {
         $sender = $request->user();
-        if (!$sender) {
+        if (! $sender) {
             return response()->json(['success' => false, 'message' => 'Unauthorized.'], 401);
         }
 
         $validator = Validator::make($request->all(), [
             'receiver_username' => 'required|string|exists:users,username',
-            'amount' => 'required|numeric|min:0.5'
+            'amount' => 'required|numeric|min:0.5',
         ]);
 
         if ($validator->fails()) {
             return response()->json([
                 'success' => false,
                 'message' => 'Invalid transaction parameters.',
-                'errors' => $validator->errors()
+                'errors' => $validator->errors(),
             ], 422);
         }
 
-        $amount = (double) $request->input('amount');
+        $amount = (float) $request->input('amount');
         if ($sender->balance < $amount) {
             return response()->json([
                 'success' => false,
-                'message' => 'Insufficient wallet balance.'
+                'message' => 'Insufficient wallet balance.',
             ], 400);
         }
 
@@ -167,6 +168,7 @@ class WalletController extends Controller
             $dbSender = User::lockForUpdate()->find($sender->id);
             if ($dbSender->balance < $amount) {
                 DB::rollBack();
+
                 return response()->json(['success' => false, 'message' => 'Insufficient wallet balance'], 400);
             }
 
@@ -174,6 +176,7 @@ class WalletController extends Controller
 
             if ($dbSender->id === $dbReceiver->id) {
                 DB::rollBack();
+
                 return response()->json(['success' => false, 'message' => 'Cannot transfer money to yourself.'], 400);
             }
 
@@ -185,14 +188,14 @@ class WalletController extends Controller
             $dbReceiver->save();
 
             // Create Transaction Log for Sender
-            $refText = 'TXF-' . strtoupper(Str::random(10));
+            $refText = 'TXF-'.strtoupper(Str::random(10));
             WalletTransaction::create([
                 'user_id' => $dbSender->id,
                 'type' => 'PAYMENT',
                 'amount' => -$amount,
                 'status' => 'SUCCESS',
-                'reference' => $refText . 'S',
-                'details' => "Transfer to {$dbReceiver->fullName} (@{$dbReceiver->username})"
+                'reference' => $refText.'S',
+                'details' => "Transfer to {$dbReceiver->fullName} (@{$dbReceiver->username})",
             ]);
 
             // Create Transaction Log for Receiver
@@ -201,8 +204,8 @@ class WalletController extends Controller
                 'type' => 'REFUND',
                 'amount' => $amount,
                 'status' => 'SUCCESS',
-                'reference' => $refText . 'R',
-                'details' => "Received from {$dbSender->fullName} (@{$dbSender->username})"
+                'reference' => $refText.'R',
+                'details' => "Received from {$dbSender->fullName} (@{$dbSender->username})",
             ]);
 
             // Add Audit Logs for tracking
@@ -210,7 +213,7 @@ class WalletController extends Controller
                 'user_id' => $dbSender->id,
                 'timestamp' => time() * 1000,
                 'action' => 'WALLET_TRANSFER',
-                'details' => "Sent GH₵ " . number_format($amount, 2) . " to @{$dbReceiver->username}."
+                'details' => 'Sent GH₵ '.number_format($amount, 2)." to @{$dbReceiver->username}.",
             ]);
 
             DB::commit();
@@ -218,13 +221,14 @@ class WalletController extends Controller
             return response()->json([
                 'success' => true,
                 'message' => 'Transfer completed successfully!',
-                'balance' => (double)$dbSender->balance
+                'balance' => (float) $dbSender->balance,
             ]);
         } catch (\Exception $e) {
             DB::rollBack();
+
             return response()->json([
                 'success' => false,
-                'message' => 'Transfer error: ' . $e->getMessage()
+                'message' => 'Transfer error: '.$e->getMessage(),
             ], 500);
         }
     }
@@ -235,31 +239,31 @@ class WalletController extends Controller
     public function requestPayout(Request $request)
     {
         $vendor = $request->user();
-        if (!$vendor || $vendor->role !== 'VENDOR') {
+        if (! $vendor || $vendor->role !== 'VENDOR') {
             return response()->json([
                 'success' => false,
-                'message' => 'Unauthorized or user is not a verified vendor.'
+                'message' => 'Unauthorized or user is not a verified vendor.',
             ], 403);
         }
 
         $validator = Validator::make($request->all(), [
             'amount' => 'required|numeric|min:5',
-            'details' => 'required|string'
+            'details' => 'required|string',
         ]);
 
         if ($validator->fails()) {
             return response()->json([
                 'success' => false,
                 'message' => 'Invalid payout amount or channel.',
-                'errors' => $validator->errors()
+                'errors' => $validator->errors(),
             ], 422);
         }
 
-        $amount = (double) $request->input('amount');
+        $amount = (float) $request->input('amount');
         if ($vendor->balance < $amount) {
             return response()->json([
                 'success' => false,
-                'message' => 'Insufficient earnings balance for payout.'
+                'message' => 'Insufficient earnings balance for payout.',
             ], 400);
         }
 
@@ -269,27 +273,28 @@ class WalletController extends Controller
             $dbVendor = User::lockForUpdate()->find($vendor->id);
             if ($dbVendor->balance < $amount) {
                 DB::rollBack();
+
                 return response()->json(['success' => false, 'message' => 'Insufficient earnings balance.'], 400);
             }
 
             $dbVendor->balance -= $amount;
             $dbVendor->save();
 
-            $ref = 'PAY-' . strtoupper(Str::random(10));
+            $ref = 'PAY-'.strtoupper(Str::random(10));
             $transaction = WalletTransaction::create([
                 'user_id' => $dbVendor->id,
                 'type' => 'PAYOUT',
                 'amount' => -$amount,
                 'status' => 'SUCCESS',
                 'reference' => $ref,
-                'details' => 'Payout requested to: ' . $request->input('details')
+                'details' => 'Payout requested to: '.$request->input('details'),
             ]);
 
             AuditLog::create([
                 'user_id' => $dbVendor->id,
                 'timestamp' => time() * 1000,
                 'action' => 'VENDOR_PAYOUT',
-                'details' => "Requested settlement of GH₵ " . number_format($amount, 2) . " to mobile money account."
+                'details' => 'Requested settlement of GH₵ '.number_format($amount, 2).' to mobile money account.',
             ]);
 
             DB::commit();
@@ -297,14 +302,15 @@ class WalletController extends Controller
             return response()->json([
                 'success' => true,
                 'message' => 'Payout processed successfully!',
-                'balance' => (double)$dbVendor->balance,
-                'transaction' => $transaction
+                'balance' => (float) $dbVendor->balance,
+                'transaction' => $transaction,
             ]);
         } catch (\Exception $e) {
             DB::rollBack();
+
             return response()->json([
                 'success' => false,
-                'message' => 'Payout settlement error: ' . $e->getMessage()
+                'message' => 'Payout settlement error: '.$e->getMessage(),
             ], 500);
         }
     }

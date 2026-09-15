@@ -2,13 +2,14 @@
 
 namespace Database\Seeders;
 
-use App\Models\User;
-use App\Models\FoodItem;
-use App\Models\Order;
-use App\Models\Feedback;
 use App\Models\AuditLog;
-use App\Models\Vendor;
+use App\Models\Feedback;
+use App\Models\FoodItem;
+use App\Models\MenuItem;
+use App\Models\Order;
 use App\Models\OrderItem;
+use App\Models\User;
+use App\Models\Vendor;
 use App\Models\WalletTransaction;
 use Illuminate\Database\Seeder;
 
@@ -39,7 +40,7 @@ class DatabaseSeeder extends Seeder
                 'program' => 'BTech Software Engineering',
                 'level' => '300',
                 'telephone' => '+233 50 123 4567',
-                'email' => 'daniel.mensah@atu.edu.gh'
+                'email' => 'daniel.mensah@atu.edu.gh',
             ],
             'info' => 'ATU-2024-D45',
             'balance' => 250.00,
@@ -59,7 +60,7 @@ class DatabaseSeeder extends Seeder
                 'program' => 'BTech Statistics',
                 'level' => '200',
                 'telephone' => '+233 24 987 6543',
-                'email' => 'abena.osei@atu.edu.gh'
+                'email' => 'abena.osei@atu.edu.gh',
             ],
             'info' => 'ATU-2025-S12',
             'balance' => 180.00,
@@ -78,7 +79,7 @@ class DatabaseSeeder extends Seeder
                 'outlet_name' => 'Auntie Mary Special',
                 'location' => 'Block C Cafeteria Booth 1',
                 'telephone' => '+233 27 111 2222',
-                'primary_category' => 'Rice & Local Dishes'
+                'primary_category' => 'Rice & Local Dishes',
             ],
             'info' => 'Auntie Mary Special',
             'balance' => 45.00,
@@ -96,7 +97,7 @@ class DatabaseSeeder extends Seeder
                 'outlet_name' => 'ATU Local Hub',
                 'location' => 'Main Dining Annex A Booth 3',
                 'telephone' => '+233 26 333 4444',
-                'primary_category' => 'Traditional Dishes'
+                'primary_category' => 'Traditional Dishes',
             ],
             'info' => 'ATU Local Hub',
             'balance' => 65.00,
@@ -114,7 +115,7 @@ class DatabaseSeeder extends Seeder
                 'outlet_name' => 'ATU Snack Corner',
                 'location' => 'Science Block Lobby Kiosk',
                 'telephone' => '+233 20 555 6666',
-                'primary_category' => 'Pastries & Drinks'
+                'primary_category' => 'Pastries & Drinks',
             ],
             'info' => 'ATU Snack Corner',
             'balance' => 0.00,
@@ -130,7 +131,7 @@ class DatabaseSeeder extends Seeder
             'operational_status' => 'active',
             'store_name' => $v1->profile_info['outlet_name'],
             'location_within_campus' => $v1->profile_info['location'],
-            'contact_email' => $v1->username . '@atu.edu.gh',
+            'contact_email' => $v1->username.'@atu.edu.gh',
             'operational_hours' => '07:30 AM - 06:30 PM',
         ]);
 
@@ -142,7 +143,7 @@ class DatabaseSeeder extends Seeder
             'operational_status' => 'active',
             'store_name' => $v2->profile_info['outlet_name'],
             'location_within_campus' => $v2->profile_info['location'],
-            'contact_email' => $v2->username . '@atu.edu.gh',
+            'contact_email' => $v2->username.'@atu.edu.gh',
             'operational_hours' => '08:00 AM - 06:00 PM',
         ]);
 
@@ -154,7 +155,7 @@ class DatabaseSeeder extends Seeder
             'operational_status' => 'active',
             'store_name' => $v3->profile_info['outlet_name'],
             'location_within_campus' => $v3->profile_info['location'],
-            'contact_email' => $v3->username . '@atu.edu.gh',
+            'contact_email' => $v3->username.'@atu.edu.gh',
             'operational_hours' => '08:00 AM - 05:00 PM',
         ]);
 
@@ -169,7 +170,7 @@ class DatabaseSeeder extends Seeder
                 'office' => 'Quality Assurance Directorate Block B',
                 'administrative_title' => 'Director of Academic Quality',
                 'telephone' => '+233 55 999 8888',
-                'email' => 'emmanuel.kaku@atu.edu.gh'
+                'email' => 'emmanuel.kaku@atu.edu.gh',
             ],
             'info' => 'ATU Quality Assurance',
         ]);
@@ -245,12 +246,12 @@ class DatabaseSeeder extends Seeder
                 'image_url' => '',
                 'description' => '330ml Ice-cold Coca-Cola can for dynamic pairing.',
                 'is_available' => true,
-            ]
+            ],
         ];
 
         foreach ($foods as $f) {
             FoodItem::create($f);
-            \App\Models\MenuItem::create([
+            MenuItem::create([
                 'id' => $f['id'],
                 'vendor_id' => $f['vendor_id'],
                 'food_name' => $f['name'],
@@ -546,7 +547,6 @@ class DatabaseSeeder extends Seeder
             'total_price' => 25.0,
         ]);
 
-
         // 4b. Create Digital Wallet Ledger Transactions
         WalletTransaction::create([
             'user_id' => $stud1->id,
@@ -605,7 +605,6 @@ class DatabaseSeeder extends Seeder
             'reference' => 'TXN-REF-1008',
             'details' => 'Refund for Cancelled Order #1008: Waakye Supreme',
         ]);
-
 
         // 5. Create Dynamic Feedback Ratings
         Feedback::create([

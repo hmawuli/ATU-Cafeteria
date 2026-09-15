@@ -2,6 +2,7 @@
 
 namespace App\Http\Resources;
 
+use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 
 class OrderResource extends JsonResource
@@ -9,7 +10,7 @@ class OrderResource extends JsonResource
     /**
      * Transform the resource into an array.
      *
-     * @param  \Illuminate\Http\Request  $request
+     * @param  Request  $request
      * @return array
      */
     public function toArray($request)
@@ -35,7 +36,7 @@ class OrderResource extends JsonResource
             'discount_applied' => (float) $this->discount_applied,
             'created_at' => $this->created_at ? $this->created_at->toIso8601String() : null,
             'updated_at' => $this->updated_at ? $this->updated_at->toIso8601String() : null,
-            
+
             // Standardizing relationships for front-end consumption
             'customer' => $this->relationLoaded('customer') && $this->customer ? [
                 'id' => $this->customer->id,

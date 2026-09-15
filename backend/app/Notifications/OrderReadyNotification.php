@@ -4,6 +4,7 @@ namespace App\Notifications;
 
 use App\Models\Order;
 use Illuminate\Bus\Queueable;
+use Illuminate\Notifications\Messages\MailMessage;
 use Illuminate\Notifications\Notification;
 
 class OrderReadyNotification extends Notification
@@ -11,14 +12,12 @@ class OrderReadyNotification extends Notification
     use Queueable;
 
     /**
-     * @var \App\Models\Order
+     * @var Order
      */
     protected $order;
 
     /**
      * Create a new notification instance.
-     *
-     * @param  \App\Models\Order  $order
      */
     public function __construct(Order $order)
     {
@@ -40,22 +39,22 @@ class OrderReadyNotification extends Notification
      * Get the mail representation of the notification.
      *
      * @param  mixed  $notifiable
-     * @return \Illuminate\Notifications\Messages\MailMessage
+     * @return MailMessage
      */
     public function toMail($notifiable)
     {
-        return (new \Illuminate\Notifications\Messages\MailMessage)
+        return (new MailMessage)
             ->subject("🍔 ATU Cafeteria: Your Order #{$this->order->id} is READY!")
-            ->greeting("Hello, " . ($notifiable->fullName ?: $notifiable->username) . "!")
-            ->line("Great news! Your pre-ordered food is now ready for pickup at the counter.")
-            ->line("Order Details:")
+            ->greeting('Hello, '.($notifiable->fullName ?: $notifiable->username).'!')
+            ->line('Great news! Your pre-ordered food is now ready for pickup at the counter.')
+            ->line('Order Details:')
             ->line("• **Item:** {$this->order->food_name}")
             ->line("• **Quantity:** {$this->order->quantity}")
-            ->line("• **Total Paid:** GH₵" . number_format($this->order->total_price, 2))
+            ->line('• **Total Paid:** GH₵'.number_format($this->order->total_price, 2))
             ->line("🔑 **Your Security Pickup PIN:** {$this->order->pickup_pin}")
-            ->line("Please show this PIN at the counter to retrieve your hot meal.")
+            ->line('Please show this PIN at the counter to retrieve your hot meal.')
             ->action('View My Orders', url('/'))
-            ->line("Thank you for using Accra Technical University (ATU) Cafeteria Hub!");
+            ->line('Thank you for using Accra Technical University (ATU) Cafeteria Hub!');
     }
 
     /**
