@@ -163,7 +163,61 @@ class CafeteriaProvider extends ChangeNotifier {
     }
   }
 
+  Future<void> _syncRemoteFoodItems() async {
+    try {
+      final response = await http.get(
+        Uri.parse('$_laravelBaseUrl/api/food-items'),
+        headers: const {
+          'Accept': 'application/json',
+        },
+      ).timeout(const Duration(seconds: 10));
+
+      if (response.statusCode != 200 || response.body.isEmpty) {
+        return;
+      }
+
+      final decoded = jsonDecode(response.body);
+      if (decoded is! List) return;
+
+      for (final raw in decoded) {
+        if (raw is! Map) continue;
+        try {
+          final item = FoodItem.fromJson(
+            Map<String, dynamic>.from(raw),
+          );
+          await _upsertLocalFoodItem(item);
+        } catch (e) {
+          debugPrint('Skipping malformed remote food item: $e');
+        }
+      }
+    } catch (e) {
+      debugPrint('Remote food catalogue sync skipped: $e');
+    }
+  }
+
+  Future<void> _upsertLocalFoodItem(FoodItem item) async {
+    try {
+      final existing = item.id == null
+          ? null
+          : (await _db.getAllFoodItems()).where((f) => f.id == item.id).firstOrNull;
+
+      if (existing == null) {
+        await _db.insertFoodItem(item);
+      } else {
+        await _db.updateFoodItem(item);
+      }
+    } catch (e) {
+      debugPrint('Local food catalogue cache update skipped: $e');
+    }
+  }
+
   Future<void> refreshAllData() async {
+    // The Laravel database is the source of truth for the live menu.
+    // Keep SQLite as an offline cache, but always synchronize food items
+    // when the API is reachable so vendor/kiosk views never depend on stale
+    // local demo data.
+    await _syncRemoteFoodItems();
+
     if (_authToken != null) {
       await fetchAndCacheFeedback();
       await fetchAndCacheAuditLogs();
