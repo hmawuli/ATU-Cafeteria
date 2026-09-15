@@ -67,6 +67,8 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                   ),
                 ),
                 const SizedBox(height: 18),
+                _fulfilmentCard(context),
+                const SizedBox(height: 18),
                 Card(
                     child: Padding(
                         padding: const EdgeInsets.all(16),
@@ -78,21 +80,20 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                                       TextStyle(fontWeight: FontWeight.w800)),
                               RadioGroup<String>(
                                 groupValue: _method,
-                                onChanged: (value) =>
-                                    setState(() => _method = value!),
-                                child: const RadioListTile<String>(
-                                  value: 'Wallet',
-                                  title: Text('ATU Cafeteria Wallet'),
-                                  secondary: Icon(
-                                      Icons.account_balance_wallet_outlined),
-                                ),
-                              ),
-                              const RadioListTile<String>(
-                                value: 'Online',
-                                title: Text('Mobile Money / Card'),
-                                subtitle: Text(
-                                    'Pay securely through Paystack.'),
-                                secondary: Icon(Icons.payments_outlined),
+                                onChanged: (value) => setState(() => _method = value!),
+                                child: const Column(children: [
+                                  RadioListTile<String>(
+                                    value: 'Wallet',
+                                    title: Text('ATU Cafeteria Wallet'),
+                                    secondary: Icon(Icons.account_balance_wallet_outlined),
+                                  ),
+                                  RadioListTile<String>(
+                                    value: 'Online',
+                                    title: Text('Mobile Money / Card'),
+                                    subtitle: Text('Pay securely through Paystack.'),
+                                    secondary: Icon(Icons.payments_outlined),
+                                  ),
+                                ]),
                               ),
                             ]))),
                 const SizedBox(height: 18),
@@ -150,7 +151,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                           if (discount > 0) ...[
                             const SizedBox(height: 8),
                             Row(children: [const Text('Loyalty discount'), const Spacer(), Text('- GH₵ ${discount.toStringAsFixed(2)}')]),
-                          ]),
+                          ],
                           const Divider(height: 28),
                           Row(children: [
                             const Text('Total',
