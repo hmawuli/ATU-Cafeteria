@@ -227,11 +227,12 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
     final period = value.hour >= 12 ? 'PM' : 'AM';
     return '${value.day}/${value.month}/${value.year} at $hour:$minute $period';
   }
-  Future<void> _payOnline(BuildContext context, CafeteriaProvider auth, CartProvider cart, int points, double finalTotal) async {
+  Future<void> _payOnline(CafeteriaProvider auth, CartProvider cart, int points, double finalTotal) async {
     final user = auth.currentUser;
     final email = user?.email;
     if (email == null || email.trim().isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
+      if (!mounted) return;
+      ScaffoldMessenger.of(this.context).showSnackBar(
         const SnackBar(content: Text('A valid email address is required for online payment.')),
       );
       return;
@@ -259,9 +260,9 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
         );
         if (!launched) throw Exception('Unable to open the payment page.');
 
-        if (!context.mounted) return;
+        if (!mounted) return;
         final verified = await showDialog<bool>(
-          context: context,
+          context: this.context,
           barrierDismissible: false,
           builder: (ctx) => AlertDialog(
             title: const Text('Complete your payment'),
@@ -280,11 +281,11 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
             ],
           ),
         );
-        if (verified != true || !context.mounted) return;
+        if (verified != true || !mounted) return;
       } else {
-        if (!context.mounted) return;
+        if (!mounted) return;
         final proceed = await showDialog<bool>(
-          context: context,
+          context: this.context,
           builder: (ctx) => AlertDialog(
             title: const Text('Payment simulation'),
             content: Text(
@@ -302,7 +303,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
             ],
           ),
         );
-        if (proceed != true || !context.mounted) return;
+        if (proceed != true || !mounted) return;
       }
 
       final confirmed = await auth.verifyPaystackPayment(
@@ -320,14 +321,14 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
         'estimated_pickup_time': _fulfilment == 'Schedule pickup' && _scheduledPickup != null ? _scheduledPickup!.toIso8601String() : 'Calculating...',
         if (_noteController.text.trim().isNotEmpty) 'note': _noteController.text.trim(),
       });
-      if (!context.mounted) return;
+      if (!mounted) return;
       final orderId = result is Map
           ? (result['order'] is Map ? (result['order']['id'] ?? result['id']) : result['id'])
           : null;
       cart.clear();
       final pickupPin = result is Map ? result['pickup_pin']?.toString() : null;
       await showDialog<void>(
-        context: context,
+        context: this.context,
         builder: (ctx) => AlertDialog(
           icon: const Icon(Icons.verified_outlined, size: 48),
           title: const Text('Payment confirmed'),
@@ -342,7 +343,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                 Navigator.pop(ctx);
                 if (orderId != null) {
                   Navigator.pushReplacementNamed(
-                    context,
+                    this.context,
                     '/order-tracking',
                     arguments: orderId is int ? orderId : int.tryParse(orderId.toString()),
                   );
@@ -418,13 +419,13 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
     }
     if (_method == 'Online') {
       if (!mounted) return;
-      await _payOnline(context, auth, cart, points, finalTotal);
+      await _payOnline(auth, cart, points, finalTotal);
       return;
     }
 
     if (!mounted) return;
     final ok = await showDialog<bool>(
-      context: context,
+      context: this.context,
       builder: (ctx) => AlertDialog(
         title: const Text('Confirm order'),
         content: Text(
