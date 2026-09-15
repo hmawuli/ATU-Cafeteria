@@ -130,7 +130,33 @@ class _StudentDashboardScreenState extends State<StudentDashboardScreen> {
   Widget _buildBrowseMenu(BuildContext context, CafeteriaProvider provider) {
     var list = provider.allFoodItems.where((item) => item.isAvailable).toList();
     if (_selectedCategory != 'All') {
-      list = list.where((item) => item.category == _selectedCategory).toList();
+      // The API uses descriptive category names while the student UI uses
+      // short, friendly labels. Match both forms so categories never appear
+      // empty simply because their display names differ.
+      final normalizedCategory = _selectedCategory.toLowerCase().trim();
+      list = list.where((item) {
+        final category = item.category.toLowerCase().trim();
+        switch (normalizedCategory) {
+          case 'lunch specials':
+            return category == 'lunch specials' ||
+                category.contains('lunch') ||
+                category.contains('main dish');
+          case 'traditional':
+            return category == 'traditional' ||
+                category.contains('traditional');
+          case 'drinks':
+            return category == 'drinks' ||
+                category.contains('beverage') ||
+                category.contains('drink');
+          case 'snacks':
+            return category == 'snacks' ||
+                category.contains('snack') ||
+                category.contains('pastr') ||
+                category.contains('fast food');
+          default:
+            return category == normalizedCategory;
+        }
+      }).toList();
     }
     if (_searchQuery.isNotEmpty) {
       final q = _searchQuery.toLowerCase();
