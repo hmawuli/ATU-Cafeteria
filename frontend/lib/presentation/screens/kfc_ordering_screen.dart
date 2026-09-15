@@ -120,6 +120,17 @@ class _KfcOrderingScreenState extends State<KfcOrderingScreen> {
     ).toList();
 
     final cart = context.watch<CartProvider>();
+    final recentItems = <FoodItem>[];
+    final seenRecentIds = <int>{};
+    for (final order in cafe.customerOrders.reversed) {
+      final foodId = order.foodItemId;
+      if (foodId == null || seenRecentIds.contains(foodId)) continue;
+      final matches = all.where((item) => item.id == foodId);
+      if (matches.isEmpty) continue;
+      recentItems.add(matches.first);
+      seenRecentIds.add(foodId);
+      if (recentItems.length == 6) break;
+    }
 
     return Scaffold(
       appBar: AppBar(
@@ -239,6 +250,41 @@ class _KfcOrderingScreenState extends State<KfcOrderingScreen> {
               ),
             ),
             const SizedBox(height: 14),
+            if (recentItems.isNotEmpty) ...[
+              Text(
+                'Order again',
+                style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                      fontWeight: FontWeight.w900,
+                    ),
+              ),
+              const SizedBox(height: 4),
+              Text(
+                'Your recent picks, ready in one tap',
+                style: Theme.of(context).textTheme.bodySmall,
+              ),
+              const SizedBox(height: 10),
+              SizedBox(
+                height: 76,
+                child: ListView.separated(
+                  scrollDirection: Axis.horizontal,
+                  itemCount: recentItems.length,
+                  separatorBuilder: (_, __) => const SizedBox(width: 10),
+                  itemBuilder: (_, i) {
+                    final item = recentItems[i];
+                    return ActionChip(
+                      avatar: const Icon(Icons.replay_rounded, size: 18),
+                      label: Text(
+                        item.name,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      onPressed: () => _showMealDetails(item),
+                    );
+                  },
+                ),
+              ),
+              const SizedBox(height: 18),
+            ],
             KfcOrderingSections(
               items: items,
               onAdd: _showMealDetails,
