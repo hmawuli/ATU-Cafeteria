@@ -497,7 +497,7 @@ class CafeteriaProvider extends ChangeNotifier {
 
     // Use package:http so authentication works on Web, Linux, Android and iOS.
     try {
-      final loginUrl = Uri.parse('$_laravelBaseUrl/api/student/login');
+      final loginUrl = Uri.parse('$_laravelBaseUrl/api/login');
       final response = await http
           .post(
             loginUrl,
