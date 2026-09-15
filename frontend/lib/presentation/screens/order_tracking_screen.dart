@@ -60,6 +60,43 @@ class _OrderTrackingScreenState extends State<OrderTrackingScreen> {
     }
   }
 
+  Future<void> _cancelOrder() async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Cancel this order?'),
+        content: const Text(
+          'You can cancel while the order is still being processed. This action cannot be undone.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Keep order'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('Cancel order'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted) return;
+
+    try {
+      await _api.post('/orders/${widget.orderId}/cancel');
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Order cancelled successfully.')),
+      );
+      await _load();
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(e.toString().replaceFirst('Exception: ', ''))),
+      );
+    }
+  }
+
   String _label(String status) {
     switch (status.toUpperCase()) {
       case 'PENDING':
@@ -200,6 +237,20 @@ class _OrderTrackingScreenState extends State<OrderTrackingScreen> {
                             leading: const Icon(Icons.pin_outlined),
                             title: const Text('Ready for pickup'),
                             subtitle: const Text('Use the pickup PIN shown after checkout at the vendor counter.'),
+                          ),
+                        ),
+                      if (const {'PENDING', 'ORDER_PLACED', 'PREPARING'}.contains(status.toUpperCase()))
+                        Card(
+                          child: Padding(
+                            padding: const EdgeInsets.all(12),
+                            child: SizedBox(
+                              width: double.infinity,
+                              child: OutlinedButton.icon(
+                                onPressed: _cancelOrder,
+                                icon: const Icon(Icons.cancel_outlined),
+                                label: const Text('Cancel order'),
+                              ),
+                            ),
                           ),
                         ),
                       if (status.toUpperCase() == 'CANCELLED' || status.toUpperCase() == 'DECLINED')
