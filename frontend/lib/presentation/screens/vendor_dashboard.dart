@@ -317,12 +317,22 @@ class _VendorDashboardScreenState extends State<VendorDashboardScreen> {
               itemBuilder: (context, index) {
                 final item = list[index];
                 return Card(
+                  clipBehavior: Clip.antiAlias,
                   child: ListTile(
-                    leading: CircleAvatar(
-                      backgroundColor:
-                          Theme.of(context).colorScheme.primaryContainer,
-                      child: Text(item.name.substring(0, 1),
-                          style: const TextStyle(fontWeight: FontWeight.bold)),
+                    leading: SizedBox(
+                      width: 64,
+                      height: 64,
+                      child: item.imageUrl.trim().isNotEmpty
+                          ? ClipRRect(
+                              borderRadius: BorderRadius.circular(8),
+                              child: Image.network(
+                                item.imageUrl,
+                                fit: BoxFit.cover,
+                                errorBuilder: (_, __, ___) =>
+                                    const _VendorFoodPlaceholder(),
+                              ),
+                            )
+                          : const _VendorFoodPlaceholder(),
                     ),
                     title: Text(item.name,
                         style: const TextStyle(fontWeight: FontWeight.bold)),
@@ -1052,5 +1062,22 @@ extension RatingsAverage on Iterable<dynamic> {
       sum += element;
     }
     return sum / length;
+  }
+}
+
+
+class _VendorFoodPlaceholder extends StatelessWidget {
+  const _VendorFoodPlaceholder();
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      color: Theme.of(context).colorScheme.primaryContainer,
+      alignment: Alignment.center,
+      child: Icon(
+        Icons.restaurant_rounded,
+        color: Theme.of(context).colorScheme.primary,
+      ),
+    );
   }
 }
