@@ -50,7 +50,7 @@ class _StudentDashboardScreenState extends State<StudentDashboardScreen> {
                 tooltip: "Return to Admin Console",
                 onPressed: () {
                   provider.stopImpersonation();
-                  Navigator.pushReplacementNamed(context, '/admin_home');
+                  Navigator.pushReplacementNamed(context, '/admin');
                 },
               )
             : null,
@@ -71,7 +71,7 @@ class _StudentDashboardScreenState extends State<StudentDashboardScreen> {
                         TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
                 onPressed: () {
                   provider.stopImpersonation();
-                  Navigator.pushReplacementNamed(context, '/admin_home');
+                  Navigator.pushReplacementNamed(context, '/admin');
                 },
               ),
             )
