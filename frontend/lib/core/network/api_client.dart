@@ -37,7 +37,7 @@ class ApiClient {
   Future<dynamic> request(String method, String path,
       {Map<String, dynamic>? body}) async {
     token ??= await _storage.read(key: _tokenKey);
-    final uri = Uri.parse('${AppConfig.normalizedApiBaseUrl}${path.replaceFirst(RegExp(r'^/'), '')}');
+    final uri = Uri.parse('${AppConfig.normalizedApiBaseUrl}/api/${path.replaceFirst(RegExp(r'^/'), '')}');
     final headers = <String, String>{
       'Accept': 'application/json',
       'Content-Type': 'application/json',
