@@ -162,13 +162,13 @@ class Sidebar extends StatelessWidget {
         child: SafeArea(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
           Padding(padding: const EdgeInsets.all(18), child: AtuBrand.title()),
           const Divider(color: Colors.white24),
-          ... (vendor
-              ? ['Dashboard','Menu Catalog','Orders','Performance','Reviews','Transactions','Store Settings','Notifications']
-              : ['Dashboard','Users','Vendors','Orders','Food & Menu','Ratings & Reviews','Reports','System Settings'])
+          ...(vendor
+              ? ['Dashboard','Menu Catalog','Orders','Kiosk','Performance','Reviews','Transactions','Store Settings','Notifications']
+              : ['Dashboard','Users','Vendors','Orders','Finance','Food & Menu','Ratings & Reviews','Reports','System Settings'])
               .map((item) => InkWell(
                     onTap: () => onSelected(item),
                     child: Container(width: double.infinity,
-                      padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
+                      padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 13),
                       color: selected == item ? Colors.white.withValues(alpha: .13) : Colors.transparent,
                       child: Row(children: [
                         Icon(_iconFor(item), color: selected == item ? AppTheme.accent : Colors.white70, size: 19),
@@ -193,6 +193,7 @@ class Sidebar extends StatelessWidget {
       case 'Dashboard': return Icons.dashboard_outlined;
       case 'Menu Catalog': return Icons.restaurant_menu;
       case 'Orders': return Icons.receipt_long;
+      case 'Kiosk': return Icons.point_of_sale_outlined;
       case 'Performance': case 'Reports': return Icons.insights;
       case 'Reviews': case 'Ratings & Reviews': return Icons.star_outline;
       case 'Transactions': case 'Finance': return Icons.payments_outlined;
