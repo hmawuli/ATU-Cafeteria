@@ -13,6 +13,7 @@ class PublicHomeScreen extends StatefulWidget {
 class _PublicHomeScreenState extends State<PublicHomeScreen> {
   final ApiClient _api = ApiClient();
   final TextEditingController _search = TextEditingController();
+  final GlobalKey _menuKey = GlobalKey();
   List<FoodItem> _items = [];
   bool _loading = true;
   String? _error;
@@ -106,13 +107,24 @@ class _PublicHomeScreenState extends State<PublicHomeScreen> {
             padding: EdgeInsets.fromLTRB(constraints.maxWidth >= 1200 ? 48 : 20, 24, constraints.maxWidth >= 1200 ? 48 : 20, 48),
             children: [
               Center(child: ConstrainedBox(constraints: const BoxConstraints(maxWidth: 1220), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                _Hero(onBrowse: () => Scrollable.ensureVisible(context.findRenderObject()!, duration: const Duration(milliseconds: 300)), onCart: () => Navigator.pushNamed(context, '/cart')),
+                _Hero(
+                  onBrowse: () {
+                    final target = _menuKey.currentContext;
+                    if (target != null) {
+                      Scrollable.ensureVisible(target, duration: const Duration(milliseconds: 300), curve: Curves.easeInOut);
+                    }
+                  },
+                  onCart: () => Navigator.pushNamed(context, '/cart'),
+                ),
                 const SizedBox(height: 24),
-                TextField(controller: _search, onChanged: (_) => setState(() {}), decoration: InputDecoration(hintText: 'Search meals, snacks and drinks...', prefixIcon: const Icon(Icons.search), suffixIcon: _search.text.isEmpty ? null : IconButton(onPressed: () { _search.clear(); setState(() {}); }, icon: const Icon(Icons.clear)))),
+                TextField(controller: _search, onChanged: (_) => setState((){}), decoration: InputDecoration(hintText: 'Search meals, snacks and drinks...', prefixIcon: const Icon(Icons.search), suffixIcon: _search.text.isEmpty ? null : IconButton(onPressed: () { _search.clear(); setState(() {}); }, icon: const Icon(Icons.clear)))),
                 const SizedBox(height: 14),
                 SingleChildScrollView(scrollDirection: Axis.horizontal, child: Row(children: [for (final category in _categories) Padding(padding: const EdgeInsets.only(right: 8), child: ChoiceChip(selected: category == _category, label: Text(category), onSelected: (_) => setState(() => _category = category)))])),
                 const SizedBox(height: 26),
-                Row(children: [Expanded(child: Text('Today’s menu', style: Theme.of(context).textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.w900))), if (!_loading) Text('${visible.length} ${visible.length == 1 ? 'meal' : 'meals'}')]),
+                Row(
+                  key: _menuKey,
+                  children: [Expanded(child: Text('Today’s menu', style: Theme.of(context).textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.w900))), if (!_loading) Text('${visible.length} ${visible.length == 1 ? 'meal' : 'meals'}')],
+                ),
                 const SizedBox(height: 14),
                 if (_loading) const Padding(padding: EdgeInsets.all(48), child: Center(child: CircularProgressIndicator()))
                 else if (_error != null) _ErrorCard(message: _error!, onRetry: _loadMenu)
