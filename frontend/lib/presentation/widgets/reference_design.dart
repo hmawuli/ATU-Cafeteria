@@ -110,19 +110,53 @@ class FoodImage extends StatelessWidget {
   final String url;
   final double width;
   final double height;
-  const FoodImage({super.key, required this.url, this.width = 100, this.height = 86});
+  final String? category;
+
+  const FoodImage({
+    super.key,
+    required this.url,
+    this.width = 100,
+    this.height = 86,
+    this.category,
+  });
+
+  String _fallbackUrl() {
+    final value = (category ?? '').toLowerCase();
+    if (value.contains('drink') || value.contains('beverage')) {
+      return 'https://images.unsplash.com/photo-1544145945-f90425340c7e?auto=format&fit=crop&w=900&q=82';
+    }
+    if (value.contains('snack') || value.contains('breakfast')) {
+      return 'https://images.unsplash.com/photo-1509440159596-0249088772ff?auto=format&fit=crop&w=900&q=82';
+    }
+    if (value.contains('dessert')) {
+      return 'https://images.unsplash.com/photo-1551024506-0bccd828d307?auto=format&fit=crop&w=900&q=82';
+    }
+    return 'https://images.unsplash.com/photo-1547592180-85f173990554?auto=format&fit=crop&w=900&q=82';
+  }
+
   @override
   Widget build(BuildContext context) {
-    if (url.trim().isEmpty) {
-      return Container(width: width, height: height, color: AppTheme.primary.withValues(alpha: .08),
-          child: const Icon(Icons.restaurant, color: AppTheme.primary, size: 34));
-    }
+    final source = url.trim().isEmpty ? _fallbackUrl() : url.trim();
     return ClipRRect(
       borderRadius: BorderRadius.circular(14),
-      child: Image.network(url, width: width, height: height, fit: BoxFit.cover,
-          errorBuilder: (_, __, ___) => Container(width: width, height: height,
-              color: AppTheme.primary.withValues(alpha: .08),
-              child: const Icon(Icons.restaurant, color: AppTheme.primary, size: 34))),
+      child: Image.network(
+        source,
+        width: width,
+        height: height,
+        fit: BoxFit.cover,
+        errorBuilder: (_, __, ___) => Container(
+          width: width,
+          height: height,
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              colors: [AppTheme.primary.withValues(alpha: .16), AppTheme.accent.withValues(alpha: .32)],
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+            ),
+          ),
+          child: const Icon(Icons.restaurant, color: AppTheme.primary, size: 34),
+        ),
+      ),
     );
   }
 }
