@@ -15,7 +15,10 @@ class ApiException implements Exception {
 class ApiClient {
   final http.Client _client;
   String? token;
-  static const _tokenKey = 'atu_cafeteria_auth_token';
+
+  // Keep this key identical to SecureSessionStore so login sessions are
+  // available to every API request, including checkout.
+  static const _tokenKey = 'atu_auth_token';
   static const FlutterSecureStorage _storage = FlutterSecureStorage();
 
   ApiClient({http.Client? client}) : _client = client ?? http.Client();
@@ -37,7 +40,8 @@ class ApiClient {
   Future<dynamic> request(String method, String path,
       {Map<String, dynamic>? body}) async {
     token ??= await _storage.read(key: _tokenKey);
-    final uri = Uri.parse('${AppConfig.normalizedApiBaseUrl}/api/${path.replaceFirst(RegExp(r'^/'), '')}');
+    final uri = Uri.parse(
+        '${AppConfig.normalizedApiBaseUrl}/api/${path.replaceFirst(RegExp(r'^/'), '')}');
     final headers = <String, String>{
       'Accept': 'application/json',
       'Content-Type': 'application/json',
@@ -50,19 +54,29 @@ class ApiClient {
     final encodedBody = body == null ? null : jsonEncode(body);
     switch (method.toUpperCase()) {
       case 'GET':
-        response = await _client.get(uri, headers: headers).timeout(const Duration(seconds: 25));
+        response = await _client
+            .get(uri, headers: headers)
+            .timeout(const Duration(seconds: 25));
         break;
       case 'POST':
-        response = await _client.post(uri, headers: headers, body: encodedBody).timeout(const Duration(seconds: 25));
+        response = await _client
+            .post(uri, headers: headers, body: encodedBody)
+            .timeout(const Duration(seconds: 25));
         break;
       case 'PUT':
-        response = await _client.put(uri, headers: headers, body: encodedBody).timeout(const Duration(seconds: 25));
+        response = await _client
+            .put(uri, headers: headers, body: encodedBody)
+            .timeout(const Duration(seconds: 25));
         break;
       case 'PATCH':
-        response = await _client.patch(uri, headers: headers, body: encodedBody).timeout(const Duration(seconds: 25));
+        response = await _client
+            .patch(uri, headers: headers, body: encodedBody)
+            .timeout(const Duration(seconds: 25));
         break;
       case 'DELETE':
-        response = await _client.delete(uri, headers: headers, body: encodedBody).timeout(const Duration(seconds: 25));
+        response = await _client
+            .delete(uri, headers: headers, body: encodedBody)
+            .timeout(const Duration(seconds: 25));
         break;
       default:
         throw ArgumentError('Unsupported HTTP method: $method');
