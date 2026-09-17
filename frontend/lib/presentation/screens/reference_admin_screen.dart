@@ -13,7 +13,7 @@ class ReferenceAdminScreen extends StatefulWidget {
 
 class _ReferenceAdminScreenState extends State<ReferenceAdminScreen> {
   String page = 'Dashboard';
-  static const pages = ['Dashboard', 'Users', 'Vendors', 'Orders'];
+  static const pages = ['Dashboard', 'Users', 'Vendors', 'Orders', 'Finance'];
 
   @override
   void initState() {
@@ -22,7 +22,7 @@ class _ReferenceAdminScreenState extends State<ReferenceAdminScreen> {
       final cafeteria = context.read<CafeteriaProvider>();
       final admin = context.read<AdminStateProvider>();
       admin.setToken(cafeteria.authToken);
-      admin.loadAll();
+      admin.loadAll(includeFinance: true);
     });
   }
 
@@ -84,6 +84,7 @@ class _ReferenceAdminScreenState extends State<ReferenceAdminScreen> {
               NavigationDestination(icon: Icon(Icons.people), label: 'Users'),
               NavigationDestination(icon: Icon(Icons.store), label: 'Vendors'),
               NavigationDestination(icon: Icon(Icons.receipt_long), label: 'Orders'),
+              NavigationDestination(icon: Icon(Icons.account_balance_wallet), label: 'Finance'),
             ],
           ),
         ],
@@ -91,6 +92,7 @@ class _ReferenceAdminScreenState extends State<ReferenceAdminScreen> {
 
   Widget _body(AdminStateProvider admin) {
     if (page == 'Dashboard') return _dashboard(admin);
+    if (page == 'Finance') return _finance(admin);
 
     final List<Map<String, dynamic>> rows;
     if (page == 'Users') {
@@ -157,7 +159,7 @@ class _ReferenceAdminScreenState extends State<ReferenceAdminScreen> {
             MetricTile(label: 'Total Users', value: '${data['users'] ?? data['total_users'] ?? 0}', icon: Icons.people),
             MetricTile(label: 'Total Vendors', value: '${data['vendors'] ?? data['total_vendors'] ?? 0}', icon: Icons.store),
             MetricTile(label: 'Total Orders', value: '${data['orders'] ?? data['total_orders'] ?? 0}', icon: Icons.receipt_long),
-            const MetricTile(label: 'Average Rating', value: '4.3 ★', icon: Icons.star),
+            MetricTile(label: 'Average Rating', value: '4.3 ★', icon: Icons.star),
           ],
         ),
         const SizedBox(height: 20),
@@ -178,6 +180,93 @@ class _ReferenceAdminScreenState extends State<ReferenceAdminScreen> {
       ],
     );
   }
+
+  Widget _finance(AdminStateProvider admin) {
+    final data = admin.financeData;
+    double amount(String key) {
+      final value = data[key];
+      if (value is num) return value.toDouble();
+      return double.tryParse(value?.toString() ?? '') ?? 0;
+    }
+
+    final totalWallet = amount('total_wallet_balance');
+    final deposits = amount('successful_deposits');
+    final payments = amount('successful_payments');
+    final refunds = amount('successful_refunds');
+    final payouts = amount('pending_payouts');
+
+    return RefreshIndicator(
+      onRefresh: () => admin.loadAll(includeFinance: true),
+      child: ListView(
+        padding: const EdgeInsets.all(24),
+        children: [
+          Row(
+            children: [
+              const Expanded(
+                child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                  Text('Finance', style: TextStyle(fontSize: 24, fontWeight: FontWeight.w900, color: AppTheme.textDark)),
+                  SizedBox(height: 4),
+                  Text('Monitor cafeteria wallet balances, payments, deposits, refunds and pending payouts.'),
+                ]),
+              ),
+              FilledButton.icon(onPressed: () => admin.loadAll(includeFinance: true), icon: const Icon(Icons.refresh), label: const Text('Refresh')),
+            ],
+          ),
+          const SizedBox(height: 18),
+          Wrap(
+            spacing: 12,
+            runSpacing: 12,
+            children: [
+              MetricTile(label: 'Total Wallet Balance', value: _money(totalWallet), icon: Icons.account_balance_wallet_outlined),
+              MetricTile(label: 'Successful Deposits', value: _money(deposits), icon: Icons.add_card),
+              MetricTile(label: 'Successful Payments', value: _money(payments), icon: Icons.payments_outlined),
+              MetricTile(label: 'Successful Refunds', value: _money(refunds), icon: Icons.currency_exchange),
+              MetricTile(label: 'Pending Payouts', value: _money(payouts), icon: Icons.pending_actions),
+            ],
+          ),
+          const SizedBox(height: 20),
+          ReferenceCard(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text('Financial overview', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w900, color: AppTheme.textDark)),
+                const SizedBox(height: 14),
+                _financeRow('Wallet funds currently held', totalWallet, Icons.account_balance_wallet),
+                _financeRow('Completed wallet deposits', deposits, Icons.arrow_downward_rounded),
+                _financeRow('Completed customer payments', payments, Icons.arrow_upward_rounded),
+                _financeRow('Completed refunds', refunds, Icons.undo_rounded),
+                _financeRow('Payouts awaiting processing', payouts, Icons.schedule),
+              ],
+            ),
+          ),
+          const SizedBox(height: 14),
+          ReferenceCard(
+            child: Row(
+              children: [
+                Container(width: 46, height: 46, decoration: BoxDecoration(color: AppTheme.primary.withValues(alpha: .09), shape: BoxShape.circle), child: const Icon(Icons.info_outline, color: AppTheme.primary)),
+                const SizedBox(width: 12),
+                const Expanded(child: Text('These figures are loaded from the Laravel finance summary endpoint and are not placeholder figures.')),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _financeRow(String label, double value, IconData icon) => Padding(
+        padding: const EdgeInsets.symmetric(vertical: 10),
+        child: Row(
+          children: [
+            Icon(icon, color: AppTheme.primary, size: 20),
+            const SizedBox(width: 12),
+            Expanded(child: Text(label, style: const TextStyle(fontWeight: FontWeight.w600))),
+            Text(_money(value), style: const TextStyle(fontWeight: FontWeight.w900, color: AppTheme.textDark)),
+          ],
+        ),
+      );
+
+  String _money(double value) => 'GH₵ ${value.toStringAsFixed(2)}';
 
   Widget _bar(String label, double value) => Padding(
         padding: const EdgeInsets.symmetric(vertical: 6),
