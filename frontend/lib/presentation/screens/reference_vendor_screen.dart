@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 import '../../core/theme/app_theme.dart';
 import '../../domain/models/models.dart';
 import '../providers/cafeteria_provider.dart';
+import '../providers/cart_provider.dart';
 import '../widgets/reference_design.dart';
 
 class ReferenceVendorScreen extends StatefulWidget {
@@ -13,6 +14,8 @@ class ReferenceVendorScreen extends StatefulWidget {
 
 class _ReferenceVendorScreenState extends State<ReferenceVendorScreen> {
   String page = 'Dashboard';
+  String _kioskQuery = '';
+  String _kioskCategory = 'All';
 
   @override
   Widget build(BuildContext context) {
@@ -34,6 +37,7 @@ class _ReferenceVendorScreenState extends State<ReferenceVendorScreen> {
                       NavigationDestination(icon: Icon(Icons.dashboard), label: 'Dashboard'),
                       NavigationDestination(icon: Icon(Icons.restaurant_menu), label: 'Menu'),
                       NavigationDestination(icon: Icon(Icons.receipt_long), label: 'Orders'),
+                      NavigationDestination(icon: Icon(Icons.point_of_sale_outlined), label: 'Kiosk'),
                       NavigationDestination(icon: Icon(Icons.insights), label: 'Performance'),
                     ],
                   ),
@@ -82,8 +86,8 @@ class _ReferenceVendorScreenState extends State<ReferenceVendorScreen> {
     );
   }
 
-  static const _pages = ['Dashboard', 'Menu Catalog', 'Orders', 'Performance'];
-  int get _index => _pages.indexOf(page).clamp(0, 3);
+  static const _pages = ['Dashboard', 'Menu Catalog', 'Orders', 'Kiosk', 'Performance'];
+  int get _index => _pages.indexOf(page).clamp(0, _pages.length - 1);
 
   Widget _mobileHeader(CafeteriaProvider provider) => Container(
         height: 64,
@@ -105,6 +109,8 @@ class _ReferenceVendorScreenState extends State<ReferenceVendorScreen> {
         return _menu(provider);
       case 'Orders':
         return _orders(provider);
+      case 'Kiosk':
+        return _kiosk(provider);
       case 'Performance':
         return _performance(provider);
       default:
@@ -235,6 +241,153 @@ class _ReferenceVendorScreenState extends State<ReferenceVendorScreen> {
     );
   }
 
+  // ============================================================
+  // WALK-IN CUSTOMER KIOSK
+  // ============================================================
+  Widget _kiosk(CafeteriaProvider provider) {
+    final cart = context.watch<CartProvider>();
+    final source = provider.vendorFoodItems.where((item) => item.isAvailable).toList();
+    final categories = <String>{'All', ...source.map((e) => e.category)}.toList();
+    final query = _kioskQuery.trim().toLowerCase();
+    final items = source.where((item) {
+      final matchesCategory = _kioskCategory == 'All' || item.category == _kioskCategory;
+      final matchesSearch = query.isEmpty ||
+          item.name.toLowerCase().contains(query) ||
+          item.category.toLowerCase().contains(query);
+      return matchesCategory && matchesSearch;
+    }).toList();
+
+    return Column(
+      children: [
+        Container(
+          margin: const EdgeInsets.fromLTRB(24, 18, 24, 0),
+          padding: const EdgeInsets.all(20),
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              colors: [AppTheme.primaryDark, AppTheme.primary],
+            ),
+            borderRadius: BorderRadius.circular(18),
+          ),
+          child: Row(
+            children: [
+              Container(
+                width: 54,
+                height: 54,
+                decoration: BoxDecoration(color: AppTheme.accent, borderRadius: BorderRadius.circular(14)),
+                child: const Icon(Icons.point_of_sale_outlined, color: AppTheme.primaryDark, size: 30),
+              ),
+              const SizedBox(width: 16),
+              const Expanded(
+                child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                  Text('WALK-IN CUSTOMER KIOSK', style: TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.w900)),
+                  SizedBox(height: 4),
+                  Text('Let customers browse this vendor, build an order and proceed to checkout.', style: TextStyle(color: Colors.white70)),
+                ]),
+              ),
+              Badge(
+                isLabelVisible: cart.itemCount > 0,
+                label: Text('${cart.itemCount}'),
+                child: IconButton(
+                  tooltip: 'Open cart',
+                  onPressed: () => Navigator.pushNamed(context, '/cart'),
+                  icon: const Icon(Icons.shopping_cart_outlined, color: Colors.white, size: 30),
+                ),
+              ),
+            ],
+          ),
+        ),
+        Padding(
+          padding: const EdgeInsets.fromLTRB(24, 14, 24, 8),
+          child: Row(
+            children: [
+              Expanded(
+                child: TextField(
+                  onChanged: (value) => setState(() => _kioskQuery = value),
+                  decoration: const InputDecoration(
+                    hintText: 'Search this vendor menu...',
+                    prefixIcon: Icon(Icons.search),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 12),
+              DropdownButton<String>(
+                value: categories.contains(_kioskCategory) ? _kioskCategory : 'All',
+                items: categories.map((category) => DropdownMenuItem(value: category, child: Text(category))).toList(),
+                onChanged: (value) => setState(() => _kioskCategory = value ?? 'All'),
+              ),
+            ],
+          ),
+        ),
+        Expanded(
+          child: Row(
+            children: [
+              Expanded(
+                child: items.isEmpty
+                    ? const Center(child: Text('No available food items match this search.'))
+                    : GridView.builder(
+                        padding: const EdgeInsets.fromLTRB(24, 8, 12, 24),
+                        gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
+                          maxCrossAxisExtent: 270,
+                          mainAxisExtent: 245,
+                          crossAxisSpacing: 14,
+                          mainAxisSpacing: 14,
+                        ),
+                        itemCount: items.length,
+                        itemBuilder: (_, index) => _KioskFoodCard(item: items[index]),
+                      ),
+              ),
+              SizedBox(
+                width: 300,
+                child: ReferenceCard(
+                  padding: const EdgeInsets.all(18),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      Row(children: [
+                        const Expanded(child: Text('CURRENT ORDER', style: TextStyle(fontSize: 17, fontWeight: FontWeight.w900, color: AppTheme.textDark))),
+                        Text('${cart.itemCount} items', style: const TextStyle(color: AppTheme.textMuted, fontSize: 11)),
+                      ]),
+                      const Divider(height: 24),
+                      Expanded(
+                        child: cart.isEmpty
+                            ? const Center(child: Text('Tap a food item to add it to the customer order.', textAlign: TextAlign.center))
+                            : ListView(
+                                children: cart.lines.map((line) => ListTile(
+                                  contentPadding: EdgeInsets.zero,
+                                  title: Text(line.item.name, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontWeight: FontWeight.w800)),
+                                  subtitle: Text('Qty ${line.quantity}'),
+                                  trailing: Text('GH₵ ${line.total.toStringAsFixed(2)}', style: const TextStyle(fontWeight: FontWeight.w800)),
+                                )).toList(),
+                              ),
+                      ),
+                      const Divider(height: 24),
+                      Row(children: [
+                        const Text('TOTAL', style: TextStyle(fontWeight: FontWeight.w800)),
+                        const Spacer(),
+                        Text('GH₵ ${cart.subtotal.toStringAsFixed(2)}', style: const TextStyle(fontSize: 19, fontWeight: FontWeight.w900, color: AppTheme.primary)),
+                      ]),
+                      const SizedBox(height: 12),
+                      FilledButton.icon(
+                        onPressed: cart.isEmpty ? null : () => Navigator.pushNamed(context, '/checkout'),
+                        icon: const Icon(Icons.arrow_forward_rounded),
+                        label: const Text('PROCEED TO CHECKOUT'),
+                      ),
+                      const SizedBox(height: 6),
+                      TextButton(
+                        onPressed: cart.isEmpty ? null : cart.clear,
+                        child: const Text('Clear order'),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
   Widget _performance(CafeteriaProvider provider) {
     final revenue = provider.vendorOrders.fold<double>(0, (sum, order) => sum + order.totalPrice);
     final completed = provider.vendorOrders.where((o) => o.status.toUpperCase() == 'COMPLETED').length;
@@ -310,5 +463,42 @@ class _ReferenceVendorScreenState extends State<ReferenceVendorScreen> {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Food item added successfully.')));
     }
+  }
+}
+
+class _KioskFoodCard extends StatelessWidget {
+  final FoodItem item;
+  const _KioskFoodCard({required this.item});
+
+  @override
+  Widget build(BuildContext context) {
+    final cart = context.read<CartProvider>();
+    return ReferenceCard(
+      padding: EdgeInsets.zero,
+      child: InkWell(
+        borderRadius: BorderRadius.circular(16),
+        onTap: () => cart.add(item),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Expanded(child: FoodImage(url: item.imageUrl, width: double.infinity, height: 120)),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(14, 10, 14, 12),
+              child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                Text(item.name, maxLines: 2, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w900, color: AppTheme.textDark)),
+                const SizedBox(height: 3),
+                Text(item.category, style: const TextStyle(fontSize: 11, color: AppTheme.textMuted)),
+                const SizedBox(height: 8),
+                Row(children: [
+                  Text('GH₵ ${item.price.toStringAsFixed(2)}', style: const TextStyle(fontWeight: FontWeight.w900, color: AppTheme.primary)),
+                  const Spacer(),
+                  const Icon(Icons.add_circle, color: AppTheme.primary),
+                ]),
+              ]),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 }
