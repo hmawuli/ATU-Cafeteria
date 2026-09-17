@@ -134,15 +134,104 @@ class _MealCard extends StatelessWidget {
 
 class _OrderPanel extends StatelessWidget {
   final CartProvider cart;
+
   const _OrderPanel({required this.cart});
+
   @override
-  Widget build(BuildContext context) => Card(margin: const EdgeInsets.all(18), child: Padding(padding: const EdgeInsets.all(20), child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-    Row(children: [const Expanded(child: Text('YOUR ORDER', style: TextStyle(fontSize: 20, fontWeight: FontWeight.w900))), Text('${cart.itemCount} items', style: const TextStyle(color: Colors.grey))]),
-    const Divider(height: 28),
-    Expanded(child: cart.isEmpty ? const Center(child: Text('Tap a meal to add it here.', textAlign: TextAlign.center)) : ListView(children: cart.lines.map((line) => ListTile(contentPadding: EdgeInsets.zero, title: Text(line.item.name, style: const TextStyle(fontWeight: FontWeight.w800)), subtitle: Text('Qty: ${line.quantity}'), trailing: Text('GH₵ ${line.total.toStringAsFixed(2)}', style: const TextStyle(fontWeight: FontWeight.w800))).toList())),
-    const Divider(height: 24),
-    Row(children: [const Text('TOTAL', style: TextStyle(fontWeight: FontWeight.w800)), const Spacer(), Text('GH₵ ${cart.subtotal.toStringAsFixed(2)}', style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w900))]),
-    const SizedBox(height: 12),
-    FilledButton(onPressed: cart.isEmpty ? null : () => Navigator.pushNamed(context, '/checkout'), child: const Padding(padding: EdgeInsets.symmetric(vertical: 14), child: Text('PROCEED TO PAYMENT'))),
-  ]));
+  Widget build(BuildContext context) {
+    return Card(
+      margin: const EdgeInsets.all(18),
+      child: Padding(
+        padding: const EdgeInsets.all(20),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Row(
+              children: [
+                const Expanded(
+                  child: Text(
+                    'YOUR ORDER',
+                    style: TextStyle(
+                      fontSize: 20,
+                      fontWeight: FontWeight.w900,
+                    ),
+                  ),
+                ),
+                Text(
+                  '${cart.itemCount} items',
+                  style: const TextStyle(color: Colors.grey),
+                ),
+              ],
+            ),
+
+            const Divider(height: 28),
+
+            Expanded(
+              child: cart.isEmpty
+                  ? const Center(
+                      child: Text(
+                        'Tap a meal to add it here.',
+                        textAlign: TextAlign.center,
+                      ),
+                    )
+                  : ListView(
+                      children: [
+                        for (final line in cart.lines)
+                          ListTile(
+                            contentPadding: EdgeInsets.zero,
+                            title: Text(
+                              line.item.name,
+                              style: const TextStyle(
+                                fontWeight: FontWeight.w800,
+                              ),
+                            ),
+                            subtitle: Text(
+                              'Qty: ${line.quantity}',
+                            ),
+                            trailing: Text(
+                              'GH₵ ${line.total.toStringAsFixed(2)}',
+                              style: const TextStyle(
+                                fontWeight: FontWeight.w800,
+                              ),
+                            ),
+                          ),
+                      ],
+                    ),
+            ),
+
+            const Divider(height: 24),
+
+            Row(
+              children: [
+                const Text(
+                  'TOTAL',
+                  style: TextStyle(fontWeight: FontWeight.w800),
+                ),
+                const Spacer(),
+                Text(
+                  'GH₵ ${cart.subtotal.toStringAsFixed(2)}',
+                  style: const TextStyle(
+                    fontSize: 20,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+              ],
+            ),
+
+            const SizedBox(height: 12),
+
+            FilledButton(
+              onPressed: cart.isEmpty
+                  ? null
+                  : () => Navigator.pushNamed(context, '/checkout'),
+              child: const Padding(
+                padding: EdgeInsets.symmetric(vertical: 14),
+                child: Text('PROCEED TO PAYMENT'),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
 }
