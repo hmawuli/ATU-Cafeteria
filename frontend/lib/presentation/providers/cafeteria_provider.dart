@@ -1578,43 +1578,132 @@ class CafeteriaProvider extends ChangeNotifier {
     await refreshAllData();
   }
 
-  Future<void> addVendorFoodItem(String name, double price, String category, String description) async {
-    if (_currentUser == null || name.trim().isEmpty || price <= 0) return;
-    final vendorId = _currentUser!.id!;
-    final cleanName = name.trim();
-    final cleanDescription = description.trim().isEmpty ? 'Freshly prepared on campus.' : description.trim();
-
-    if (_authToken != null) {
-      try {
-        final response = await http.post(
-          Uri.parse('$_laravelBaseUrl/api/food-items'),
-          headers: {
-            'Accept': 'application/json',
-            'Content-Type': 'application/json',
-            'Authorization': 'Bearer $_authToken',
-          },
-          body: jsonEncode({
-            'vendor_id': vendorId,
-            'name': cleanName,
-            'price': price,
-            'category': category,
-            'description': cleanDescription,
-            'image_url': '',
-            'initial_stock': 50,
-            'low_stock_threshold': 10,
-          }),
-        ).timeout(const Duration(seconds: 10));
-        if (response.statusCode != 201) {
-          debugPrint('Remote menu creation failed: ${response.body}');
-          return;
-        }
-      } catch (e) {
-        debugPrint('Remote menu creation failed: $e');
-        return;
-      }
+  Future<String?> addVendorFoodItem(
+    String name,
+    double price,
+    String category,
+    String description,
+  ) async {
+    if (_currentUser == null) {
+      return 'No vendor is currently logged in.';
     }
 
-    await refreshAllData();
+    final cleanName = name.trim();
+
+    if (cleanName.isEmpty) {
+      return 'Food name is required.';
+    }
+
+    if (price <= 0) {
+      return 'Price must be greater than zero.';
+    }
+
+    if (_authToken == null || _authToken!.trim().isEmpty) {
+      return 'Your session has expired. Please log in again.';
+    }
+
+    final vendorId = _currentUser!.id;
+
+    if (vendorId == null) {
+      return 'The logged-in vendor does not have a valid ID.';
+    }
+
+    final cleanDescription = description.trim();
+
+    if (cleanDescription.length < 10) {
+      return 'Description must be at least 10 characters.';
+    }
+
+    try {
+      final url = Uri.parse('$_laravelBaseUrl/api/food-items');
+
+      debugPrint('========================================');
+      debugPrint('ADDING VENDOR FOOD ITEM');
+      debugPrint('URL: $url');
+      debugPrint('Vendor ID: $vendorId');
+      debugPrint('Food: $cleanName');
+      debugPrint('Price: $price');
+      debugPrint('Category: $category');
+      debugPrint('Description: $cleanDescription');
+      debugPrint('========================================');
+
+      final response = await http.post(
+        url,
+        headers: {
+          'Accept': 'application/json',
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $_authToken',
+        },
+        body: jsonEncode({
+          'vendor_id': vendorId,
+          'name': cleanName,
+          'price': price,
+          'category': category,
+          'description': cleanDescription,
+          'image_url': '',
+          'initial_stock': 50,
+          'low_stock_threshold': 10,
+        }),
+      ).timeout(const Duration(seconds: 10));
+
+      debugPrint('ADD FOOD RESPONSE STATUS: ${response.statusCode}');
+      debugPrint('ADD FOOD RESPONSE BODY: ${response.body}');
+
+      if (response.statusCode == 201) {
+        debugPrint('Food item created successfully.');
+
+        await refreshAllData();
+
+        return null;
+      }
+
+      try {
+        if (response.body.isNotEmpty) {
+          final decoded = jsonDecode(response.body);
+
+          if (decoded is Map) {
+            final errors = decoded['errors'];
+
+            if (errors is Map) {
+              final messages = <String>[];
+
+              for (final value in errors.values) {
+                if (value is List) {
+                  messages.addAll(
+                    value.map((item) => item.toString()),
+                  );
+                } else {
+                  messages.add(value.toString());
+                }
+              }
+
+              if (messages.isNotEmpty) {
+                return messages.join('\n');
+              }
+            }
+
+            final message = decoded['message'];
+
+            if (message != null &&
+                message.toString().trim().isNotEmpty) {
+              return message.toString();
+            }
+          }
+        }
+      } catch (e) {
+        debugPrint('Could not decode Laravel error response: $e');
+      }
+
+      return 'Unable to add food item. Server returned ${response.statusCode}.';
+    } on TimeoutException {
+      debugPrint('ADD FOOD ERROR: Request timed out.');
+
+      return 'The server took too long to respond. Please try again.';
+    } catch (e) {
+      debugPrint('ADD FOOD ERROR: $e');
+
+      return 'Unable to connect to the server. Please check the backend connection.';
+    }
   }
 
   Future<void> deleteVendorFoodItem(FoodItem item) async {

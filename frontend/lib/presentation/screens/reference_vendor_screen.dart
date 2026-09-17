@@ -374,7 +374,7 @@ class _ReferenceVendorScreenState extends State<ReferenceVendorScreen> {
                       ),
                       const SizedBox(height: 6),
                       TextButton(
-                        onPressed: cart.isEmpty ? null : cart.clear,
+                        onPressed: cart.isEmpty ? null : () => cart.clear(),
                         child: const Text('Clear order'),
                       ),
                     ],
@@ -444,8 +444,26 @@ class _ReferenceVendorScreenState extends State<ReferenceVendorScreen> {
               onPressed: () async {
                 final value = double.tryParse(price.text.trim());
                 if (name.text.trim().isEmpty || value == null || value <= 0) return;
-                final success = await provider.addVendorFoodItem(name.text.trim(), value, category, description.text.trim());
-                if (dialogContext.mounted) Navigator.pop(dialogContext, success);
+                final error = await provider.addVendorFoodItem(
+                  name.text.trim(),
+                  value,
+                  category,
+                  description.text.trim(),
+                );
+
+                if (!dialogContext.mounted) return;
+
+                if (error != null) {
+                  ScaffoldMessenger.of(dialogContext).showSnackBar(
+                    SnackBar(
+                      content: Text(error),
+                      backgroundColor: Colors.red,
+                    ),
+                  );
+                  return;
+                }
+
+                Navigator.pop(dialogContext, true);
               },
               child: const Text('Add Food'),
             ),

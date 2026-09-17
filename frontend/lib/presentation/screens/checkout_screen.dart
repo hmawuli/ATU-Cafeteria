@@ -96,7 +96,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
       RadioListTile<String>(value: 'Schedule pickup', title: Text('Schedule pickup'), subtitle: Text('Choose a future pickup time.'), secondary: Icon(Icons.schedule_outlined)),
     ])),
     if (_fulfilment == 'Schedule pickup') OutlinedButton.icon(onPressed: _pickSchedule, icon: const Icon(Icons.event_outlined), label: Text(_scheduledPickup == null ? 'Choose pickup time' : _formatDateTime(_scheduledPickup!))),
-  ]));
+  ])));
 
   Future<void> _pickSchedule() async {
     final now = DateTime.now();
