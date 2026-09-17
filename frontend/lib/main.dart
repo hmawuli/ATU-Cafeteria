@@ -18,10 +18,12 @@ import 'package:atu_cafeteria/presentation/screens/vendor_order_display_screen.d
 import 'package:atu_cafeteria/presentation/screens/kfc_ordering_screen.dart';
 import 'package:atu_cafeteria/presentation/screens/order_tracking_screen.dart';
 import 'package:atu_cafeteria/presentation/screens/group_order_screen.dart';
+import 'package:atu_cafeteria/presentation/screens/food_detail_screen.dart';
 import 'package:atu_cafeteria/presentation/screens/reference_student_screen.dart';
 import 'package:atu_cafeteria/presentation/screens/reference_vendor_screen.dart';
 import 'package:atu_cafeteria/presentation/screens/reference_admin_screen.dart';
 import 'package:atu_cafeteria/presentation/widgets/auth_gate.dart';
+import 'package:atu_cafeteria/domain/models/models.dart';
 
 void main() { WidgetsFlutterBinding.ensureInitialized(); runApp(const ATUCafeteriaApp()); }
 
@@ -36,6 +38,12 @@ class ATUCafeteriaApp extends StatelessWidget {
       '/admin-security':(_)=>const AdminSecurityScreen(), '/smart-insights':(_)=>const SmartInsightsScreen(),
       '/cart':(_)=>const CartScreen(), '/checkout':(_)=>const CheckoutScreen(), '/kiosk':(_)=>const KioskScreen(),
       '/vendor-display':(_)=>const VendorOrderDisplayScreen(), '/kfc-ordering':(_)=>const KfcOrderingScreen(), '/group-order':(_)=>const GroupOrderScreen(),
+      '/food-detail':(context){
+        final item = ModalRoute.of(context)?.settings.arguments;
+        return item is FoodItem
+            ? FoodDetailScreen(item: item)
+            : const Scaffold(body: Center(child: Text('Invalid food item.')));
+      },
       '/order-tracking':(context){final id=ModalRoute.of(context)?.settings.arguments;final orderId=id is int?id:int.tryParse(id?.toString()??'');return orderId==null?const Scaffold(body:Center(child:Text('Invalid order ID.'))):OrderTrackingScreen(orderId:orderId);},
     })
   );
