@@ -92,6 +92,53 @@ class OrderController extends Controller
      * Get orders placed by a specific student.
      * Supports filtering by status or searching by food name/status.
      */
+    public function getPurchasedVendors(Request $request)
+    {
+        $user = $request->user();
+
+        $orders = Order::where(function ($query) use ($user) {
+            $query->where('customer_id', $user->id)
+                ->orWhere('student_id', $user->id);
+        })->whereNotNull('vendor_id')->orderByDesc('order_timestamp')->get();
+
+        $vendorIds = $orders->pluck('vendor_id')->unique()->values();
+        $reviewedOrderIds = \App\Models\DeliveredOrderReview::where('student_id', $user->id)
+            ->whereIn('order_id', $orders->pluck('id'))
+            ->pluck('order_id')
+            ->all();
+
+        $vendors = User::whereIn('id', $vendorIds)->get()->keyBy('id');
+
+        $result = $vendorIds->map(function ($vendorId) use ($orders, $vendors, $reviewedOrderIds) {
+            $vendorOrders = $orders->where('vendor_id', $vendorId);
+            $latest = $vendorOrders->first();
+            $vendor = $vendors->get($vendorId);
+            $hasCompletedOrder = $vendorOrders->contains(function ($order) {
+                return in_array(strtoupper((string) ($order->status ?? $order->order_status)), ['DELIVERED', 'COMPLETED'], true);
+            });
+            $hasUnreviewedCompletedOrder = $vendorOrders->contains(function ($order) use ($reviewedOrderIds) {
+                $status = strtoupper((string) ($order->status ?? $order->order_status));
+                return in_array($status, ['DELIVERED', 'COMPLETED'], true)
+                    && ! in_array($order->id, $reviewedOrderIds, true);
+            });
+
+            return [
+                'vendor_id' => (int) $vendorId,
+                'name' => $vendor?->fullName ?: 'Campus Vendor',
+                'store_name' => $vendor?->info ?: 'Campus Food Vendor',
+                'order_count' => $vendorOrders->count(),
+                'latest_order_id' => $latest?->id,
+                'latest_status' => $latest?->status ?? $latest?->order_status ?? 'PENDING',
+                'can_review' => $hasCompletedOrder && $hasUnreviewedCompletedOrder,
+            ];
+        })->values();
+
+        return response()->json([
+            'success' => true,
+            'vendors' => $result,
+        ], 200);
+    }
+
     public function getCustomerOrders(Request $request, $customerId)
     {
         $user = $request->user();
