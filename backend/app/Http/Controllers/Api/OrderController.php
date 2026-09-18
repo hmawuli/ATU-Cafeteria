@@ -12,12 +12,15 @@ use App\Models\AuditLog;
 use App\Models\FoodItem;
 use App\Models\MenuItem;
 use App\Models\Order;
+use App\Models\User;
+use App\Models\WalletTransaction;
 use App\Notifications\NewIncomingOrderNotification;
 use App\Notifications\OrderStatusChangedNotification;
 use App\Services\ReceiptPdfWriter;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Validator;
+use Illuminate\Support\Str;
 
 class OrderController extends Controller
 {
