@@ -1209,7 +1209,7 @@ class _ReferenceStudentScreenState extends State<ReferenceStudentScreen> {
                         if (!context.mounted || !dialogContext.mounted) return;
                         if (error != null) {
                           setDialogState(() => submitting = false);
-                          ScaffoldMessenger.of(context).showSnackBar(
+                          ScaffoldMessenger.of(dialogContext).showSnackBar(
                             SnackBar(content: Text(error)),
                           );
                           return;
