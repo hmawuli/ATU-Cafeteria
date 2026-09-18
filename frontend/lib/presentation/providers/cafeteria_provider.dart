@@ -189,7 +189,7 @@ class CafeteriaProvider extends ChangeNotifier {
       if (raw is List) {
         _purchasedVendors = raw
             .whereType<Map>()
-            .map((item) => Map<String, dynamic>.from(item))
+            .map(Map<String, dynamic>.from)
             .toList();
       }
     } catch (e) {
