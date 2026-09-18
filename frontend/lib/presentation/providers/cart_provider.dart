@@ -16,7 +16,7 @@ class CartProvider extends ChangeNotifier {
   double get subtotal => _lines.values.fold(0, (sum, line) => sum + line.total);
   bool get isEmpty => _lines.isEmpty;
   List<Map<String, dynamic>> toCheckoutPayload() => _lines.values
-      .map((line) => {'menu_item_id': line.item.id, 'quantity': line.quantity})
+      .map((line) => {'food_item_id': line.item.id, 'quantity': line.quantity})
       .toList();
 
   void add(FoodItem item) {
