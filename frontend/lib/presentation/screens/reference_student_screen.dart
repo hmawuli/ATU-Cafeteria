@@ -1103,7 +1103,7 @@ class _ReferenceStudentScreenState extends State<ReferenceStudentScreen> {
               ),
             ),
             if (hasReviewed)
-              const StatusPill('Reviewed')
+              StatusPill('Reviewed')
             else if (canReview && reviewOrderId != null)
               OutlinedButton.icon(
                 onPressed: () => _showVendorReviewDialog(
