@@ -142,6 +142,7 @@ Route::middleware(['auth:sanctum', InactivityTimeout::class])->group(function ()
     Route::middleware('role:STUDENT,ADMIN')->group(function () {
         // Authenticated Student Orders Endpoints
         Route::get('/student/orders', [OrderController::class, 'getAuthenticatedStudentOrders']);
+        Route::get('/student/purchased-vendors', [OrderController::class, 'getPurchasedVendors']);
         Route::get('/student/order-history', [OrderController::class, 'getPersonalOrderHistory']);
         Route::post('/student/orders', [OrderController::class, 'storeAuthenticatedStudentOrder']);
         Route::post('/v1/student/orders', [OrderController::class, 'storeAuthenticatedStudentOrder']);
@@ -331,10 +332,12 @@ Route::get('/food-items/{foodItemId}/feedback', [FoodItemFeedbackController::cla
 Route::post('/food-items/feedback', [FoodItemFeedbackController::class, 'store']);
 
 // Delivered Order Reviews & Ratings Endpoints
-Route::get('/reviews', [DeliveredOrderReviewController::class, 'index']);
-Route::get('/reviews/vendor/{vendorId}', [DeliveredOrderReviewController::class, 'getVendorReviews']);
-Route::get('/reviews/food-item/{foodItemId}', [DeliveredOrderReviewController::class, 'getFoodItemReviews']);
-Route::post('/reviews', [DeliveredOrderReviewController::class, 'store']);
+Route::middleware(['auth:sanctum', InactivityTimeout::class, 'role:STUDENT,ADMIN'])->group(function () {
+    Route::get('/reviews', [DeliveredOrderReviewController::class, 'index']);
+    Route::get('/reviews/vendor/{vendorId}', [DeliveredOrderReviewController::class, 'getVendorReviews']);
+    Route::get('/reviews/food-item/{foodItemId}', [DeliveredOrderReviewController::class, 'getFoodItemReviews']);
+    Route::post('/reviews', [DeliveredOrderReviewController::class, 'store']);
+});
 
 // Centralised Quality Assurance Traceability Audit Logs Endpoints
 Route::get('/audit-logs', [AuditLogController::class, 'index']);
