@@ -35,7 +35,6 @@ class _PublicHomeScreenState extends State<PublicHomeScreen> {
   Future<void> _loadMenu() async {
     if (mounted) setState(() { _loading = true; _error = null; });
     try {
-      final provider = context.read<CafeteriaProvider>();
         final response = await http.get(
         Uri.parse('${AppConfig.normalizedApiBaseUrl}/api/food-items'),
         headers: const {'Accept': 'application/json'},
