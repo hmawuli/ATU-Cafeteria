@@ -259,7 +259,7 @@ class _ReferenceAdminScreenState extends State<ReferenceAdminScreen> {
               contactEmail: contactEmail.text.trim().isEmpty ? null : contactEmail.text.trim(),
               contactInfo: contactInfo.text.trim().isEmpty ? null : contactInfo.text.trim(),
             );
-            if (!mounted) return;
+            if (!this.mounted || !dialogContext.mounted) return;
             if (ok) {
               Navigator.of(dialogContext).pop();
               ScaffoldMessenger.of(this.context).showSnackBar(const SnackBar(content: Text('Vendor account created successfully.')));
@@ -359,7 +359,7 @@ class _ReferenceAdminScreenState extends State<ReferenceAdminScreen> {
             MetricTile(label: 'Total Users', value: '${data['users'] ?? data['total_users'] ?? 0}', icon: Icons.people),
             MetricTile(label: 'Total Vendors', value: '${data['vendors'] ?? data['total_vendors'] ?? 0}', icon: Icons.store),
             MetricTile(label: 'Total Orders', value: '${data['orders'] ?? data['total_orders'] ?? 0}', icon: Icons.receipt_long),
-            MetricTile(label: 'Average Rating', value: '4.3 ★', icon: Icons.star),
+            const MetricTile(label: 'Average Rating', value: '4.3 ★', icon: Icons.star),
           ],
         ),
         const SizedBox(height: 20),
