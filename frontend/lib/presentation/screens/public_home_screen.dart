@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import '../../core/network/api_client.dart';
 import '../../domain/models/models.dart';
 import '../providers/cart_provider.dart';
+import '../providers/cafeteria_provider.dart';
 
 class PublicHomeScreen extends StatefulWidget {
   const PublicHomeScreen({super.key});
@@ -11,7 +11,6 @@ class PublicHomeScreen extends StatefulWidget {
 }
 
 class _PublicHomeScreenState extends State<PublicHomeScreen> {
-  final ApiClient _api = ApiClient();
   final TextEditingController _search = TextEditingController();
   final GlobalKey _menuKey = GlobalKey();
   List<FoodItem> _items = [];
@@ -28,23 +27,23 @@ class _PublicHomeScreenState extends State<PublicHomeScreen> {
   @override
   void dispose() {
     _search.dispose();
-    _api.close();
     super.dispose();
   }
 
   Future<void> _loadMenu() async {
     if (mounted) setState(() { _loading = true; _error = null; });
     try {
-      final data = await _api.get('/food-items');
-      final raw = data is Map && data['food_items'] is List
-          ? data['food_items']
-          : data is Map && data['data'] is List ? data['data'] : data;
-      if (raw is List) {
-        _items = raw.whereType<Map>().map((e) => FoodItem.fromJson(Map<String, dynamic>.from(e))).where((e) => e.isAvailable).toList();
-      } else {
-        _items = [];
+      final provider = context.read<CafeteriaProvider>();
+      // Use the same catalogue pipeline as the authenticated student area.
+      // The provider prefers the live Laravel menu and falls back to its
+      // lightweight SQLite cache when the API is temporarily unavailable.
+      await provider.initialize();
+      _items = provider.allFoodItems.where((item) => item.isAvailable).toList();
+      if (_items.isEmpty) {
+        _error = 'No available meals found. Please check the cafeteria menu.';
       }
-    } catch (_) {
+    } catch (e) {
+      debugPrint('Public menu load failed: $e');
       _error = 'We could not load today’s menu. Please try again.';
     } finally {
       if (mounted) setState(() => _loading = false);
