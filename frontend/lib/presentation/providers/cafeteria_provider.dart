@@ -88,6 +88,9 @@ class CafeteriaProvider extends ChangeNotifier {
   List<Order> _customerOrders = [];
   List<Order> get customerOrders => _customerOrders;
 
+  List<Map<String, dynamic>> _purchasedVendors = [];
+  List<Map<String, dynamic>> get purchasedVendors => _purchasedVendors;
+
   List<Order> _vendorOrders = [];
   List<Order> get vendorOrders => _vendorOrders;
 
@@ -160,6 +163,86 @@ class CafeteriaProvider extends ChangeNotifier {
       debugPrint(
           "Campus network unstable: loading from SQLite local cache. Exception: $e");
       _isOrderCacheOffline = true;
+    }
+  }
+
+  Future<void> fetchPurchasedVendors() async {
+    if (_authToken == null || _currentUser?.id == null) {
+      _purchasedVendors = [];
+      return;
+    }
+
+    try {
+      final url = Uri.parse("$_laravelBaseUrl/api/student/purchased-vendors");
+      final client = HttpClient();
+      client.connectionTimeout = const Duration(seconds: 4);
+      final request = await client.getUrl(url);
+      request.headers.add("Accept", "application/json");
+      request.headers.add("Authorization", "Bearer $_authToken");
+      final response = await request.close();
+
+      if (response.statusCode != 200) return;
+
+      final body = await response.transform(utf8.decoder).join();
+      final decoded = json.decode(body);
+      final raw = decoded is Map ? decoded['vendors'] : decoded;
+      if (raw is List) {
+        _purchasedVendors = raw
+            .whereType<Map>()
+            .map((item) => Map<String, dynamic>.from(item))
+            .toList();
+      }
+    } catch (e) {
+      debugPrint('Purchased vendor sync skipped: $e');
+    }
+  }
+
+  Future<String?> submitVendorReview({
+    required int orderId,
+    required int vendorRating,
+    String? vendorComment,
+    int? foodRating,
+    String? foodComment,
+  }) async {
+    if (_authToken == null) return 'Your login session has expired. Please sign in again.';
+
+    try {
+      final url = Uri.parse("$_laravelBaseUrl/api/reviews");
+      final client = HttpClient();
+      client.connectionTimeout = const Duration(seconds: 6);
+      final request = await client.postUrl(url);
+      request.headers.add("Accept", "application/json");
+      request.headers.add("Content-Type", "application/json");
+      request.headers.add("Authorization", "Bearer $_authToken");
+      request.add(utf8.encode(jsonEncode({
+        'order_id': orderId,
+        'vendor_rating': vendorRating,
+        if (vendorComment != null && vendorComment.trim().isNotEmpty)
+          'vendor_comment': vendorComment.trim(),
+        if (foodRating != null) 'food_rating': foodRating,
+        if (foodComment != null && foodComment.trim().isNotEmpty)
+          'food_comment': foodComment.trim(),
+      })));
+      final response = await request.close();
+      final body = await response.transform(utf8.decoder).join();
+
+      Map<String, dynamic>? decoded;
+      if (body.isNotEmpty) {
+        final raw = json.decode(body);
+        if (raw is Map) decoded = Map<String, dynamic>.from(raw);
+      }
+
+      if (response.statusCode == 201) {
+        await fetchPurchasedVendors();
+        notifyListeners();
+        return null;
+      }
+
+      return decoded?['message']?.toString() ??
+          'We could not submit your review. Please try again.';
+    } catch (e) {
+      debugPrint('Vendor review failed: $e');
+      return 'Unable to submit the review. Please check your connection and try again.';
     }
   }
 
@@ -266,6 +349,7 @@ class CafeteriaProvider extends ChangeNotifier {
       if (_currentUser!.role == 'STUDENT') {
         await fetchAndCacheStudentOrders(_currentUser!.id!);
         _customerOrders = await _db.getOrdersForCustomer(_currentUser!.id!);
+        await fetchPurchasedVendors();
       } else if (_currentUser!.role == 'VENDOR') {
         _vendorOrders = await _db.getOrdersForVendor(_currentUser!.id!);
         final remoteVendorItems = _allFoodItems
@@ -995,6 +1079,7 @@ class CafeteriaProvider extends ChangeNotifier {
     _loginError = null;
     _registrationSuccess = false;
     _customerOrders = [];
+    _purchasedVendors = [];
     _vendorOrders = [];
     _vendorFoodItems = [];
     _vendorFeedback = [];
