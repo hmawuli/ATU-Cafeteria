@@ -1017,9 +1017,220 @@ class _ReferenceStudentScreenState extends State<ReferenceStudentScreen> {
             )
           else
             ...provider.customerOrders.map(_orderCard),
+          if (provider.purchasedVendors.isNotEmpty) ...[
+            const SizedBox(height: 24),
+            const Text(
+              'Vendors You Have Purchased From',
+              style: TextStyle(
+                fontSize: 21,
+                fontWeight: FontWeight.w900,
+                color: AppTheme.textDark,
+              ),
+            ),
+            const SizedBox(height: 8),
+            const Text(
+              'Rate and review vendors after your order has been delivered.',
+              style: TextStyle(color: AppTheme.textMuted),
+            ),
+            const SizedBox(height: 12),
+            ...provider.purchasedVendors.map((vendor) => _purchasedVendorCard(provider, vendor)),
+          ],
         ],
       ),
     );
+  }
+
+  Widget _purchasedVendorCard(
+    CafeteriaProvider provider,
+    Map<String, dynamic> vendor,
+  ) {
+    final name = vendor['name']?.toString().trim();
+    final store = vendor['store_name']?.toString().trim();
+    final orderCount = vendor['order_count'] ?? 0;
+    final status = vendor['latest_status']?.toString() ?? 'PENDING';
+    final canReview = vendor['can_review'] == true;
+    final hasReviewed = vendor['has_reviewed'] == true;
+    final reviewOrderId = int.tryParse('${vendor['review_order_id'] ?? ''}');
+
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 10),
+      child: ReferenceCard(
+        child: Row(
+          children: [
+            Container(
+              width: 52,
+              height: 52,
+              decoration: BoxDecoration(
+                color: AppTheme.primary.withValues(alpha: .08),
+                borderRadius: BorderRadius.circular(14),
+              ),
+              child: const Icon(
+                Icons.storefront_rounded,
+                color: AppTheme.primary,
+                size: 28,
+              ),
+            ),
+            const SizedBox(width: 14),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    (store?.isNotEmpty == true) ? store! : (name?.isNotEmpty == true ? name! : 'Campus Vendor'),
+                    style: const TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w900,
+                      color: AppTheme.textDark,
+                    ),
+                  ),
+                  if (name?.isNotEmpty == true && store != name)
+                    Text(
+                      name!,
+                      style: const TextStyle(
+                        fontSize: 12,
+                        color: AppTheme.textMuted,
+                      ),
+                    ),
+                  const SizedBox(height: 4),
+                  Text(
+                    '${orderCount} purchase${orderCount == 1 ? '' : 's'} • $status',
+                    style: const TextStyle(
+                      fontSize: 12,
+                      color: AppTheme.textMuted,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            if (hasReviewed)
+              const StatusPill('Reviewed')
+            else if (canReview && reviewOrderId != null)
+              OutlinedButton.icon(
+                onPressed: () => _showVendorReviewDialog(
+                  provider,
+                  vendor,
+                  reviewOrderId,
+                ),
+                icon: const Icon(Icons.star_outline),
+                label: const Text('Rate'),
+              )
+            else
+              const Text(
+                'After delivery',
+                style: TextStyle(
+                  fontSize: 11,
+                  color: AppTheme.textMuted,
+                ),
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Future<void> _showVendorReviewDialog(
+    CafeteriaProvider provider,
+    Map<String, dynamic> vendor,
+    int orderId,
+  ) async {
+    var rating = 5;
+    final commentController = TextEditingController();
+    var submitting = false;
+    final vendorName = vendor['store_name']?.toString().trim().isNotEmpty == true
+        ? vendor['store_name'].toString()
+        : vendor['name']?.toString() ?? 'Vendor';
+
+    try {
+      final result = await showDialog<String>(
+        context: context,
+        barrierDismissible: false,
+        builder: (dialogContext) => StatefulBuilder(
+          builder: (dialogContext, setDialogState) => AlertDialog(
+            title: Text('Rate $vendorName'),
+            content: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Text(
+                    'How was your experience with this vendor?',
+                    textAlign: TextAlign.center,
+                  ),
+                  const SizedBox(height: 14),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: List.generate(
+                      5,
+                      (index) => IconButton(
+                        tooltip: '${index + 1} star',
+                        onPressed: submitting
+                            ? null
+                            : () => setDialogState(() => rating = index + 1),
+                        icon: Icon(
+                          index < rating ? Icons.star : Icons.star_border,
+                          color: AppTheme.accent,
+                          size: 32,
+                        ),
+                      ),
+                    ),
+                  ),
+                  Text(
+                    '$rating / 5',
+                    style: const TextStyle(fontWeight: FontWeight.w800),
+                  ),
+                  const SizedBox(height: 12),
+                  TextField(
+                    controller: commentController,
+                    maxLines: 4,
+                    maxLength: 300,
+                    enabled: !submitting,
+                    decoration: const InputDecoration(
+                      labelText: 'Review (optional)',
+                      hintText: 'Tell us about your experience...',
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            actions: [
+              TextButton(
+                onPressed: submitting ? null : () => Navigator.pop(dialogContext),
+                child: const Text('Cancel'),
+              ),
+              FilledButton(
+                onPressed: submitting
+                    ? null
+                    : () async {
+                        setDialogState(() => submitting = true);
+                        final error = await provider.submitVendorReview(
+                          orderId: orderId,
+                          vendorRating: rating,
+                          vendorComment: commentController.text,
+                        );
+                        if (!dialogContext.mounted) return;
+                        if (error != null) {
+                          setDialogState(() => submitting = false);
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(content: Text(error)),
+                          );
+                          return;
+                        }
+                        Navigator.pop(dialogContext, 'submitted');
+                      },
+                child: Text(submitting ? 'Submitting...' : 'Submit Review'),
+              ),
+            ],
+          ),
+        ),
+      );
+
+      if (result == 'submitted' && mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Thank you. Your vendor review has been submitted.')),
+        );
+      }
+    } finally {
+      commentController.dispose();
+    }
   }
 
   Widget _orderCard(Order order) {
