@@ -246,7 +246,7 @@ class CafeteriaProvider extends ChangeNotifier {
     }
   }
 
-  Future<void> _syncRemoteFoodItems() async {
+  Future<List<FoodItem>> _syncRemoteFoodItems() async {
     try {
       final response = await http.get(
         Uri.parse('$_laravelBaseUrl/api/food-items'),
@@ -256,41 +256,45 @@ class CafeteriaProvider extends ChangeNotifier {
       ).timeout(const Duration(seconds: 10));
 
       if (response.statusCode != 200 || response.body.isEmpty) {
-        return;
+        return [];
       }
 
       final decoded = jsonDecode(response.body);
-      if (decoded is! List) return;
+      if (decoded is! List) return [];
 
+      final remoteItems = <FoodItem>[];
       for (final raw in decoded) {
         if (raw is! Map) continue;
         try {
-          final item = FoodItem.fromJson(
-            Map<String, dynamic>.from(raw),
+          remoteItems.add(
+            FoodItem.fromJson(Map<String, dynamic>.from(raw)),
           );
-          await _upsertLocalFoodItem(item);
         } catch (e) {
           debugPrint('Skipping malformed remote food item: $e');
         }
       }
+
+      // Keep SQLite as an offline cache. The live API list is returned
+      // directly so the UI does not depend on a successful local upsert.
+      for (final item in remoteItems) {
+        try {
+          await _upsertLocalFoodItem(item);
+        } catch (e) {
+          debugPrint('Local food cache update skipped: $e');
+        }
+      }
+
+      return remoteItems;
     } catch (e) {
       debugPrint('Remote food catalogue sync skipped: $e');
+      return [];
     }
   }
 
   Future<void> _upsertLocalFoodItem(FoodItem item) async {
+    if (item.id == null) return;
     try {
-      final cachedItems = await _db.getAllFoodItems();
-      final matches = item.id == null
-          ? <FoodItem>[]
-          : cachedItems.where((f) => f.id == item.id).toList();
-      final existing = matches.isEmpty ? null : matches.first;
-
-      if (existing == null) {
-        await _db.insertFoodItem(item);
-      } else {
-        await _db.updateFoodItem(item);
-      }
+      await _db.insertFoodItem(item);
     } catch (e) {
       debugPrint('Local food catalogue cache update skipped: $e');
     }
@@ -331,7 +335,7 @@ class CafeteriaProvider extends ChangeNotifier {
     // Keep SQLite as an offline cache, but always synchronize food items
     // when the API is reachable so vendor/kiosk views never depend on stale
     // local demo data.
-    await _syncRemoteFoodItems();
+    final remoteFoodItems = await _syncRemoteFoodItems();
     await _syncRemoteVendorFoodItems();
 
     if (_authToken != null) {
@@ -340,7 +344,11 @@ class CafeteriaProvider extends ChangeNotifier {
     }
 
     _allVendors = await _db.getAllVendors();
-    _allFoodItems = await _db.getAllFoodItems();
+    // Prefer the live Laravel catalogue whenever it is available.
+    // Fall back to SQLite only when the API cannot be reached.
+    _allFoodItems = remoteFoodItems.isNotEmpty
+        ? remoteFoodItems
+        : await _db.getAllFoodItems();
     _allOrders = await _db.getAllOrders();
     _allFeedback = await _db.getAllFeedback();
     _auditLogs = await _db.getAllLogs();
