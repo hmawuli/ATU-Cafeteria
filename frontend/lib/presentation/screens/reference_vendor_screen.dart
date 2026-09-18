@@ -263,7 +263,7 @@ class _ReferenceVendorScreenState extends State<ReferenceVendorScreen> {
           margin: const EdgeInsets.fromLTRB(24, 18, 24, 0),
           padding: const EdgeInsets.all(20),
           decoration: BoxDecoration(
-            gradient: LinearGradient(
+            gradient: const LinearGradient(
               colors: [AppTheme.primaryDark, AppTheme.primary],
             ),
             borderRadius: BorderRadius.circular(18),
@@ -374,7 +374,7 @@ class _ReferenceVendorScreenState extends State<ReferenceVendorScreen> {
                       ),
                       const SizedBox(height: 6),
                       TextButton(
-                        onPressed: cart.isEmpty ? null : () => cart.clear(),
+                        onPressed: cart.isEmpty ? null : cart.clear,
                         child: const Text('Clear order'),
                       ),
                     ],
