@@ -58,8 +58,18 @@ class DeliveredOrderReviewController extends Controller
             ], 400);
         }
 
+        $user = $request->user();
+        if (! $user || (int) ($order->customer_id ?? $order->student_id) !== (int) $user->id) {
+            return response()->json([
+                'success' => false,
+                'message' => 'You may only review an order that belongs to your account.',
+            ], 403);
+        }
+
         // Check if student has already reviewed this order
-        $existingReview = DeliveredOrderReview::where('order_id', $orderId)->first();
+        $existingReview = DeliveredOrderReview::where('order_id', $orderId)
+            ->where('student_id', $user->id)
+            ->first();
         if ($existingReview) {
             return response()->json([
                 'success' => false,
