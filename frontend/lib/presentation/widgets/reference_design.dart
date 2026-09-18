@@ -218,7 +218,7 @@ class Sidebar extends StatelessWidget {
             Text('Logout', style: TextStyle(color: Color(0xFFFF7777), fontWeight: FontWeight.w800)),
           ]))),
           Padding(padding: const EdgeInsets.fromLTRB(18, 0, 18, 18),
-              child: Text('Good Food • Healthy Minds • Brighter Future', style: TextStyle(color: Colors.white54, fontSize: 8))),
+              child: const Text('Good Food • Healthy Minds • Brighter Future', style: TextStyle(color: Colors.white54, fontSize: 8))),
         ])),
       );
 
