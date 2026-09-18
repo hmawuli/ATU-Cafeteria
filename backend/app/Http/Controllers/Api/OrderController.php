@@ -1648,6 +1648,7 @@ class OrderController extends Controller
 
                     AuditLog::create([
                         'user_id' => $lockedUser->id,
+                        'timestamp' => now()->getTimestampMs(),
                         'action' => 'ORDER_CREATED',
                         'details' => "Placed order #{$order->id} for '{$itemName}' x {$item['quantity']}",
                     ]);
