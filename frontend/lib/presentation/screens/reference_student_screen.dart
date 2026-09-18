@@ -1093,7 +1093,7 @@ class _ReferenceStudentScreenState extends State<ReferenceStudentScreen> {
                     ),
                   const SizedBox(height: 4),
                   Text(
-                    '${orderCount} purchase${orderCount == 1 ? '' : 's'} • $status',
+                    '$orderCount purchase${orderCount == 1 ? '' : 's'} • $status',
                     style: const TextStyle(
                       fontSize: 12,
                       color: AppTheme.textMuted,
@@ -1103,7 +1103,7 @@ class _ReferenceStudentScreenState extends State<ReferenceStudentScreen> {
               ),
             ),
             if (hasReviewed)
-              StatusPill('Reviewed')
+              const StatusPill('Reviewed')
             else if (canReview && reviewOrderId != null)
               OutlinedButton.icon(
                 onPressed: () => _showVendorReviewDialog(
@@ -1206,7 +1206,7 @@ class _ReferenceStudentScreenState extends State<ReferenceStudentScreen> {
                           vendorRating: rating,
                           vendorComment: commentController.text,
                         );
-                        if (!dialogContext.mounted) return;
+                        if (!context.mounted || !dialogContext.mounted) return;
                         if (error != null) {
                           setDialogState(() => submitting = false);
                           ScaffoldMessenger.of(context).showSnackBar(
