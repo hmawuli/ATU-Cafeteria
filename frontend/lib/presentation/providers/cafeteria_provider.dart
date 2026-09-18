@@ -666,6 +666,17 @@ class CafeteriaProvider extends ChangeNotifier {
       final decoded = jsonDecode(response.body) as Map<String, dynamic>;
       _currentUser =
           User.fromJson(Map<String, dynamic>.from(decoded['user'] ?? {}));
+
+      // A browser refresh restores the session token, but it does not restore
+      // the provider's in-memory catalogue/order state. Load the same live
+      // data used immediately after login so a returning student never sees
+      // an empty menu simply because the page was refreshed.
+      try {
+        await refreshAllData();
+      } catch (e) {
+        debugPrint('Restored-session data refresh skipped: $e');
+      }
+
       if (_currentUser?.role == 'STUDENT') _startReadyOrderPolling();
       if (_currentUser?.role == 'VENDOR' || _currentUser?.role == 'ADMIN') {
         startVendorOrderPolling();
