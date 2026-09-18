@@ -66,7 +66,7 @@ class AppTheme {
         elevation: 1.5,
         color: Colors.white,
         surfaceTintColor: Colors.transparent,
-        shadowColor: Color(0x18062E68),
+        shadowColor: const Color(0x18062E68),
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(18),
           side: const BorderSide(color: border),
