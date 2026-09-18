@@ -129,6 +129,9 @@ class OrderController extends Controller
                 'order_count' => $vendorOrders->count(),
                 'latest_order_id' => $latest?->id,
                 'latest_status' => $latest?->status ?? $latest?->order_status ?? 'PENDING',
+                'has_reviewed' => $vendorOrders->contains(function ($order) use ($reviewedOrderIds) {
+                    return in_array($order->id, $reviewedOrderIds, true);
+                }),
                 'review_order_id' => $hasUnreviewedCompletedOrder
                     ? $vendorOrders->first(function ($order) use ($reviewedOrderIds) {
                         $status = strtoupper((string) ($order->status ?? $order->order_status));
