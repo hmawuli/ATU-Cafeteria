@@ -172,8 +172,16 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
       });
       if (!context.mounted) return;
       final pageContext = context;
-      final orderId = result is Map ? (result['order'] is Map ? (result['order']['id'] ?? result['id']) : result['id']) : null;
+      final orderId = result is Map
+          ? (result['order'] is Map
+              ? (result['order']['id'] ?? result['id'])
+              : (result['id'] ??
+                  ((result['orders'] is List && result['orders'].isNotEmpty && result['orders'].first is Map)
+                      ? result['orders'].first['id']
+                      : null)))
+          : null;
       cart.clear();
+      await auth.refreshAllData();
       final pickupPin = result is Map ? result['pickup_pin']?.toString() : null;
       await showDialog<void>(context: pageContext, builder: (ctx) => AlertDialog(
         icon: const Icon(Icons.verified_outlined, size: 48), title: const Text('Payment confirmed'),
@@ -248,8 +256,16 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
         'estimated_pickup_time': _fulfilment == 'Schedule pickup' && _scheduledPickup != null ? _scheduledPickup!.toIso8601String() : 'Calculating...',
       });
       if (!context.mounted) return;
-      final orderId = result is Map ? (result['order'] is Map ? (result['order']['id'] ?? result['id']) : result['id']) : null;
+      final orderId = result is Map
+          ? (result['order'] is Map
+              ? (result['order']['id'] ?? result['id'])
+              : (result['id'] ??
+                  ((result['orders'] is List && result['orders'].isNotEmpty && result['orders'].first is Map)
+                      ? result['orders'].first['id']
+                      : null)))
+          : null;
       cart.clear();
+      await auth.refreshAllData();
       final message = result is Map && result['message'] != null ? result['message'].toString() : 'Your order has been placed successfully.';
       if (!mounted) return;
       await showDialog<void>(context: context, builder: (ctx) => AlertDialog(
