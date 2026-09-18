@@ -9,6 +9,7 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\StoreOrderRequest;
 use App\Http\Resources\OrderResource;
 use App\Models\AuditLog;
+use App\Models\FoodItem;
 use App\Models\MenuItem;
 use App\Models\Order;
 use App\Notifications\NewIncomingOrderNotification;
@@ -1488,12 +1489,26 @@ class OrderController extends Controller
     {
         $validator = Validator::make($request->all(), [
             'items' => 'required|array|min:1|max:50',
-            'items.*.menu_item_id' => 'required|integer|distinct|exists:menu_items,id',
+            'items.*.menu_item_id' => 'nullable|integer|distinct|exists:menu_items,id',
+            'items.*.food_item_id' => 'nullable|integer|distinct|exists:food_items,id',
             'items.*.quantity' => 'required|integer|min:1|max:50',
             'points_to_redeem' => 'nullable|integer|min:0|max:100000',
             'payment_method' => 'nullable|string|in:wallet,momo,card,WALLET,MOMO,CARD',
             'payment_reference' => 'nullable|string|max:120',
         ]);
+
+        $validator->after(function ($validator) use ($request) {
+            foreach ((array) $request->input('items', []) as $index => $input) {
+                $menuItemId = $input['menu_item_id'] ?? null;
+                $foodItemId = $input['food_item_id'] ?? null;
+                if (! $menuItemId && ! $foodItemId) {
+                    $validator->errors()->add(
+                        "items.{$index}",
+                        'Each cart item must reference a menu item or food item.'
+                    );
+                }
+            }
+        });
 
         if ($validator->fails()) {
             return response()->json([
@@ -1519,26 +1534,52 @@ class OrderController extends Controller
                 $items = [];
 
                 foreach ($request->input('items') as $index => $input) {
-                    $menuItem = AppModelsMenuItem::whereKey((int) $input['menu_item_id'])
-                        ->lockForUpdate()->first();
+                    $menuItemId = $input['menu_item_id'] ?? null;
+                    $foodItemId = $input['food_item_id'] ?? null;
 
-                    if (! $menuItem) {
-                        throw new \RuntimeException("Menu item at index {$index} is no longer available.");
+                    if ($menuItemId) {
+                        $catalogItem = MenuItem::whereKey((int) $menuItemId)
+                            ->lockForUpdate()->first();
+                        $isMenuItem = true;
+                    } else {
+                        $catalogItem = FoodItem::whereKey((int) $foodItemId)
+                            ->lockForUpdate()->first();
+                        $isMenuItem = false;
                     }
-                    if (! $menuItem->is_available) {
-                        throw new \RuntimeException("Menu item '{$menuItem->name}' is currently unavailable.");
+
+                    if (! $catalogItem) {
+                        throw new \RuntimeException("Cart item at index {$index} is no longer available.");
+                    }
+
+                    if (! $catalogItem->is_available) {
+                        $itemName = $catalogItem->name ?: ($catalogItem->food_name ?? 'This item');
+                        throw new \RuntimeException("Menu item '{$itemName}' is currently unavailable.");
                     }
 
                     $quantity = (int) $input['quantity'];
-                    $stock = $menuItem->current_stock;
-                    if ($stock !== null && $stock < $quantity) {
-                        throw new \RuntimeException("Only {$stock} unit(s) of '{$menuItem->name}' remain.");
+
+                    // Standalone menu_items track current stock. The legacy food_items
+                    // catalog exposes initial_stock but not a live current_stock field,
+                    // so availability is enforced there without decrementing a
+                    // non-live stock value.
+                    if ($isMenuItem) {
+                        $stock = $catalogItem->current_stock;
+                        if ($stock !== null && $stock < $quantity) {
+                            throw new \RuntimeException("Only {$stock} unit(s) of '{$catalogItem->name}' remain.");
+                        }
                     }
 
-                    $unitPrice = round((float) $menuItem->price, 2);
+                    $unitPrice = round((float) $catalogItem->price, 2);
                     $lineTotal = round($unitPrice * $quantity, 2);
                     $total = round($total + $lineTotal, 2);
-                    $items[] = compact('menuItem', 'quantity', 'unitPrice', 'lineTotal');
+
+                    $items[] = [
+                        'catalog_item' => $catalogItem,
+                        'quantity' => $quantity,
+                        'unitPrice' => $unitPrice,
+                        'lineTotal' => $lineTotal,
+                        'is_menu_item' => $isMenuItem,
+                    ];
                 }
 
                 if ($pointsToRedeem > (int) ($lockedUser->loyalty_points ?? 0)) {
@@ -1563,7 +1604,7 @@ class OrderController extends Controller
                 } elseif ((float) $lockedUser->balance < $finalTotal) {
                     throw new \RuntimeException(
                         'Insufficient wallet balance. You need GH₵ '.number_format($finalTotal, 2).
-                        ', but your balance is GH₵ '.number_format((float) $lockedUser->balance, 2).'.'
+                        ', but your balance is GH₵'.number_format((float) $lockedUser->balance, 2).'.'
                     );
                 }
 
@@ -1573,14 +1614,17 @@ class OrderController extends Controller
                 foreach ($items as $item) {
                     $ratio = $total > 0 ? $item['lineTotal'] / $total : 0;
                     $itemDiscount = round($discount * $ratio, 2);
+                    $catalogItem = $item['catalog_item'];
+                    $itemName = $catalogItem->name ?: ($catalogItem->food_name ?? 'Meal');
 
                     $order = Order::create([
                         'customer_id' => $lockedUser->id,
                         'student_id' => $lockedUser->id,
                         'user_id' => $lockedUser->id,
-                        'vendor_id' => $item['menuItem']->vendor_id,
-                        'menu_item_id' => $item['menuItem']->id,
-                        'food_name' => $item['menuItem']->name,
+                        'vendor_id' => $catalogItem->vendor_id,
+                        'food_item_id' => $item['is_menu_item'] ? null : $catalogItem->id,
+                        'menu_item_id' => $item['is_menu_item'] ? $catalogItem->id : null,
+                        'food_name' => $itemName,
                         'quantity' => $item['quantity'],
                         'unit_price' => $item['unitPrice'],
                         'total_price' => max(0.0, round($item['lineTotal'] - $itemDiscount, 2)),
@@ -1592,17 +1636,17 @@ class OrderController extends Controller
                         'discount_applied' => $itemDiscount,
                     ]);
 
-                    if ($item['menuItem']->current_stock !== null) {
-                        $item['menuItem']->decrement('current_stock', $item['quantity']);
-                        if (($item['menuItem']->current_stock - $item['quantity']) <= 0) {
-                            $item['menuItem']->update(['is_available' => false]);
+                    if ($item['is_menu_item'] && $catalogItem->current_stock !== null) {
+                        $catalogItem->decrement('current_stock', $item['quantity']);
+                        if (($catalogItem->current_stock - $item['quantity']) <= 0) {
+                            $catalogItem->update(['is_available' => false]);
                         }
                     }
 
                     AuditLog::create([
                         'user_id' => $lockedUser->id,
                         'action' => 'ORDER_CREATED',
-                        'details' => "Placed order #{$order->id} for '{$item['menuItem']->name}' x {$item['quantity']}",
+                        'details' => "Placed order #{$order->id} for '{$itemName}' x {$item['quantity']}",
                     ]);
                     $createdOrders[] = $order;
                 }
