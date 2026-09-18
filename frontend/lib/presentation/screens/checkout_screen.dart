@@ -18,7 +18,19 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
   final TextEditingController _pointsController = TextEditingController();
   final TextEditingController _noteController = TextEditingController();
   bool _submitting = false;
+  bool _cartReady = false;
   final ApiClient _api = ApiClient();
+
+  @override
+  void initState() {
+    super.initState();
+    _restoreCart();
+  }
+
+  Future<void> _restoreCart() async {
+    await context.read<CartProvider>().restore();
+    if (mounted) setState(() => _cartReady = true);
+  }
 
   @override
   void dispose() {
@@ -37,9 +49,11 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
     final finalTotal = (total - discount).clamp(0.0, double.infinity).toDouble();
     return Scaffold(
       appBar: AppBar(title: const Text('Checkout')),
-      body: cart.isEmpty
-          ? const Center(child: Text('Your cart is empty.'))
-          : ListView(
+      body: !_cartReady
+          ? const Center(child: CircularProgressIndicator())
+          : cart.isEmpty
+              ? const Center(child: Text('Your cart is empty.'))
+              : ListView(
               padding: const EdgeInsets.all(20),
               children: [
                 Text('Review your order', style: Theme.of(context).textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.w900)),
@@ -219,7 +233,15 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
     _api.token = token;
 
     final cart = context.read<CartProvider>();
-    if (cart.isEmpty) return;
+    await cart.restore();
+    if (!context.mounted || cart.isEmpty) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Your cart is empty. Please add a meal and try again.')),
+        );
+      }
+      return;
+    }
     if (_fulfilment == 'Schedule pickup' && _scheduledPickup == null) {
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Choose a pickup time first.')));
       return;
