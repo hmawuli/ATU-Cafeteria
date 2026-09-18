@@ -125,44 +125,53 @@ class CafeteriaProvider extends ChangeNotifier {
     notifyListeners();
   }
 
-  Future<void> fetchAndCacheStudentOrders(int studentId) async {
+  Future<List<Order>> fetchAndCacheStudentOrders(int studentId) async {
     try {
       final url = Uri.parse("$_laravelBaseUrl/api/orders/customer/$studentId");
-      final client = HttpClient();
-      client.connectionTimeout = const Duration(seconds: 3);
-      final request = await client.getUrl(url);
-      if (_authToken != null) {
-        request.headers.add("Authorization", "Bearer $_authToken");
-      }
-      final response = await request.close();
-      if (response.statusCode == 200) {
-        final body = await response.transform(utf8.decoder).join();
-        final List decoded = json.decode(body);
-        for (var item in decoded) {
-          final order = Order(
-            id: item['id'],
-            customerId: item['customer_id'] ?? item['student_id'] ?? studentId,
-            vendorId: item['vendor_id'] ?? 0,
-            foodItemId: item['food_item_id'] ?? item['menu_item_id'] ?? 0,
-            foodName: item['food_name'] ?? 'Meal',
-            quantity: item['quantity'] ?? 1,
-            unitPrice: (item['unit_price'] as num?)?.toDouble() ?? 0.0,
-            totalPrice: (item['total_price'] as num?)?.toDouble() ?? 0.0,
-            orderTimestamp: item['order_timestamp'] ??
-                DateTime.now().millisecondsSinceEpoch,
-            status: item['status'] ?? item['order_status'] ?? 'PENDING',
-            pickupPin: item['pickup_pin'] ?? '0000',
-          );
-          await _db.insertOrder(order);
-        }
-        _isOrderCacheOffline = false;
-      } else {
+      final response = await http.get(
+        url,
+        headers: {
+          'Accept': 'application/json',
+          if (_authToken != null) 'Authorization': 'Bearer $_authToken',
+        },
+      ).timeout(const Duration(seconds: 8));
+
+      if (response.statusCode != 200 || response.body.isEmpty) {
         _isOrderCacheOffline = true;
+        return [];
       }
+
+      final decoded = jsonDecode(response.body);
+      if (decoded is! List) {
+        _isOrderCacheOffline = true;
+        return [];
+      }
+
+      final remoteOrders = <Order>[];
+      for (final raw in decoded) {
+        if (raw is! Map) continue;
+        try {
+          final order = Order.fromJson(Map<String, dynamic>.from(raw));
+          remoteOrders.add(order);
+
+          // SQLite is only an offline cache. A cache write must never prevent
+          // a successfully fetched server order from reaching the UI.
+          try {
+            await _db.insertOrder(order);
+          } catch (e) {
+            debugPrint('Student order cache update skipped: $e');
+          }
+        } catch (e) {
+          debugPrint('Skipping malformed remote student order: $e');
+        }
+      }
+
+      _isOrderCacheOffline = false;
+      return remoteOrders;
     } catch (e) {
-      debugPrint(
-          "Campus network unstable: loading from SQLite local cache. Exception: $e");
+      debugPrint('Student order sync skipped; using SQLite cache: $e');
       _isOrderCacheOffline = true;
+      return [];
     }
   }
 
@@ -355,8 +364,12 @@ class CafeteriaProvider extends ChangeNotifier {
 
     if (_currentUser != null) {
       if (_currentUser!.role == 'STUDENT') {
-        await fetchAndCacheStudentOrders(_currentUser!.id!);
-        _customerOrders = await _db.getOrdersForCustomer(_currentUser!.id!);
+        final remoteOrders = await fetchAndCacheStudentOrders(_currentUser!.id!);
+        // Prefer the live Laravel orders. SQLite remains an offline fallback
+        // only when the server cannot be reached.
+        _customerOrders = remoteOrders.isNotEmpty
+            ? remoteOrders
+            : await _db.getOrdersForCustomer(_currentUser!.id!);
         await fetchPurchasedVendors();
       } else if (_currentUser!.role == 'VENDOR') {
         _vendorOrders = await _db.getOrdersForVendor(_currentUser!.id!);
