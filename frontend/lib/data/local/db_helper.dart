@@ -195,16 +195,22 @@ class DbHelper {
   // ==========================================
   Future<int> insertFoodItem(FoodItem item) async {
     final db = await instance.database;
-    return await db.insert('food_items', {
-      'id': item.id,
-      'vendorId': item.vendorId,
-      'name': item.name,
-      'price': item.price,
-      'category': item.category,
-      'imageUrl': item.imageUrl,
-      'description': item.description,
-      'isAvailable': item.isAvailable ? 1 : 0,
-    });
+    return await db.insert(
+      'food_items',
+      {
+        'id': item.id,
+        'vendorId': item.vendorId,
+        'name': item.name,
+        'price': item.price,
+        'category': item.category,
+        'imageUrl': item.imageUrl,
+        'description': item.description,
+        'isAvailable': item.isAvailable ? 1 : 0,
+        'calories': item.calories,
+        'allergens': item.allergens,
+      },
+      conflictAlgorithm: ConflictAlgorithm.replace,
+    );
   }
 
   Future<List<FoodItem>> getAllFoodItems() async {
@@ -235,6 +241,8 @@ class DbHelper {
         'imageUrl': item.imageUrl,
         'description': item.description,
         'isAvailable': item.isAvailable ? 1 : 0,
+        'calories': item.calories,
+        'allergens': item.allergens,
       },
       where: 'id = ?',
       whereArgs: [item.id],
