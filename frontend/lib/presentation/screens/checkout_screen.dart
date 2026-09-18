@@ -257,7 +257,19 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
         actions: [FilledButton(onPressed: () { Navigator.pop(ctx); if (orderId != null) { Navigator.pushReplacementNamed(ctx, '/order-tracking', arguments: orderId is int ? orderId : int.tryParse(orderId.toString())); } else { Navigator.pushReplacementNamed(ctx, '/student'); } }, child: const Text('View dashboard'))],
       ));
     } on ApiException catch (e) {
-      if (context.mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.message)));
+      if (context.mounted) {
+        final details = e.errors.entries
+            .map((entry) {
+              final value = entry.value;
+              if (value is List) return value.map((item) => item.toString()).join(' ');
+              return value.toString();
+            })
+            .where((value) => value.trim().isNotEmpty)
+            .join(' ');
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(details.isEmpty ? e.message : '$details')),
+        );
+      }
     } catch (_) {
       if (context.mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Unable to place the order. Please check your connection and try again.')));
     } finally { if (mounted) setState(() => _submitting = false); }
