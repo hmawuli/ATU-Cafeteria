@@ -80,7 +80,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                   Row(children: [const Text('Subtotal'), const Spacer(), Text('GH₵ ${total.toStringAsFixed(2)}')]),
                   if (discount > 0) ...[const SizedBox(height: 8), Row(children: [const Text('Loyalty discount'), const Spacer(), Text('- GH₵ ${discount.toStringAsFixed(2)}')])],
                   const Divider(height: 28),
-                  Row(children: [const Text('Total', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w900)), const Spacer(), Text('GH₵ ${finalTotal.toStringAsFixed(2)}', style: TextStyle(fontSize: 20, fontWeight: FontWeight.w900, color: Colors.blue))]),
+                  Row(children: [const Text('Total', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w900)), const Spacer(), Text('GH₵ ${finalTotal.toStringAsFixed(2)}', style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w900, color: Colors.blue))]),
                   const SizedBox(height: 16),
                   SizedBox(width: double.infinity, height: 52, child: FilledButton.icon(onPressed: _submitting ? null : () => _showConfirmation(context), icon: const Icon(Icons.check_circle_outline), label: Text(_submitting ? 'Processing...' : 'Place Order Securely'))),
                 ]))),
@@ -182,6 +182,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
           : null;
       cart.clear();
       await auth.refreshAllData();
+      if (!pageContext.mounted) return;
       final pickupPin = result is Map ? result['pickup_pin']?.toString() : null;
       await showDialog<void>(context: pageContext, builder: (ctx) => AlertDialog(
         icon: const Icon(Icons.verified_outlined, size: 48), title: const Text('Payment confirmed'),
@@ -267,7 +268,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
       cart.clear();
       await auth.refreshAllData();
       final message = result is Map && result['message'] != null ? result['message'].toString() : 'Your order has been placed successfully.';
-      if (!mounted) return;
+      if (!context.mounted) return;
       await showDialog<void>(context: context, builder: (ctx) => AlertDialog(
         icon: const Icon(Icons.check_circle_outline, size: 48), title: const Text('Order placed'), content: Text(message),
         actions: [FilledButton(onPressed: () { Navigator.pop(ctx); if (orderId != null) { Navigator.pushReplacementNamed(ctx, '/order-tracking', arguments: orderId is int ? orderId : int.tryParse(orderId.toString())); } else { Navigator.pushReplacementNamed(ctx, '/student'); } }, child: const Text('View dashboard'))],
@@ -283,7 +284,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
             .where((value) => value.trim().isNotEmpty)
             .join(' ');
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(details.isEmpty ? e.message : '$details')),
+          SnackBar(content: Text(details.isEmpty ? e.message : details)),
         );
       }
     } catch (_) {
