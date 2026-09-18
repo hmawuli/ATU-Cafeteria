@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'dart:convert';
+import 'package:http/http.dart' as http;
+import '../../core/config/app_config.dart';
 import '../../domain/models/models.dart';
 import '../providers/cart_provider.dart';
-import '../providers/cafeteria_provider.dart';
 
 class PublicHomeScreen extends StatefulWidget {
   const PublicHomeScreen({super.key});
@@ -34,11 +36,32 @@ class _PublicHomeScreenState extends State<PublicHomeScreen> {
     if (mounted) setState(() { _loading = true; _error = null; });
     try {
       final provider = context.read<CafeteriaProvider>();
-      // Use the same catalogue pipeline as the authenticated student area.
-      // The provider prefers the live Laravel menu and falls back to its
-      // lightweight SQLite cache when the API is temporarily unavailable.
-      await provider.initialize();
-      _items = provider.allFoodItems.where((item) => item.isAvailable).toList();
+        final response = await http.get(
+        Uri.parse('${AppConfig.normalizedApiBaseUrl}/api/food-items'),
+        headers: const {'Accept': 'application/json'},
+      ).timeout(const Duration(seconds: 12));
+
+      if (response.statusCode != 200) {
+        throw Exception('Menu request failed (${response.statusCode})');
+      }
+
+      final decoded = jsonDecode(response.body);
+      final raw = decoded is Map && decoded['food_items'] is List
+          ? decoded['food_items']
+          : decoded is Map && decoded['data'] is List
+              ? decoded['data']
+              : decoded;
+
+      if (raw is! List) {
+        throw Exception('Invalid menu response');
+      }
+
+      _items = raw
+          .whereType<Map>()
+          .map((e) => FoodItem.fromJson(Map<String, dynamic>.from(e)))
+          .where((item) => item.isAvailable)
+          .toList();
+
       if (_items.isEmpty) {
         _error = 'No available meals found. Please check the cafeteria menu.';
       }
