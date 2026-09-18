@@ -262,7 +262,7 @@ class _ReferenceAdminScreenState extends State<ReferenceAdminScreen> {
             if (!this.mounted || !dialogContext.mounted) return;
             if (ok) {
               Navigator.of(dialogContext).pop();
-              ScaffoldMessenger.of(this.context).showSnackBar(const SnackBar(content: Text('Vendor account created successfully.')));
+              ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Vendor account created successfully.')));
             } else {
               setDialogState(() => saving = false);
               ScaffoldMessenger.of(this.context).showSnackBar(SnackBar(content: Text(admin.error ?? 'Could not create vendor.')));
