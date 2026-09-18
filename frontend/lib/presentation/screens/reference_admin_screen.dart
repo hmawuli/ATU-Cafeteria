@@ -259,7 +259,7 @@ class _ReferenceAdminScreenState extends State<ReferenceAdminScreen> {
               contactEmail: contactEmail.text.trim().isEmpty ? null : contactEmail.text.trim(),
               contactInfo: contactInfo.text.trim().isEmpty ? null : contactInfo.text.trim(),
             );
-            if (!this.mounted || !dialogContext.mounted) return;
+            if (!mounted || !dialogContext.mounted) return;
             if (ok) {
               Navigator.of(dialogContext).pop();
               ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Vendor account created successfully.')));
