@@ -17,7 +17,10 @@ class _KfcOrderingScreenState extends State<KfcOrderingScreen> {
   String _category = 'All';
 
   @override
-  void dispose() { _search.dispose(); super.dispose(); }
+  void dispose() {
+    _search.dispose();
+    super.dispose();
+  }
 
   Future<void> _showMealDetails(FoodItem item) async {
     if (!item.isAvailable) return;
@@ -31,7 +34,8 @@ class _KfcOrderingScreenState extends State<KfcOrderingScreen> {
           final scheme = Theme.of(context).colorScheme;
           return SafeArea(
             child: Padding(
-              padding: EdgeInsets.fromLTRB(20, 0, 20, 20 + MediaQuery.of(context).viewInsets.bottom),
+              padding: EdgeInsets.fromLTRB(
+                  20, 0, 20, 20 + MediaQuery.of(context).viewInsets.bottom),
               child: SingleChildScrollView(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -42,37 +46,77 @@ class _KfcOrderingScreenState extends State<KfcOrderingScreen> {
                         width: double.infinity,
                         height: 220,
                         child: item.imageUrl.trim().isEmpty
-                            ? Container(color: scheme.primaryContainer, child: Icon(Icons.restaurant_rounded, size: 80, color: scheme.primary))
-                            : Image.network(item.imageUrl, fit: BoxFit.cover,
+                            ? Container(
+                                color: scheme.primaryContainer,
+                                child: Icon(Icons.restaurant_rounded,
+                                    size: 80, color: scheme.primary))
+                            : Image.network(item.imageUrl,
+                                fit: BoxFit.cover,
                                 errorBuilder: (_, __, ___) => Container(
-                                  color: scheme.primaryContainer,
-                                  child: Icon(Icons.restaurant_rounded, size: 80, color: scheme.primary),
-                                )),
+                                      color: scheme.primaryContainer,
+                                      child: Icon(Icons.restaurant_rounded,
+                                          size: 80, color: scheme.primary),
+                                    )),
                       ),
                     ),
                     const SizedBox(height: 18),
-                    Text(item.category, style: TextStyle(color: scheme.primary, fontWeight: FontWeight.w800)),
+                    Text(item.category,
+                        style: TextStyle(
+                            color: scheme.primary,
+                            fontWeight: FontWeight.w800)),
                     const SizedBox(height: 4),
-                    Text(item.name, style: Theme.of(context).textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.w900)),
+                    Text(item.name,
+                        style: Theme.of(context)
+                            .textTheme
+                            .headlineSmall
+                            ?.copyWith(fontWeight: FontWeight.w900)),
                     const SizedBox(height: 8),
-                    Text(item.description.isEmpty ? 'Freshly prepared and available for campus ordering.' : item.description,
-                        style: Theme.of(context).textTheme.bodyLarge?.copyWith(height: 1.45)),
+                    Text(
+                        item.description.isEmpty
+                            ? 'Freshly prepared and available for campus ordering.'
+                            : item.description,
+                        style: Theme.of(context)
+                            .textTheme
+                            .bodyLarge
+                            ?.copyWith(height: 1.45)),
                     const SizedBox(height: 14),
                     Wrap(spacing: 8, runSpacing: 8, children: [
-                      Chip(avatar: const Icon(Icons.local_fire_department, size: 18), label: Text('${item.calories} kcal')),
-                      Chip(avatar: const Icon(Icons.info_outline, size: 18), label: Text('Allergens: ${item.allergens}')),
+                      Chip(
+                          avatar:
+                              const Icon(Icons.local_fire_department, size: 18),
+                          label: Text('${item.calories} kcal')),
+                      Chip(
+                          avatar: const Icon(Icons.info_outline, size: 18),
+                          label: Text('Allergens: ${item.allergens}')),
                     ]),
                     const SizedBox(height: 18),
                     Row(children: [
                       Text('GH₵ ${item.price.toStringAsFixed(2)}',
-                          style: TextStyle(fontSize: 22, fontWeight: FontWeight.w900, color: scheme.primary)),
+                          style: TextStyle(
+                              fontSize: 22,
+                              fontWeight: FontWeight.w900,
+                              color: scheme.primary)),
                       const Spacer(),
                       DecoratedBox(
-                        decoration: BoxDecoration(border: Border.all(color: scheme.outlineVariant), borderRadius: BorderRadius.circular(14)),
+                        decoration: BoxDecoration(
+                            border: Border.all(color: scheme.outlineVariant),
+                            borderRadius: BorderRadius.circular(14)),
                         child: Row(children: [
-                          IconButton(onPressed: quantity > 1 ? () => setSheetState(() => quantity--) : null, icon: const Icon(Icons.remove_rounded)),
-                          SizedBox(width: 30, child: Text('$quantity', textAlign: TextAlign.center, style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 17))),
-                          IconButton(onPressed: () => setSheetState(() => quantity++), icon: const Icon(Icons.add_rounded)),
+                          IconButton(
+                              onPressed: quantity > 1
+                                  ? () => setSheetState(() => quantity--)
+                                  : null,
+                              icon: const Icon(Icons.remove_rounded)),
+                          SizedBox(
+                              width: 30,
+                              child: Text('$quantity',
+                                  textAlign: TextAlign.center,
+                                  style: const TextStyle(
+                                      fontWeight: FontWeight.w900,
+                                      fontSize: 17))),
+                          IconButton(
+                              onPressed: () => setSheetState(() => quantity++),
+                              icon: const Icon(Icons.add_rounded)),
                         ]),
                       ),
                     ]),
@@ -83,7 +127,8 @@ class _KfcOrderingScreenState extends State<KfcOrderingScreen> {
                       child: FilledButton.icon(
                         onPressed: () => Navigator.pop(sheetContext, true),
                         icon: const Icon(Icons.add_shopping_cart),
-                        label: Text('Add $quantity ${quantity == 1 ? 'item' : 'items'} • GH₵ ${(item.price * quantity).toStringAsFixed(2)}'),
+                        label: Text(
+                            'Add $quantity ${quantity == 1 ? 'item' : 'items'} • GH₵ ${(item.price * quantity).toStringAsFixed(2)}'),
                       ),
                     ),
                   ],
@@ -102,7 +147,9 @@ class _KfcOrderingScreenState extends State<KfcOrderingScreen> {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text('${item.name} added to your order.'),
-          action: SnackBarAction(label: 'VIEW CART', onPressed: () => Navigator.pushNamed(context, '/cart')),
+          action: SnackBarAction(
+              label: 'VIEW CART',
+              onPressed: () => Navigator.pushNamed(context, '/cart')),
         ),
       );
     }
@@ -112,12 +159,19 @@ class _KfcOrderingScreenState extends State<KfcOrderingScreen> {
   Widget build(BuildContext context) {
     final cafe = context.watch<CafeteriaProvider>();
     final all = cafe.allFoodItems.where((i) => i.isAvailable).toList();
-    final categories = <String>{'All', ...all.map((i) => i.category).where((v) => v.trim().isNotEmpty)}.toList();
+    final categories = <String>{
+      'All',
+      ...all.map((i) => i.category).where((v) => v.trim().isNotEmpty)
+    }.toList();
     final q = _query.toLowerCase();
-    final items = all.where((i) =>
-      (_category == 'All' || i.category == _category) &&
-      (q.isEmpty || i.name.toLowerCase().contains(q) || i.description.toLowerCase().contains(q) || i.category.toLowerCase().contains(q))
-    ).toList();
+    final items = all
+        .where((i) =>
+            (_category == 'All' || i.category == _category) &&
+            (q.isEmpty ||
+                i.name.toLowerCase().contains(q) ||
+                i.description.toLowerCase().contains(q) ||
+                i.category.toLowerCase().contains(q)))
+        .toList();
 
     final cart = context.watch<CartProvider>();
     final recentItems = <FoodItem>[];
@@ -141,15 +195,16 @@ class _KfcOrderingScreenState extends State<KfcOrderingScreen> {
             icon: const Icon(Icons.groups_outlined),
             onPressed: () => Navigator.pushNamed(context, '/group-order'),
           ),
-          Consumer<CartProvider>(builder: (_, cart, __) => Badge(
-            isLabelVisible: cart.itemCount > 0,
-            label: Text(cart.itemCount.toString()),
-            child: IconButton(
-              tooltip: 'Cart',
-              icon: const Icon(Icons.shopping_bag_outlined),
-              onPressed: () => Navigator.pushNamed(context, '/cart'),
-            ),
-          )),
+          Consumer<CartProvider>(
+              builder: (_, cart, __) => Badge(
+                    isLabelVisible: cart.itemCount > 0,
+                    label: Text(cart.itemCount.toString()),
+                    child: IconButton(
+                      tooltip: 'Cart',
+                      icon: const Icon(Icons.shopping_bag_outlined),
+                      onPressed: () => Navigator.pushNamed(context, '/cart'),
+                    ),
+                  )),
         ],
       ),
       bottomNavigationBar: cart.isEmpty
@@ -234,10 +289,15 @@ class _KfcOrderingScreenState extends State<KfcOrderingScreen> {
               decoration: InputDecoration(
                 hintText: 'Search meals, snacks and drinks...',
                 prefixIcon: const Icon(Icons.search_rounded),
-                suffixIcon: _query.isEmpty ? null : IconButton(
-                  onPressed: () { _search.clear(); setState(() => _query = ''); },
-                  icon: const Icon(Icons.clear_rounded),
-                ),
+                suffixIcon: _query.isEmpty
+                    ? null
+                    : IconButton(
+                        onPressed: () {
+                          _search.clear();
+                          setState(() => _query = '');
+                        },
+                        icon: const Icon(Icons.clear_rounded),
+                      ),
               ),
             ),
             const SizedBox(height: 10),
@@ -258,10 +318,13 @@ class _KfcOrderingScreenState extends State<KfcOrderingScreen> {
             Card(
               child: ListTile(
                 leading: CircleAvatar(
-                  child: Icon(Icons.groups_rounded, color: Theme.of(context).colorScheme.primary),
+                  child: Icon(Icons.groups_rounded,
+                      color: Theme.of(context).colorScheme.primary),
                 ),
-                title: const Text('Order together', style: TextStyle(fontWeight: FontWeight.w900)),
-                subtitle: const Text('Invite friends and checkout one shared order.'),
+                title: const Text('Order together',
+                    style: TextStyle(fontWeight: FontWeight.w900)),
+                subtitle:
+                    const Text('Invite friends and checkout one shared order.'),
                 trailing: const Icon(Icons.arrow_forward_ios_rounded, size: 16),
                 onTap: () => Navigator.pushNamed(context, '/group-order'),
               ),

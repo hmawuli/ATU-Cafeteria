@@ -175,7 +175,8 @@ class _MobileStudentScreenState extends State<MobileStudentScreen> {
           const SizedBox(height: 16),
           _search(),
           const SizedBox(height: 20),
-          _header('Featured Vendors', 'View All', () => setState(() => _tab = 1)),
+          _header(
+              'Featured Vendors', 'View All', () => setState(() => _tab = 1)),
           const SizedBox(height: 10),
           _featuredVendors(vendors),
           const SizedBox(height: 20),
@@ -337,7 +338,8 @@ class _MobileStudentScreenState extends State<MobileStudentScreen> {
       return _panel(
         const Padding(
           padding: EdgeInsets.all(16),
-          child: Text('Vendors will appear here when their menus are available.'),
+          child:
+              Text('Vendors will appear here when their menus are available.'),
         ),
       );
     }
@@ -367,7 +369,8 @@ class _MobileStudentScreenState extends State<MobileStudentScreen> {
         child: InkWell(
           onTap: () {
             if (foods.isNotEmpty) {
-              Navigator.pushNamed(context, '/food-detail', arguments: foods.first);
+              Navigator.pushNamed(context, '/food-detail',
+                  arguments: foods.first);
             } else {
               setState(() => _tab = 1);
             }
@@ -386,7 +389,9 @@ class _MobileStudentScreenState extends State<MobileStudentScreen> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      vendor.fullName.isEmpty ? 'Campus Vendor' : vendor.fullName,
+                      vendor.fullName.isEmpty
+                          ? 'Campus Vendor'
+                          : vendor.fullName,
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                       style: const TextStyle(
@@ -405,7 +410,8 @@ class _MobileStudentScreenState extends State<MobileStudentScreen> {
                     Row(
                       children: [
                         const Icon(Icons.star, color: yellow, size: 17),
-                        const Text(' 4.6', style: TextStyle(fontWeight: FontWeight.w800)),
+                        const Text(' 4.6',
+                            style: TextStyle(fontWeight: FontWeight.w800)),
                         const Spacer(),
                         _openPill(vendor.isOpen),
                       ],
@@ -442,7 +448,11 @@ class _MobileStudentScreenState extends State<MobileStudentScreen> {
     final actions = [
       ('All Vendors', Icons.storefront_rounded, () => setState(() => _tab = 1)),
       ('My Orders', Icons.receipt_long_rounded, () => setState(() => _tab = 2)),
-      ('Cart', Icons.shopping_cart_rounded, () => Navigator.pushNamed(context, '/cart')),
+      (
+        'Cart',
+        Icons.shopping_cart_rounded,
+        () => Navigator.pushNamed(context, '/cart')
+      ),
       ('Settings', Icons.settings_rounded, () => setState(() => _tab = 3)),
     ];
     return Row(
@@ -503,7 +513,8 @@ class _MobileStudentScreenState extends State<MobileStudentScreen> {
             padding: const EdgeInsets.all(9),
             child: Row(
               children: [
-                SizedBox(width: 88, height: 76, child: _foodImage(item.imageUrl)),
+                SizedBox(
+                    width: 88, height: 76, child: _foodImage(item.imageUrl)),
                 const SizedBox(width: 11),
                 Expanded(
                   child: Column(
@@ -521,7 +532,9 @@ class _MobileStudentScreenState extends State<MobileStudentScreen> {
                       ),
                       const SizedBox(height: 3),
                       Text(
-                        item.description.isEmpty ? item.category : item.description,
+                        item.description.isEmpty
+                            ? item.category
+                            : item.description,
                         maxLines: 2,
                         overflow: TextOverflow.ellipsis,
                         style: const TextStyle(color: muted, fontSize: 11),
@@ -539,7 +552,8 @@ class _MobileStudentScreenState extends State<MobileStudentScreen> {
                   ),
                 ),
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                   decoration: BoxDecoration(
                     color: yellow,
                     borderRadius: BorderRadius.circular(20),
@@ -565,7 +579,8 @@ class _MobileStudentScreenState extends State<MobileStudentScreen> {
       children: [
         const Text(
           'Vendors & Food',
-          style: TextStyle(color: navy, fontSize: 27, fontWeight: FontWeight.w900),
+          style:
+              TextStyle(color: navy, fontSize: 27, fontWeight: FontWeight.w900),
         ),
         const SizedBox(height: 4),
         const Text(
@@ -595,7 +610,9 @@ class _MobileStudentScreenState extends State<MobileStudentScreen> {
   }
 
   Widget _vendorListCard(User vendor) {
-    final foods = context.read<CafeteriaProvider>().allFoodItems
+    final foods = context
+        .read<CafeteriaProvider>()
+        .allFoodItems
         .where((f) => f.vendorId == vendor.id && f.isAvailable)
         .toList();
     return Material(
@@ -605,13 +622,18 @@ class _MobileStudentScreenState extends State<MobileStudentScreen> {
       child: InkWell(
         onTap: () {
           if (foods.isNotEmpty) {
-            Navigator.pushNamed(context, '/food-detail', arguments: foods.first);
+            Navigator.pushNamed(context, '/food-detail',
+                arguments: foods.first);
           }
         },
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            SizedBox(height: 145, width: double.infinity, child: _foodImage(foods.isNotEmpty ? foods.first.imageUrl : '')),
+            SizedBox(
+                height: 145,
+                width: double.infinity,
+                child:
+                    _foodImage(foods.isNotEmpty ? foods.first.imageUrl : '')),
             Padding(
               padding: const EdgeInsets.fromLTRB(14, 12, 14, 14),
               child: Row(
@@ -622,12 +644,23 @@ class _MobileStudentScreenState extends State<MobileStudentScreen> {
                       children: [
                         Text(
                           vendor.fullName,
-                          style: const TextStyle(color: navy, fontSize: 17, fontWeight: FontWeight.w900),
+                          style: const TextStyle(
+                              color: navy,
+                              fontSize: 17,
+                              fontWeight: FontWeight.w900),
                         ),
                         const SizedBox(height: 3),
-                        Text(vendor.info.isEmpty ? 'Local Dishes & Snacks' : vendor.info, style: const TextStyle(color: muted)),
+                        Text(
+                            vendor.info.isEmpty
+                                ? 'Local Dishes & Snacks'
+                                : vendor.info,
+                            style: const TextStyle(color: muted)),
                         const SizedBox(height: 7),
-                        const Row(children: [Icon(Icons.star, color: yellow, size: 18), Text(' 4.6', style: TextStyle(fontWeight: FontWeight.w800))]),
+                        const Row(children: [
+                          Icon(Icons.star, color: yellow, size: 18),
+                          Text(' 4.6',
+                              style: TextStyle(fontWeight: FontWeight.w800))
+                        ]),
                       ],
                     ),
                   ),
@@ -646,10 +679,14 @@ class _MobileStudentScreenState extends State<MobileStudentScreen> {
     return ListView(
       padding: const EdgeInsets.fromLTRB(16, 18, 16, 24),
       children: [
-        const Text('My Orders', style: TextStyle(color: navy, fontSize: 27, fontWeight: FontWeight.w900)),
+        const Text('My Orders',
+            style: TextStyle(
+                color: navy, fontSize: 27, fontWeight: FontWeight.w900)),
         const SizedBox(height: 14),
         if (orders.isEmpty)
-          _panel(const Padding(padding: EdgeInsets.all(20), child: Text('You have no orders yet.')))
+          _panel(const Padding(
+              padding: EdgeInsets.all(20),
+              child: Text('You have no orders yet.')))
         else
           ...orders.take(8).map(_orderCard),
       ],
@@ -678,7 +715,10 @@ class _MobileStudentScreenState extends State<MobileStudentScreen> {
                   Expanded(
                     child: Text(
                       'Order #ATU-${order.id ?? '----'}',
-                      style: const TextStyle(color: navy, fontSize: 18, fontWeight: FontWeight.w900),
+                      style: const TextStyle(
+                          color: navy,
+                          fontSize: 18,
+                          fontWeight: FontWeight.w900),
                     ),
                   ),
                   _status(status, color),
@@ -692,7 +732,8 @@ class _MobileStudentScreenState extends State<MobileStudentScreen> {
               const SizedBox(height: 5),
               Text(
                 'GH₵ ${order.totalPrice.toStringAsFixed(2)}',
-                style: const TextStyle(color: blue, fontSize: 16, fontWeight: FontWeight.w900),
+                style: const TextStyle(
+                    color: blue, fontSize: 16, fontWeight: FontWeight.w900),
               ),
               const SizedBox(height: 13),
               _progress(status),
@@ -701,7 +742,9 @@ class _MobileStudentScreenState extends State<MobileStudentScreen> {
                 Align(
                   alignment: Alignment.centerRight,
                   child: OutlinedButton.icon(
-                    onPressed: () => Navigator.pushNamed(context, '/order-tracking', arguments: order.id),
+                    onPressed: () => Navigator.pushNamed(
+                        context, '/order-tracking',
+                        arguments: order.id),
                     icon: const Icon(Icons.track_changes_rounded),
                     label: const Text('Track Order'),
                   ),
@@ -717,8 +760,12 @@ class _MobileStudentScreenState extends State<MobileStudentScreen> {
   Widget _status(String text, Color color) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 7),
-      decoration: BoxDecoration(color: color.withValues(alpha: .12), borderRadius: BorderRadius.circular(18)),
-      child: Text(text, style: TextStyle(color: color, fontWeight: FontWeight.w900, fontSize: 11)),
+      decoration: BoxDecoration(
+          color: color.withValues(alpha: .12),
+          borderRadius: BorderRadius.circular(18)),
+      child: Text(text,
+          style: TextStyle(
+              color: color, fontWeight: FontWeight.w900, fontSize: 11)),
     );
   }
 
@@ -727,8 +774,12 @@ class _MobileStudentScreenState extends State<MobileStudentScreen> {
     final normalized = status.toLowerCase();
     var active = 0;
     if (normalized.contains('prepar')) active = 1;
-    if (normalized.contains('ready') || normalized.contains('delivery')) active = 2;
-    if (normalized.contains('deliver') || normalized.contains('picked')) active = 3;
+    if (normalized.contains('ready') || normalized.contains('delivery')) {
+      active = 2;
+    }
+    if (normalized.contains('deliver') || normalized.contains('picked')) {
+      active = 3;
+    }
     if (normalized.contains('completed')) active = 3;
     return Row(
       children: [
@@ -741,20 +792,37 @@ class _MobileStudentScreenState extends State<MobileStudentScreen> {
                   height: 24,
                   decoration: BoxDecoration(
                     shape: BoxShape.circle,
-                    color: i <= active ? (i == active ? yellow : navy) : Colors.white,
-                    border: Border.all(color: i <= active ? navy : const Color(0xFF9FB7D3), width: 2),
+                    color: i <= active
+                        ? (i == active ? yellow : navy)
+                        : Colors.white,
+                    border: Border.all(
+                        color: i <= active ? navy : const Color(0xFF9FB7D3),
+                        width: 2),
                   ),
                   child: i < active
                       ? const Icon(Icons.check, size: 15, color: Colors.white)
-                      : Center(child: Text('${i + 1}', style: TextStyle(fontSize: 11, color: i == active ? navy : muted, fontWeight: FontWeight.w800))),
+                      : Center(
+                          child: Text('${i + 1}',
+                              style: TextStyle(
+                                  fontSize: 11,
+                                  color: i == active ? navy : muted,
+                                  fontWeight: FontWeight.w800))),
                 ),
                 const SizedBox(height: 4),
-                Text(labels[i], textAlign: TextAlign.center, style: const TextStyle(fontSize: 9, color: muted, fontWeight: FontWeight.w700)),
+                Text(labels[i],
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(
+                        fontSize: 9,
+                        color: muted,
+                        fontWeight: FontWeight.w700)),
               ],
             ),
           ),
           if (i < labels.length - 1)
-            Expanded(child: Container(height: 2, color: i < active ? navy : const Color(0xFFB8C9DC))),
+            Expanded(
+                child: Container(
+                    height: 2,
+                    color: i < active ? navy : const Color(0xFFB8C9DC))),
         ],
       ],
     );
@@ -770,16 +838,23 @@ class _MobileStudentScreenState extends State<MobileStudentScreen> {
             backgroundColor: blue,
             child: Text(
               user.fullName.isEmpty ? 'S' : user.fullName[0].toUpperCase(),
-              style: const TextStyle(color: Colors.white, fontSize: 30, fontWeight: FontWeight.w900),
+              style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 30,
+                  fontWeight: FontWeight.w900),
             ),
           ),
         ),
         const SizedBox(height: 10),
         Center(
-          child: Text(user.fullName, style: const TextStyle(color: navy, fontSize: 22, fontWeight: FontWeight.w900)),
+          child: Text(user.fullName,
+              style: const TextStyle(
+                  color: navy, fontSize: 22, fontWeight: FontWeight.w900)),
         ),
         const SizedBox(height: 4),
-        Center(child: Text(user.email ?? user.username, style: const TextStyle(color: muted))),
+        Center(
+            child: Text(user.email ?? user.username,
+                style: const TextStyle(color: muted))),
         const SizedBox(height: 14),
         Center(child: _status(user.accountStatus, const Color(0xFF20A45A))),
         const SizedBox(height: 18),
@@ -788,17 +863,26 @@ class _MobileStudentScreenState extends State<MobileStudentScreen> {
             padding: const EdgeInsets.all(18),
             child: Row(
               children: [
-                const Icon(Icons.account_balance_wallet_outlined, color: blue, size: 30),
+                const Icon(Icons.account_balance_wallet_outlined,
+                    color: blue, size: 30),
                 const SizedBox(width: 13),
-                const Expanded(child: Text('Wallet Balance', style: TextStyle(color: navy, fontWeight: FontWeight.w800))),
-                Text('GH₵ ${user.balance.toStringAsFixed(2)}', style: const TextStyle(color: blue, fontSize: 20, fontWeight: FontWeight.w900)),
+                const Expanded(
+                    child: Text('Wallet Balance',
+                        style: TextStyle(
+                            color: navy, fontWeight: FontWeight.w800))),
+                Text('GH₵ ${user.balance.toStringAsFixed(2)}',
+                    style: const TextStyle(
+                        color: blue,
+                        fontSize: 20,
+                        fontWeight: FontWeight.w900)),
               ],
             ),
           ),
         ),
         const SizedBox(height: 14),
         _profileAction(Icons.settings_outlined, 'Settings', () {}),
-        _profileAction(Icons.notifications_none_rounded, 'Notifications', () => Navigator.pushNamed(context, '/notifications')),
+        _profileAction(Icons.notifications_none_rounded, 'Notifications',
+            () => Navigator.pushNamed(context, '/notifications')),
         _profileAction(Icons.logout_rounded, 'Sign out', () {
           provider.logOut();
           Navigator.pushReplacementNamed(context, '/login');
@@ -807,7 +891,8 @@ class _MobileStudentScreenState extends State<MobileStudentScreen> {
     );
   }
 
-  Widget _profileAction(IconData icon, String title, VoidCallback onTap, {bool danger = false}) {
+  Widget _profileAction(IconData icon, String title, VoidCallback onTap,
+      {bool danger = false}) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 10),
       child: Material(
@@ -816,9 +901,13 @@ class _MobileStudentScreenState extends State<MobileStudentScreen> {
         child: ListTile(
           onTap: onTap,
           leading: Icon(icon, color: danger ? Colors.redAccent : navy),
-          title: Text(title, style: TextStyle(color: danger ? Colors.redAccent : navy, fontWeight: FontWeight.w800)),
+          title: Text(title,
+              style: TextStyle(
+                  color: danger ? Colors.redAccent : navy,
+                  fontWeight: FontWeight.w800)),
           trailing: const Icon(Icons.chevron_right_rounded, color: muted),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+          shape:
+              RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
         ),
       ),
     );
@@ -861,7 +950,9 @@ class _MobileStudentScreenState extends State<MobileStudentScreen> {
             const Icon(Icons.cloud_off_rounded, color: muted, size: 42),
             const SizedBox(height: 8),
             Text(
-              noData ? "Today's menu is not available yet." : 'No meals match your search.',
+              noData
+                  ? "Today's menu is not available yet."
+                  : 'No meals match your search.',
               textAlign: TextAlign.center,
               style: const TextStyle(color: navy, fontWeight: FontWeight.w800),
             ),
@@ -893,7 +984,8 @@ class _MobileStudentScreenState extends State<MobileStudentScreen> {
           Expanded(
             child: Text(
               'Browse freely and build your cart. Sign in is required only when you are ready to checkout.',
-              style: TextStyle(color: navy, fontWeight: FontWeight.w700, height: 1.35),
+              style: TextStyle(
+                  color: navy, fontWeight: FontWeight.w700, height: 1.35),
             ),
           ),
         ],

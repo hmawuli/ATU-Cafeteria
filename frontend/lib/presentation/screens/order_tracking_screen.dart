@@ -23,7 +23,8 @@ class _OrderTrackingScreenState extends State<OrderTrackingScreen> {
   void initState() {
     super.initState();
     _load();
-    _timer = Timer.periodic(const Duration(seconds: 4), (_) => _load(silent: true));
+    _timer =
+        Timer.periodic(const Duration(seconds: 4), (_) => _load(silent: true));
   }
 
   @override
@@ -38,17 +39,21 @@ class _OrderTrackingScreenState extends State<OrderTrackingScreen> {
     try {
       final value = await _api.get('/orders/${widget.orderId}/tracking');
       if (!mounted) return;
-      final data = value is Map
-          ? Map<String, dynamic>.from(value)
-          : <String, dynamic>{};
+      final data =
+          value is Map ? Map<String, dynamic>.from(value) : <String, dynamic>{};
       setState(() {
         _order = data;
-        _stages = data['stages'] is List ? List<dynamic>.from(data['stages']) : const [];
+        _stages = data['stages'] is List
+            ? List<dynamic>.from(data['stages'])
+            : const [];
         _error = null;
         _loading = false;
       });
       final status = data['status']?.toString().toUpperCase();
-      if (status == 'COMPLETED' || status == 'DELIVERED' || status == 'CANCELLED' || status == 'DECLINED') {
+      if (status == 'COMPLETED' ||
+          status == 'DELIVERED' ||
+          status == 'CANCELLED' ||
+          status == 'DECLINED') {
         _timer?.cancel();
       }
     } catch (e) {
@@ -158,7 +163,10 @@ class _OrderTrackingScreenState extends State<OrderTrackingScreen> {
                             children: [
                               Text(
                                 terminal ? _label(status) : 'We’re on it!',
-                                style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                                style: Theme.of(context)
+                                    .textTheme
+                                    .headlineSmall
+                                    ?.copyWith(
                                       fontWeight: FontWeight.w900,
                                     ),
                               ),
@@ -180,10 +188,13 @@ class _OrderTrackingScreenState extends State<OrderTrackingScreen> {
                                   const SizedBox(width: 10),
                                   Expanded(
                                     child: Text(
-                                      eta == null || eta.isEmpty || eta == 'Calculating...'
+                                      eta == null ||
+                                              eta.isEmpty ||
+                                              eta == 'Calculating...'
                                           ? 'Pickup time: Calculating...'
                                           : 'Pickup time: $eta',
-                                      style: const TextStyle(fontWeight: FontWeight.w800),
+                                      style: const TextStyle(
+                                          fontWeight: FontWeight.w800),
                                     ),
                                   ),
                                 ],
@@ -201,31 +212,40 @@ class _OrderTrackingScreenState extends State<OrderTrackingScreen> {
                             children: [
                               const Text(
                                 'Order progress',
-                                style: TextStyle(fontSize: 18, fontWeight: FontWeight.w900),
+                                style: TextStyle(
+                                    fontSize: 18, fontWeight: FontWeight.w900),
                               ),
                               const SizedBox(height: 12),
                               ..._stages.asMap().entries.map((entry) {
                                 final stage = entry.value is Map
-                                    ? Map<String, dynamic>.from(entry.value as Map)
+                                    ? Map<String, dynamic>.from(
+                                        entry.value as Map)
                                     : <String, dynamic>{};
                                 final completed = stage['completed'] == true;
                                 final active = stage['active'] == true;
-                                final name = stage['name']?.toString() ?? 'Step';
+                                final name =
+                                    stage['name']?.toString() ?? 'Step';
                                 return ListTile(
                                   contentPadding: EdgeInsets.zero,
                                   leading: CircleAvatar(
                                     child: Icon(
-                                      completed ? Icons.check_rounded : Icons.circle_outlined,
+                                      completed
+                                          ? Icons.check_rounded
+                                          : Icons.circle_outlined,
                                       size: 20,
                                     ),
                                   ),
                                   title: Text(
                                     name,
                                     style: TextStyle(
-                                      fontWeight: active || completed ? FontWeight.w800 : FontWeight.w500,
+                                      fontWeight: active || completed
+                                          ? FontWeight.w800
+                                          : FontWeight.w500,
                                     ),
                                   ),
-                                  subtitle: active ? const Text('Current status') : null,
+                                  subtitle: active
+                                      ? const Text('Current status')
+                                      : null,
                                 );
                               }),
                             ],
@@ -238,10 +258,12 @@ class _OrderTrackingScreenState extends State<OrderTrackingScreen> {
                           child: ListTile(
                             leading: Icon(Icons.pin_outlined),
                             title: Text('Ready for pickup'),
-                            subtitle: Text('Use the pickup PIN shown after checkout at the vendor counter.'),
+                            subtitle: Text(
+                                'Use the pickup PIN shown after checkout at the vendor counter.'),
                           ),
                         ),
-                      if (const {'PENDING', 'ORDER_PLACED', 'PREPARING'}.contains(status.toUpperCase()))
+                      if (const {'PENDING', 'ORDER_PLACED', 'PREPARING'}
+                          .contains(status.toUpperCase()))
                         Card(
                           child: Padding(
                             padding: const EdgeInsets.all(12),
@@ -255,12 +277,14 @@ class _OrderTrackingScreenState extends State<OrderTrackingScreen> {
                             ),
                           ),
                         ),
-                      if (status.toUpperCase() == 'CANCELLED' || status.toUpperCase() == 'DECLINED')
+                      if (status.toUpperCase() == 'CANCELLED' ||
+                          status.toUpperCase() == 'DECLINED')
                         Card(
                           child: ListTile(
                             leading: const Icon(Icons.info_outline),
                             title: Text(_label(status)),
-                            subtitle: const Text('Please contact the cafeteria if you need assistance with this order.'),
+                            subtitle: const Text(
+                                'Please contact the cafeteria if you need assistance with this order.'),
                           ),
                         ),
                     ],
@@ -277,7 +301,8 @@ class _OrderTrackingScreenState extends State<OrderTrackingScreen> {
             children: [
               const Icon(Icons.cloud_off_rounded, size: 52),
               const SizedBox(height: 12),
-              Text(_error ?? 'Unable to load order tracking.', textAlign: TextAlign.center),
+              Text(_error ?? 'Unable to load order tracking.',
+                  textAlign: TextAlign.center),
               const SizedBox(height: 14),
               FilledButton.icon(
                 onPressed: _load,

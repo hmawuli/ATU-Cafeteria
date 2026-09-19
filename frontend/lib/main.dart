@@ -39,7 +39,8 @@ class ATUCafeteriaApp extends StatelessWidget {
         providers: [
           ChangeNotifierProvider(create: (_) => CafeteriaProvider()),
           ChangeNotifierProvider(create: (_) => CartProvider()),
-          ChangeNotifierProvider(create: (_) => AdminStateProvider(ApiClient())),
+          ChangeNotifierProvider(
+              create: (_) => AdminStateProvider(ApiClient())),
         ],
         child: MaterialApp(
           title: 'ATU Cafeteria',
@@ -75,9 +76,8 @@ class ATUCafeteriaApp extends StatelessWidget {
             },
             '/order-tracking': (context) {
               final id = ModalRoute.of(context)?.settings.arguments;
-              final orderId = id is int
-                  ? id
-                  : int.tryParse(id?.toString() ?? '');
+              final orderId =
+                  id is int ? id : int.tryParse(id?.toString() ?? '');
               return orderId == null
                   ? const Scaffold(
                       body: Center(child: Text('Invalid order ID.')),

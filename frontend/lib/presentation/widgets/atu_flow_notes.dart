@@ -6,5 +6,6 @@ import 'package:flutter/foundation.dart';
 /// vendor: dashboard -> menu -> orders -> preparing -> ready -> pickup;
 /// admin: dashboard -> users/vendors/orders -> reports/settings.
 class AtuFlow {
-  static void log(String from, String to) => debugPrint('ATU FLOW: $from -> $to');
+  static void log(String from, String to) =>
+      debugPrint('ATU FLOW: $from -> $to');
 }

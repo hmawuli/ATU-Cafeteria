@@ -51,7 +51,8 @@ class _ReferenceStudentScreenState extends State<ReferenceStudentScreen> {
                 if (!wide)
                   NavigationBar(
                     selectedIndex: _tab,
-                    onDestinationSelected: (value) => setState(() => _tab = value),
+                    onDestinationSelected: (value) =>
+                        setState(() => _tab = value),
                     destinations: const [
                       NavigationDestination(
                         icon: Icon(Icons.home_outlined),
@@ -120,9 +121,8 @@ class _ReferenceStudentScreenState extends State<ReferenceStudentScreen> {
   }
 
   Widget _home(CafeteriaProvider provider, User user, bool wide) {
-    final available = provider.allFoodItems
-        .where((item) => item.isAvailable)
-        .toList();
+    final available =
+        provider.allFoodItems.where((item) => item.isAvailable).toList();
 
     final categories = <String>{
       'All',
@@ -146,8 +146,7 @@ class _ReferenceStudentScreenState extends State<ReferenceStudentScreen> {
       return categoryMatch && searchMatch;
     }).toList();
 
-    final popular = [...available]
-      ..sort((a, b) => b.price.compareTo(a.price));
+    final popular = [...available]..sort((a, b) => b.price.compareTo(a.price));
     final vendors = _vendorDirectory(provider, available);
 
     return RefreshIndicator(
@@ -320,8 +319,8 @@ class _ReferenceStudentScreenState extends State<ReferenceStudentScreen> {
     List<FoodItem> foods,
   ) {
     final result = provider.allVendors
-        .where((vendor) =>
-            vendor.role.toUpperCase() == 'VENDOR' && vendor.isOpen)
+        .where(
+            (vendor) => vendor.role.toUpperCase() == 'VENDOR' && vendor.isOpen)
         .toList();
     final ids = result.map((vendor) => vendor.id).whereType<int>().toSet();
 
@@ -1033,7 +1032,8 @@ class _ReferenceStudentScreenState extends State<ReferenceStudentScreen> {
               style: TextStyle(color: AppTheme.textMuted),
             ),
             const SizedBox(height: 12),
-            ...provider.purchasedVendors.map((vendor) => _purchasedVendorCard(provider, vendor)),
+            ...provider.purchasedVendors
+                .map((vendor) => _purchasedVendorCard(provider, vendor)),
           ],
         ],
       ),
@@ -1076,7 +1076,9 @@ class _ReferenceStudentScreenState extends State<ReferenceStudentScreen> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    (store?.isNotEmpty == true) ? store! : (name?.isNotEmpty == true ? name! : 'Campus Vendor'),
+                    (store?.isNotEmpty == true)
+                        ? store!
+                        : (name?.isNotEmpty == true ? name! : 'Campus Vendor'),
                     style: const TextStyle(
                       fontSize: 16,
                       fontWeight: FontWeight.w900,
@@ -1136,9 +1138,10 @@ class _ReferenceStudentScreenState extends State<ReferenceStudentScreen> {
     var rating = 5;
     final commentController = TextEditingController();
     var submitting = false;
-    final vendorName = vendor['store_name']?.toString().trim().isNotEmpty == true
-        ? vendor['store_name'].toString()
-        : vendor['name']?.toString() ?? 'Vendor';
+    final vendorName =
+        vendor['store_name']?.toString().trim().isNotEmpty == true
+            ? vendor['store_name'].toString()
+            : vendor['name']?.toString() ?? 'Vendor';
 
     try {
       final result = await showDialog<String>(
@@ -1193,7 +1196,8 @@ class _ReferenceStudentScreenState extends State<ReferenceStudentScreen> {
             ),
             actions: [
               TextButton(
-                onPressed: submitting ? null : () => Navigator.pop(dialogContext),
+                onPressed:
+                    submitting ? null : () => Navigator.pop(dialogContext),
                 child: const Text('Cancel'),
               ),
               FilledButton(
@@ -1225,7 +1229,9 @@ class _ReferenceStudentScreenState extends State<ReferenceStudentScreen> {
 
       if (result == 'submitted' && mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Thank you. Your vendor review has been submitted.')),
+          const SnackBar(
+              content:
+                  Text('Thank you. Your vendor review has been submitted.')),
         );
       }
     } finally {
@@ -1294,9 +1300,7 @@ class _ReferenceStudentScreenState extends State<ReferenceStudentScreen> {
                 radius: 34,
                 backgroundColor: AppTheme.primary,
                 child: Text(
-                  user.fullName.isEmpty
-                      ? 'S'
-                      : user.fullName[0].toUpperCase(),
+                  user.fullName.isEmpty ? 'S' : user.fullName[0].toUpperCase(),
                   style: const TextStyle(
                     color: Colors.white,
                     fontSize: 25,

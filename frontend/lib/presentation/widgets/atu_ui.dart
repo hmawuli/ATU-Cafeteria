@@ -7,12 +7,14 @@ class AtuUi {
   static const Color green = AppTheme.success;
   static const Color surface = AppTheme.background;
 
-  static BoxDecoration card({Color? color, double radius = 16}) => BoxDecoration(
+  static BoxDecoration card({Color? color, double radius = 16}) =>
+      BoxDecoration(
         color: color ?? Colors.white,
         borderRadius: BorderRadius.circular(radius),
         border: Border.all(color: AppTheme.border),
         boxShadow: const [
-          BoxShadow(color: Color(0x12000000), blurRadius: 8, offset: Offset(0, 2)),
+          BoxShadow(
+              color: Color(0x12000000), blurRadius: 8, offset: Offset(0, 2)),
         ],
       );
 
@@ -22,7 +24,8 @@ class AtuUi {
     bool back = false,
     VoidCallback? onBack,
     List<Widget> actions = const [],
-  }) => Container(
+  }) =>
+      Container(
         color: navy,
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
         child: SafeArea(
@@ -80,7 +83,8 @@ class AtuUi {
     String title, {
     String? action,
     VoidCallback? onAction,
-  }) => Padding(
+  }) =>
+      Padding(
         padding: const EdgeInsets.fromLTRB(16, 18, 16, 10),
         child: Row(
           children: [
@@ -110,7 +114,8 @@ class AtuUi {
     String text,
     VoidCallback? onPressed, {
     IconData? icon,
-  }) => SizedBox(
+  }) =>
+      SizedBox(
         width: double.infinity,
         height: 52,
         child: ElevatedButton.icon(

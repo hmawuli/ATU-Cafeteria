@@ -91,8 +91,7 @@ class _VendorDashboardScreenState extends State<VendorDashboardScreen> {
             IconButton(
               tooltip: 'Open order display',
               icon: const Icon(Icons.tv_outlined),
-              onPressed: () =>
-                  Navigator.pushNamed(context, '/vendor-display'),
+              onPressed: () => Navigator.pushNamed(context, '/vendor-display'),
             ),
             IconButton(
               tooltip: 'Open self-service kiosk',
@@ -1064,7 +1063,6 @@ extension RatingsAverage on Iterable<dynamic> {
     return sum / length;
   }
 }
-
 
 class _VendorFoodPlaceholder extends StatelessWidget {
   const _VendorFoodPlaceholder();

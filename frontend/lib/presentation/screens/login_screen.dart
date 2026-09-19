@@ -132,9 +132,10 @@ class _LoginScreenState extends State<LoginScreen> {
                               labelText: 'Username',
                               prefixIcon: Icon(Icons.person_outline_rounded),
                             ),
-                            validator: (value) => value == null || value.trim().isEmpty
-                                ? 'Enter your username.'
-                                : null,
+                            validator: (value) =>
+                                value == null || value.trim().isEmpty
+                                    ? 'Enter your username.'
+                                    : null,
                           ),
                           const SizedBox(height: 14),
                           TextFormField(
@@ -144,12 +145,16 @@ class _LoginScreenState extends State<LoginScreen> {
                             onFieldSubmitted: (_) => loading ? null : _login(),
                             decoration: InputDecoration(
                               labelText: 'PIN',
-                              prefixIcon: const Icon(Icons.lock_outline_rounded),
+                              prefixIcon:
+                                  const Icon(Icons.lock_outline_rounded),
                               suffixIcon: IconButton(
                                 icon: Icon(
-                                  _obscure ? Icons.visibility : Icons.visibility_off,
+                                  _obscure
+                                      ? Icons.visibility
+                                      : Icons.visibility_off,
                                 ),
-                                onPressed: () => setState(() => _obscure = !_obscure),
+                                onPressed: () =>
+                                    setState(() => _obscure = !_obscure),
                               ),
                             ),
                             validator: (value) => value == null || value.isEmpty
@@ -159,7 +164,8 @@ class _LoginScreenState extends State<LoginScreen> {
                           Align(
                             alignment: Alignment.centerRight,
                             child: TextButton(
-                              onPressed: () => Navigator.pushNamed(context, '/reset-password'),
+                              onPressed: () => Navigator.pushNamed(
+                                  context, '/reset-password'),
                               child: const Text('Forgot password?'),
                             ),
                           ),
@@ -173,7 +179,8 @@ class _LoginScreenState extends State<LoginScreen> {
                                   ? const SizedBox(
                                       width: 22,
                                       height: 22,
-                                      child: CircularProgressIndicator(strokeWidth: 2),
+                                      child: CircularProgressIndicator(
+                                          strokeWidth: 2),
                                     )
                                   : const Text(
                                       'Sign In',
@@ -187,17 +194,20 @@ class _LoginScreenState extends State<LoginScreen> {
                           const SizedBox(height: 15),
                           Row(
                             children: [
-                              Expanded(child: Divider(color: Colors.grey.shade300)),
+                              Expanded(
+                                  child: Divider(color: Colors.grey.shade300)),
                               const Padding(
                                 padding: EdgeInsets.symmetric(horizontal: 12),
                                 child: Text('or'),
                               ),
-                              Expanded(child: Divider(color: Colors.grey.shade300)),
+                              Expanded(
+                                  child: Divider(color: Colors.grey.shade300)),
                             ],
                           ),
                           const SizedBox(height: 10),
                           TextButton(
-                            onPressed: () => Navigator.pushNamed(context, '/register'),
+                            onPressed: () =>
+                                Navigator.pushNamed(context, '/register'),
                             child: const Text(
                               'Create an account',
                               style: TextStyle(fontWeight: FontWeight.w800),
@@ -207,9 +217,11 @@ class _LoginScreenState extends State<LoginScreen> {
                           const Row(
                             mainAxisAlignment: MainAxisAlignment.center,
                             children: [
-                              Icon(Icons.verified_user_outlined, size: 15, color: Color(0xFF20B95A)),
+                              Icon(Icons.verified_user_outlined,
+                                  size: 15, color: Color(0xFF20B95A)),
                               SizedBox(width: 6),
-                              Text('Secure ATU Cafeteria access', style: TextStyle(fontSize: 11)),
+                              Text('Secure ATU Cafeteria access',
+                                  style: TextStyle(fontSize: 11)),
                             ],
                           ),
                         ],
@@ -245,7 +257,8 @@ class _TwoFactorScreenState extends State<TwoFactorScreen> {
 
   Future<void> _verify() async {
     final provider = context.read<CafeteriaProvider>();
-    final ok = await provider.verifyTwoFactor(widget.username, _code.text.trim());
+    final ok =
+        await provider.verifyTwoFactor(widget.username, _code.text.trim());
     if (!mounted) return;
     if (ok) {
       Navigator.pushReplacementNamed(context, '/admin');
@@ -274,7 +287,8 @@ class _TwoFactorScreenState extends State<TwoFactorScreen> {
                       const SizedBox(height: 15),
                       const Text(
                         'Two-factor authentication',
-                        style: TextStyle(fontSize: 21, fontWeight: FontWeight.w900),
+                        style: TextStyle(
+                            fontSize: 21, fontWeight: FontWeight.w900),
                       ),
                       const SizedBox(height: 8),
                       const Text(
@@ -286,7 +300,8 @@ class _TwoFactorScreenState extends State<TwoFactorScreen> {
                         controller: _code,
                         keyboardType: TextInputType.number,
                         maxLength: 6,
-                        decoration: const InputDecoration(labelText: 'Verification code'),
+                        decoration: const InputDecoration(
+                            labelText: 'Verification code'),
                       ),
                       const SizedBox(height: 4),
                       SizedBox(

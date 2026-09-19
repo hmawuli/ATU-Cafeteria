@@ -10,10 +10,15 @@ class CartScreen extends StatelessWidget {
       context: context,
       builder: (ctx) => AlertDialog(
         title: const Text('Clear cart?'),
-        content: const Text('All items will be removed from your current order.'),
+        content:
+            const Text('All items will be removed from your current order.'),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Keep items')),
-          FilledButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('Clear cart')),
+          TextButton(
+              onPressed: () => Navigator.pop(ctx, false),
+              child: const Text('Keep items')),
+          FilledButton(
+              onPressed: () => Navigator.pop(ctx, true),
+              child: const Text('Clear cart')),
         ],
       ),
     );
@@ -41,7 +46,8 @@ class CartScreen extends StatelessWidget {
                 Icon(Icons.shopping_bag_outlined, size: 64),
                 SizedBox(height: 12),
                 Text('Your cart is empty',
-                    style: TextStyle(fontSize: 20, fontWeight: FontWeight.w800)),
+                    style:
+                        TextStyle(fontSize: 20, fontWeight: FontWeight.w800)),
                 SizedBox(height: 6),
                 Text('Add meals from the menu to get started.'),
               ]),
@@ -68,15 +74,24 @@ class CartScreen extends StatelessWidget {
                                   borderRadius: BorderRadius.circular(12),
                                   child: line.item.imageUrl.trim().isEmpty
                                       ? Container(
-                                          color: Theme.of(context).colorScheme.surfaceContainerHighest,
-                                          child: const Icon(Icons.restaurant_rounded, size: 34),
+                                          color: Theme.of(context)
+                                              .colorScheme
+                                              .surfaceContainerHighest,
+                                          child: const Icon(
+                                              Icons.restaurant_rounded,
+                                              size: 34),
                                         )
                                       : Image.network(
                                           line.item.imageUrl,
                                           fit: BoxFit.cover,
-                                          errorBuilder: (_, __, ___) => Container(
-                                            color: Theme.of(context).colorScheme.surfaceContainerHighest,
-                                            child: const Icon(Icons.restaurant_rounded, size: 34),
+                                          errorBuilder: (_, __, ___) =>
+                                              Container(
+                                            color: Theme.of(context)
+                                                .colorScheme
+                                                .surfaceContainerHighest,
+                                            child: const Icon(
+                                                Icons.restaurant_rounded,
+                                                size: 34),
                                           ),
                                         ),
                                 ),
@@ -89,14 +104,18 @@ class CartScreen extends StatelessWidget {
                                     Text(line.item.name,
                                         maxLines: 2,
                                         overflow: TextOverflow.ellipsis,
-                                        style: const TextStyle(fontWeight: FontWeight.w800)),
+                                        style: const TextStyle(
+                                            fontWeight: FontWeight.w800)),
                                     const SizedBox(height: 4),
-                                    Text('GH₵ ${line.item.price.toStringAsFixed(2)} each'),
+                                    Text(
+                                        'GH₵ ${line.item.price.toStringAsFixed(2)} each'),
                                     const SizedBox(height: 6),
                                     Text('GH₵ ${line.total.toStringAsFixed(2)}',
                                         style: TextStyle(
                                           fontWeight: FontWeight.w900,
-                                          color: Theme.of(context).colorScheme.primary,
+                                          color: Theme.of(context)
+                                              .colorScheme
+                                              .primary,
                                         )),
                                   ],
                                 ),
@@ -104,7 +123,10 @@ class CartScreen extends StatelessWidget {
                               const SizedBox(width: 8),
                               DecoratedBox(
                                 decoration: BoxDecoration(
-                                  border: Border.all(color: Theme.of(context).colorScheme.outlineVariant),
+                                  border: Border.all(
+                                      color: Theme.of(context)
+                                          .colorScheme
+                                          .outlineVariant),
                                   borderRadius: BorderRadius.circular(14),
                                 ),
                                 child: Row(
@@ -113,11 +135,13 @@ class CartScreen extends StatelessWidget {
                                     IconButton(
                                       tooltip: 'Decrease quantity',
                                       visualDensity: VisualDensity.compact,
-                                      onPressed: () => cart.remove(line.item.id!),
+                                      onPressed: () =>
+                                          cart.remove(line.item.id!),
                                       icon: const Icon(Icons.remove_rounded),
                                     ),
                                     Text('${line.quantity}',
-                                        style: const TextStyle(fontWeight: FontWeight.w900)),
+                                        style: const TextStyle(
+                                            fontWeight: FontWeight.w900)),
                                     IconButton(
                                       tooltip: 'Increase quantity',
                                       visualDensity: VisualDensity.compact,
@@ -142,22 +166,27 @@ class CartScreen extends StatelessWidget {
                       child: Column(
                         children: [
                           Row(children: [
-                            Text('${cart.itemCount} ${cart.itemCount == 1 ? 'item' : 'items'}'),
+                            Text(
+                                '${cart.itemCount} ${cart.itemCount == 1 ? 'item' : 'items'}'),
                             const Spacer(),
                             Text('GH₵ ${cart.subtotal.toStringAsFixed(2)}',
-                                style: const TextStyle(fontWeight: FontWeight.w900)),
+                                style: const TextStyle(
+                                    fontWeight: FontWeight.w900)),
                           ]),
                           const SizedBox(height: 8),
                           const Row(children: [
                             Icon(Icons.lock_outline, size: 16),
                             SizedBox(width: 6),
-                            Expanded(child: Text('Secure checkout • Pickup or scheduled collection')),
+                            Expanded(
+                                child: Text(
+                                    'Secure checkout • Pickup or scheduled collection')),
                           ]),
                           const SizedBox(height: 14),
                           SizedBox(
                             width: double.infinity,
                             child: FilledButton.icon(
-                              onPressed: () => Navigator.pushNamed(context, '/checkout'),
+                              onPressed: () =>
+                                  Navigator.pushNamed(context, '/checkout'),
                               icon: const Icon(Icons.shopping_cart_checkout),
                               label: const Text('Proceed to Checkout'),
                             ),

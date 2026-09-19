@@ -53,7 +53,8 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
     } catch (_) {
       if (!mounted) return;
       setState(() {
-        _error = 'Unable to load notifications. Check your connection and try again.';
+        _error =
+            'Unable to load notifications. Check your connection and try again.';
         _loading = false;
       });
     }

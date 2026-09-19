@@ -6,7 +6,8 @@ import '../providers/cafeteria_provider.dart';
 class VendorOrderDisplayScreen extends StatefulWidget {
   const VendorOrderDisplayScreen({super.key});
   @override
-  State<VendorOrderDisplayScreen> createState() => _VendorOrderDisplayScreenState();
+  State<VendorOrderDisplayScreen> createState() =>
+      _VendorOrderDisplayScreenState();
 }
 
 class _VendorOrderDisplayScreenState extends State<VendorOrderDisplayScreen> {
@@ -91,12 +92,13 @@ class _VendorOrderDisplayScreenState extends State<VendorOrderDisplayScreen> {
                                 fontSize: 23, fontWeight: FontWeight.w800)),
                         const SizedBox(height: 8),
                         Text('Quantity: ${order.quantity}'),
-                        Text('Total: GH₵ ${order.totalPrice.toStringAsFixed(2)}'),
+                        Text(
+                            'Total: GH₵ ${order.totalPrice.toStringAsFixed(2)}'),
                         const Spacer(),
                         if (next != null)
                           FilledButton(
-                            onPressed: () => provider.updateOrderStatus(
-                                order.id!, next),
+                            onPressed: () =>
+                                provider.updateOrderStatus(order.id!, next),
                             child: Text(
                               next == 'PREPARING'
                                   ? 'ACCEPT • START PREPARING'

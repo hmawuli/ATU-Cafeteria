@@ -196,10 +196,8 @@ class CafeteriaProvider extends ChangeNotifier {
       final decoded = json.decode(body);
       final raw = decoded is Map ? decoded['vendors'] : decoded;
       if (raw is List) {
-        _purchasedVendors = raw
-            .whereType<Map>()
-            .map(Map<String, dynamic>.from)
-            .toList();
+        _purchasedVendors =
+            raw.whereType<Map>().map(Map<String, dynamic>.from).toList();
       }
     } catch (e) {
       debugPrint('Purchased vendor sync skipped: $e');
@@ -213,7 +211,9 @@ class CafeteriaProvider extends ChangeNotifier {
     int? foodRating,
     String? foodComment,
   }) async {
-    if (_authToken == null) return 'Your login session has expired. Please sign in again.';
+    if (_authToken == null) {
+      return 'Your login session has expired. Please sign in again.';
+    }
 
     try {
       final url = Uri.parse("$_laravelBaseUrl/api/reviews");
@@ -310,7 +310,9 @@ class CafeteriaProvider extends ChangeNotifier {
   }
 
   Future<void> _syncRemoteVendorFoodItems() async {
-    if (_authToken == null || _currentUser?.id == null || _currentUser?.role != 'VENDOR') {
+    if (_authToken == null ||
+        _currentUser?.id == null ||
+        _currentUser?.role != 'VENDOR') {
       return;
     }
 
@@ -330,7 +332,8 @@ class CafeteriaProvider extends ChangeNotifier {
       for (final raw in decoded) {
         if (raw is! Map) continue;
         try {
-          await _upsertLocalFoodItem(FoodItem.fromJson(Map<String, dynamic>.from(raw)));
+          await _upsertLocalFoodItem(
+              FoodItem.fromJson(Map<String, dynamic>.from(raw)));
         } catch (e) {
           debugPrint('Skipping malformed vendor menu item: $e');
         }
@@ -339,6 +342,7 @@ class CafeteriaProvider extends ChangeNotifier {
       debugPrint('Vendor menu sync skipped: $e');
     }
   }
+
   Future<void> refreshAllData() async {
     // The Laravel database is the source of truth for the live menu.
     // Keep SQLite as an offline cache, but always synchronize food items
@@ -364,7 +368,8 @@ class CafeteriaProvider extends ChangeNotifier {
 
     if (_currentUser != null) {
       if (_currentUser!.role == 'STUDENT') {
-        final remoteOrders = await fetchAndCacheStudentOrders(_currentUser!.id!);
+        final remoteOrders =
+            await fetchAndCacheStudentOrders(_currentUser!.id!);
         // Prefer the live Laravel orders. SQLite remains an offline fallback
         // only when the server cannot be reached.
         _customerOrders = remoteOrders.isNotEmpty
@@ -593,8 +598,8 @@ class CafeteriaProvider extends ChangeNotifier {
 
         _announcedReadyOrders.add(id);
         final title = raw['title']?.toString() ?? 'Order Ready for Pickup! 🍽️';
-        final body = raw['body']?.toString() ??
-            'Your order #$id is ready for pickup.';
+        final body =
+            raw['body']?.toString() ?? 'Your order #$id is ready for pickup.';
         _liveAlerts.insert(0, '$title $body');
         if (_liveAlerts.length > 5) _liveAlerts.removeLast();
         changed = true;
@@ -746,8 +751,8 @@ class CafeteriaProvider extends ChangeNotifier {
           passwordHash: _localCacheCredentialHash(pinCode),
         );
         _currentUser = remoteUser;
-        _authToken = decoded['token']?.toString() ??
-            response.headers['x-auth-token'];
+        _authToken =
+            decoded['token']?.toString() ?? response.headers['x-auth-token'];
 
         if (_authToken != null && _authToken!.isNotEmpty) {
           await SecureSessionStore.save(
@@ -790,8 +795,7 @@ class CafeteriaProvider extends ChangeNotifier {
         return false;
       }
 
-      _loginError =
-          decoded['message']?.toString() ?? 'Unable to authenticate.';
+      _loginError = decoded['message']?.toString() ?? 'Unable to authenticate.';
     } catch (e) {
       debugPrint('Laravel login request failed: $e');
       _loginError =
@@ -915,24 +919,28 @@ class CafeteriaProvider extends ChangeNotifier {
             );
         break;
       case 'POST':
-        response = await http.post(url, headers: headers, body: encodedBody).timeout(
-              const Duration(seconds: 10),
-            );
+        response =
+            await http.post(url, headers: headers, body: encodedBody).timeout(
+                  const Duration(seconds: 10),
+                );
         break;
       case 'PUT':
-        response = await http.put(url, headers: headers, body: encodedBody).timeout(
-              const Duration(seconds: 10),
-            );
+        response =
+            await http.put(url, headers: headers, body: encodedBody).timeout(
+                  const Duration(seconds: 10),
+                );
         break;
       case 'PATCH':
-        response = await http.patch(url, headers: headers, body: encodedBody).timeout(
-              const Duration(seconds: 10),
-            );
+        response =
+            await http.patch(url, headers: headers, body: encodedBody).timeout(
+                  const Duration(seconds: 10),
+                );
         break;
       case 'DELETE':
-        response = await http.delete(url, headers: headers, body: encodedBody).timeout(
-              const Duration(seconds: 10),
-            );
+        response =
+            await http.delete(url, headers: headers, body: encodedBody).timeout(
+                  const Duration(seconds: 10),
+                );
         break;
       default:
         throw ArgumentError('Unsupported HTTP method: $method');
@@ -940,9 +948,8 @@ class CafeteriaProvider extends ChangeNotifier {
 
     final decoded = response.body.isNotEmpty ? jsonDecode(response.body) : {};
     if (response.statusCode < 200 || response.statusCode >= 300) {
-      final msg = decoded is Map
-          ? decoded['message']?.toString()
-          : 'Request failed.';
+      final msg =
+          decoded is Map ? decoded['message']?.toString() : 'Request failed.';
       throw Exception(msg ?? 'Request failed.');
     }
     return decoded;
@@ -1454,7 +1461,9 @@ class CafeteriaProvider extends ChangeNotifier {
       final response = await request.close();
       final body = await response.transform(utf8.decoder).join();
       final decoded = json.decode(body);
-      if (response.statusCode == 200 && decoded is Map && decoded['success'] == true) {
+      if (response.statusCode == 200 &&
+          decoded is Map &&
+          decoded['success'] == true) {
         return Map<String, dynamic>.from(decoded['data'] as Map);
       }
       debugPrint("Initialize Paystack error response: $body");
@@ -1483,7 +1492,9 @@ class CafeteriaProvider extends ChangeNotifier {
       final response = await request.close();
       final body = await response.transform(utf8.decoder).join();
       final decoded = json.decode(body);
-      if (response.statusCode == 200 && decoded is Map && decoded['success'] == true) {
+      if (response.statusCode == 200 &&
+          decoded is Map &&
+          decoded['success'] == true) {
         if (purpose == 'WALLET_TOPUP') {
           _studentWalletBalance += amount;
           await refreshAllData();
@@ -1670,15 +1681,17 @@ class CafeteriaProvider extends ChangeNotifier {
 
     if (_authToken != null && item.id != null) {
       try {
-        final response = await http.put(
-          Uri.parse('$_laravelBaseUrl/api/food-items/${item.id}'),
-          headers: {
-            'Accept': 'application/json',
-            'Content-Type': 'application/json',
-            'Authorization': 'Bearer $_authToken',
-          },
-          body: jsonEncode({'is_available': isAvailable}),
-        ).timeout(const Duration(seconds: 10));
+        final response = await http
+            .put(
+              Uri.parse('$_laravelBaseUrl/api/food-items/${item.id}'),
+              headers: {
+                'Accept': 'application/json',
+                'Content-Type': 'application/json',
+                'Authorization': 'Bearer $_authToken',
+              },
+              body: jsonEncode({'is_available': isAvailable}),
+            )
+            .timeout(const Duration(seconds: 10));
         if (response.statusCode != 200) {
           debugPrint('Remote availability update failed: ${response.body}');
         }
@@ -1688,9 +1701,11 @@ class CafeteriaProvider extends ChangeNotifier {
     }
 
     await _db.updateFoodItem(updated);
-    _liveAlerts.insert(0, isAvailable
-        ? "🟢 '${item.name}' is now available."
-        : "🔴 '${item.name}' is temporarily unavailable.");
+    _liveAlerts.insert(
+        0,
+        isAvailable
+            ? "🟢 '${item.name}' is now available."
+            : "🔴 '${item.name}' is temporarily unavailable.");
     if (_liveAlerts.length > 5) _liveAlerts.removeLast();
     await refreshAllData();
   }
@@ -1744,24 +1759,26 @@ class CafeteriaProvider extends ChangeNotifier {
       debugPrint('Description: $cleanDescription');
       debugPrint('========================================');
 
-      final response = await http.post(
-        url,
-        headers: {
-          'Accept': 'application/json',
-          'Content-Type': 'application/json',
-          'Authorization': 'Bearer $_authToken',
-        },
-        body: jsonEncode({
-          'vendor_id': vendorId,
-          'name': cleanName,
-          'price': price,
-          'category': category,
-          'description': cleanDescription,
-          'image_url': '',
-          'initial_stock': 50,
-          'low_stock_threshold': 10,
-        }),
-      ).timeout(const Duration(seconds: 10));
+      final response = await http
+          .post(
+            url,
+            headers: {
+              'Accept': 'application/json',
+              'Content-Type': 'application/json',
+              'Authorization': 'Bearer $_authToken',
+            },
+            body: jsonEncode({
+              'vendor_id': vendorId,
+              'name': cleanName,
+              'price': price,
+              'category': category,
+              'description': cleanDescription,
+              'image_url': '',
+              'initial_stock': 50,
+              'low_stock_threshold': 10,
+            }),
+          )
+          .timeout(const Duration(seconds: 10));
 
       debugPrint('ADD FOOD RESPONSE STATUS: ${response.statusCode}');
       debugPrint('ADD FOOD RESPONSE BODY: ${response.body}');
@@ -1801,8 +1818,7 @@ class CafeteriaProvider extends ChangeNotifier {
 
             final message = decoded['message'];
 
-            if (message != null &&
-                message.toString().trim().isNotEmpty) {
+            if (message != null && message.toString().trim().isNotEmpty) {
               return message.toString();
             }
           }
@@ -1846,6 +1862,7 @@ class CafeteriaProvider extends ChangeNotifier {
     await _db.deleteFoodItem(item.id!);
     await refreshAllData();
   }
+
   Future<void> updateOrderStatus(int orderId, String newStatus) async {
     await _db.updateOrderStatus(orderId, newStatus);
 

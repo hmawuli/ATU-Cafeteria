@@ -29,7 +29,6 @@ class AppTheme {
       fontFamily: 'Roboto',
       visualDensity: VisualDensity.adaptivePlatformDensity,
       splashFactory: InkRipple.splashFactory,
-
       appBarTheme: const AppBarTheme(
         backgroundColor: primary,
         foregroundColor: Colors.white,
@@ -45,7 +44,6 @@ class AppTheme {
         ),
         iconTheme: IconThemeData(color: Colors.white),
       ),
-
       snackBarTheme: const SnackBarThemeData(
         behavior: SnackBarBehavior.floating,
         backgroundColor: primaryDark,
@@ -54,13 +52,11 @@ class AppTheme {
           fontWeight: FontWeight.w600,
         ),
       ),
-
       dividerTheme: const DividerThemeData(
         space: 1,
         thickness: 1,
         color: Color(0xFFE2EAF3),
       ),
-
       cardTheme: CardThemeData(
         margin: EdgeInsets.zero,
         elevation: 1.5,
@@ -72,11 +68,11 @@ class AppTheme {
           side: const BorderSide(color: border),
         ),
       ),
-
       inputDecorationTheme: InputDecorationTheme(
         filled: true,
         fillColor: Colors.white,
-        labelStyle: const TextStyle(color: textMuted, fontWeight: FontWeight.w500),
+        labelStyle:
+            const TextStyle(color: textMuted, fontWeight: FontWeight.w500),
         hintStyle: const TextStyle(color: Color(0xFF7A8CA2)),
         prefixIconColor: primary,
         border: OutlineInputBorder(
@@ -95,41 +91,41 @@ class AppTheme {
           borderRadius: BorderRadius.circular(14),
           borderSide: const BorderSide(color: Color(0xFFD32F2F)),
         ),
-        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 15),
+        contentPadding:
+            const EdgeInsets.symmetric(horizontal: 16, vertical: 15),
       ),
-
       filledButtonTheme: FilledButtonThemeData(
         style: FilledButton.styleFrom(
           backgroundColor: primary,
           foregroundColor: Colors.white,
           minimumSize: const Size(0, 50),
           padding: const EdgeInsets.symmetric(horizontal: 20),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(13)),
+          shape:
+              RoundedRectangleBorder(borderRadius: BorderRadius.circular(13)),
           textStyle: const TextStyle(fontWeight: FontWeight.w800),
         ),
       ),
-
       elevatedButtonTheme: ElevatedButtonThemeData(
         style: ElevatedButton.styleFrom(
           backgroundColor: primary,
           foregroundColor: Colors.white,
           minimumSize: const Size(0, 50),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(13)),
+          shape:
+              RoundedRectangleBorder(borderRadius: BorderRadius.circular(13)),
           elevation: 1,
           textStyle: const TextStyle(fontWeight: FontWeight.w800),
         ),
       ),
-
       outlinedButtonTheme: OutlinedButtonThemeData(
         style: OutlinedButton.styleFrom(
           foregroundColor: primary,
           minimumSize: const Size(0, 48),
           side: const BorderSide(color: Color(0xFFB8CDE3), width: 1.2),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(13)),
+          shape:
+              RoundedRectangleBorder(borderRadius: BorderRadius.circular(13)),
           textStyle: const TextStyle(fontWeight: FontWeight.w700),
         ),
       ),
-
       navigationBarTheme: NavigationBarThemeData(
         height: 72,
         backgroundColor: primary,
@@ -145,16 +141,15 @@ class AppTheme {
         }),
         iconTheme: WidgetStateProperty.resolveWith((states) {
           final selected = states.contains(WidgetState.selected);
-          return IconThemeData(color: selected ? primaryDark : Colors.white, size: 24);
+          return IconThemeData(
+              color: selected ? primaryDark : Colors.white, size: 24);
         }),
       ),
-
       floatingActionButtonTheme: const FloatingActionButtonThemeData(
         backgroundColor: accent,
         foregroundColor: primaryDark,
         elevation: 3,
       ),
-
       chipTheme: ChipThemeData(
         backgroundColor: Colors.white,
         selectedColor: accent,
@@ -176,7 +171,8 @@ class AppTheme {
       useMaterial3: true,
       colorScheme: scheme,
       scaffoldBackgroundColor: const Color(0xFF071A31),
-      appBarTheme: const AppBarTheme(backgroundColor: primaryDark, foregroundColor: Colors.white),
+      appBarTheme: const AppBarTheme(
+          backgroundColor: primaryDark, foregroundColor: Colors.white),
       cardTheme: CardThemeData(
         color: const Color(0xFF102946),
         elevation: 2,

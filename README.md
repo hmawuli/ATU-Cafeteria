@@ -48,6 +48,36 @@ Do not hard-code a deployment URL in source code. Supply it at runtime/build tim
 flutter run --dart-define=API_BASE_URL=https://your-api.example.com/api/
 ```
 
+### Running on a physical phone (no more changing the IP)
+
+`127.0.0.1` inside the app means **the phone itself**, never your computer. Pick one mode:
+
+1. **USB (recommended, zero configuration)** — tunnel over the cable:
+   ```bash
+   scripts/serve_backend.sh        # starts Laravel on 0.0.0.0:8001
+   scripts/connect_phone.sh        # adb reverse tcp:8001 tcp:8001
+   flutter run
+   ```
+   The app's default `http://127.0.0.1:8001` then reaches your computer over USB.
+   Works regardless of Wi-Fi changes; re-run `connect_phone.sh` after unplugging.
+
+2. **Same Wi-Fi** — set the address once in `lib/core/config/app_config.dart`:
+   ```dart
+   static const String staticApiHost = '192.168.1.50'; // your `hostname -I` IP
+   ```
+   Start the backend with `scripts/serve_backend.sh` (binds `0.0.0.0` so the phone
+   can reach it). To make the laptop's IP truly fixed, pin it on your router
+   (DHCP reservation) or run: `sudo nmcli connection modify <wifi> ipv4.method manual ipv4.addresses 192.168.1.50/24 ipv4.gateway 192.168.1.1` and reconnect.
+
+3. **Android emulator** — pass the emulator loopback alias at run time:
+   ```bash
+   flutter run --dart-define=API_BASE_URL=http://10.0.2.2:8001
+   ```
+
+Precedence: `--dart-define` → `staticApiHost` → `127.0.0.1:8001`.
+Android dev builds also need cleartext HTTP, enabled in
+`frontend/android/app/src/main/AndroidManifest.xml` (`usesCleartextTraffic`).
+
 ## Quality gates
 
 Before committing:
