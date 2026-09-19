@@ -10,7 +10,7 @@ class GroupOrderScreen extends StatefulWidget {
 }
 
 class _GroupOrderScreenState extends State<GroupOrderScreen> {
-  final ApiClient _api = ApiClient();
+  late final ApiClient _api;
   final _codeController = TextEditingController();
   String? _code;
   Map<String, dynamic>? _session;
@@ -21,8 +21,13 @@ class _GroupOrderScreenState extends State<GroupOrderScreen> {
   String _paymentMode = 'HOST_PAYS';
 
   @override
+  void initState() {
+    super.initState();
+    _api = context.read<ApiClient>();
+  }
+
+  @override
   void dispose() {
-    _api.close();
     _codeController.dispose();
     super.dispose();
   }

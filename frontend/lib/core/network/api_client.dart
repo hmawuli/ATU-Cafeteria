@@ -39,15 +39,22 @@ class ApiClient {
 
   Future<dynamic> request(String method, String path,
       {Map<String, dynamic>? body}) async {
-    token ??= await _storage.read(key: _tokenKey);
+    // The token is session scoped. Read secure storage on every request so a
+    // single shared ApiClient can never serve a stale token after a logout /
+    // login as another user. The in-memory [token] is only a fallback (e.g.
+    // unit tests that inject a client without secure storage).
+    final storedToken = await _storage.read(key: _tokenKey);
+    final effectiveToken =
+        (storedToken != null && storedToken.isNotEmpty) ? storedToken : token;
+
     final uri = Uri.parse(
         '${AppConfig.normalizedApiBaseUrl}/api/${path.replaceFirst(RegExp(r'^/'), '')}');
     final headers = <String, String>{
       'Accept': 'application/json',
       'Content-Type': 'application/json',
     };
-    if (token != null && token!.isNotEmpty) {
-      headers['Authorization'] = 'Bearer $token';
+    if (effectiveToken != null && effectiveToken.isNotEmpty) {
+      headers['Authorization'] = 'Bearer $effectiveToken';
     }
 
     late http.Response response;

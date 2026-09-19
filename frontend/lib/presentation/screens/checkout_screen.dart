@@ -19,11 +19,12 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
   final TextEditingController _noteController = TextEditingController();
   bool _submitting = false;
   bool _cartReady = false;
-  final ApiClient _api = ApiClient();
+  late final ApiClient _api;
 
   @override
   void initState() {
     super.initState();
+    _api = context.read<ApiClient>();
     _restoreCart();
   }
 
@@ -36,7 +37,6 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
   void dispose() {
     _noteController.dispose();
     _pointsController.dispose();
-    _api.close();
     super.dispose();
   }
 
@@ -340,15 +340,12 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
         throw Exception('Payment has not been confirmed by Paystack.');
       }
 
-      // Keep the checkout client explicitly synchronized with the authenticated
-      // provider token. This avoids relying on secure-storage propagation in
-      // Flutter Web between separately created client instances.
+      // The shared ApiClient resolves the session token itself.
       final token = auth.authToken;
       if (token == null || token.isEmpty) {
         throw Exception(
             'Your login session has expired. Please sign in again.');
       }
-      _api.token = token;
 
       final result = await _api.post('/student/cart-checkout', body: {
         'items': cart.toCheckoutPayload(),
@@ -437,9 +434,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
       return;
     }
 
-    // The provider is the authoritative authentication state. Copy its
-    // current Sanctum token into this checkout client's headers before ANY
-    // authenticated request (including loyalty preview and wallet checkout).
+    // The shared ApiClient resolves the session token itself.
     final token = auth.authToken;
     if (token == null || token.isEmpty) {
       if (!mounted) return;
@@ -448,7 +443,6 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
               Text('Your login session is missing. Please sign in again.')));
       return;
     }
-    _api.token = token;
 
     final cart = context.read<CartProvider>();
     await cart.restore();

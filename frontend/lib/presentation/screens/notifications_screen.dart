@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import 'package:atu_cafeteria/core/network/api_client.dart';
 
 class NotificationsScreen extends StatefulWidget {
@@ -9,7 +10,7 @@ class NotificationsScreen extends StatefulWidget {
 }
 
 class _NotificationsScreenState extends State<NotificationsScreen> {
-  final ApiClient _api = ApiClient();
+  late final ApiClient _api;
   bool _loading = true;
   String? _error;
   List<Map<String, dynamic>> _notifications = [];
@@ -17,12 +18,12 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
   @override
   void initState() {
     super.initState();
+    _api = context.read<ApiClient>();
     _loadNotifications();
   }
 
   @override
   void dispose() {
-    _api.close();
     super.dispose();
   }
 

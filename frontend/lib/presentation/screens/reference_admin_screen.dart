@@ -430,7 +430,7 @@ class _ReferenceAdminScreenState extends State<ReferenceAdminScreen> {
         if (required && text.isEmpty) return '$label is required.';
         if (email &&
             text.isNotEmpty &&
-            !RegExp(r'^[^@\s]+@[^@\s]+\.[^@\s]+\$').hasMatch(text)) {
+            !RegExp(r'^[^@\s]+@[^@\s]+\.[^@\s]+$').hasMatch(text)) {
           return 'Enter a valid email address.';
         }
         return null;
@@ -547,6 +547,23 @@ class _ReferenceAdminScreenState extends State<ReferenceAdminScreen> {
                 icon: const Icon(Icons.refresh),
                 label: const Text('Refresh')),
           ]),
+          if (admin.financeError != null) ...[
+            const SizedBox(height: 18),
+            ReferenceCard(
+              child: Row(
+                children: [
+                  const Icon(Icons.lock_outline, color: AppTheme.textMuted),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Text(
+                      admin.financeError!,
+                      style: const TextStyle(color: AppTheme.textMuted),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
           const SizedBox(height: 18),
           Wrap(spacing: 12, runSpacing: 12, children: [
             MetricTile(

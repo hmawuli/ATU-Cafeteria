@@ -49,10 +49,20 @@ class VendorAuthController extends Controller
             ], 401);
         }
 
-        // Compare direct PIN (Pre-hashed from clients)
-        if (Hash::check($request->input('pin'), (string) $user->password) || Hash::check(hash('sha256', $request->input('pin')), (string) $user->password) || hash_equals((string) $user->password, hash('sha256', $request->input('pin')))) {
-            if (! Hash::check($request->input('pin'), (string) $user->password)) {
-                $user->password = Hash::make($request->input('pin'));
+        // Compare direct PIN (Pre-hashed from clients). Guard Hash::check with
+        // a bcrypt prefix so malformed/legacy raw-hash rows fail safely (401)
+        // instead of raising a RuntimeException (500).
+        $storedPassword = (string) $user->password;
+        $isBcrypt = str_starts_with($storedPassword, '$2');
+        $pin = (string) $request->input('pin');
+        $legacySha256 = hash('sha256', $pin);
+        $directMatch = $isBcrypt && Hash::check($pin, $storedPassword);
+        $legacySha256Match = $isBcrypt && Hash::check($legacySha256, $storedPassword);
+        $rawSha256Match = hash_equals($storedPassword, $legacySha256);
+
+        if ($directMatch || $legacySha256Match || $rawSha256Match) {
+            if (! $directMatch) {
+                $user->password = Hash::make($pin);
                 $user->saveQuietly();
             }
             // Register Audit Log

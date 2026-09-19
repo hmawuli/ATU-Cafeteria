@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import '../../core/network/api_client.dart';
 
 class RegisterScreen extends StatefulWidget {
@@ -15,9 +16,15 @@ class _RegisterScreenState extends State<RegisterScreen> {
   final _pin = TextEditingController();
   final _confirm = TextEditingController();
   final _programme = TextEditingController();
-  final _api = ApiClient();
+  late final ApiClient _api;
   bool _busy = false;
   bool _obscurePin = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _api = context.read<ApiClient>();
+  }
 
   @override
   void dispose() {
@@ -27,7 +34,6 @@ class _RegisterScreenState extends State<RegisterScreen> {
     _pin.dispose();
     _confirm.dispose();
     _programme.dispose();
-    _api.close();
     super.dispose();
   }
 

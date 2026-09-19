@@ -10,7 +10,7 @@ class SmartInsightsScreen extends StatefulWidget {
 }
 
 class _SmartInsightsScreenState extends State<SmartInsightsScreen> {
-  final ApiClient _api = ApiClient();
+  late final ApiClient _api;
   bool loading = true;
   String? error;
   List<dynamic> recommendations = [];
@@ -21,12 +21,12 @@ class _SmartInsightsScreenState extends State<SmartInsightsScreen> {
   @override
   void initState() {
     super.initState();
+    _api = context.read<ApiClient>();
     WidgetsBinding.instance.addPostFrameCallback((_) => _load());
   }
 
   Future<void> _load() async {
     final cafe = context.read<CafeteriaProvider>();
-    _api.token = cafe.authToken;
     setState(() => loading = true);
     try {
       final role = (cafe.currentUser?.role ?? '').toUpperCase();
@@ -54,7 +54,6 @@ class _SmartInsightsScreenState extends State<SmartInsightsScreen> {
 
   @override
   void dispose() {
-    _api.close();
     super.dispose();
   }
 

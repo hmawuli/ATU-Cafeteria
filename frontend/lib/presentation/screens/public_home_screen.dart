@@ -28,7 +28,7 @@ class _PublicHomeScreenState extends State<PublicHomeScreen> {
   @override
   void initState() {
     super.initState();
-    _api = ApiClient();
+    _api = context.read<ApiClient>();
     _menuRepository = MenuRepository(_api);
     _loadMenu();
   }
@@ -36,7 +36,6 @@ class _PublicHomeScreenState extends State<PublicHomeScreen> {
   @override
   void dispose() {
     _search.dispose();
-    _api.close();
     super.dispose();
   }
 

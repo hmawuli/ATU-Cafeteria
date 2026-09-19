@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import 'package:atu_cafeteria/core/network/api_client.dart';
 
 class OrderTrackingScreen extends StatefulWidget {
@@ -12,7 +13,7 @@ class OrderTrackingScreen extends StatefulWidget {
 }
 
 class _OrderTrackingScreenState extends State<OrderTrackingScreen> {
-  final ApiClient _api = ApiClient();
+  late final ApiClient _api;
   Timer? _timer;
   Map<String, dynamic>? _order;
   List<dynamic> _stages = const [];
@@ -22,6 +23,7 @@ class _OrderTrackingScreenState extends State<OrderTrackingScreen> {
   @override
   void initState() {
     super.initState();
+    _api = context.read<ApiClient>();
     _load();
     _timer =
         Timer.periodic(const Duration(seconds: 4), (_) => _load(silent: true));
@@ -30,7 +32,6 @@ class _OrderTrackingScreenState extends State<OrderTrackingScreen> {
   @override
   void dispose() {
     _timer?.cancel();
-    _api.close();
     super.dispose();
   }
 

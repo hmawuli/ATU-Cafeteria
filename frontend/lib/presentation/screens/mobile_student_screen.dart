@@ -57,27 +57,30 @@ class _MobileStudentScreenState extends State<MobileStudentScreen> {
       foregroundColor: Colors.white,
       elevation: 0,
       titleSpacing: 16,
-      title: Row(
-        children: [
-          Container(
-            width: 38,
-            height: 38,
-            decoration: BoxDecoration(
-              color: yellow,
-              borderRadius: BorderRadius.circular(10),
+      title: GestureDetector(
+        onTap: () => Navigator.pushNamed(context, '/home'),
+        child: Row(
+          children: [
+            Container(
+              width: 38,
+              height: 38,
+              decoration: BoxDecoration(
+                color: yellow,
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: const Icon(
+                Icons.restaurant_menu_rounded,
+                color: navy,
+                size: 24,
+              ),
             ),
-            child: const Icon(
-              Icons.restaurant_menu_rounded,
-              color: navy,
-              size: 24,
+            const SizedBox(width: 10),
+            const Text(
+              'ATU CAFETERIA',
+              style: TextStyle(fontSize: 18, fontWeight: FontWeight.w900),
             ),
-          ),
-          const SizedBox(width: 10),
-          const Text(
-            'ATU CAFETERIA',
-            style: TextStyle(fontSize: 18, fontWeight: FontWeight.w900),
-          ),
-        ],
+          ],
+        ),
       ),
       actions: [
         Consumer<CartProvider>(

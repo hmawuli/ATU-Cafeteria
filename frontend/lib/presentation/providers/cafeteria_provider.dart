@@ -1386,6 +1386,11 @@ class CafeteriaProvider extends ChangeNotifier {
 
   // Remote Synchronization & Performance Metrics
   Future<void> fetchVendorPerformanceMetrics(int vendorId) async {
+    // Both endpoints below are protected; without a bearer token Sanctum
+    // rejects them with 401 "Unauthenticated.".
+    final token = _authToken;
+    if (token == null || token.isEmpty) return;
+
     _isFetchingRemoteMetrics = true;
     _remoteVendorMetrics = null;
     _remoteRechartsData = null;
@@ -1398,6 +1403,8 @@ class CafeteriaProvider extends ChangeNotifier {
       final client = HttpClient();
       client.connectionTimeout = const Duration(seconds: 4);
       final request = await client.getUrl(metricsUrl);
+      request.headers.set(HttpHeaders.acceptHeader, 'application/json');
+      request.headers.set(HttpHeaders.authorizationHeader, 'Bearer $token');
       final response = await request.close();
 
       if (response.statusCode == 200) {
@@ -1419,6 +1426,8 @@ class CafeteriaProvider extends ChangeNotifier {
       final rechartsUrl = Uri.parse(
           "$_laravelBaseUrl/api/vendor/recharts-sales?vendor_id=$vendorId");
       final rRequest = await client.getUrl(rechartsUrl);
+      rRequest.headers.set(HttpHeaders.acceptHeader, 'application/json');
+      rRequest.headers.set(HttpHeaders.authorizationHeader, 'Bearer $token');
       final rResponse = await rRequest.close();
       if (rResponse.statusCode == 200) {
         final rBody = await rResponse.transform(utf8.decoder).join();

@@ -26,16 +26,11 @@ class _AdminSecurityScreenState extends State<AdminSecurityScreen> {
     String path,
     Map<String, dynamic> body,
   ) async {
-    final provider = context.read<CafeteriaProvider>();
-    final client = ApiClient()..token = provider.authToken;
-    try {
-      final result = await client.request(method, path, body: body);
-      if (result is Map<String, dynamic>) return result;
-      if (result is Map) return Map<String, dynamic>.from(result);
-      return <String, dynamic>{'data': result};
-    } finally {
-      client.close();
-    }
+    final client = context.read<ApiClient>();
+    final result = await client.request(method, path, body: body);
+    if (result is Map<String, dynamic>) return result;
+    if (result is Map) return Map<String, dynamic>.from(result);
+    return <String, dynamic>{'data': result};
   }
 
   Future<void> _requestCode() async {

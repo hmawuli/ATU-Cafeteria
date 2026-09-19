@@ -25,6 +25,11 @@ class AdminStateProvider extends ChangeNotifier {
   Map<String, dynamic> commandCenterData = {};
   List<dynamic> securityAlerts = [];
 
+  /// Set when the Finance endpoint rejects the current admin (e.g. a
+  /// CAFETERIA_ADMIN lacking `payments.view`). Other sections must keep
+  /// loading normally, so this is tracked separately from [_error].
+  String? financeError;
+
   bool get loading => _loading;
   String? get error => _error;
 
@@ -32,37 +37,78 @@ class AdminStateProvider extends ChangeNotifier {
       {bool includeFinance = true, bool includeSettings = false}) async {
     _loading = true;
     _error = null;
+    if (includeFinance) financeError = null;
     notifyListeners();
-    try {
-      final futures = <Future<Map<String, dynamic>>>[
-        repository.dashboard(),
-        repository.users(),
-        repository.vendors(),
-        repository.orders(),
-        repository.auditLogs(),
-        smart.commandCenter(),
-        smart.securityAlerts(),
-      ];
-      if (includeFinance) futures.add(repository.finance());
-      if (includeSettings) futures.add(repository.settings());
-      final results = await Future.wait(futures);
-      dashboardData = Map<String, dynamic>.from(results[0]['data'] ?? {});
-      users = _items(results[1]['data']);
-      vendors = _items(results[2]['data']);
-      orders = _items(results[3]['data']);
-      auditLogs = _items(results[4]['data']);
-      commandCenterData = Map<String, dynamic>.from(results[5]['data'] ?? {});
-      securityAlerts = _items(results[6]['data']);
-      var i = 7;
-      if (includeFinance) {
-        financeData = Map<String, dynamic>.from(results[i++]['data'] ?? {});
-      }
-      if (includeSettings) settings = _items(results[i]['data']);
-    } catch (e) {
-      _error = e.toString();
+
+    // Each section loads independently: a single forbidden/failed endpoint
+    // (e.g. Finance for a CAFETERIA_ADMIN) must never prevent Users, Vendors
+    // or the dashboard from refreshing, otherwise newly created records stay
+    // invisible after a page refresh.
+    final futures = <Future<void>>[
+      _assign(
+        repository.dashboard,
+        (v) => dashboardData = Map<String, dynamic>.from(v['data'] ?? {}),
+      ),
+      _assign(
+        repository.users,
+        (v) => users = _items(v['data']),
+      ),
+      _assign(
+        repository.vendors,
+        (v) => vendors = _items(v['data']),
+      ),
+      _assign(
+        repository.orders,
+        (v) => orders = _items(v['data']),
+      ),
+      _assign(
+        repository.auditLogs,
+        (v) => auditLogs = _items(v['data']),
+      ),
+      _assign(
+        smart.commandCenter,
+        (v) => commandCenterData = Map<String, dynamic>.from(v['data'] ?? {}),
+      ),
+      _assign(
+        smart.securityAlerts,
+        (v) => securityAlerts = _items(v['data']),
+      ),
+    ];
+    if (includeFinance) {
+      futures.add(_assign(
+        repository.finance,
+        (v) {
+          financeData = Map<String, dynamic>.from(v['data'] ?? {});
+          financeError = null;
+        },
+        onError: (_) => financeError =
+            'You do not have permission to view finance. Contact a SUPER_ADMIN or FINANCE_ADMIN.',
+      ));
     }
+    if (includeSettings) {
+      futures.add(_assign(
+        repository.settings,
+        (v) => settings = _items(v['data']),
+      ));
+    }
+    await Future.wait(futures);
     _loading = false;
     notifyListeners();
+  }
+
+  /// Runs one admin API call and commits its result only on success.
+  Future<void> _assign(
+    Future<Map<String, dynamic>> Function() request,
+    void Function(Map<String, dynamic>) commit, {
+    void Function(Object error)? onError,
+  }) async {
+    try {
+      final result = await request();
+      commit(result);
+    } catch (e) {
+      _error = e.toString();
+      onError?.call(e);
+    }
   }
 
   Future<bool> changeUserStatus(int id, String status) async => _run(() async {

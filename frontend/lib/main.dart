@@ -9,6 +9,7 @@ import 'package:atu_cafeteria/presentation/screens/login_screen.dart';
 import 'package:atu_cafeteria/presentation/screens/register_screen.dart';
 import 'package:atu_cafeteria/presentation/screens/password_reset_screen.dart';
 import 'package:atu_cafeteria/presentation/screens/email_verification_screen.dart';
+import 'package:atu_cafeteria/presentation/screens/public_home_screen.dart';
 import 'package:atu_cafeteria/presentation/screens/cart_screen.dart';
 import 'package:atu_cafeteria/presentation/screens/checkout_screen.dart';
 import 'package:atu_cafeteria/presentation/screens/admin_security_screen.dart';
@@ -37,10 +38,14 @@ class ATUCafeteriaApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) => MultiProvider(
         providers: [
+          // One shared HTTP client for the whole app: screens read it with
+          // context.read<ApiClient>() instead of creating (and forgetting to
+          // authenticate or close) their own instances.
+          Provider<ApiClient>(create: (_) => ApiClient()),
           ChangeNotifierProvider(create: (_) => CafeteriaProvider()),
           ChangeNotifierProvider(create: (_) => CartProvider()),
           ChangeNotifierProvider(
-              create: (_) => AdminStateProvider(ApiClient())),
+              create: (ctx) => AdminStateProvider(ctx.read<ApiClient>())),
         ],
         child: MaterialApp(
           title: 'ATU Cafeteria',
@@ -50,6 +55,7 @@ class ATUCafeteriaApp extends StatelessWidget {
           themeMode: ThemeMode.system,
           home: const SplashScreen(),
           routes: {
+            '/home': (_) => const PublicHomeScreen(),
             '/login': (_) => const LoginScreen(),
             '/register': (_) => const RegisterScreen(),
             '/student': (_) => const MobileStudentScreen(),

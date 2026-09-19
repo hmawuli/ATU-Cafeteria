@@ -17,13 +17,16 @@ class AuthController extends Controller
     private function verifyCredential(User $user, string $credential): bool
     {
         $stored = (string) $user->password;
-        if (Hash::check($credential, $stored)) {
+        $isBcrypt = str_starts_with($stored, '$2');
+        $legacySha256 = hash('sha256', $credential);
+
+        if ($isBcrypt && Hash::check($credential, $stored)) {
             return true;
         }
 
         // Migrate credentials created by earlier Flutter clients that sent SHA-256.
-        $legacySha256 = hash('sha256', $credential);
-        if (Hash::check($legacySha256, $stored) || hash_equals($stored, $legacySha256)) {
+        if (hash_equals($stored, $legacySha256) ||
+            ($isBcrypt && Hash::check($legacySha256, $stored))) {
             $user->password = Hash::make($credential);
             $user->saveQuietly();
 
