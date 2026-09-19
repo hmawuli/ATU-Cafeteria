@@ -4,6 +4,7 @@ use App\Http\Middleware\AuditAndSanitizeOrderMiddleware;
 use App\Http\Middleware\EnsureSecureTransport;
 use App\Http\Middleware\PermissionMiddleware;
 use App\Http\Middleware\RequestPerformanceLogMiddleware;
+use App\Http\Middleware\RequireAuthenticatedApiRoutes;
 use App\Http\Middleware\RoleMiddleware;
 use App\Http\Middleware\SecureHeadersMiddleware;
 use App\Http\Middleware\SystemErrorLoggerMiddleware;
@@ -28,6 +29,7 @@ return Application::configure(basePath: dirname(__DIR__))
         $middleware->api(append: [
             'throttle:api',
             EnsureSecureTransport::class,
+            RequireAuthenticatedApiRoutes::class,
         ]);
 
         $middleware->alias([
