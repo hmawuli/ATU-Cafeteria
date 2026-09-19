@@ -15,10 +15,16 @@ class FoodItemController extends Controller
 {
     /**
      * Display a listing of all food items.
+     *
+     * A vendor can accidentally have duplicate records with the same dish
+     * name. The API keeps the earliest record and hides duplicates from the
+     * customer catalogue without deleting database records.
      */
     public function index()
     {
-        $foods = FoodItem::all();
+        $foods = FoodItem::orderBy('id')->get()->unique(function ($food) {
+            return $food->vendor_id . '|' . mb_strtolower(trim($food->name));
+        })->values();
 
         return response()->json($foods, 200);
     }
@@ -28,7 +34,13 @@ class FoodItemController extends Controller
      */
     public function getVendorFoodItems($vendorId)
     {
-        $foods = FoodItem::where('vendor_id', $vendorId)->get();
+        $foods = FoodItem::where('vendor_id', $vendorId)
+            ->orderBy('id')
+            ->get()
+            ->unique(function ($food) {
+                return mb_strtolower(trim($food->name));
+            })
+            ->values();
 
         return response()->json($foods, 200);
     }
@@ -61,7 +73,6 @@ class FoodItemController extends Controller
                 'low_stock_threshold' => $request->input('low_stock_threshold', 10),
             ]);
 
-            // Register Audit Log
             AuditLog::create([
                 'user_id' => $createdFood->vendor_id,
                 'timestamp' => time() * 1000,
@@ -97,11 +108,9 @@ class FoodItemController extends Controller
         }
 
         $updatedFood = DB::transaction(function () use ($food, $request) {
-            // We allow partial updates
             $data = $request->only(['name', 'price', 'category', 'description', 'image_url', 'is_available', 'initial_stock', 'low_stock_threshold']);
             $food->update($data);
 
-            // Register Audit Log
             AuditLog::create([
                 'user_id' => $food->vendor_id,
                 'timestamp' => time() * 1000,
@@ -142,7 +151,6 @@ class FoodItemController extends Controller
         DB::transaction(function () use ($food, $vendorId, $name) {
             $food->delete();
 
-            // Register Audit Log
             AuditLog::create([
                 'user_id' => $vendorId,
                 'timestamp' => time() * 1000,
@@ -179,7 +187,6 @@ class FoodItemController extends Controller
         $ids = $request->input('ids');
         $isAvailable = $request->input('is_available');
 
-        // Check ownership of all items
         $foods = FoodItem::whereIn('id', $ids)->get();
         foreach ($foods as $food) {
             if ($food->vendor_id !== $user->id && strtoupper($user->role) !== 'ADMIN') {
