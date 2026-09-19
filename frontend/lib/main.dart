@@ -19,7 +19,7 @@ import 'package:atu_cafeteria/presentation/screens/kfc_ordering_screen.dart';
 import 'package:atu_cafeteria/presentation/screens/order_tracking_screen.dart';
 import 'package:atu_cafeteria/presentation/screens/group_order_screen.dart';
 import 'package:atu_cafeteria/presentation/screens/food_detail_screen.dart';
-import 'package:atu_cafeteria/presentation/screens/reference_student_screen.dart';
+import 'package:atu_cafeteria/presentation/screens/mobile_student_screen.dart';
 import 'package:atu_cafeteria/presentation/screens/reference_vendor_screen.dart';
 import 'package:atu_cafeteria/presentation/screens/reference_admin_screen.dart';
 import 'package:atu_cafeteria/presentation/screens/notifications_screen.dart';
@@ -51,7 +51,7 @@ class ATUCafeteriaApp extends StatelessWidget {
           routes: {
             '/login': (_) => const LoginScreen(),
             '/register': (_) => const RegisterScreen(),
-            '/student': (_) => const ReferenceStudentScreen(),
+            '/student': (_) => const MobileStudentScreen(),
             '/vendor': (_) => const ReferenceVendorScreen(),
             '/admin': (_) => const ReferenceAdminScreen(),
             '/reset-password': (_) => const PasswordResetScreen(),
