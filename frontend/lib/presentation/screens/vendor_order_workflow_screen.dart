@@ -221,7 +221,7 @@ class _VendorOrderWorkflowScreenState extends State<VendorOrderWorkflowScreen> {
       appBar: AppBar(
         title: const Text('Vendor Order Centre'),
         actions: [
-          IconButton(onPressed: () => _loadOrders(), icon: const Icon(Icons.refresh)),
+          IconButton(onPressed: _loadOrders, icon: const Icon(Icons.refresh)),
           IconButton(
             tooltip: 'Full vendor dashboard',
             onPressed: () => Navigator.pushNamed(context, '/vendor-dashboard'),
@@ -283,22 +283,31 @@ class _VendorOrderWorkflowScreenState extends State<VendorOrderWorkflowScreen> {
           children: [
             Row(
               children: [
-                Text('#${order.id ?? '-'}', style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w900)),
-                const Spacer(),
+                Expanded(
+                  child: Text('Order #${order.id ?? '—'}', style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 17)),
+                ),
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                  decoration: BoxDecoration(color: _statusColor(status).withValues(alpha: .14), borderRadius: BorderRadius.circular(20)),
-                  child: Text(order.displayStatus, style: TextStyle(fontWeight: FontWeight.w800, color: _statusColor(status))),
+                  decoration: BoxDecoration(
+                    color: _statusColor(status).withValues(alpha: .12),
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                  child: Text(status, style: TextStyle(fontWeight: FontWeight.w800, color: _statusColor(status))),
                 ),
               ],
             ),
             const SizedBox(height: 12),
-            Text(order.foodName, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w800)),
-            const SizedBox(height: 6),
-            Text('Quantity: ${order.quantity}  •  GH₵ ${order.totalPrice.toStringAsFixed(2)}'),
-            if (order.estimatedPickupTime != null && order.estimatedPickupTime!.isNotEmpty) ...[
-              const SizedBox(height: 4),
-              Text('Pickup: ${order.estimatedPickupTime}'),
+            Text('Customer: ${order.customerName ?? 'Student'}'),
+            const SizedBox(height: 4),
+            Text('Total: GH₵ ${order.totalAmount.toStringAsFixed(2)}', style: const TextStyle(fontWeight: FontWeight.w800)),
+            if (order.items.isNotEmpty) ...[
+              const SizedBox(height: 10),
+              ...order.items.map(
+                (item) => Padding(
+                  padding: const EdgeInsets.only(bottom: 4),
+                  child: Text('• ${item.name} × ${item.quantity}'),
+                ),
+              ),
             ],
             if (action.isNotEmpty) ...[
               const SizedBox(height: 14),
@@ -306,7 +315,7 @@ class _VendorOrderWorkflowScreenState extends State<VendorOrderWorkflowScreen> {
                 width: double.infinity,
                 child: FilledButton.icon(
                   onPressed: _busy ? null : () => _advance(order),
-                  icon: Icon(status == 'READY' || status == 'READY_FOR_PICKUP' ? Icons.verified_outlined : Icons.arrow_forward_rounded),
+                  icon: Icon(status == 'READY' || status == 'READY_FOR_PICKUP' ? Icons.verified_user : Icons.arrow_forward),
                   label: Text(action),
                 ),
               ),
