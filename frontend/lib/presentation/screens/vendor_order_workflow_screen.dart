@@ -27,7 +27,10 @@ class _VendorOrderWorkflowScreenState extends State<VendorOrderWorkflowScreen> {
   void initState() {
     super.initState();
     _loadOrders();
-    _timer = Timer.periodic(const Duration(seconds: 5), (_) => _loadOrders(silent: true));
+    _timer = Timer.periodic(
+      const Duration(seconds: 5),
+      (_) => _loadOrders(silent: true),
+    );
   }
 
   @override
@@ -39,8 +42,9 @@ class _VendorOrderWorkflowScreenState extends State<VendorOrderWorkflowScreen> {
   Future<void> _loadOrders({bool silent = false}) async {
     final provider = context.read<CafeteriaProvider>();
     final token = provider.authToken;
-    final vendorId = provider.currentUser?.id;
-    if (token == null || token.isEmpty || vendorId == null) return;
+    if (token == null || token.isEmpty || provider.currentUser?.id == null) {
+      return;
+    }
 
     try {
       final response = await http.get(
@@ -54,8 +58,11 @@ class _VendorOrderWorkflowScreenState extends State<VendorOrderWorkflowScreen> {
       if (response.statusCode != 200) {
         throw Exception('Server returned ${response.statusCode}.');
       }
+
       final decoded = response.body.isEmpty ? null : jsonDecode(response.body);
-      if (decoded is! List) throw Exception('Invalid order response.');
+      if (decoded is! List) {
+        throw Exception('Invalid order response.');
+      }
 
       final orders = <Order>[];
       for (final raw in decoded) {
@@ -65,36 +72,36 @@ class _VendorOrderWorkflowScreenState extends State<VendorOrderWorkflowScreen> {
         } catch (_) {}
       }
       orders.sort((a, b) => (b.id ?? 0).compareTo(a.id ?? 0));
+
       if (!mounted) return;
       setState(() {
         _orders = orders;
         _loading = false;
         _error = null;
       });
-    } catch (e) {
-      if (!mounted) return;
-      if (!silent) {
-        setState(() {
-          _loading = false;
-          _error = 'Unable to load live orders. Check that Laravel is running.';
-        });
-      }
+    } catch (_) {
+      if (!mounted || silent) return;
+      setState(() {
+        _loading = false;
+        _error = 'Unable to load live orders. Check that Laravel is running.';
+      });
     }
   }
 
   Future<void> _advance(Order order) async {
     final status = order.status.toUpperCase();
     if (order.id == null) return;
+
     if (status == 'READY' || status == 'READY_FOR_PICKUP') {
       await _verifyPickup(order);
       return;
     }
 
-    final next = status == 'PENDING' || status == 'ORDER_PLACED'
-        ? 'PREPARING'
-        : status == 'PREPARING'
-            ? 'READY'
-            : null;
+    final next = switch (status) {
+      'PENDING' || 'ORDER_PLACED' => 'PREPARING',
+      'PREPARING' => 'READY',
+      _ => null,
+    };
     if (next == null) return;
 
     setState(() => _busy = true);
@@ -131,7 +138,10 @@ class _VendorOrderWorkflowScreenState extends State<VendorOrderWorkflowScreen> {
           ),
         ),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Cancel'),
+          ),
           FilledButton(
             onPressed: () {
               final value = controller.text.trim();
@@ -150,6 +160,7 @@ class _VendorOrderWorkflowScreenState extends State<VendorOrderWorkflowScreen> {
       final provider = context.read<CafeteriaProvider>();
       final token = provider.authToken;
       if (token == null || token.isEmpty) throw Exception('Session expired.');
+
       final response = await http.post(
         Uri.parse('${provider.laravelBaseUrl}/api/orders/${order.id}/verify-pickup'),
         headers: {
@@ -165,6 +176,7 @@ class _VendorOrderWorkflowScreenState extends State<VendorOrderWorkflowScreen> {
       if (response.statusCode != 200) {
         throw Exception(message ?? 'Pickup verification failed.');
       }
+
       await _loadOrders(silent: true);
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -200,6 +212,7 @@ class _VendorOrderWorkflowScreenState extends State<VendorOrderWorkflowScreen> {
   Color _statusColor(String status) {
     switch (status.toUpperCase()) {
       case 'COMPLETED':
+      case 'DELIVERED':
         return AppTheme.success;
       case 'READY':
       case 'READY_FOR_PICKUP':
@@ -216,7 +229,11 @@ class _VendorOrderWorkflowScreenState extends State<VendorOrderWorkflowScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final active = _orders.where((o) => !['COMPLETED', 'DELIVERED', 'CANCELLED', 'DECLINED'].contains(o.status.toUpperCase())).length;
+    final active = _orders.where((order) {
+      return !['COMPLETED', 'DELIVERED', 'CANCELLED', 'DECLINED']
+          .contains(order.status.toUpperCase());
+    }).length;
+
     return Scaffold(
       appBar: AppBar(
         title: const Text('Vendor Order Centre'),
@@ -239,7 +256,9 @@ class _VendorOrderWorkflowScreenState extends State<VendorOrderWorkflowScreen> {
                   Container(
                     padding: const EdgeInsets.all(20),
                     decoration: BoxDecoration(
-                      gradient: const LinearGradient(colors: [AppTheme.primaryDark, AppTheme.primary]),
+                      gradient: const LinearGradient(
+                        colors: [AppTheme.primaryDark, AppTheme.primary],
+                      ),
                       borderRadius: BorderRadius.circular(20),
                     ),
                     child: Row(
@@ -250,9 +269,19 @@ class _VendorOrderWorkflowScreenState extends State<VendorOrderWorkflowScreen> {
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              const Text('LIVE ORDERS', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 20)),
+                              const Text(
+                                'LIVE ORDERS',
+                                style: TextStyle(
+                                  color: Colors.white,
+                                  fontWeight: FontWeight.w900,
+                                  fontSize: 20,
+                                ),
+                              ),
                               const SizedBox(height: 4),
-                              Text('$active active • updates every 5 seconds', style: const TextStyle(color: Colors.white70)),
+                              Text(
+                                '$active active • updates every 5 seconds',
+                                style: const TextStyle(color: Colors.white70),
+                              ),
                             ],
                           ),
                         ),
@@ -261,9 +290,19 @@ class _VendorOrderWorkflowScreenState extends State<VendorOrderWorkflowScreen> {
                   ),
                   const SizedBox(height: 16),
                   if (_error != null)
-                    Card(child: Padding(padding: const EdgeInsets.all(16), child: Text(_error!))),
+                    Card(
+                      child: Padding(
+                        padding: const EdgeInsets.all(16),
+                        child: Text(_error!),
+                      ),
+                    ),
                   if (_orders.isEmpty)
-                    const Card(child: Padding(padding: EdgeInsets.all(28), child: Center(child: Text('No customer orders yet.')))),
+                    const Card(
+                      child: Padding(
+                        padding: EdgeInsets.all(28),
+                        child: Center(child: Text('No customer orders yet.')),
+                      ),
+                    ),
                   ..._orders.map(_orderCard),
                 ],
               ),
@@ -274,6 +313,8 @@ class _VendorOrderWorkflowScreenState extends State<VendorOrderWorkflowScreen> {
   Widget _orderCard(Order order) {
     final status = order.status.toUpperCase();
     final action = _actionLabel(order);
+    final total = order.totalPrice;
+
     return Card(
       margin: const EdgeInsets.only(bottom: 12),
       child: Padding(
@@ -284,7 +325,10 @@ class _VendorOrderWorkflowScreenState extends State<VendorOrderWorkflowScreen> {
             Row(
               children: [
                 Expanded(
-                  child: Text('Order #${order.id ?? '—'}', style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 17)),
+                  child: Text(
+                    'Order #${order.id ?? '—'}',
+                    style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 17),
+                  ),
                 ),
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
@@ -292,30 +336,39 @@ class _VendorOrderWorkflowScreenState extends State<VendorOrderWorkflowScreen> {
                     color: _statusColor(status).withValues(alpha: .12),
                     borderRadius: BorderRadius.circular(20),
                   ),
-                  child: Text(status, style: TextStyle(fontWeight: FontWeight.w800, color: _statusColor(status))),
+                  child: Text(
+                    status,
+                    style: TextStyle(
+                      fontWeight: FontWeight.w800,
+                      color: _statusColor(status),
+                    ),
+                  ),
                 ),
               ],
             ),
             const SizedBox(height: 12),
-            Text('Customer: ${order.customerName ?? 'Student'}'),
+            Text('Customer #${order.customerId}'),
             const SizedBox(height: 4),
-            Text('Total: GH₵ ${order.totalAmount.toStringAsFixed(2)}', style: const TextStyle(fontWeight: FontWeight.w800)),
-            if (order.items.isNotEmpty) ...[
-              const SizedBox(height: 10),
-              ...order.items.map(
-                (item) => Padding(
-                  padding: const EdgeInsets.only(bottom: 4),
-                  child: Text('• ${item.name} × ${item.quantity}'),
-                ),
-              ),
-            ],
+            Text(
+              'Meal: ${order.foodName} × ${order.quantity}',
+              style: const TextStyle(fontWeight: FontWeight.w600),
+            ),
+            const SizedBox(height: 4),
+            Text(
+              'Total: GH₵ ${total.toStringAsFixed(2)}',
+              style: const TextStyle(fontWeight: FontWeight.w800),
+            ),
             if (action.isNotEmpty) ...[
               const SizedBox(height: 14),
               SizedBox(
                 width: double.infinity,
                 child: FilledButton.icon(
                   onPressed: _busy ? null : () => _advance(order),
-                  icon: Icon(status == 'READY' || status == 'READY_FOR_PICKUP' ? Icons.verified_user : Icons.arrow_forward),
+                  icon: Icon(
+                    status == 'READY' || status == 'READY_FOR_PICKUP'
+                        ? Icons.verified_user
+                        : Icons.arrow_forward,
+                  ),
                   label: Text(action),
                 ),
               ),
