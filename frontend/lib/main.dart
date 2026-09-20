@@ -16,6 +16,7 @@ import 'package:atu_cafeteria/presentation/screens/admin_security_screen.dart';
 import 'package:atu_cafeteria/presentation/screens/smart_insights_screen.dart';
 import 'package:atu_cafeteria/presentation/screens/kiosk_screen.dart';
 import 'package:atu_cafeteria/presentation/screens/vendor_order_display_screen.dart';
+import 'package:atu_cafeteria/presentation/screens/vendor_order_workflow_screen.dart';
 import 'package:atu_cafeteria/presentation/screens/kfc_ordering_screen.dart';
 import 'package:atu_cafeteria/presentation/screens/order_tracking_screen.dart';
 import 'package:atu_cafeteria/presentation/screens/group_order_screen.dart';
@@ -38,9 +39,6 @@ class ATUCafeteriaApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) => MultiProvider(
         providers: [
-          // One shared HTTP client for the whole app: screens read it with
-          // context.read<ApiClient>() instead of creating (and forgetting to
-          // authenticate or close) their own instances.
           Provider<ApiClient>(create: (_) => ApiClient()),
           ChangeNotifierProvider(create: (_) => CafeteriaProvider()),
           ChangeNotifierProvider(create: (_) => CartProvider()),
@@ -59,7 +57,8 @@ class ATUCafeteriaApp extends StatelessWidget {
             '/login': (_) => const LoginScreen(),
             '/register': (_) => const RegisterScreen(),
             '/student': (_) => const MobileStudentScreen(),
-            '/vendor': (_) => const ReferenceVendorScreen(),
+            '/vendor': (_) => const VendorOrderWorkflowScreen(),
+            '/vendor-dashboard': (_) => const ReferenceVendorScreen(),
             '/admin': (_) => const ReferenceAdminScreen(),
             '/reset-password': (_) => const PasswordResetScreen(),
             '/verify-email': (_) => const EmailVerificationScreen(),
