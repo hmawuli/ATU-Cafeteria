@@ -11,7 +11,7 @@ class FoodDetailScreen extends StatelessWidget {
   String _fallbackImage() {
     final category = item.category.toLowerCase();
     if (category.contains('drink') || category.contains('beverage')) {
-      return 'https://images.unsplash.com/photo-1544145945-f90425340c7e?auto=format&fit=crop&w=1200&q=85';
+      return 'https://images.unsplash.com/photo-1554866585-cd94860890b7?auto=format&fit=crop&w=1200&q=85';
     }
     if (category.contains('snack') || category.contains('breakfast')) {
       return 'https://images.unsplash.com/photo-1509440159596-0249088772ff?auto=format&fit=crop&w=1200&q=85';
@@ -19,7 +19,7 @@ class FoodDetailScreen extends StatelessWidget {
     if (category.contains('dessert')) {
       return 'https://images.unsplash.com/photo-1551024506-0bccd828d307?auto=format&fit=crop&w=1200&q=85';
     }
-    return 'https://images.unsplash.com/photo-1547592180-85f173990554?auto=format&fit=crop&w=1200&q=85';
+    return 'https://images.unsplash.com/photo-1540189549336-e6e99c3679fe?auto=format&fit=crop&w=1200&q=85';
   }
 
   void _addToCart(BuildContext context) {
@@ -68,6 +68,12 @@ class FoodDetailScreen extends StatelessWidget {
               child: Image.network(
                 imageUrl,
                 fit: BoxFit.cover,
+                loadingBuilder: (_, child, progress) => progress == null
+                    ? child
+                    : Container(
+                        color: scheme.primaryContainer,
+                        child: const Center(
+                            child: CircularProgressIndicator(strokeWidth: 2))),
                 errorBuilder: (_, __, ___) => Container(
                   color: scheme.primaryContainer,
                   child: Icon(Icons.restaurant_rounded,

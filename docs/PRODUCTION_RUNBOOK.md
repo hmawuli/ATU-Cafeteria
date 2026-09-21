@@ -13,7 +13,7 @@ The script creates the Android platform files with Flutter, installs Dart depend
 ```bash
 cd backend
 php artisan migrate --seed
-php artisan serve --host=0.0.0.0 --port=8000
+php artisan serve --host=0.0.0.0 --port=8001
 ```
 
 ## Start Flutter
@@ -22,13 +22,13 @@ For an Android emulator:
 
 ```bash
 cd frontend
-flutter run --dart-define=API_BASE_URL=http://10.0.2.2:8000/api/
+flutter run --dart-define=API_BASE_URL=http://10.0.2.2:8001/api/
 ```
 
 For a physical phone, replace the host with the development computer's LAN IP:
 
 ```bash
-flutter run --dart-define=API_BASE_URL=http://192.168.1.100:8000/api/
+flutter run --dart-define=API_BASE_URL=http://192.168.1.100:8001/api/
 ```
 
 ## Release checklist

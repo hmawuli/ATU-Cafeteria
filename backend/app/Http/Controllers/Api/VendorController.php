@@ -46,6 +46,15 @@ class VendorController extends Controller
 
         $orders = $user->vendorOrders()->orderBy('order_timestamp', 'desc')->get();
 
+        // The pickup PIN is the student's proof-of-identity at the counter.
+        // It must never be handed to the vendor through the API, otherwise the
+        // vendor could verify any visitor by reading the code off the list.
+        if (strtoupper($user->role) === 'VENDOR') {
+            $orders->each(function ($order) {
+                $order->makeHidden('pickup_pin');
+            });
+        }
+
         return response()->json($orders, 200);
     }
 

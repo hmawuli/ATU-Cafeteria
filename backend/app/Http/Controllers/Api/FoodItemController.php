@@ -23,7 +23,7 @@ class FoodItemController extends Controller
     public function index()
     {
         $foods = FoodItem::orderBy('id')->get()->unique(function ($food) {
-            return $food->vendor_id . '|' . mb_strtolower(trim($food->name));
+            return $food->vendor_id.'|'.mb_strtolower(trim($food->name));
         })->values();
 
         return response()->json($foods, 200);

@@ -156,7 +156,7 @@ class FoodImage extends StatelessWidget {
   String _fallbackUrl() {
     final value = (category ?? '').toLowerCase();
     if (value.contains('drink') || value.contains('beverage')) {
-      return 'https://images.unsplash.com/photo-1544145945-f90425340c7e?auto=format&fit=crop&w=900&q=82';
+      return 'https://images.unsplash.com/photo-1554866585-cd94860890b7?auto=format&fit=crop&w=900&q=82';
     }
     if (value.contains('snack') || value.contains('breakfast')) {
       return 'https://images.unsplash.com/photo-1509440159596-0249088772ff?auto=format&fit=crop&w=900&q=82';
@@ -164,7 +164,7 @@ class FoodImage extends StatelessWidget {
     if (value.contains('dessert')) {
       return 'https://images.unsplash.com/photo-1551024506-0bccd828d307?auto=format&fit=crop&w=900&q=82';
     }
-    return 'https://images.unsplash.com/photo-1547592180-85f173990554?auto=format&fit=crop&w=900&q=82';
+    return 'https://images.unsplash.com/photo-1540189549336-e6e99c3679fe?auto=format&fit=crop&w=900&q=82';
   }
 
   @override
@@ -262,11 +262,7 @@ class Sidebar extends StatelessWidget {
                       'Menu Catalog',
                       'Orders',
                       'Kiosk',
-                      'Performance',
-                      'Reviews',
-                      'Transactions',
-                      'Store Settings',
-                      'Notifications'
+                      'Performance'
                     ]
                   : [
                       'Dashboard',
@@ -274,10 +270,9 @@ class Sidebar extends StatelessWidget {
                       'Vendors',
                       'Orders',
                       'Finance',
-                      'Food & Menu',
-                      'Ratings & Reviews',
-                      'Reports',
-                      'System Settings'
+                      'Command Center',
+                      'Security Alerts',
+                      'Settings'
                     ])
               .map((item) => InkWell(
                     onTap: () => onSelected(item),
@@ -339,12 +334,14 @@ class Sidebar extends StatelessWidget {
       case 'Performance':
       case 'Reports':
         return Icons.insights;
-      case 'Reviews':
-      case 'Ratings & Reviews':
-        return Icons.star_outline;
-      case 'Transactions':
+      case 'Command Center':
+        return Icons.precision_manufacturing_outlined;
+      case 'Security Alerts':
+        return Icons.security_outlined;
       case 'Finance':
+      case 'Transactions':
         return Icons.payments_outlined;
+      case 'Settings':
       case 'Store Settings':
       case 'System Settings':
         return Icons.settings_outlined;

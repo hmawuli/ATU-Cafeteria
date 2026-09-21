@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:atu_cafeteria/core/network/api_client.dart';
+import '../widgets/order_qr_card.dart';
 
 class OrderTrackingScreen extends StatefulWidget {
   final int orderId;
@@ -254,7 +255,7 @@ class _OrderTrackingScreenState extends State<OrderTrackingScreen> {
                         ),
                       ),
                       const SizedBox(height: 18),
-                      if (status.toUpperCase() == 'READY')
+                      if (status.toUpperCase() == 'READY') ...[
                         const Card(
                           child: ListTile(
                             leading: Icon(Icons.pin_outlined),
@@ -263,6 +264,15 @@ class _OrderTrackingScreenState extends State<OrderTrackingScreen> {
                                 'Use the pickup PIN shown after checkout at the vendor counter.'),
                           ),
                         ),
+                        if ((_order?['pickup_pin']?.toString() ?? '').isNotEmpty)
+                          Padding(
+                            padding: const EdgeInsets.symmetric(vertical: 12),
+                            child: OrderQrCard(
+                              orderId: widget.orderId,
+                              pickupCode: _order!['pickup_pin'].toString(),
+                            ),
+                          ),
+                      ],
                       if (const {'PENDING', 'ORDER_PLACED', 'PREPARING'}
                           .contains(status.toUpperCase()))
                         Card(

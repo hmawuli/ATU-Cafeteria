@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\AuditLog;
+use App\Models\Feedback;
 use App\Models\Order;
 use App\Models\SystemSetting;
 use App\Models\User;
@@ -23,6 +24,8 @@ class AdminManagementController extends Controller
         return response()->json([
             'success' => true,
             'data' => [
+                'total_users' => User::count(),
+                'total_orders' => Order::count(),
                 'students' => User::where('role', 'STUDENT')->count(),
                 'vendors' => User::where('role', 'VENDOR')->count(),
                 'active_users' => User::where('account_status', 'ACTIVE')->count(),
@@ -32,6 +35,7 @@ class AdminManagementController extends Controller
                 'completed_orders' => Order::where('status', 'COMPLETED')->count(),
                 'sales_today' => (float) Order::where('created_at', '>=', $today)->whereIn('status', ['COMPLETED', 'READY'])->sum('total_price'),
                 'wallet_balance' => (float) User::sum('balance'),
+                'average_rating' => round((float) Feedback::avg('rating_food_quality') ?? 0, 1),
             ],
         ]);
     }

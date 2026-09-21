@@ -53,8 +53,11 @@ class CafeteriaProvider extends ChangeNotifier {
   bool _registrationSuccess = false;
   bool get registrationSuccess => _registrationSuccess;
 
-  double _studentWalletBalance = 185.50; // Starting pre-seed digital currency
-  double get studentWalletBalance => _studentWalletBalance;
+  /// The wallet balance is the server's authoritative `users.balance`,
+  /// mirrored onto [currentUser]. Every page reads this single value so a
+  /// checkout, wallet top-up or admin adjustment is immediately reflected
+  /// across the app instead of drifting from a hard-coded local figure.
+  double get studentWalletBalance => _currentUser?.balance ?? 0;
 
   String _vendorAnnouncement =
       "All meals prepared in alignment with Accra hygiene standards. Dine safe, study hard!";
@@ -387,7 +390,43 @@ class CafeteriaProvider extends ChangeNotifier {
         _vendorFeedback = await _db.getFeedbackForVendor(_currentUser!.id!);
       }
     }
+
+    // Every page reads `studentWalletBalance` from the authenticated user.
+    // Re-sync that user from the API so wallet changes made on the server
+    // (checkouts, top-ups, admin adjustments) are visible on all pages.
+    await _syncCurrentUserFromServer();
     notifyListeners();
+  }
+
+  /// Refresh the authenticated user's profile (notably the wallet balance)
+  /// from `/api/me`. The server is the single source of truth for money held.
+  Future<void> _syncCurrentUserFromServer() async {
+    if (_authToken == null || _authToken!.isEmpty || _currentUser == null) {
+      return;
+    }
+    try {
+      final response = await http
+          .get(
+            Uri.parse('$_laravelBaseUrl/api/me'),
+            headers: {
+              'Accept': 'application/json',
+              'Authorization': 'Bearer $_authToken',
+            },
+          )
+          .timeout(const Duration(seconds: 8));
+
+      if (response.statusCode != 200 || response.body.isEmpty) return;
+      final decoded = jsonDecode(response.body);
+      final raw = decoded is Map ? decoded['user'] : null;
+      if (raw is Map) {
+        final fresh = User.fromJson(Map<String, dynamic>.from(raw));
+        if (_currentUser != null) {
+          _currentUser = _currentUser!.copyWith(balance: fresh.balance);
+        }
+      }
+    } catch (e) {
+      debugPrint('Current user balance sync skipped: $e');
+    }
   }
 
   Future<void> _seedDatabaseIfEmpty() async {
@@ -1278,8 +1317,13 @@ class CafeteriaProvider extends ChangeNotifier {
   // ==========================================
 
   void rechargeWallet(double amount) async {
-    _studentWalletBalance += amount;
     if (_currentUser != null) {
+      // Re-sync the authoritative balance first, then apply the credit so a
+      // legacy caller never shows an overwritten value.
+      await refreshAllData();
+      _currentUser = _currentUser!.copyWith(
+        balance: _currentUser!.balance + amount,
+      );
       await _db.insertAuditLog(AuditLog(
         userId: _currentUser!.id!,
         action: "WALLET_CREDIT",
@@ -1287,9 +1331,8 @@ class CafeteriaProvider extends ChangeNotifier {
             "Securely loaded GH₵ ${amount.toStringAsFixed(2)} via Mobile Money Gateway.",
         timestamp: DateTime.now().millisecondsSinceEpoch,
       ));
-      await refreshAllData();
+      notifyListeners();
     }
-    notifyListeners();
   }
 
   Future<bool> placeOrder(
@@ -1298,10 +1341,12 @@ class CafeteriaProvider extends ChangeNotifier {
 
     final requiredSum = foodItem.price * quantity;
     if (useWallet) {
-      if (_studentWalletBalance < requiredSum) {
+      if (_currentUser!.balance < requiredSum) {
         return false;
       }
-      _studentWalletBalance -= requiredSum;
+      _currentUser = _currentUser!.copyWith(
+        balance: _currentUser!.balance - requiredSum,
+      );
     }
 
     // Generate a secure 4-digit numeric pickup PIN
@@ -1505,7 +1550,14 @@ class CafeteriaProvider extends ChangeNotifier {
           decoded is Map &&
           decoded['success'] == true) {
         if (purpose == 'WALLET_TOPUP') {
-          _studentWalletBalance += amount;
+          // The server has already verified and credited the wallet (users.balance).
+          // Mirror the credit locally so every page shows it even if the
+          // subsequent /api/me re-sync is unavailable.
+          if (_currentUser != null) {
+            _currentUser = _currentUser!.copyWith(
+              balance: _currentUser!.balance + amount,
+            );
+          }
           await refreshAllData();
         }
         return true;

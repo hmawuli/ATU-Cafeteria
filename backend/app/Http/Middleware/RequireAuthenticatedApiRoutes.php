@@ -18,12 +18,12 @@ class RequireAuthenticatedApiRoutes
 {
     public function handle(Request $request, Closure $next): Response
     {
-        if (!$this->requiresAuthentication($request)) {
+        if (! $this->requiresAuthentication($request)) {
             return $next($request);
         }
 
         $token = $request->bearerToken();
-        if (!$token) {
+        if (! $token) {
             return response()->json([
                 'message' => 'Authentication required.',
             ], 401);
@@ -32,7 +32,7 @@ class RequireAuthenticatedApiRoutes
         $accessToken = PersonalAccessToken::findToken($token);
         $user = $accessToken?->tokenable;
 
-        if (!$user) {
+        if (! $user) {
             return response()->json([
                 'message' => 'Unauthenticated.',
             ], 401);

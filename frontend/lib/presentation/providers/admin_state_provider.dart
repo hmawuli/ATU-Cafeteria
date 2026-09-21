@@ -149,6 +149,10 @@ class AdminStateProvider extends ChangeNotifier {
         await repository.walletAdjustment(id, amount, type, reason);
         await loadAll();
       });
+  Future<bool> resolveSecurityAlert(int id) async => _run(() async {
+        await smart.resolveSecurityAlert(id);
+        await loadAll();
+      });
   Future<bool> _run(Future<void> Function() action) async {
     try {
       _error = null;

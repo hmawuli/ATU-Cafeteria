@@ -12,6 +12,7 @@ use App\Models\User;
 use App\Models\Vendor;
 use App\Models\WalletTransaction;
 use Illuminate\Database\Seeder;
+use Illuminate\Support\Facades\Hash;
 
 class DatabaseSeeder extends Seeder
 {
@@ -176,6 +177,9 @@ class DatabaseSeeder extends Seeder
         ]);
 
         // 3. Create FoodItems
+        // Image URLs use images.unsplash.com direct photo URLs: they serve
+        // proper CORS headers (required by the Flutter *web* build) and render
+        // a polished card layout on every platform.
         $foods = [
             [
                 'id' => 101,
@@ -183,7 +187,7 @@ class DatabaseSeeder extends Seeder
                 'name' => 'ATU Chicken Jollof Rice',
                 'price' => 25.0,
                 'category' => 'Lunch Specials',
-                'image_url' => 'https://commons.wikimedia.org/wiki/Special:FilePath/Ghana%20Jollof%20Rice%20with%20Chicken.jpg',
+                'image_url' => 'https://images.unsplash.com/photo-1512058564366-18510be2db19?auto=format&fit=crop&w=1000&q=85',
                 'description' => 'Classic aromatic rice stewed with authentic Ghanaian tomato sauce, served with seasoned fried chicken salad & shito.',
                 'is_available' => true,
             ],
@@ -193,7 +197,7 @@ class DatabaseSeeder extends Seeder
                 'name' => 'Zesty Ginger Sobolo',
                 'price' => 10.0,
                 'category' => 'Drinks',
-                'image_url' => 'https://commons.wikimedia.org/wiki/Special:FilePath/Sobolo%20sold%20in%20Ghana.jpg',
+                'image_url' => 'https://images.unsplash.com/photo-1544787219-7f47ccb76574?auto=format&fit=crop&w=1000&q=85',
                 'description' => 'Refreshing chilled local hibiscus flower drink brewed with fresh ginger, pineapple peels, and sweetener.',
                 'is_available' => true,
             ],
@@ -203,7 +207,7 @@ class DatabaseSeeder extends Seeder
                 'name' => 'Red-Red Beans Stew',
                 'price' => 20.0,
                 'category' => 'Lunch Specials',
-                'image_url' => 'https://commons.wikimedia.org/wiki/Special:FilePath/Local%20Ghanaian%20Food%2C%20Beans%20and%20Plantain.jpg',
+                'image_url' => 'https://images.unsplash.com/photo-1540189549336-e6e99c3679fe?auto=format&fit=crop&w=1000&q=85',
                 'description' => 'Stewed tender cowpea bean hash in palm palm oil, accompanied by fried ripe sugar-plantain dices.',
                 'is_available' => true,
             ],
@@ -213,7 +217,7 @@ class DatabaseSeeder extends Seeder
                 'name' => 'Waakye Supreme',
                 'price' => 30.0,
                 'category' => 'Traditional',
-                'image_url' => 'https://commons.wikimedia.org/wiki/Special:FilePath/Waakye%20in%20Accra%2C%20Ghana.jpg',
+                'image_url' => 'https://images.unsplash.com/photo-1555939594-58d7cb561ad1?auto=format&fit=crop&w=1000&q=85',
                 'description' => 'A student favorite! Local black-eyed peas boiled with rice and millet stalks. Accompanying boiled egg, spiced gari, talia, and hot wele shito.',
                 'is_available' => true,
             ],
@@ -223,7 +227,7 @@ class DatabaseSeeder extends Seeder
                 'name' => 'Fufu & Goat Light Soup',
                 'price' => 35.0,
                 'category' => 'Traditional',
-                'image_url' => 'https://commons.wikimedia.org/wiki/Special:FilePath/Goat%20Light%20Soup%20and%20Fufu.jpg',
+                'image_url' => 'https://images.unsplash.com/photo-1547592180-85f173990554?auto=format&fit=crop&w=1000&q=85',
                 'description' => 'Rich Ghanaian fufu pounded from fresh cassava and green plantains, submerged in aromatic goat meat soup.',
                 'is_available' => true,
             ],
@@ -233,7 +237,7 @@ class DatabaseSeeder extends Seeder
                 'name' => 'Savoury Meat Pie',
                 'price' => 15.0,
                 'category' => 'Snacks',
-                'image_url' => 'https://commons.wikimedia.org/wiki/Special:FilePath/Meat%20pie%20and%20green%20leaves.jpg',
+                'image_url' => 'https://images.unsplash.com/photo-1509440159596-0249088772ff?auto=format&fit=crop&w=1000&q=85',
                 'description' => 'Crispy, flaky puff pastry loaded with moist, cooked mince beef seasoning.',
                 'is_available' => true,
             ],
@@ -243,7 +247,7 @@ class DatabaseSeeder extends Seeder
                 'name' => 'Chilled Coca-Cola',
                 'price' => 8.0,
                 'category' => 'Drinks',
-                'image_url' => 'https://digitalcontent.api.tesco.com/v2/media/ghs/02f86646-764d-404e-9941-786fc6f87e1a/54cbadde-5e8d-44f2-804b-8a5c423f64df_2034414780.jpeg?h=960&w=960',
+                'image_url' => 'https://images.unsplash.com/photo-1554866585-cd94860890b7?auto=format&fit=crop&w=1000&q=85',
                 'description' => '330ml Ice-cold Coca-Cola can for dynamic pairing.',
                 'is_available' => true,
             ],

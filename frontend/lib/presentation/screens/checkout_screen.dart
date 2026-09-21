@@ -3,6 +3,7 @@ import 'package:url_launcher/url_launcher.dart';
 import 'package:provider/provider.dart';
 import '../providers/cart_provider.dart';
 import '../providers/cafeteria_provider.dart';
+import '../widgets/order_qr_card.dart';
 import '../../core/network/api_client.dart';
 
 class CheckoutScreen extends StatefulWidget {
@@ -380,9 +381,25 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
           builder: (ctx) => AlertDialog(
                 icon: const Icon(Icons.verified_outlined, size: 48),
                 title: const Text('Payment confirmed'),
-                content: Text(pickupPin == null
-                    ? 'Your order has been placed successfully.'
-                    : 'Order placed successfully. Pickup PIN: $pickupPin'),
+                content: SingleChildScrollView(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(pickupPin == null
+                          ? 'Your order has been placed successfully.'
+                          : 'Order placed successfully. Show your collection pass at the vendor counter.'),
+                      if (orderId != null && pickupPin != null) ...[
+                        const SizedBox(height: 16),
+                        OrderQrCard(
+                          orderId: orderId is int
+                              ? orderId
+                              : int.tryParse(orderId.toString()) ?? 0,
+                          pickupCode: pickupPin,
+                        ),
+                      ],
+                    ],
+                  ),
+                ),
                 actions: [
                   FilledButton(
                       onPressed: () {

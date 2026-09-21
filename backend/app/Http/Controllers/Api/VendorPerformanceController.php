@@ -437,7 +437,7 @@ class VendorPerformanceController extends Controller
         });
 
         // Fallback demo/seed data if database orders table has sparse data
-        if (empty($byDate)) {
+        if (empty($byDateMap)) {
             // Generate realistic fallback peak hours if empty
             if ($maxHourlyOrders === 0) {
                 $peakHours = [

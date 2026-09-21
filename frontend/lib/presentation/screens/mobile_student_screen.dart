@@ -27,7 +27,40 @@ class _MobileStudentScreenState extends State<MobileStudentScreen> {
     final provider = context.watch<CafeteriaProvider>();
     final user = provider.currentUser;
     if (user == null) {
-      return const Scaffold(body: Center(child: Text('Please sign in again.')));
+      return Scaffold(
+        backgroundColor: page,
+        body: Center(
+          child: Padding(
+            padding: const EdgeInsets.all(28),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Icon(Icons.lock_outline_rounded,
+                    size: 64, color: navy),
+                const SizedBox(height: 16),
+                const Text(
+                  'Please sign in to continue.',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.w900),
+                ),
+                const SizedBox(height: 6),
+                const Text(
+                  'Your session has ended. Sign in again to keep ordering.',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(color: muted),
+                ),
+                const SizedBox(height: 22),
+                FilledButton.icon(
+                  onPressed: () =>
+                      Navigator.pushReplacementNamed(context, '/login'),
+                  icon: const Icon(Icons.login_rounded),
+                  label: const Text('Sign in'),
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
     }
 
     return Scaffold(
@@ -790,6 +823,51 @@ class _MobileStudentScreenState extends State<MobileStudentScreen> {
     );
   }
 
+  Color _statusColor(String status) {
+    switch (status.toUpperCase()) {
+      case 'ACTIVE':
+        return const Color(0xFF20A45A);
+      case 'SUSPENDED':
+        return const Color(0xFFE67E22);
+      case 'DISABLED':
+        return const Color(0xFFD64545);
+      default:
+        return const Color(0xFF20A45A);
+    }
+  }
+
+  Future<void> _showAbout(BuildContext context) {
+    return showDialog<void>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        icon: Container(
+          width: 72,
+          height: 72,
+          decoration: BoxDecoration(
+            color: yellow,
+            borderRadius: BorderRadius.circular(18),
+          ),
+          child: const Icon(Icons.restaurant_menu_rounded, color: navy, size: 38),
+        ),
+        title: const Text('ATU Cafeteria',
+            textAlign: TextAlign.center,
+            style: TextStyle(fontWeight: FontWeight.w900)),
+        content: const Text(
+          'ATU Cafeteria Food Ordering & Live Order Tracking Application\n\n'
+          'v1.1.0\n'
+          'Accra Technical University',
+          textAlign: TextAlign.center,
+        ),
+        actions: [
+          FilledButton(
+            onPressed: () => Navigator.pop(dialogContext),
+            child: const Text('Close'),
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _progress(String status) {
     const labels = ['Received', 'Preparing', 'Ready', 'Picked Up'];
     final normalized = status.toLowerCase();
@@ -895,11 +973,12 @@ class _MobileStudentScreenState extends State<MobileStudentScreen> {
           ),
         ),
         const SizedBox(height: 14),
-        Center(child: _status(user.accountStatus, const Color(0xFF20A45A))),
+        Center(child: _status(user.accountStatus, _statusColor(user.accountStatus))),
         const SizedBox(height: 18),
         _walletCard(context, provider),
         const SizedBox(height: 14),
-        _profileAction(Icons.settings_outlined, 'Settings', () {}),
+        _profileAction(Icons.info_outline_rounded, 'About this app',
+            () => _showAbout(context)),
         _profileAction(
           Icons.notifications_none_rounded,
           'Notifications',

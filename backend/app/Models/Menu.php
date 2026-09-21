@@ -27,11 +27,11 @@ class Menu extends Model
     ];
 
     /**
-     * Get the Vendor profile offering this menu entry.
+     * Get the vendor account (VENDOR-role user) offering this menu entry.
      */
     public function vendor()
     {
-        return $this->belongsTo(Vendor::class, 'vendor_id');
+        return $this->belongsTo(User::class, 'vendor_id');
     }
 
     /**

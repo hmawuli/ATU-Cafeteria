@@ -27,9 +27,13 @@ class AppConfig {
 
   /// Computer LAN IP used by the physical Android phone over Wi-Fi.
   ///
-  /// This is currently the laptop address reported by `hostname -I`.
-  /// A per-launch `--dart-define=API_BASE_URL=...` still takes priority.
-  static const String staticApiHost = '172.20.10.3';
+  /// Leave this empty to use the loopback default (`http://127.0.0.1:8001`),
+  /// which works out of the box for web, desktop and USB (`adb reverse`)
+  /// development. For phone-over-Wi-Fi only, set this to the address
+  /// reported by `hostname -I` (e.g. `192.168.1.50`) so the phone can reach
+  /// the laptop; a per-launch `--dart-define=API_BASE_URL=...` still takes
+  /// priority.
+  static const String staticApiHost = '';
 
   static const String _port = '8001';
   static const String _loopbackDefault = 'http://127.0.0.1:8001';

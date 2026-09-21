@@ -13,7 +13,13 @@ class ReferenceAdminScreen extends StatefulWidget {
 
 class _ReferenceAdminScreenState extends State<ReferenceAdminScreen> {
   String page = 'Dashboard';
-  static const pages = ['Dashboard', 'Users', 'Vendors', 'Orders', 'Finance'];
+  static const mobilePages = [
+    'Dashboard',
+    'Users',
+    'Vendors',
+    'Orders',
+    'Finance',
+  ];
 
   @override
   void initState() {
@@ -22,7 +28,7 @@ class _ReferenceAdminScreenState extends State<ReferenceAdminScreen> {
       final cafeteria = context.read<CafeteriaProvider>();
       final admin = context.read<AdminStateProvider>();
       admin.setToken(cafeteria.authToken);
-      admin.loadAll(includeFinance: true);
+      admin.loadAll(includeFinance: true, includeSettings: true);
     });
   }
 
@@ -66,7 +72,8 @@ class _ReferenceAdminScreenState extends State<ReferenceAdminScreen> {
                 AtuBrand.title(compact: true),
                 const Spacer(),
                 IconButton(
-                    onPressed: () => admin.loadAll(includeFinance: true),
+                    onPressed: () =>
+                        admin.loadAll(includeFinance: true, includeSettings: true),
                     icon: const Icon(Icons.refresh, color: Colors.white)),
                 IconButton(
                   onPressed: () {
@@ -80,9 +87,10 @@ class _ReferenceAdminScreenState extends State<ReferenceAdminScreen> {
           ),
           Expanded(child: _body(admin)),
           NavigationBar(
-            selectedIndex: pages.indexOf(page).clamp(0, pages.length - 1),
+            selectedIndex:
+                mobilePages.indexOf(page).clamp(0, mobilePages.length - 1),
             onDestinationSelected: (index) =>
-                setState(() => page = pages[index]),
+                setState(() => page = mobilePages[index]),
             destinations: const [
               NavigationDestination(
                   icon: Icon(Icons.dashboard), label: 'Dashboard'),
@@ -101,6 +109,9 @@ class _ReferenceAdminScreenState extends State<ReferenceAdminScreen> {
     if (page == 'Dashboard') return _dashboard(admin);
     if (page == 'Finance') return _finance(admin);
     if (page == 'Vendors') return _vendorsPage(admin);
+    if (page == 'Command Center') return _commandCenter(admin);
+    if (page == 'Security Alerts') return _securityAlerts(admin);
+    if (page == 'Settings') return _settings(admin);
 
     final List<Map<String, dynamic>> rows;
     if (page == 'Users') {
@@ -440,6 +451,16 @@ class _ReferenceAdminScreenState extends State<ReferenceAdminScreen> {
 
   Widget _dashboard(AdminStateProvider admin) {
     final data = admin.dashboardData;
+    // Vendor performance bars are computed from the live orders loaded by the
+    // admin API — never hard-coded.
+    final vendorStats = _aggregateVendorStats(admin.orders);
+    final vendorRows = vendorStats.entries.toList()
+      ..sort((a, b) => (b.value['revenue'] as double)
+          .compareTo(a.value['revenue'] as double));
+    final maxRevenue =
+        vendorRows.isEmpty ? 1.0 : (vendorRows.first.value['revenue'] as double);
+    final topVendors = vendorRows.take(5).toList();
+
     return ListView(
       padding: const EdgeInsets.all(24),
       children: [
@@ -474,7 +495,7 @@ class _ReferenceAdminScreenState extends State<ReferenceAdminScreen> {
           children: [
             MetricTile(
                 label: 'Total Users',
-                value: '${data['users'] ?? data['total_users'] ?? 0}',
+                value: '${data['total_users'] ?? data['students'] ?? 0}',
                 icon: Icons.people),
             MetricTile(
                 label: 'Total Vendors',
@@ -482,10 +503,28 @@ class _ReferenceAdminScreenState extends State<ReferenceAdminScreen> {
                 icon: Icons.store),
             MetricTile(
                 label: 'Total Orders',
-                value: '${data['orders'] ?? data['total_orders'] ?? 0}',
+                value: '${data['total_orders'] ?? data['orders'] ?? 0}',
                 icon: Icons.receipt_long),
-            const MetricTile(
-                label: 'Average Rating', value: '4.3 ★', icon: Icons.star),
+            MetricTile(
+                label: 'Orders Today',
+                value: '${data['orders_today'] ?? 0}',
+                icon: Icons.today),
+            MetricTile(
+                label: 'Pending Orders',
+                value: '${data['pending_orders'] ?? 0}',
+                icon: Icons.hourglass_top),
+            MetricTile(
+                label: 'Sales Today (GH¢)',
+                value: (data['sales_today'] ?? 0).toStringAsFixed(2),
+                icon: Icons.trending_up),
+            MetricTile(
+                label: 'Average Rating',
+                value: '${data['average_rating'] ?? '—'} ★',
+                icon: Icons.star),
+            MetricTile(
+                label: 'Wallet Balance (GH¢)',
+                value: (data['wallet_balance'] ?? 0).toStringAsFixed(2),
+                icon: Icons.account_balance_wallet),
           ],
         ),
         const SizedBox(height: 20),
@@ -497,16 +536,49 @@ class _ReferenceAdminScreenState extends State<ReferenceAdminScreen> {
                     fontSize: 18,
                     fontWeight: FontWeight.w900,
                     color: AppTheme.textDark)),
+            const SizedBox(height: 6),
+            const Text('Revenue from live order data, top 5 vendors.',
+                style: TextStyle(color: AppTheme.textMuted, fontSize: 11)),
             const SizedBox(height: 15),
-            _bar('Emanuella Adu Dudaa', .92),
-            _bar('Lovelace Lartey Adams', .78),
-            _bar('KV Bakery', .64),
-            _bar('Joll of Rice & Chicken', .58),
-            _bar('Donut (Chocolate)', .46),
+            if (topVendors.isEmpty)
+              const Padding(
+                padding: EdgeInsets.symmetric(vertical: 16),
+                child: Text('No order data yet.'),
+              )
+            else
+              ...topVendors.map((entry) {
+                final revenue = entry.value['revenue'] as double;
+                return _bar('${entry.key} · ${entry.value['orders']} orders',
+                    maxRevenue <= 0 ? 0 : (revenue / maxRevenue).clamp(0, 1),
+                    trailing: 'GH¢${revenue.toStringAsFixed(2)}');
+              }),
           ]),
         ),
       ],
     );
+  }
+
+  Map<String, Map<String, dynamic>> _aggregateVendorStats(
+      List<dynamic> orders) {
+    final stats = <String, Map<String, dynamic>>{};
+    for (final order in orders) {
+      if (order is! Map) continue;
+      final vendor = order['vendor'];
+      final name = vendor is Map
+          ? (vendor['fullName']?.toString() ??
+              vendor['name']?.toString() ??
+              'Vendor ${order['vendor_id'] ?? ''}')
+          : (order['vendor_name']?.toString() ??
+              'Vendor ${order['vendor_id'] ?? ''}');
+      final total =
+          double.tryParse((order['total_price'] ?? order['totalPrice'] ?? 0).toString()) ??
+              0;
+      final entry = stats.putIfAbsent(
+          name, () => <String, dynamic>{'orders': 0, 'revenue': 0.0});
+      entry['orders'] = (entry['orders'] as int) + 1;
+      entry['revenue'] = (entry['revenue'] as double) + total;
+    }
+    return stats;
   }
 
   Widget _finance(AdminStateProvider admin) {
@@ -635,15 +707,256 @@ class _ReferenceAdminScreenState extends State<ReferenceAdminScreen> {
                 fontWeight: FontWeight.w900, color: AppTheme.textDark))
       ]));
   String _money(double value) => 'GH₵ ${value.toStringAsFixed(2)}';
-  Widget _bar(String label, double value) => Padding(
+  Widget _bar(String label, double value, {String? trailing}) => Padding(
       padding: const EdgeInsets.symmetric(vertical: 6),
       child: Row(children: [
         SizedBox(
-            width: 170,
-            child: Text(label, style: const TextStyle(fontSize: 11))),
+            width: 220,
+            child: Text(label,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(fontSize: 11))),
         Expanded(child: LinearProgressIndicator(value: value, minHeight: 12)),
         const SizedBox(width: 8),
-        Text('${(value * 100).round()}',
-            style: const TextStyle(fontWeight: FontWeight.w900))
+        SizedBox(
+            width: 78,
+            child: Text(
+                trailing ?? '${(value * 100).round()}',
+                textAlign: TextAlign.end,
+                style: const TextStyle(fontWeight: FontWeight.w900))),
       ]));
+  Widget _commandCenter(AdminStateProvider admin) {
+    final d = admin.commandCenterData;
+    String value(String key) => d[key]?.toString() ?? '—';
+    return RefreshIndicator(
+      onRefresh: () => admin.loadAll(includeFinance: true, includeSettings: true),
+      child: ListView(
+        padding: const EdgeInsets.all(24),
+        children: [
+          const Text('Command Center',
+              style: TextStyle(
+                  fontSize: 24,
+                  fontWeight: FontWeight.w900,
+                  color: AppTheme.textDark)),
+          const SizedBox(height: 6),
+          const Text('Live status of cafeteria operations.',
+              style: TextStyle(color: AppTheme.textMuted, fontSize: 12)),
+          const SizedBox(height: 18),
+          Wrap(
+            spacing: 12,
+            runSpacing: 12,
+            children: [
+              MetricTile(
+                  label: 'Active Orders',
+                  value: value('active_orders'),
+                  icon: Icons.receipt_long),
+              MetricTile(
+                  label: 'Completed Today',
+                  value: value('completed_orders_today'),
+                  icon: Icons.task_alt),
+              MetricTile(
+                  label: 'Sales Today (GH¢)',
+                  value: value('sales_today'),
+                  icon: Icons.trending_up),
+              MetricTile(
+                  label: 'Avg Wait (min)',
+                  value: value('average_wait_minutes'),
+                  icon: Icons.timer_outlined),
+              MetricTile(
+                  label: 'Open Security Alerts',
+                  value: value('open_security_alerts'),
+                  icon: Icons.shield_outlined),
+              MetricTile(
+                  label: 'Food Waste Rate (%)',
+                  value: value('waste_rate_percent'),
+                  icon: Icons.recycling),
+              MetricTile(
+                  label: 'System Status',
+                  value: value('system_status'),
+                  icon: Icons.health_and_safety),
+            ],
+          ),
+          const SizedBox(height: 20),
+          const ReferenceCard(
+            child: ListTile(
+              leading: Icon(Icons.tips_and_updates_outlined,
+                  color: AppTheme.primary),
+              title: Text('What is this?',
+                  style: TextStyle(fontWeight: FontWeight.w800)),
+              subtitle: Text(
+                  'The command centre aggregates live queue, waste and security signals across all vendors. Figures are fetched from the Laravel smart-cafeteria endpoints.'),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _securityAlerts(AdminStateProvider admin) {
+    final alerts = List<Map<String, dynamic>>.from(admin.securityAlerts);
+    return RefreshIndicator(
+      onRefresh: () => admin.loadAll(includeFinance: true),
+      child: ListView(
+        padding: const EdgeInsets.all(24),
+        children: [
+          const Text('Security Alerts',
+              style: TextStyle(
+                  fontSize: 24,
+                  fontWeight: FontWeight.w900,
+                  color: AppTheme.textDark)),
+          const SizedBox(height: 6),
+          const Text('Review and resolve security signals.',
+              style: TextStyle(color: AppTheme.textMuted, fontSize: 12)),
+          const SizedBox(height: 18),
+          if (alerts.isEmpty)
+            const ReferenceCard(
+              child: Padding(
+                padding: EdgeInsets.all(24),
+                child: Row(children: [
+                  Icon(Icons.shield_outlined, color: AppTheme.primary),
+                  SizedBox(width: 12),
+                  Expanded(
+                      child: Text('No open security alerts. All clear!')),
+                ]),
+              ),
+            )
+          else
+            ...alerts.map((alert) {
+              final severity = (alert['severity']?.toString() ?? 'LOW')
+                  .toUpperCase();
+              final severityColor = severity == 'HIGH'
+                  ? const Color(0xFFD32F2F)
+                  : severity == 'MEDIUM'
+                      ? const Color(0xFFF57C00)
+                      : const Color(0xFF388E3C);
+              final user = alert['user'] is Map
+                  ? (alert['user']['fullName'] ??
+                      alert['user']['username'] ??
+                      'Unknown user')
+                  : 'Unknown user';
+              return Padding(
+                padding: const EdgeInsets.only(bottom: 12),
+                child: ReferenceCard(
+                  child: Padding(
+                    padding: const EdgeInsets.all(16),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(children: [
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 10, vertical: 4),
+                            decoration: BoxDecoration(
+                              color: severityColor.withValues(alpha: .12),
+                              borderRadius: BorderRadius.circular(999),
+                            ),
+                            child: Text(severity,
+                                style: TextStyle(
+                                    color: severityColor,
+                                    fontWeight: FontWeight.w900,
+                                    fontSize: 11)),
+                          ),
+                          const SizedBox(width: 10),
+                          Expanded(
+                            child: Text(
+                                alert['type']?.toString() ?? 'SECURITY_ALERT',
+                                style: const TextStyle(
+                                    fontWeight: FontWeight.w800,
+                                    fontSize: 12)),
+                          ),
+                        ]),
+                        const SizedBox(height: 10),
+                        Text(alert['message']?.toString() ?? 'Alert message.'),
+                        const SizedBox(height: 8),
+                        Text('By: $user · ${alert['occurred_at'] ?? ''}',
+                            style: const TextStyle(
+                                color: AppTheme.textMuted, fontSize: 11)),
+                        const SizedBox(height: 12),
+                        Align(
+                          alignment: Alignment.centerRight,
+                          child: OutlinedButton.icon(
+                            onPressed: () async {
+                              final ok = await admin.resolveSecurityAlert(
+                                  (alert['id'] as num?)?.toInt() ?? 0);
+                              if (!mounted) return;
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(
+                                    content: Text(ok
+                                        ? 'Alert resolved.'
+                                        : 'Could not resolve alert.')),
+                              );
+                            },
+                            icon: const Icon(Icons.check_circle_outline, size: 18),
+                            label: const Text('Resolve'),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              );
+            }),
+        ],
+      ),
+    );
+  }
+
+  Widget _settings(AdminStateProvider admin) {
+    final settings = List<Map<String, dynamic>>.from(admin.settings);
+    return RefreshIndicator(
+      onRefresh: () => admin.loadAll(includeFinance: true, includeSettings: true),
+      child: ListView(
+        padding: const EdgeInsets.all(24),
+        children: [
+          const Text('System Settings',
+              style: TextStyle(
+                  fontSize: 24,
+                  fontWeight: FontWeight.w900,
+                  color: AppTheme.textDark)),
+          const SizedBox(height: 6),
+          const Text('Cafeteria-wide configuration values.',
+              style: TextStyle(color: AppTheme.textMuted, fontSize: 12)),
+          const SizedBox(height: 18),
+          if (settings.isEmpty)
+            const ReferenceCard(
+              child: Padding(
+                padding: EdgeInsets.all(24),
+                child: Row(
+                  children: [
+                    Icon(Icons.info_outline, color: AppTheme.primary),
+                    SizedBox(width: 12),
+                    Expanded(
+                        child: Text(
+                            'No system settings are configured, or your admin level does not have permission to view settings.')),
+                  ],
+                ),
+              ),
+            )
+          else
+            ...settings.map((setting) {
+              final key = setting['key']?.toString() ?? 'key';
+              final value = setting['value']?.toString() ?? '';
+              final description =
+                  setting['description']?.toString() ?? '';
+              return Padding(
+                padding: const EdgeInsets.only(bottom: 10),
+                child: ReferenceCard(
+                  child: ListTile(
+                    leading: const Icon(Icons.tune, color: AppTheme.primary),
+                    title: Text(key,
+                        style: const TextStyle(fontWeight: FontWeight.w800)),
+                    subtitle: Text(
+                        description.isEmpty ? value : '$description\n$value'),
+                    trailing: Text(value,
+                        style: const TextStyle(
+                            fontWeight: FontWeight.w900,
+                            color: AppTheme.textDark)),
+                  ),
+                ),
+              );
+            }),
+        ],
+      ),
+    );
+  }
 }

@@ -16,6 +16,7 @@ class _ReferenceVendorScreenState extends State<ReferenceVendorScreen> {
   String page = 'Dashboard';
   String _kioskQuery = '';
   String _kioskCategory = 'All';
+  bool _metricsRequested = false;
 
   @override
   Widget build(BuildContext context) {
@@ -171,7 +172,10 @@ class _ReferenceVendorScreenState extends State<ReferenceVendorScreen> {
               icon: Icons.receipt_long),
           MetricTile(
               label: 'Active Orders', value: '$active', icon: Icons.timelapse),
-          const MetricTile(label: 'Rating', value: '4.7 ★', icon: Icons.star),
+          MetricTile(
+              label: 'Rating',
+              value: '${provider.getAverageRating(provider.vendorFeedback).toStringAsFixed(1)} ★',
+              icon: Icons.star),
           MetricTile(
               label: 'Menu Items',
               value: '${provider.vendorFoodItems.length}',
@@ -282,20 +286,49 @@ class _ReferenceVendorScreenState extends State<ReferenceVendorScreen> {
 
   Widget _row(Order order) => Padding(
         padding: const EdgeInsets.symmetric(vertical: 9),
-        child: Row(
-          children: [
-            SizedBox(
+        child: LayoutBuilder(
+          builder: (context, constraints) {
+            final wide = constraints.maxWidth >= 640;
+            final id = SizedBox(
                 width: 90,
                 child: Text('#ATU-${order.id ?? 0}',
-                    style: const TextStyle(fontWeight: FontWeight.w900))),
-            Expanded(child: Text('${order.foodName} × ${order.quantity}')),
-            Text('GH₵ ${order.totalPrice.toStringAsFixed(2)}',
-                style: const TextStyle(fontWeight: FontWeight.w800)),
-            const SizedBox(width: 10),
-            StatusPill(order.displayStatus),
-            const SizedBox(width: 8),
-            _nextAction(order),
-          ],
+                    style: const TextStyle(fontWeight: FontWeight.w900)));
+            final name = Expanded(
+                child: Text('${order.foodName} × ${order.quantity}'));
+            final price = Text(
+                'GH₵ ${order.totalPrice.toStringAsFixed(2)}',
+                style: const TextStyle(fontWeight: FontWeight.w800));
+            final pill = StatusPill(order.displayStatus);
+            final action = _nextAction(order);
+            if (wide) {
+              return Row(
+                children: [
+                  id,
+                  name,
+                  price,
+                  const SizedBox(width: 10),
+                  pill,
+                  const SizedBox(width: 8),
+                  action,
+                ],
+              );
+            }
+            // Narrow layout: split across two lines so the row never overflows.
+            return Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(children: [id, name]),
+                const SizedBox(height: 6),
+                Row(children: [
+                  pill,
+                  const SizedBox(width: 8),
+                  price,
+                  const Spacer(),
+                  action,
+                ]),
+              ],
+            );
+          },
         ),
       );
 
@@ -431,10 +464,13 @@ class _ReferenceVendorScreenState extends State<ReferenceVendorScreen> {
           ),
         ),
         Expanded(
-          child: Row(
-            children: [
-              Expanded(
-                child: items.isEmpty
+          child: LayoutBuilder(
+            builder: (context, kc) {
+              final showPanel = kc.maxWidth >= 820;
+              return Row(
+                children: [
+                  Expanded(
+                    child: items.isEmpty
                     ? const Center(
                         child:
                             Text('No available food items match this search.'))
@@ -452,7 +488,8 @@ class _ReferenceVendorScreenState extends State<ReferenceVendorScreen> {
                             _KioskFoodCard(item: items[index]),
                       ),
               ),
-              SizedBox(
+              if (showPanel)
+                SizedBox(
                 width: 300,
                 child: ReferenceCard(
                   padding: const EdgeInsets.all(18),
@@ -525,6 +562,8 @@ class _ReferenceVendorScreenState extends State<ReferenceVendorScreen> {
                 ),
               ),
             ],
+              );
+            },
           ),
         ),
       ],
@@ -532,11 +571,41 @@ class _ReferenceVendorScreenState extends State<ReferenceVendorScreen> {
   }
 
   Widget _performance(CafeteriaProvider provider) {
-    final revenue = provider.vendorOrders
-        .fold<double>(0, (sum, order) => sum + order.totalPrice);
-    final completed = provider.vendorOrders
-        .where((o) => o.status.toUpperCase() == 'COMPLETED')
-        .length;
+    final vendorId = provider.currentUser?.id;
+    if (!_metricsRequested) {
+      _metricsRequested = true;
+      if (vendorId != null) {
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (mounted) provider.fetchVendorPerformanceMetrics(vendorId);
+        });
+      }
+    }
+
+    final metrics = provider.remoteVendorMetrics ?? const <String, dynamic>{};
+    final revenue = metrics['total_sales'] is num
+        ? (metrics['total_sales'] as num).toDouble()
+        : provider.vendorOrders.fold<double>(
+            0, (sum, order) => sum + order.totalPrice);
+    final completed = metrics['total_completed_orders'] is num
+        ? (metrics['total_completed_orders'] as num).toInt()
+        : provider.vendorOrders
+            .where((o) => o.status.toUpperCase() == 'COMPLETED')
+            .length;
+    final rating = metrics['rating_overall']?.toString() ?? '—';
+    final prepSpeed = metrics['avg_completion_time_display']?.toString() ??
+        metrics['average_delivery_time_display']?.toString() ??
+        '—';
+    final fulfillment = metrics['order_fulfillment_rate']?.toString() ?? '—';
+    final popular =
+        metrics['popular_menu_items'] is List ? metrics['popular_menu_items'] : const [];
+
+    final byDate = List<Map<String, dynamic>>.from(
+        provider.remoteRechartsData ?? const []);
+    final maxSales = byDate.fold<double>(0, (m, d) {
+      final s = double.tryParse((d['sales'] ?? 0).toString()) ?? 0;
+      return s > m ? s : m;
+    });
+
     return ListView(
       padding: const EdgeInsets.all(24),
       children: [
@@ -552,20 +621,101 @@ class _ReferenceVendorScreenState extends State<ReferenceVendorScreen> {
               value: 'GH₵ ${revenue.toStringAsFixed(2)}',
               icon: Icons.payments),
           MetricTile(
-              label: 'Completed',
-              value: '$completed',
-              icon: Icons.check_circle),
-          const MetricTile(
-              label: 'Prep Speed', value: '12.5 min', icon: Icons.timer),
-          const MetricTile(label: 'Rating', value: '4.7 ★', icon: Icons.star),
+              label: 'Completed', value: '$completed', icon: Icons.check_circle),
+          MetricTile(
+              label: 'Prep Speed', value: prepSpeed, icon: Icons.timer),
+          MetricTile(
+              label: 'Rating', value: '$rating ★', icon: Icons.star),
+          MetricTile(
+              label: 'Fulfilment', value: '$fulfillment%', icon: Icons.task_alt),
+          MetricTile(
+              label: 'Menu Items',
+              value: '${provider.vendorFoodItems.length}',
+              icon: Icons.restaurant_menu),
         ]),
         const SizedBox(height: 20),
-        const ReferenceCard(
-            child: Center(
-                child: Padding(
-                    padding: EdgeInsets.all(35),
-                    child: Icon(Icons.show_chart,
-                        size: 80, color: AppTheme.primary)))),
+        ReferenceCard(
+          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            const Text('Daily Sales Trend',
+                style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.w900,
+                    color: AppTheme.textDark)),
+            const SizedBox(height: 6),
+            const Text('Live sales from the analytics endpoint.',
+                style: TextStyle(color: AppTheme.textMuted, fontSize: 11)),
+            const SizedBox(height: 14),
+            if (byDate.isEmpty)
+              const Padding(
+                padding: EdgeInsets.symmetric(vertical: 18),
+                child: Row(children: [
+                  Icon(Icons.show_chart, color: AppTheme.primary),
+                  SizedBox(width: 12),
+                  Expanded(
+                      child: Text(
+                          'No sales data yet. Place and complete orders to see trends.')),
+                ]),
+              )
+            else
+              ...byDate.take(14).map((day) {
+                final s =
+                    double.tryParse((day['sales'] ?? 0).toString()) ?? 0;
+                final label = day['date']?.toString() ?? '';
+                return Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 5),
+                  child: Row(children: [
+                    SizedBox(
+                        width: 90,
+                        child: Text(label,
+                            style: const TextStyle(fontSize: 11))),
+                    Expanded(
+                        child: LinearProgressIndicator(
+                            value: maxSales <= 0 ? 0 : (s / maxSales).clamp(0, 1),
+                            minHeight: 12,
+                            backgroundColor: AppTheme.primary.withValues(alpha: .1))),
+                    const SizedBox(width: 8),
+                    SizedBox(
+                        width: 80,
+                        child: Text('GH₵${s.toStringAsFixed(2)}',
+                            textAlign: TextAlign.end,
+                            style: const TextStyle(
+                                fontWeight: FontWeight.w800, fontSize: 11))),
+                  ]),
+                );
+              }),
+          ]),
+        ),
+        const SizedBox(height: 16),
+        if (popular.isNotEmpty)
+          ReferenceCard(
+            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              const Text('Popular Menu Items',
+                  style: TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.w900,
+                      color: AppTheme.textDark)),
+              const SizedBox(height: 12),
+              ...List<Map<String, dynamic>>.from(popular).map((item) {
+                final name = item['name']?.toString() ?? 'Item';
+                final qty = item['quantity_sold']?.toString() ?? '0';
+                final sales = double.tryParse((item['sales'] ?? 0).toString());
+                return Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 6),
+                  child: Row(children: [
+                    const Icon(Icons.restaurant_menu,
+                        color: AppTheme.primary, size: 18),
+                    const SizedBox(width: 10),
+                    Expanded(
+                        child: Text(name,
+                            style: const TextStyle(fontWeight: FontWeight.w700))),
+                    Text('×$qty  ·  GH₵${(sales ?? 0).toStringAsFixed(2)}',
+                        style: const TextStyle(
+                            color: AppTheme.textMuted, fontSize: 12)),
+                  ]),
+                );
+              }),
+            ]),
+          ),
       ],
     );
   }

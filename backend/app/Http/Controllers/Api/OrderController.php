@@ -9,6 +9,7 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\StoreOrderRequest;
 use App\Http\Resources\OrderResource;
 use App\Models\AuditLog;
+use App\Models\DeliveredOrderReview;
 use App\Models\FoodItem;
 use App\Models\MenuItem;
 use App\Models\Order;
@@ -102,7 +103,7 @@ class OrderController extends Controller
         })->whereNotNull('vendor_id')->orderByDesc('order_timestamp')->get();
 
         $vendorIds = $orders->pluck('vendor_id')->unique()->values();
-        $reviewedOrderIds = \App\Models\DeliveredOrderReview::where('student_id', $user->id)
+        $reviewedOrderIds = DeliveredOrderReview::where('student_id', $user->id)
             ->whereIn('order_id', $orders->pluck('id'))
             ->pluck('order_id')
             ->all();
@@ -118,6 +119,7 @@ class OrderController extends Controller
             });
             $hasUnreviewedCompletedOrder = $vendorOrders->contains(function ($order) use ($reviewedOrderIds) {
                 $status = strtoupper((string) ($order->status ?? $order->order_status));
+
                 return in_array($status, ['DELIVERED', 'COMPLETED'], true)
                     && ! in_array($order->id, $reviewedOrderIds, true);
             });
@@ -135,6 +137,7 @@ class OrderController extends Controller
                 'review_order_id' => $hasUnreviewedCompletedOrder
                     ? $vendorOrders->first(function ($order) use ($reviewedOrderIds) {
                         $status = strtoupper((string) ($order->status ?? $order->order_status));
+
                         return in_array($status, ['DELIVERED', 'COMPLETED'], true)
                             && ! in_array($order->id, $reviewedOrderIds, true);
                     })?->id
@@ -369,7 +372,7 @@ class OrderController extends Controller
 
         // Notify the vendor of the new incoming pre-order
         if ($order->vendor_id) {
-            $vendor = \App\Models\User::find($order->vendor_id);
+            $vendor = User::find($order->vendor_id);
             if ($vendor) {
                 try {
                     $vendor->notify(new NewIncomingOrderNotification($order));
@@ -486,7 +489,7 @@ class OrderController extends Controller
         // Notify the student user of the status change
         $studentId = $updatedOrder->customer_id ?? $updatedOrder->student_id;
         if ($studentId) {
-            $student = \App\Models\User::find($studentId);
+            $student = User::find($studentId);
             if ($student) {
                 try {
                     $student->notify(new OrderStatusChangedNotification($updatedOrder, $oldStatus, $normalizedStatus));
@@ -499,6 +502,11 @@ class OrderController extends Controller
 
         if ($normalizedStatus === 'COMPLETED') {
             event(new OrderStatusCompleted($updatedOrder));
+        }
+
+        // Never expose the pickup PIN to vendors; it is the student's secret.
+        if ($role === 'VENDOR') {
+            $updatedOrder->makeHidden('pickup_pin');
         }
 
         return response()->json([
@@ -660,7 +668,7 @@ class OrderController extends Controller
         // Notify the student user of the status change (e.g. preparation, readiness)
         $studentId = $updatedOrder->customer_id ?? $updatedOrder->student_id;
         if ($studentId) {
-            $student = \App\Models\User::find($studentId);
+            $student = User::find($studentId);
             if ($student) {
                 try {
                     $student->notify(new OrderStatusChangedNotification($updatedOrder, $oldStatus, $newStatus));
@@ -678,6 +686,12 @@ class OrderController extends Controller
 
         if ((strtoupper($oldStatus) === 'PENDING' || strtoupper($oldStatus) === 'ORDER_PLACED') && strtoupper($newStatus) === 'READY') {
             event(new OrderStatusReady($updatedOrder));
+        }
+
+        // The pickup PIN is the student's secret; vendors must verify it with the
+        // student at the counter rather than reading it from the API response.
+        if ($role === 'VENDOR') {
+            $updatedOrder->makeHidden('pickup_pin');
         }
 
         return response()->json($updatedOrder, 200);
@@ -780,7 +794,7 @@ class OrderController extends Controller
                 // Notify student of status change
                 $studentId = $order->customer_id ?? $order->student_id;
                 if ($studentId) {
-                    $student = \App\Models\User::find($studentId);
+                    $student = User::find($studentId);
                     if ($student) {
                         try {
                             $student->notify(new OrderStatusChangedNotification($order, $oldStatus, $newStatus));
@@ -800,6 +814,13 @@ class OrderController extends Controller
                 }
             }
         });
+
+        // Keep the pickup PIN off vendor-facing responses.
+        if ($role === 'VENDOR') {
+            foreach ($updatedOrders as $updatedOrder) {
+                $updatedOrder->makeHidden('pickup_pin');
+            }
+        }
 
         return response()->json([
             'success' => true,
@@ -908,6 +929,10 @@ class OrderController extends Controller
         }
 
         event(new OrderStatusCompleted($updatedOrder));
+
+        if (strtoupper($user->role) === 'VENDOR') {
+            $updatedOrder->makeHidden('pickup_pin');
+        }
 
         return response()->json([
             'success' => true,
@@ -1159,7 +1184,7 @@ class OrderController extends Controller
                 ]);
 
                 // Create Wallet Transaction
-                \App\Models\WalletTransaction::create([
+                WalletTransaction::create([
                     'user_id' => $user->id,
                     'type' => 'PAYMENT',
                     'amount' => -$finalPrice,
@@ -1181,7 +1206,7 @@ class OrderController extends Controller
 
             // Notify vendor
             if ($order->vendor_id) {
-                $vendor = \App\Models\User::find($order->vendor_id);
+                $vendor = User::find($order->vendor_id);
                 if ($vendor) {
                     try {
                         $vendor->notify(new NewIncomingOrderNotification($order));
@@ -1285,7 +1310,7 @@ class OrderController extends Controller
                 $student->save();
 
                 // Create Refund Transaction
-                \App\Models\WalletTransaction::create([
+                WalletTransaction::create([
                     'user_id' => $student->id,
                     'type' => 'REFUND',
                     'amount' => floatval($order->total_price),
@@ -1384,11 +1409,20 @@ class OrderController extends Controller
         }
 
         // Return direct single JSON snapshot
+        $user = $request->user();
+        $isOwner = in_array((int) $user->id, [
+            (int) $order->customer_id,
+            (int) $order->student_id,
+            (int) $order->user_id,
+        ], true);
+        $canViewPin = $isOwner || strtoupper($user->role ?? '') === 'ADMIN';
+
         return response()->json([
             'success' => true,
             'id' => $order->id,
             'status' => $order->status,
             'estimated_pickup_time' => $order->estimated_pickup_time,
+            'pickup_pin' => $canViewPin ? $order->pickup_pin : null,
             'stages' => $this->getTrackingStages($order->status),
         ]);
     }
@@ -1821,7 +1855,7 @@ class OrderController extends Controller
             }
         }
 
-        $vendor = \App\Models\User::find($vendorId);
+        $vendor = User::find($vendorId);
         if (! $vendor) {
             return response()->json([
                 'success' => false,

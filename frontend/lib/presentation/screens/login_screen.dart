@@ -261,7 +261,14 @@ class _TwoFactorScreenState extends State<TwoFactorScreen> {
         await provider.verifyTwoFactor(widget.username, _code.text.trim());
     if (!mounted) return;
     if (ok) {
-      Navigator.pushReplacementNamed(context, '/admin');
+      final role = provider.currentUser?.role.toUpperCase();
+      final route = role == 'ADMIN'
+          ? '/admin'
+          : role == 'VENDOR'
+              ? '/vendor'
+              : '/student';
+      if (!mounted) return;
+      Navigator.pushReplacementNamed(context, route);
     } else {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text(provider.loginError ?? 'Verification failed.')),

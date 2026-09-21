@@ -76,10 +76,10 @@ class AppTheme {
         elevation: 1,
         color: Colors.white,
         surfaceTintColor: Colors.transparent,
-        shadowColor: Color(0x18062E68),
+        shadowColor: const Color(0x18062E68),
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(16),
-          side: BorderSide(color: border),
+          side: const BorderSide(color: border),
         ),
       ),
       inputDecorationTheme: InputDecorationTheme(
