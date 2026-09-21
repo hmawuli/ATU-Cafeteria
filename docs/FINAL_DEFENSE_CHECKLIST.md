@@ -23,11 +23,14 @@
 - [ ] Open Profile → Top Up Wallet.
 - [ ] Enter a valid amount.
 - [ ] Confirm Paystack initialization returns a reference.
-- [ ] In demo mode, verify the simulated transaction and confirm the wallet is credited.
+- [ ] For a local/defense demonstration only, set `PAYSTACK_DEMO_MODE=true` deliberately and verify the simulated transaction.
+- [ ] For real payments, set `PAYSTACK_DEMO_MODE=false` and configure a valid `PAYSTACK_SECRET_KEY`.
 - [ ] With a real Paystack key, open the authorization URL and complete Mobile Money/Card checkout.
 - [ ] Verify the transaction through Laravel before crediting the wallet.
+- [ ] Confirm a payment reference must belong to the authenticated account.
 - [ ] Repeat verification and confirm the wallet is not credited twice.
-- [ ] Confirm direct online order payment does not also debit the cafeteria wallet.
+- [ ] Confirm direct online order payment does not also debit or credit the cafeteria wallet.
+- [ ] Confirm failed/unconfigured Paystack payments do not create a successful ledger entry.
 
 ## Vendor journey
 
@@ -83,4 +86,4 @@ curl -I http://<LAPTOP-LAN-IP>:8001
 
 ## Release note
 
-The Android application ID is now `com.atu.cafeteria`. The repository intentionally keeps debug signing for local/defense builds. A production release requires a real Android keystore and secure production API/Paystack configuration.
+The Android application ID is now `com.atu.cafeteria`. The repository intentionally keeps debug signing for local/defense builds. A production release requires a real Android keystore and secure production API/Paystack configuration. The backend no longer falls back to a fake Paystack secret; demo behavior must be explicitly enabled.
