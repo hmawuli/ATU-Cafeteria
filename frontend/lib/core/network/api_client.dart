@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:atu_cafeteria/core/config/server_config.dart';
+import 'package:atu_cafeteria/core/network/infinityfree_challenge_solver.dart';
 
 class ApiException implements Exception {
   final int statusCode;
@@ -57,37 +58,9 @@ class ApiClient {
       headers['Authorization'] = 'Bearer $effectiveToken';
     }
 
-    late http.Response response;
     final encodedBody = body == null ? null : jsonEncode(body);
-    switch (method.toUpperCase()) {
-      case 'GET':
-        response = await _client
-            .get(uri, headers: headers)
-            .timeout(const Duration(seconds: 25));
-        break;
-      case 'POST':
-        response = await _client
-            .post(uri, headers: headers, body: encodedBody)
-            .timeout(const Duration(seconds: 25));
-        break;
-      case 'PUT':
-        response = await _client
-            .put(uri, headers: headers, body: encodedBody)
-            .timeout(const Duration(seconds: 25));
-        break;
-      case 'PATCH':
-        response = await _client
-            .patch(uri, headers: headers, body: encodedBody)
-            .timeout(const Duration(seconds: 25));
-        break;
-      case 'DELETE':
-        response = await _client
-            .delete(uri, headers: headers, body: encodedBody)
-            .timeout(const Duration(seconds: 25));
-        break;
-      default:
-        throw ArgumentError('Unsupported HTTP method: $method');
-    }
+    final response =
+        await _performWithBrowserCheck(method, uri, headers, encodedBody);
 
     dynamic decoded;
     if (response.body.isNotEmpty) {
@@ -113,6 +86,58 @@ class ApiClient {
       );
     }
     return decoded;
+  }
+
+  /// Performs one HTTP request, re-sending it with a solved cookie if the
+  /// hosting answered with InfinityFree's JavaScript "browser check" page
+  /// (the free tier requires JS clients to prove they solved an AES challenge;
+  /// we solve it natively instead of running a browser).
+  Future<http.Response> _performWithBrowserCheck(
+      String method, Uri uri, Map<String, String> headers, String? encodedBody) {
+    Future<http.Response> perform() {
+      final requestHeaders = Map<String, String>.from(headers);
+      final cached = InfinityFreeChallengeSolver.cookies;
+      if (cached != null) requestHeaders['Cookie'] = '__test=$cached';
+      return _send(method, uri, requestHeaders, encodedBody);
+    }
+
+    return perform().then((response) {
+      final contentType = response.headers['content-type'] ?? '';
+      if (!InfinityFreeChallengeSolver.isChallenge(contentType, response.body)) {
+        return response;
+      }
+      final cookie = InfinityFreeChallengeSolver.solveFromHtml(response.body);
+      if (cookie == null) return response; // not a challenge we can solve
+      return perform();
+    });
+  }
+
+  Future<http.Response> _send(
+      String method, Uri uri, Map<String, String> headers, String? encodedBody) {
+    switch (method.toUpperCase()) {
+      case 'GET':
+        return _client
+            .get(uri, headers: headers)
+            .timeout(const Duration(seconds: 25));
+      case 'POST':
+        return _client
+            .post(uri, headers: headers, body: encodedBody)
+            .timeout(const Duration(seconds: 25));
+      case 'PUT':
+        return _client
+            .put(uri, headers: headers, body: encodedBody)
+            .timeout(const Duration(seconds: 25));
+      case 'PATCH':
+        return _client
+            .patch(uri, headers: headers, body: encodedBody)
+            .timeout(const Duration(seconds: 25));
+      case 'DELETE':
+        return _client
+            .delete(uri, headers: headers, body: encodedBody)
+            .timeout(const Duration(seconds: 25));
+      default:
+        throw ArgumentError('Unsupported HTTP method: $method');
+    }
   }
 
   Future<dynamic> get(String path) => request('GET', path);
