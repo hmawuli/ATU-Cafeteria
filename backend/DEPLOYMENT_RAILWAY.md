@@ -1,47 +1,62 @@
 # Laravel API Deployment — Railway
 
-The deployable backend is the `backend/` directory.
+The deployable backend is the `backend/` directory. Railway builds it with
+Nixpacks (`railway.json`) and runs migrations before starting the HTTP service.
 
-## Required environment variables
+## Fastest path to a fully working demo
 
-At minimum configure:
+1. **Create a Railway project** → **New Service → Deploy from GitHub repo**
+   (`hmawuli/ATU-Cafeteria`), set the **service root to `backend/`**.
+2. **Set environment variables** (Variables tab):
+   ```env
+   APP_ENV=production
+   APP_DEBUG=false
+   APP_KEY=<paste from: php artisan key:generate --show>
+   APP_URL=https://<your-railway-domain>
+   DB_CONNECTION=sqlite
+   PAYSTACK_SECRET_KEY=<optional, only for real payments>
+   ```
+3. **Add a Volume** to the backend service:
+   - Mount path: **`/app/database`**
+   - This keeps the SQLite file (`database/database.sqlite`) on a persistent
+     disk — without it, all data is wiped on every redeploy/restart. Single
+     volume, ~1 GB is plenty.
+4. **Seed demo data once** after the first deploy (the app needs menu items,
+   vendors and users to be usable):
+   - Railway → backend service → **Connect shell** (or a one-off command):
+     ```
+     php artisan db:seed --force
+     ```
+   - This creates the demo users (students `PIN 1234`, vendors
+     `maryjoint/1111`, `atkitch/2222`, `snackbag/3333`, admin `admin123`),
+     the food catalogue, orders and wallet history.
+5. **Point the phone app at the backend** — no rebuild needed:
+   - Open the app → login screen → **API server settings** (link under the
+     "Secure ATU Cafeteria access" row).
+   - Enter `https://<your-railway-domain>` → **Save**.
+   - The same installed APK now works anywhere (4G/Wi-Fi, laptop off).
 
-```env
-APP_ENV=production
-APP_DEBUG=false
-APP_KEY=<generated-secure-key>
-APP_URL=https://<your-railway-domain>
+## Notes
 
-DB_CONNECTION=<production-driver>
-DB_HOST=<host>
-DB_PORT=<port>
-DB_DATABASE=<database>
-DB_USERNAME=<username>
-DB_PASSWORD=<password>
-
-PAYSTACK_SECRET_KEY=<server-secret>
-```
-
-Do not commit `.env` or production secrets.
-
-## Deployment
-
-Configure Railway to use `backend/` as the service root. The supplied `railway.json` runs database migrations before starting the HTTP service.
-
-For a production database, use PostgreSQL or the database service recommended by your deployment environment rather than the local SQLite file.
+- **Do not commit `.env` or secrets.** All config is set through Railway's
+  Variables panel.
+- **SQLite + volume is perfect for a demo/defense.** For a long-lived
+  multi-user production system, prefer a Railway-managed **PostgreSQL**
+  (set `DB_CONNECTION=pgsql`, `DB_HOST`, `DB_PORT`, `DB_DATABASE`,
+  `DB_USERNAME`, `DB_PASSWORD`) — the code works with either.
+- LLRT/stateless caveat: sessions and the file cache are ephemeral per
+  instance, which is fine for the API (token auth is stateless).
 
 ## Health checks
 
-- Laravel health endpoint: `/up`
-- Application API health endpoint: `/api/health`
+- Laravel health: `https://<domain>/up`
+- API health: `https://<domain>/api/health`
 
-## After deployment
+## After deployment checklist
 
-1. Open the API health endpoint.
-2. Run migrations if they were not executed by the deployment command.
-3. Confirm authentication.
-4. Confirm menu reads.
-5. Confirm order placement.
-6. Confirm vendor status updates.
-7. Confirm payment configuration before enabling real payments.
-8. Point Flutter to the HTTPS API endpoint using `API_BASE_URL`.
+1. Open `/api/health` in a browser — expect `{"status":"UP",...}`.
+2. Seed data (step 4 above) if you want the demo catalogue.
+3. In the app, set the **API server** URL and sign in
+   (`maryjoint / 1111` for a vendor, `admin123` for admin).
+4. Confirm menu reads → order placement → vendor order workflow → admin
+   dashboard.
