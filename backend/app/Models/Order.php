@@ -5,6 +5,7 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes;
+use Illuminate\Support\Facades\Auth;
 
 class Order extends Model
 {
@@ -48,6 +49,29 @@ class Order extends Model
         'discount_applied' => 'double',
     ];
 
+    protected static function booted(): void
+    {
+        static::addGlobalScope('authenticatedOrderAccess', function ($builder) {
+            $user = Auth::user();
+
+            if (! $user) {
+                return;
+            }
+
+            $role = strtoupper((string) ($user->role ?? ''));
+
+            if ($role === 'STUDENT') {
+                $builder->where(function ($query) use ($user) {
+                    $query->where('customer_id', $user->id)
+                        ->orWhere('student_id', $user->id)
+                        ->orWhere('user_id', $user->id);
+                });
+            } elseif ($role === 'VENDOR') {
+                $builder->where('vendor_id', $user->id);
+            }
+        });
+    }
+
     /**
      * Map order_status dynamically to status.
      */
@@ -86,65 +110,41 @@ class Order extends Model
         $this->attributes['user_id'] = $value;
     }
 
-    /**
-     * Get the student customer who placed the order.
-     */
     public function customer()
     {
         return $this->belongsTo(User::class, 'customer_id');
     }
 
-    /**
-     * Get the student who placed the order.
-     */
     public function student()
     {
         return $this->belongsTo(User::class, 'student_id');
     }
 
-    /**
-     * Secure direct aliased user relationship.
-     */
     public function user()
     {
         return $this->belongsTo(User::class, 'user_id');
     }
 
-    /**
-     * Advanced International-Standard Relationship: Order Items.
-     */
     public function items()
     {
         return $this->hasMany(OrderItem::class, 'order_id');
     }
 
-    /**
-     * Get the vendor who accepted the order.
-     */
     public function vendor()
     {
         return $this->belongsTo(User::class, 'vendor_id');
     }
 
-    /**
-     * Get the food item record, if it exists.
-     */
     public function foodItem()
     {
         return $this->belongsTo(FoodItem::class, 'food_item_id');
     }
 
-    /**
-     * Get the menu item record, if it exists.
-     */
     public function menuItem()
     {
         return $this->belongsTo(MenuItem::class, 'menu_item_id');
     }
 
-    /**
-     * Feedback attached to this order.
-     */
     public function feedback()
     {
         return $this->hasOne(Feedback::class, 'order_id');
