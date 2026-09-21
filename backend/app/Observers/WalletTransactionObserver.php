@@ -25,9 +25,9 @@ final class WalletTransactionObserver
             return;
         }
 
-        // Seeders and other explicit CLI maintenance operations may create
-        // historical ledger rows without an authenticated HTTP actor.
-        if (app()->runningInConsole()) {
+        // Allow explicit CLI seed/maintenance operations, but never bypass the
+        // guard during PHPUnit execution.
+        if (app()->runningInConsole() && ! app()->runningUnitTests()) {
             return;
         }
 
