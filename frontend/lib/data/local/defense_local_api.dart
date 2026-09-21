@@ -1,20 +1,22 @@
 import 'dart:math';
+
 import 'package:path/path.dart';
 import 'package:sqflite/sqflite.dart';
 
-/// Small local API-shaped data layer used only by the phone-only defense build.
+/// Local API-shaped data layer used only by the phone-only defense build.
 ///
-/// It deliberately mirrors the important Laravel concepts (users, food,
-/// orders, wallet ledger and reviews) without requiring PHP, a server or a
-/// network connection. The normal Flutter/Laravel path is unaffected.
+/// It mirrors the important Laravel concepts without requiring PHP, a server,
+/// Wi-Fi, or mobile data. The normal Flutter/Laravel path is unaffected.
 class DefenseLocalApi {
   DefenseLocalApi._();
+
   static final DefenseLocalApi instance = DefenseLocalApi._();
 
   Database? _db;
 
   Future<Database> get database async {
     if (_db != null) return _db!;
+
     final root = await getDatabasesPath();
     _db = await openDatabase(
       join(root, 'atu_cafeteria_defense.db'),
@@ -148,21 +150,21 @@ class DefenseLocalApi {
         'balance': 0,
       });
 
-      final foods = [
+      const foods = <List<Object>>[
         [1, 10, 'ATU Chicken Jollof Rice', 25.0, 'Lunch Specials', 'Jollof rice, seasoned chicken, salad and shito.'],
         [2, 10, 'Zesty Ginger Sobolo', 10.0, 'Drinks', 'Chilled hibiscus drink brewed with fresh ginger.'],
         [3, 11, 'Waakye Supreme', 30.0, 'Traditional', 'Waakye served with egg, gari, stew and shito.'],
         [4, 11, 'Fufu & Goat Light Soup', 35.0, 'Traditional', 'Fresh fufu with aromatic goat light soup.'],
         [5, 10, 'Savoury Meat Pie', 15.0, 'Snacks', 'Flaky pastry filled with seasoned minced beef.'],
       ];
-      for (final f in foods) {
+      for (final food in foods) {
         await tx.insert('food_items', {
-          'id': f[0],
-          'vendor_id': f[1],
-          'name': f[2],
-          'price': f[3],
-          'category': f[4],
-          'description': f[5],
+          'id': food[0],
+          'vendor_id': food[1],
+          'name': food[2],
+          'price': food[3],
+          'category': food[4],
+          'description': food[5],
           'available': 1,
         });
       }
@@ -202,10 +204,12 @@ class DefenseLocalApi {
 
   Future<List<Map<String, dynamic>>> users({String? role}) async {
     final db = await database;
-    return db.query('users',
-        where: role == null ? null : 'role = ?',
-        whereArgs: role == null ? null : [role],
-        orderBy: 'full_name ASC');
+    return db.query(
+      'users',
+      where: role == null ? null : 'role = ?',
+      whereArgs: role == null ? null : [role],
+      orderBy: 'full_name ASC',
+    );
   }
 
   Future<List<Map<String, dynamic>>> foods() async {
@@ -215,29 +219,68 @@ class DefenseLocalApi {
 
   Future<List<Map<String, dynamic>>> ordersFor(int userId, String role) async {
     final db = await database;
-    final where = role == 'STUDENT' ? 'customer_id = ?' : role == 'VENDOR' ? 'vendor_id = ?' : null;
-    return db.query('orders', where: where, whereArgs: where == null ? null : [userId], orderBy: 'created_at DESC');
+    final String? where = role == 'STUDENT'
+        ? 'customer_id = ?'
+        : role == 'VENDOR'
+            ? 'vendor_id = ?'
+            : null;
+    return db.query(
+      'orders',
+      where: where,
+      whereArgs: where == null ? null : [userId],
+      orderBy: 'created_at DESC',
+    );
   }
 
   Future<double> balance(int userId) async {
     final db = await database;
-    final rows = await db.query('users', columns: ['balance'], where: 'id = ?', whereArgs: [userId], limit: 1);
-    return rows.isEmpty ? 0 : ((rows.first['balance'] as num?)?.toDouble() ?? 0);
+    final rows = await db.query(
+      'users',
+      columns: ['balance'],
+      where: 'id = ?',
+      whereArgs: [userId],
+      limit: 1,
+    );
+    if (rows.isEmpty) return 0;
+    return ((rows.first['balance'] as num?)?.toDouble() ?? 0);
   }
 
-  Future<int> placeOrder({required int customerId, required int foodId, required int quantity}) async {
+  Future<int> placeOrder({
+    required int customerId,
+    required int foodId,
+    required int quantity,
+  }) async {
+    if (quantity < 1) throw ArgumentError.value(quantity, 'quantity');
+
     final db = await database;
     return db.transaction((tx) async {
-      final foods = await tx.query('food_items', where: 'id = ? AND available = 1', whereArgs: [foodId], limit: 1);
+      final foods = await tx.query(
+        'food_items',
+        where: 'id = ? AND available = 1',
+        whereArgs: [foodId],
+        limit: 1,
+      );
       if (foods.isEmpty) throw StateError('Food item is unavailable.');
       final food = foods.first;
       final price = (food['price'] as num).toDouble();
       final total = price * quantity;
-      final users = await tx.query('users', where: 'id = ?', whereArgs: [customerId], limit: 1);
+
+      final users = await tx.query(
+        'users',
+        where: 'id = ? AND role = ?',
+        whereArgs: [customerId, 'STUDENT'],
+        limit: 1,
+      );
       if (users.isEmpty) throw StateError('Student account not found.');
       final current = (users.first['balance'] as num).toDouble();
       if (current < total) throw StateError('Insufficient wallet balance.');
-      await tx.update('users', {'balance': current - total}, where: 'id = ?', whereArgs: [customerId]);
+
+      await tx.update(
+        'users',
+        {'balance': current - total},
+        where: 'id = ?',
+        whereArgs: [customerId],
+      );
       await tx.insert('wallet_ledger', {
         'user_id': customerId,
         'type': 'DEBIT',
@@ -245,6 +288,7 @@ class DefenseLocalApi {
         'description': 'Cafeteria checkout for ${food['name']}',
         'created_at': DateTime.now().millisecondsSinceEpoch,
       });
+
       final pin = (1000 + Random().nextInt(9000)).toString();
       final orderId = await tx.insert('orders', {
         'customer_id': customerId,
@@ -268,23 +312,52 @@ class DefenseLocalApi {
     });
   }
 
-  Future<void> updateOrderStatus(int orderId, String status, int actorId) async {
+  Future<void> updateOrderStatus(
+    int orderId,
+    String status,
+    int actorId,
+  ) async {
     final db = await database;
     await db.transaction((tx) async {
-      final rows = await tx.query('orders', where: 'id = ?', whereArgs: [orderId], limit: 1);
+      final rows = await tx.query(
+        'orders',
+        where: 'id = ?',
+        whereArgs: [orderId],
+        limit: 1,
+      );
       if (rows.isEmpty) throw StateError('Order not found.');
+
+      final actor = await tx.query(
+        'users',
+        where: 'id = ?',
+        whereArgs: [actorId],
+        limit: 1,
+      );
+      if (actor.isEmpty || actor.first['role'] != 'VENDOR') {
+        throw StateError('Only a vendor can advance an order.');
+      }
+      if (actor.first['id'] != rows.first['vendor_id']) {
+        throw StateError('Vendor is not assigned to this order.');
+      }
+
       final old = rows.first['status'].toString();
-      final allowed = <String, Set<String>>{
+      const allowed = <String, Set<String>>{
         'ORDER_PLACED': {'PREPARING', 'CANCELLED'},
         'PREPARING': {'READY_FOR_PICKUP', 'CANCELLED'},
         'READY_FOR_PICKUP': {'COMPLETED'},
-        'CANCELLED': {},
-        'COMPLETED': {},
+        'CANCELLED': <String>{},
+        'COMPLETED': <String>{},
       };
       if (old != status && !(allowed[old]?.contains(status) ?? false)) {
         throw StateError('Invalid order transition: $old → $status');
       }
-      await tx.update('orders', {'status': status}, where: 'id = ?', whereArgs: [orderId]);
+
+      await tx.update(
+        'orders',
+        {'status': status},
+        where: 'id = ?',
+        whereArgs: [orderId],
+      );
       await tx.insert('audit_logs', {
         'user_id': actorId,
         'action': 'ORDER_STATUS_CHANGED',
@@ -294,23 +367,55 @@ class DefenseLocalApi {
     });
   }
 
-  Future<void> addReview({required int orderId, required int customerId, required int rating, required String comment}) async {
+  Future<void> addReview({
+    required int orderId,
+    required int customerId,
+    required int rating,
+    required String comment,
+  }) async {
+    if (rating < 1 || rating > 5) {
+      throw ArgumentError.value(rating, 'rating', 'Must be between 1 and 5.');
+    }
+    final text = comment.trim();
+    if (text.isEmpty) throw ArgumentError('Review comment cannot be empty.');
+
     final db = await database;
-    final rows = await db.query('orders', where: 'id = ? AND customer_id = ? AND status = ?', whereArgs: [orderId, customerId, 'COMPLETED'], limit: 1);
-    if (rows.isEmpty) throw StateError('Only completed orders can be reviewed.');
+    final rows = await db.query(
+      'orders',
+      where: 'id = ? AND customer_id = ? AND status = ?',
+      whereArgs: [orderId, customerId, 'COMPLETED'],
+      limit: 1,
+    );
+    if (rows.isEmpty) {
+      throw StateError('Only completed orders can be reviewed.');
+    }
+
+    final existing = await db.query(
+      'reviews',
+      columns: ['id'],
+      where: 'order_id = ? AND customer_id = ?',
+      whereArgs: [orderId, customerId],
+      limit: 1,
+    );
+    if (existing.isNotEmpty) throw StateError('This order has already been reviewed.');
+
     await db.insert('reviews', {
       'order_id': orderId,
       'customer_id': customerId,
       'vendor_id': rows.first['vendor_id'],
       'rating': rating,
-      'comment': comment.trim(),
+      'comment': text,
       'created_at': DateTime.now().millisecondsSinceEpoch,
     });
   }
 
   Future<List<Map<String, dynamic>>> reviews() async {
     final db = await database;
-    return db.rawQuery('SELECT reviews.*, users.full_name AS customer_name FROM reviews LEFT JOIN users ON users.id = reviews.customer_id ORDER BY reviews.created_at DESC');
+    return db.rawQuery(
+      'SELECT reviews.*, users.full_name AS customer_name '
+      'FROM reviews LEFT JOIN users ON users.id = reviews.customer_id '
+      'ORDER BY reviews.created_at DESC',
+    );
   }
 
   Future<List<Map<String, dynamic>>> auditLogs() async {
