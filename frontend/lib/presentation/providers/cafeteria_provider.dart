@@ -5,7 +5,7 @@ import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import 'package:atu_cafeteria/domain/models/models.dart';
 import 'package:atu_cafeteria/data/local/db_helper.dart';
-import 'package:atu_cafeteria/core/config/app_config.dart';
+import 'package:atu_cafeteria/core/config/server_config.dart';
 import 'package:atu_cafeteria/core/storage/secure_session_store.dart';
 
 class CafeteriaProvider extends ChangeNotifier {
@@ -1423,12 +1423,14 @@ class CafeteriaProvider extends ChangeNotifier {
     return true;
   }
 
-  // Standard Backend connection base URL (default loopback of standard android emulator)
-  String _laravelBaseUrl = AppConfig.backendBaseUrl;
+  // Standard Backend connection base URL. Resolves at call time so the
+  // in-app "API server" setting (local USB / Wi-Fi / deployed URL) applies
+  // immediately without rebuilding.
+  String get _laravelBaseUrl => ServerConfig.baseUrl;
   String get laravelBaseUrl => _laravelBaseUrl;
 
-  void updateLaravelBaseUrl(String url) {
-    _laravelBaseUrl = url;
+  Future<void> updateLaravelBaseUrl(String? url) async {
+    await ServerConfig.setOverride(url);
     notifyListeners();
   }
 

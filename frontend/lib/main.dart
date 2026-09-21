@@ -26,10 +26,12 @@ import 'package:atu_cafeteria/presentation/screens/reference_vendor_screen.dart'
 import 'package:atu_cafeteria/presentation/screens/reference_admin_screen.dart';
 import 'package:atu_cafeteria/presentation/screens/notifications_screen.dart';
 import 'package:atu_cafeteria/presentation/screens/splash_screen.dart';
+import 'package:atu_cafeteria/core/config/server_config.dart';
 import 'package:atu_cafeteria/domain/models/models.dart';
 
-void main() {
+Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  await ServerConfig.init();
   runApp(const ATUCafeteriaApp());
 }
 

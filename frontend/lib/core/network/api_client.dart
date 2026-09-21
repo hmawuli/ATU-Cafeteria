@@ -1,7 +1,7 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
-import 'package:atu_cafeteria/core/config/app_config.dart';
+import 'package:atu_cafeteria/core/config/server_config.dart';
 
 class ApiException implements Exception {
   final int statusCode;
@@ -48,7 +48,7 @@ class ApiClient {
         (storedToken != null && storedToken.isNotEmpty) ? storedToken : token;
 
     final uri = Uri.parse(
-        '${AppConfig.normalizedApiBaseUrl}/api/${path.replaceFirst(RegExp(r'^/'), '')}');
+        '${ServerConfig.baseUrl}/api/${path.replaceFirst(RegExp(r'^/'), '')}');
     final headers = <String, String>{
       'Accept': 'application/json',
       'Content-Type': 'application/json',

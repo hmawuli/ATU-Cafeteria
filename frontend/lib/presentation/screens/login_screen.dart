@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import '../../core/config/server_config.dart';
 import '../providers/cafeteria_provider.dart';
 
 class LoginScreen extends StatefulWidget {
@@ -52,6 +53,88 @@ class _LoginScreenState extends State<LoginScreen> {
             ? '/vendor'
             : '/student';
     Navigator.pushReplacementNamed(context, route);
+  }
+
+  /// Lets the user point the app at a local (USB/Wi-Fi) or deployed backend
+  /// without rebuilding. The choice persists on the device.
+  Future<void> _openServerSettings() async {
+    final provider = context.read<CafeteriaProvider>();
+    final controller = TextEditingController(
+        text: ServerConfig.hasOverride
+            ? ServerConfig.overrideUrl
+            : ServerConfig.baseUrl);
+
+    final action = await showDialog<String>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('API server'),
+        content: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text(
+                'Address of the backend the app should talk to. Use the '
+                'default for USB, or the deployed URL (e.g. '
+                'https://your-app.up.railway.app) to run without your '
+                'computer.',
+                style: TextStyle(fontSize: 13),
+              ),
+              const SizedBox(height: 14),
+              TextField(
+                controller: controller,
+                keyboardType: TextInputType.url,
+                autocorrect: false,
+                decoration: const InputDecoration(
+                  labelText: 'Server base URL',
+                  hintText: 'https://your-app.up.railway.app',
+                  border: OutlineInputBorder(),
+                  prefixIcon: Icon(Icons.dns_outlined),
+                ),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                'Current: ${ServerConfig.baseUrl}',
+                style: const TextStyle(fontSize: 12, color: Colors.grey),
+              ),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext, 'default'),
+            child: const Text('Use default'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(dialogContext, controller.text.trim()),
+            child: const Text('Save'),
+          ),
+        ],
+      ),
+    );
+
+    controller.dispose();
+    if (!mounted || action == null) return;
+    if (action == 'default') {
+      await provider.updateLaravelBaseUrl(null);
+    } else if (action.isNotEmpty) {
+      await provider.updateLaravelBaseUrl(action);
+    }
+    if (!mounted) return;
+    ScaffoldMessenger.of(context)
+      ..hideCurrentSnackBar()
+      ..showSnackBar(SnackBar(
+        behavior: SnackBarBehavior.floating,
+        content: Text(
+          action == 'default'
+              ? 'Using the default server (${ServerConfig.baseUrl}).'
+              : 'Server set to ${ServerConfig.baseUrl}.',
+        ),
+      ));
   }
 
   @override
@@ -223,6 +306,14 @@ class _LoginScreenState extends State<LoginScreen> {
                               Text('Secure ATU Cafeteria access',
                                   style: TextStyle(fontSize: 11)),
                             ],
+                          ),
+                          const SizedBox(height: 4),
+                          TextButton.icon(
+                            onPressed: _openServerSettings,
+                            icon: const Icon(Icons.dns_outlined, size: 16),
+                            label: Text(ServerConfig.hasOverride
+                                ? 'API server: custom'
+                                : 'API server settings'),
                           ),
                         ],
                       ),
