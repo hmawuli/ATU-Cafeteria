@@ -8,19 +8,27 @@ use Illuminate\Http\Exceptions\HttpResponseException;
 
 class StoreOrderRequest extends FormRequest
 {
-    /**
-     * Determine if the user is authorized to make this request.
-     */
     public function authorize(): bool
     {
         return $this->user() !== null;
     }
 
     /**
-     * Prepare the data for validation.
+     * Never trust customer/student IDs supplied by the client. For a student
+     * order, the authenticated Sanctum user is the sole source of identity.
+     * Vendor/admin integrations may still use their explicitly supplied IDs.
      */
     protected function prepareForValidation()
     {
+        $user = $this->user();
+        if ($user && strtoupper((string) $user->role) === 'STUDENT') {
+            $this->merge([
+                'customer_id' => $user->id,
+                'student_id' => $user->id,
+            ]);
+            return;
+        }
+
         if ($this->has('student_id') && ! $this->has('customer_id')) {
             $this->merge(['customer_id' => $this->input('student_id')]);
         } elseif ($this->has('customer_id') && ! $this->has('student_id')) {
@@ -28,9 +36,6 @@ class StoreOrderRequest extends FormRequest
         }
     }
 
-    /**
-     * Get the validation rules that apply to the request.
-     */
     public function rules(): array
     {
         return [
@@ -46,9 +51,6 @@ class StoreOrderRequest extends FormRequest
         ];
     }
 
-    /**
-     * Handle a failed validation attempt.
-     */
     protected function failedValidation(Validator $validator)
     {
         throw new HttpResponseException(
