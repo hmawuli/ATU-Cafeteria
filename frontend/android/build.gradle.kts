@@ -2,6 +2,8 @@ allprojects {
     repositories {
         google()
         mavenCentral()
+        // Google-hosted mirror of Maven Central — fallback for flaky networks.
+        maven { url = uri("https://maven-central.storage-download.googleapis.com/maven2/") }
     }
 }
 

@@ -606,6 +606,25 @@ class _ReferenceVendorScreenState extends State<ReferenceVendorScreen> {
       return s > m ? s : m;
     });
 
+    // Today's revenue and orders from the vendor daily-revenue endpoint.
+    final now = DateTime.now();
+    final todayKey = '${now.year.toString().padLeft(4, '0')}-'
+        '${now.month.toString().padLeft(2, '0')}-'
+        '${now.day.toString().padLeft(2, '0')}';
+    Map<String, dynamic>? todayRow;
+    for (final day in provider.remoteDailyRevenue ?? const []) {
+      if (day is Map && (day['date']?.toString() ?? '') == todayKey) {
+        todayRow = Map<String, dynamic>.from(day);
+        break;
+      }
+    }
+    final todayRevenue = todayRow == null
+        ? 0.0
+        : double.tryParse((todayRow['revenue'] ?? 0).toString()) ?? 0;
+    final todayOrders = todayRow == null
+        ? 0
+        : int.tryParse((todayRow['orders_count'] ?? 0).toString()) ?? 0;
+
     return ListView(
       padding: const EdgeInsets.all(24),
       children: [
@@ -620,6 +639,14 @@ class _ReferenceVendorScreenState extends State<ReferenceVendorScreen> {
               label: 'Revenue',
               value: 'GH₵ ${revenue.toStringAsFixed(2)}',
               icon: Icons.payments),
+          MetricTile(
+              label: "Today's Revenue",
+              value: 'GH₵ ${todayRevenue.toStringAsFixed(2)}',
+              icon: Icons.today),
+          MetricTile(
+              label: "Today's Orders",
+              value: '$todayOrders',
+              icon: Icons.receipt_long),
           MetricTile(
               label: 'Completed', value: '$completed', icon: Icons.check_circle),
           MetricTile(

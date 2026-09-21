@@ -39,6 +39,9 @@ class CafeteriaProvider extends ChangeNotifier {
   List<dynamic>? _remoteRechartsData;
   List<dynamic>? get remoteRechartsData => _remoteRechartsData;
 
+  List<dynamic>? _remoteDailyRevenue;
+  List<dynamic>? get remoteDailyRevenue => _remoteDailyRevenue;
+
   bool _isFetchingRemoteMetrics = false;
   bool get isFetchingRemoteMetrics => _isFetchingRemoteMetrics;
 
@@ -1439,6 +1442,7 @@ class CafeteriaProvider extends ChangeNotifier {
     _isFetchingRemoteMetrics = true;
     _remoteVendorMetrics = null;
     _remoteRechartsData = null;
+    _remoteDailyRevenue = null;
     notifyListeners();
 
     try {
@@ -1481,6 +1485,21 @@ class CafeteriaProvider extends ChangeNotifier {
             rDecoded['data'] != null &&
             rDecoded['data']['by_date'] != null) {
           _remoteRechartsData = rDecoded['data']['by_date'] as List;
+        }
+      }
+
+      // 3. Fetch today's / daily revenue for the vendor
+      final dailyUrl =
+          Uri.parse("$_laravelBaseUrl/api/vendor/daily-revenue");
+      final dRequest = await client.getUrl(dailyUrl);
+      dRequest.headers.set(HttpHeaders.acceptHeader, 'application/json');
+      dRequest.headers.set(HttpHeaders.authorizationHeader, 'Bearer $token');
+      final dResponse = await dRequest.close();
+      if (dResponse.statusCode == 200) {
+        final dBody = await dResponse.transform(utf8.decoder).join();
+        final dDecoded = json.decode(dBody);
+        if (dDecoded['data'] is List) {
+          _remoteDailyRevenue = List<dynamic>.from(dDecoded['data']);
         }
       }
     } catch (e) {

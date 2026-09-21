@@ -334,7 +334,7 @@ class VendorPerformanceController extends Controller
                 'users.fullName as vendor_name',
                 'orders.total_price',
                 'orders.created_at',
-                DB::raw('CAST(orders.created_at AS DATE) as order_date')
+                DB::raw("date(orders.created_at) as order_date")
             )
             ->whereRaw('upper(orders.status) = ?', ['COMPLETED']);
 

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import '../../core/network/api_responses.dart';
 import '../../core/theme/app_theme.dart';
 import '../providers/admin_state_provider.dart';
 import '../providers/cafeteria_provider.dart';
@@ -106,6 +107,43 @@ class _ReferenceAdminScreenState extends State<ReferenceAdminScreen> {
       );
 
   Widget _body(AdminStateProvider admin) {
+    // Standard loading and error states while the initial admin data loads.
+    if (admin.loading && admin.dashboardData.isEmpty) {
+      return const Center(child: CircularProgressIndicator());
+    }
+    if (!admin.loading && admin.error != null && admin.dashboardData.isEmpty) {
+      return ListView(
+        padding: const EdgeInsets.all(24),
+        children: [
+          ReferenceCard(
+            child: Padding(
+              padding: const EdgeInsets.all(24),
+              child: Column(
+                children: [
+                  const Icon(Icons.cloud_off, size: 54, color: AppTheme.primary),
+                  const SizedBox(height: 12),
+                  const Text('Unable to load the admin dashboard',
+                      style: TextStyle(
+                          fontSize: 18, fontWeight: FontWeight.w900)),
+                  const SizedBox(height: 6),
+                  Text(admin.error!,
+                      textAlign: TextAlign.center,
+                      style: const TextStyle(color: AppTheme.textMuted)),
+                  const SizedBox(height: 18),
+                  FilledButton.icon(
+                    onPressed: () => admin.loadAll(
+                        includeFinance: true, includeSettings: true),
+                    icon: const Icon(Icons.refresh),
+                    label: const Text('Retry'),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ],
+      );
+    }
+
     if (page == 'Dashboard') return _dashboard(admin);
     if (page == 'Finance') return _finance(admin);
     if (page == 'Vendors') return _vendorsPage(admin);
@@ -135,7 +173,9 @@ class _ReferenceAdminScreenState extends State<ReferenceAdminScreen> {
                   padding: EdgeInsets.all(24),
                   child: Text('No records available.'))
               : Column(
-                  children: rows.take(20).map<Widget>((row) {
+                  children: rows.take(20).toList().asMap().entries.map(
+                      (entry) {
+                    final row = entry.value;
                     final title = row['fullName'] ??
                         row['full_name'] ??
                         row['name'] ??
@@ -146,17 +186,143 @@ class _ReferenceAdminScreenState extends State<ReferenceAdminScreen> {
                         row['status'] ??
                         row['role'] ??
                         '';
-                    return ListTile(
-                      title: Text('$title',
-                          style: const TextStyle(fontWeight: FontWeight.w800)),
-                      subtitle: Text('$subtitle'),
-                      trailing: const Icon(Icons.chevron_right),
+                    return Column(
+                      children: [
+                        if (entry.key > 0) const Divider(height: 1),
+                        ListTile(
+                          onTap: () => _showRecordDetails(row),
+                          title: Text('$title',
+                              style: const TextStyle(
+                                  fontWeight: FontWeight.w800)),
+                          subtitle: Text('$subtitle'),
+                          trailing: const Icon(Icons.chevron_right),
+                        ),
+                      ],
                     );
                   }).toList(),
                 ),
         ),
       ],
     );
+  }
+
+  /// Displays a professional detail sheet for a clicked Users/Orders row.
+  void _showRecordDetails(Map<String, dynamic> row) {
+    final title = row['fullName'] ??
+        row['full_name'] ??
+        row['name'] ??
+        row['type'] ??
+        (row['id'] != null ? 'Record #${row['id']}' : 'Record');
+    final fields = <String, String>{};
+    row.forEach((key, value) {
+      final rendered = _detailValue(value);
+      if (rendered.isEmpty) return;
+      if (_detailLabel(key) == 'ID' && rendered == '$title') return;
+      fields[_detailLabel(key)] = rendered;
+    });
+    if (fields.isEmpty) {
+      fields['Details'] = 'No additional details are available for this record.';
+    }
+
+    showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      builder: (sheetContext) => SafeArea(
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.fromLTRB(24, 12, 24, 24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(children: [
+                const Icon(Icons.person_pin_outlined,
+                    color: AppTheme.primary, size: 28),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Text('$title',
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                          fontSize: 20, fontWeight: FontWeight.w900)),
+                ),
+                IconButton(
+                    onPressed: () => Navigator.pop(sheetContext),
+                    icon: const Icon(Icons.close)),
+              ]),
+              const SizedBox(height: 16),
+              ...fields.entries.map(
+                (field) => Padding(
+                  padding: const EdgeInsets.only(bottom: 12),
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      SizedBox(
+                        width: 140,
+                        child: Text(
+                          field.key,
+                          style: const TextStyle(
+                              color: AppTheme.textMuted,
+                              fontWeight: FontWeight.w600),
+                        ),
+                      ),
+                      Expanded(
+                          child:
+                              Text(field.value, textAlign: TextAlign.start)),
+                    ],
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  String _detailValue(dynamic value) {
+    if (value == null) return '';
+    if (value is Map) {
+      return value['fullName']?.toString() ??
+          value['full_name']?.toString() ??
+          value['name']?.toString() ??
+          value['username']?.toString() ??
+          value['store_name']?.toString() ??
+          '';
+    }
+    final text = value.toString().trim();
+    if (text.isEmpty) return '';
+    final parsed = DateTime.tryParse(text);
+    if (parsed != null &&
+        text.contains('T') &&
+        (text.contains('-') || text.contains(':'))) {
+      return '${parsed.day.toString().padLeft(2, '0')}-${parsed.month.toString().padLeft(2, '0')}-${parsed.year} '
+          '${parsed.hour.toString().padLeft(2, '0')}:${parsed.minute.toString().padLeft(2, '0')}';
+    }
+    return text;
+  }
+
+  String _detailLabel(String key) {
+    const overrides = {
+      'fullName': 'Name',
+      'full_name': 'Name',
+      'username': 'Username',
+      'email': 'Email',
+      'contact_email': 'Contact email',
+      'account_status': 'Status',
+      'admin_level': 'Admin level',
+      'operational_status': 'Operational status',
+      'total_price': 'Total (GH₵)',
+      'vendor_id': 'Vendor ID',
+      'user_id': 'User ID',
+      'created_at': 'Created',
+      'updated_at': 'Updated',
+      'two_factor_enabled': '2FA enabled',
+      'profile_completed': 'Profile completed',
+    };
+    if (overrides.containsKey(key)) return overrides[key]!;
+    return key
+        .replaceAll('_', ' ')
+        .replaceFirst(key[0], key[0].toUpperCase());
   }
 
   Widget _vendorsPage(AdminStateProvider admin) {
@@ -274,12 +440,17 @@ class _ReferenceAdminScreenState extends State<ReferenceAdminScreen> {
             PopupMenuButton<String>(
               tooltip: 'Vendor actions',
               onSelected: (value) async {
-                final ok = await admin.changeVendorStatus(id, value);
-                if (!mounted) return;
-                ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-                    content: Text(ok
-                        ? 'Vendor status updated.'
-                        : (admin.error ?? 'Could not update vendor status.'))));
+                if (!admin.busy) {
+                  final ok = await admin.changeVendorStatus(id, value);
+                  if (!mounted) return;
+                  showAppMessage(
+                    context,
+                    message: ok
+                        ? (admin.actionMessage ?? 'Vendor status updated.')
+                        : (admin.error ?? 'Could not update vendor status.'),
+                    isError: !ok,
+                  );
+                }
               },
               itemBuilder: (_) => [
                 if (!active)
@@ -336,12 +507,18 @@ class _ReferenceAdminScreenState extends State<ReferenceAdminScreen> {
             if (!mounted || !dialogContext.mounted) return;
             if (ok) {
               Navigator.of(dialogContext).pop();
-              ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-                  content: Text('Vendor account created successfully.')));
+              showAppMessage(
+                this.context,
+                message:
+                    admin.actionMessage ?? 'Vendor account created successfully.',
+              );
             } else {
               setDialogState(() => saving = false);
-              ScaffoldMessenger.of(this.context).showSnackBar(SnackBar(
-                  content: Text(admin.error ?? 'Could not create vendor.')));
+              showAppMessage(
+                this.context,
+                message: admin.error ?? 'Could not create vendor.',
+                isError: true,
+              );
             }
           }
 
@@ -876,14 +1053,16 @@ class _ReferenceAdminScreenState extends State<ReferenceAdminScreen> {
                           alignment: Alignment.centerRight,
                           child: OutlinedButton.icon(
                             onPressed: () async {
+                              if (admin.busy) return;
                               final ok = await admin.resolveSecurityAlert(
                                   (alert['id'] as num?)?.toInt() ?? 0);
                               if (!mounted) return;
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                SnackBar(
-                                    content: Text(ok
-                                        ? 'Alert resolved.'
-                                        : 'Could not resolve alert.')),
+                              showAppMessage(
+                                context,
+                                message: ok
+                                    ? (admin.actionMessage ?? 'Alert resolved.')
+                                    : (admin.error ?? 'Could not resolve alert.'),
+                                isError: !ok,
                               );
                             },
                             icon: const Icon(Icons.check_circle_outline, size: 18),

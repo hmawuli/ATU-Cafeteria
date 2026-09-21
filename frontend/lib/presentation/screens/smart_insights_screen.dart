@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:atu_cafeteria/core/network/api_client.dart';
+import 'package:atu_cafeteria/core/network/api_responses.dart';
 import 'package:atu_cafeteria/presentation/providers/cafeteria_provider.dart';
 import 'package:provider/provider.dart';
 
@@ -46,7 +47,7 @@ class _SmartInsightsScreenState extends State<SmartInsightsScreen> {
       }
       setState(() => error = null);
     } catch (e) {
-      setState(() => error = e.toString());
+      setState(() => error = friendlyApiError(e));
     } finally {
       if (mounted) setState(() => loading = false);
     }
@@ -77,7 +78,22 @@ class _SmartInsightsScreenState extends State<SmartInsightsScreen> {
                 ? Center(
                     child: Padding(
                         padding: const EdgeInsets.all(20),
-                        child: Text(error!, textAlign: TextAlign.center)))
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            const Icon(Icons.cloud_off_outlined,
+                                size: 40, color: Colors.grey),
+                            const SizedBox(height: 12),
+                            Text(error!, textAlign: TextAlign.center),
+                            const SizedBox(height: 16),
+                            OutlinedButton.icon(
+                              onPressed: _load,
+                              icon: const Icon(Icons.refresh),
+                              label: const Text('Retry'),
+                            ),
+                          ],
+                        ),
+                      ))
                 : role == 'ADMIN'
                     ? _admin()
                     : role == 'STUDENT'

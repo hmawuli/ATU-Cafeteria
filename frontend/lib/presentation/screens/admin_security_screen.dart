@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:atu_cafeteria/core/network/api_client.dart';
+import 'package:atu_cafeteria/core/network/api_responses.dart';
 import '../providers/cafeteria_provider.dart';
 
 class AdminSecurityScreen extends StatefulWidget {
@@ -40,14 +41,14 @@ class _AdminSecurityScreenState extends State<AdminSecurityScreen> {
           await _call('POST', 'admin/security/2fa/request-enable', {});
       if (!mounted) return;
       setState(() => _requested = true);
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(result['message']?.toString() ?? 'Code sent.')),
+      showAppMessage(
+        context,
+        message: result['message']?.toString() ?? 'Verification code sent.',
       );
     } catch (error) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(error.toString())),
-        );
+        showAppMessage(context,
+            message: friendlyApiError(error), isError: true);
       }
     } finally {
       if (mounted) setState(() => _loading = false);
@@ -57,9 +58,8 @@ class _AdminSecurityScreenState extends State<AdminSecurityScreen> {
   Future<void> _enableTwoFactor() async {
     final code = _codeController.text.trim();
     if (code.length != 6) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Enter the 6-digit verification code.')),
-      );
+      showAppMessage(context,
+          message: 'Enter the 6-digit verification code.', isError: true);
       return;
     }
 
@@ -71,17 +71,15 @@ class _AdminSecurityScreenState extends State<AdminSecurityScreen> {
         {'code': code},
       );
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-            content:
-                Text(result['message']?.toString() ?? 'Two-factor enabled.')),
+      showAppMessage(
+        context,
+        message: result['message']?.toString() ?? 'Two-factor enabled.',
       );
       Navigator.pop(context);
     } catch (error) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(error.toString())),
-        );
+        showAppMessage(context,
+            message: friendlyApiError(error), isError: true);
       }
     } finally {
       if (mounted) setState(() => _loading = false);
@@ -120,9 +118,8 @@ class _AdminSecurityScreenState extends State<AdminSecurityScreen> {
       );
     } catch (error) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(error.toString())),
-        );
+        showAppMessage(context,
+            message: friendlyApiError(error), isError: true);
       }
     } finally {
       if (mounted) setState(() => _loading = false);

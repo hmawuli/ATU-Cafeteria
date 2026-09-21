@@ -13,6 +13,9 @@ pluginManagement {
     repositories {
         google()
         mavenCentral()
+        // Google-hosted mirror of Maven Central — keeps builds working when
+        // repo.maven.apache.org is unreachable on constrained networks.
+        maven { url = uri("https://maven-central.storage-download.googleapis.com/maven2/") }
         gradlePluginPortal()
     }
 }
