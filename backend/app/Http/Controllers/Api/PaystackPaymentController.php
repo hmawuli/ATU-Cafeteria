@@ -10,25 +10,40 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Validator;
+use Illuminate\Validation\ValidationException;
 
 class PaystackPaymentController extends Controller
 {
     /**
-     * Get target secret from configure keys.
+     * Resolve the configured Paystack secret without ever falling back to a
+     * fake credential in a deployed environment.
      */
     protected function getSecretKey(): string
     {
-        return env('PAYSTACK_SECRET_KEY') ?: 'sk_test_mock_paystack_secret_key_atu_cafeteria';
+        return trim((string) env('PAYSTACK_SECRET_KEY', ''));
+    }
+
+    protected function demoMode(): bool
+    {
+        return filter_var(env('PAYSTACK_DEMO_MODE', false), FILTER_VALIDATE_BOOL);
     }
 
     /**
      * Initialize a Paystack checkout transaction.
+     *
+     * The authenticated user's identity is authoritative. The email supplied
+     * by a client is accepted only when it matches the account email.
      */
     public function initialize(Request $request)
     {
+        $user = $request->user();
+        if (! $user) {
+            return response()->json(['success' => false, 'message' => 'Unauthenticated.'], 401);
+        }
+
         $validator = Validator::make($request->all(), [
-            'email' => 'required|email',
-            'amount' => 'required|numeric|min:0.5', // Amount in GHS / NGN
+            'email' => 'nullable|email',
+            'amount' => 'required|numeric|min:0.50',
             'purpose' => 'required|string|in:WALLET_TOPUP,DIRECT_ORDER_PAY',
         ]);
 
@@ -37,211 +52,289 @@ class PaystackPaymentController extends Controller
                 'success' => false,
                 'message' => 'Invalid payment inputs.',
                 'errors' => $validator->errors(),
-            ], 400);
+            ], 422);
         }
 
-        $email = $request->input('email');
-        $amountInPesewas = (int) ($request->input('amount') * 100); // Paystack uses sub-units (kobo/pesewas)
-        $reference = 'ATU-PAY-'.uniqid().'-'.time();
-        $purpose = $request->input('purpose');
+        $accountEmail = trim((string) ($user->email ?? ''));
+        $requestedEmail = trim((string) ($request->input('email') ?? ''));
+        if ($accountEmail === '') {
+            return response()->json([
+                'success' => false,
+                'message' => 'Your account does not have a payment email address. Update your profile first.',
+            ], 422);
+        }
+        if ($requestedEmail !== '' && strcasecmp($requestedEmail, $accountEmail) !== 0) {
+            return response()->json([
+                'success' => false,
+                'message' => 'The payment email must match your authenticated account.',
+            ], 422);
+        }
 
+        $amount = round((float) $request->input('amount'), 2);
+        $amountInPesewas = (int) round($amount * 100);
+        $reference = 'ATU-PAY-'.strtoupper(bin2hex(random_bytes(8))).'-'.time();
+        $purpose = strtoupper((string) $request->input('purpose'));
         $secretKey = $this->getSecretKey();
+        $demoMode = $this->demoMode();
 
-        // If secret key is mock, we bypass external HTTP request to avoid connection blocks
-        if (strpos($secretKey, 'sk_test_mock') !== false) {
-            $mockUrl = 'https://checkout.paystack.com/mock-gateway-redirect?ref='.$reference;
+        if (! $demoMode && $secretKey === '') {
+            return response()->json([
+                'success' => false,
+                'message' => 'Paystack is not configured on this server. Set PAYSTACK_SECRET_KEY before accepting payments.',
+            ], 503);
+        }
 
+        // Persist a pending ledger row before contacting the gateway. This
+        // binds the reference to this user and gives verification an auditable
+        // transaction to update, preventing cross-user reference reuse.
+        WalletTransaction::create([
+            'user_id' => $user->id,
+            'amount' => $amount,
+            'type' => $purpose === 'WALLET_TOPUP' ? 'DEPOSIT' : 'PAYMENT',
+            'status' => 'PENDING',
+            'reference' => $reference,
+            'details' => "Paystack initialization for {$purpose}.",
+        ]);
+
+        if ($demoMode) {
             return response()->json([
                 'success' => true,
-                'message' => 'Paystack transaction simulation initialized successfully.',
+                'message' => 'Paystack demo transaction initialized.',
                 'data' => [
-                    'authorization_url' => $mockUrl,
-                    'access_code' => 'MOCK_AC_'.uniqid(),
+                    'authorization_url' => 'https://checkout.paystack.com/demo?ref='.$reference,
+                    'access_code' => 'DEMO_'.strtoupper(bin2hex(random_bytes(6))),
                     'reference' => $reference,
-                    'amount' => $request->input('amount'),
+                    'amount' => $amount,
                     'is_simulated' => true,
                 ],
             ], 200);
         }
 
         try {
-            // Real API integration
-            $response = Http::withHeaders([
-                'Authorization' => 'Bearer '.$secretKey,
-                'Content-Type' => 'application/json',
-            ])->post('https://api.paystack.co/transaction/initialize', [
-                'email' => $email,
-                'amount' => $amountInPesewas,
-                'reference' => $reference,
-                'metadata' => [
-                    'purpose' => $purpose,
-                    'user_id' => $request->user()->id ?? null,
-                ],
-            ]);
+            $response = Http::timeout(20)
+                ->withToken($secretKey)
+                ->acceptJson()
+                ->post('https://api.paystack.co/transaction/initialize', [
+                    'email' => $accountEmail,
+                    'amount' => $amountInPesewas,
+                    'reference' => $reference,
+                    'metadata' => [
+                        'purpose' => $purpose,
+                        'user_id' => $user->id,
+                    ],
+                ]);
 
-            if ($response->successful()) {
-                $paystackData = $response->json();
-
+            if ($response->successful() && data_get($response->json(), 'status') === true) {
                 return response()->json([
                     'success' => true,
                     'message' => 'Paystack transaction initialized.',
-                    'data' => $paystackData['data'],
+                    'data' => $response->json('data'),
                 ], 200);
             }
 
-            return response()->json([
-                'success' => false,
-                'message' => 'Failed to initialize Paystack gateway API.',
-                'error' => $response->body(),
-            ], 500);
+            WalletTransaction::where('reference', $reference)->update([
+                'status' => 'FAILED',
+                'details' => 'Paystack initialization failed.',
+            ]);
 
-        } catch (\Exception $e) {
             return response()->json([
                 'success' => false,
-                'message' => 'Payment gateway execution issue occurred.',
-                'details' => $e->getMessage(),
-            ], 500);
+                'message' => 'Failed to initialize Paystack gateway transaction.',
+            ], 502);
+        } catch (\Throwable $e) {
+            WalletTransaction::where('reference', $reference)->update([
+                'status' => 'FAILED',
+                'details' => 'Paystack initialization connection failure.',
+            ]);
+
+            report($e);
+            return response()->json([
+                'success' => false,
+                'message' => 'Unable to connect to Paystack. Please try again.',
+            ], 502);
         }
     }
 
     /**
-     * Verify a Paystack checkout transaction.
+     * Verify a Paystack transaction and apply its financial effect exactly once.
      */
     public function verify(Request $request, $reference)
     {
-        $secretKey = $this->getSecretKey();
-        $isMock = (strpos($secretKey, 'sk_test_mock') !== false);
-
-        $paymentSuccess = false;
-        $amountPaid = 0.0;
-        $metadata = [];
-
-        if ($isMock) {
-            // Simulated Success - always resolves beautifully for demo/emulator purposes
-            $paymentSuccess = true;
-            $amountPaid = $request->input('amount') ? (float) $request->input('amount') : 10.0; // default/validated value
-            $metadata = ['purpose' => $request->input('purpose', 'WALLET_TOPUP')];
-        } else {
-            try {
-                $response = Http::withHeaders([
-                    'Authorization' => 'Bearer '.$secretKey,
-                ])->get("https://api.paystack.co/transaction/verify/{$reference}");
-
-                if ($response->successful()) {
-                    $resData = $response->json();
-                    if ($resData['data']['status'] === 'success') {
-                        $amountPaid = $resData['data']['amount'] / 100.0;
-                        $expectedAmount = (float) $request->input('amount', 0);
-                        if ($expectedAmount > 0 && abs($amountPaid - $expectedAmount) > 0.01) {
-                            return response()->json([
-                                'success' => false,
-                                'message' => 'The payment amount does not match the order total.',
-                            ], 409);
-                        }
-                        $paymentSuccess = true;
-                        $metadata = $resData['data']['metadata'] ?? [];
-                    }
-                }
-            } catch (\Exception $e) {
-                return response()->json([
-                    'success' => false,
-                    'message' => 'Unable to connect to Paystack billing nodes.',
-                    'error' => $e->getMessage(),
-                ], 500);
-            }
-        }
-
-        if (! $paymentSuccess) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Paystack transaction not completed or signature validation failed.',
-            ], 402);
-        }
-
-        // Process ledger update
         $user = $request->user();
         if (! $user) {
+            return response()->json(['success' => false, 'message' => 'Unauthenticated.'], 401);
+        }
+
+        $validator = Validator::make($request->all(), [
+            'amount' => 'nullable|numeric|min:0.50',
+            'purpose' => 'nullable|string|in:WALLET_TOPUP,DIRECT_ORDER_PAY',
+        ]);
+        if ($validator->fails()) {
             return response()->json([
                 'success' => false,
-                'message' => 'Authenticated user required to clear ledger assets.',
-            ], 401);
+                'message' => 'Invalid verification inputs.',
+                'errors' => $validator->errors(),
+            ], 422);
+        }
+
+        $transaction = WalletTransaction::where('reference', $reference)->first();
+        if (! $transaction) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Payment reference was not initialized by this system.',
+            ], 404);
+        }
+
+        if ((int) $transaction->user_id !== (int) $user->id) {
+            return response()->json([
+                'success' => false,
+                'message' => 'This payment reference does not belong to your account.',
+            ], 403);
+        }
+
+        if ($transaction->status === 'SUCCESS') {
+            return response()->json([
+                'success' => true,
+                'message' => 'Transaction was already processed.',
+                'reference' => $reference,
+                'amount' => (float) $transaction->amount,
+                'purpose' => $this->purposeFromTransaction($transaction),
+                'already_processed' => true,
+            ], 200);
+        }
+
+        if ($transaction->status === 'FAILED') {
+            return response()->json([
+                'success' => false,
+                'message' => 'This payment initialization failed and cannot be verified.',
+            ], 409);
+        }
+
+        $expectedAmount = (float) $transaction->amount;
+        $requestedAmount = $request->filled('amount') ? (float) $request->input('amount') : $expectedAmount;
+        if (abs($requestedAmount - $expectedAmount) > 0.01) {
+            return response()->json([
+                'success' => false,
+                'message' => 'The requested verification amount does not match the initialized transaction.',
+            ], 409);
+        }
+
+        $purpose = $this->purposeFromTransaction($transaction);
+        $secretKey = $this->getSecretKey();
+        $demoMode = $this->demoMode();
+        $amountPaid = 0.0;
+        $gatewayMetadata = [];
+
+        if ($demoMode) {
+            $amountPaid = $expectedAmount;
+            $gatewayMetadata = ['purpose' => $purpose, 'user_id' => $user->id];
+        } elseif ($secretKey !== '') {
+            try {
+                $response = Http::timeout(20)
+                    ->withToken($secretKey)
+                    ->acceptJson()
+                    ->get("https://api.paystack.co/transaction/verify/{$reference}");
+
+                $data = $response->json('data');
+                if (! $response->successful() || data_get($response->json(), 'status') !== true || data_get($data, 'status') !== 'success') {
+                    return response()->json([
+                        'success' => false,
+                        'message' => 'Paystack has not confirmed this transaction as successful.',
+                    ], 402);
+                }
+
+                $amountPaid = ((int) data_get($data, 'amount', 0)) / 100;
+                $gatewayMetadata = (array) data_get($data, 'metadata', []);
+
+                if (abs($amountPaid - $expectedAmount) > 0.01) {
+                    return response()->json([
+                        'success' => false,
+                        'message' => 'The amount confirmed by Paystack does not match the initialized amount.',
+                    ], 409);
+                }
+
+                $gatewayUserId = data_get($gatewayMetadata, 'user_id');
+                if ($gatewayUserId !== null && (int) $gatewayUserId !== (int) $user->id) {
+                    return response()->json([
+                        'success' => false,
+                        'message' => 'Paystack metadata does not match the authenticated account.',
+                    ], 403);
+                }
+            } catch (\Throwable $e) {
+                report($e);
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Unable to connect to Paystack for verification. Please try again.',
+                ], 502);
+            }
+        } else {
+            return response()->json([
+                'success' => false,
+                'message' => 'Paystack is not configured on this server.',
+            ], 503);
         }
 
         DB::beginTransaction();
         try {
-            // Check if transaction was already processed (avoid double-credit)
-            $existingTransaction = WalletTransaction::where('reference', $reference)
-                ->orWhere('details', 'LIKE', '%'.$reference.'%')
-                ->first();
+            $locked = WalletTransaction::whereKey($transaction->id)->lockForUpdate()->firstOrFail();
 
-            if ($existingTransaction) {
-                DB::rollBack();
-
+            // A concurrent verification may have completed while the gateway
+            // request was in flight. Never credit the wallet twice.
+            if ($locked->status === 'SUCCESS') {
+                DB::commit();
                 return response()->json([
                     'success' => true,
-                    'message' => 'Transaction was already ledgered and processed.',
-                    'amount' => $amountPaid,
+                    'message' => 'Transaction was already processed.',
+                    'reference' => $reference,
+                    'amount' => (float) $locked->amount,
+                    'purpose' => $purpose,
+                    'already_processed' => true,
                 ], 200);
             }
 
-            // Top up wallet or process order completion
-            $purpose = $metadata['purpose'] ?? $request->input('purpose', 'WALLET_TOPUP');
+            $dbUser = User::lockForUpdate()->findOrFail($user->id);
+            $dbUser->balance = round((float) $dbUser->balance + $amountPaid, 2);
+            $dbUser->save();
 
-            if ($purpose === 'WALLET_TOPUP') {
-                // Fetch user and lock row, then reload and update balance
-                $dbUser = User::lockForUpdate()->find($user->id);
-                if ($dbUser) {
-                    $dbUser->balance += $amountPaid;
-                    $dbUser->save();
-                }
+            $locked->status = 'SUCCESS';
+            $locked->amount = $amountPaid;
+            $locked->details = "Paystack payment verified for {$purpose}.";
+            $locked->save();
 
-                // Fetch wallet if needed. Let's record wallet transaction.
-                // In our schema, we have users with optional balances, or we have wallet actions.
-                // Let's create wallet transaction.
-                WalletTransaction::create([
-                    'user_id' => $user->id,
-                    'amount' => $amountPaid,
-                    'type' => 'DEPOSIT',
-                    'status' => 'SUCCESS',
-                    'reference' => $reference,
-                    'details' => "Deposited via Paystack Gateway. Ref: {$reference} ({$purpose})",
-                ]);
-
-                // Record audit log
-                AuditLog::create([
-                    'user_id' => $user->id,
-                    'timestamp' => time() * 1000,
-                    'action' => 'PAYSTACK_WALLET_TOPUP',
-                    'details' => "Successfully deposited GH₵ {$amountPaid} into Smart ID Wallet via secure Paystack channel.",
-                ]);
-            } else {
-                // DIRECT_ORDER_PAY - log the gateway clearance
-                AuditLog::create([
-                    'user_id' => $user->id,
-                    'timestamp' => time() * 1000,
-                    'action' => 'PAYSTACK_DIRECT_PAY',
-                    'details' => 'Cleared GH₵ '.number_format($amountPaid, 2)." for direct order fulfillment via secure Paystack gateway. Ref: {$reference}.",
-                ]);
-            }
+            AuditLog::create([
+                'user_id' => $user->id,
+                'timestamp' => now()->getTimestampMs(),
+                'action' => $purpose === 'WALLET_TOPUP' ? 'PAYSTACK_WALLET_TOPUP' : 'PAYSTACK_DIRECT_PAY',
+                'details' => 'Verified GH₵ '.number_format($amountPaid, 2)." via Paystack. Ref: {$reference}.",
+            ]);
 
             DB::commit();
 
             return response()->json([
                 'success' => true,
-                'message' => 'Paystack signature validated and funds ledgered successfully.',
+                'message' => 'Paystack payment verified and ledger updated successfully.',
                 'reference' => $reference,
                 'amount' => $amountPaid,
                 'purpose' => $purpose,
             ], 200);
-
-        } catch (\Exception $e) {
+        } catch (ValidationException $e) {
             DB::rollBack();
-
+            throw $e;
+        } catch (\Throwable $e) {
+            DB::rollBack();
+            report($e);
             return response()->json([
                 'success' => false,
-                'message' => 'Database exception during financial clearing operations.',
-                'error' => $e->getMessage(),
+                'message' => 'Financial transaction could not be completed safely.',
             ], 500);
         }
+    }
+
+    protected function purposeFromTransaction(WalletTransaction $transaction): string
+    {
+        if (str_contains((string) $transaction->details, 'DIRECT_ORDER_PAY')) {
+            return 'DIRECT_ORDER_PAY';
+        }
+        return 'WALLET_TOPUP';
     }
 }
