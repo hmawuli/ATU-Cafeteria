@@ -71,4 +71,24 @@ class WalletTransactionObserverTest extends TestCase
         (new WalletTransactionObserver)->creating($transaction);
         $this->assertSame('SUCCESS', $transaction->status);
     }
+
+    public function test_unverified_successful_payout_is_rejected(): void
+    {
+        $vendor = new User;
+        $vendor->id = 10;
+        $vendor->role = 'VENDOR';
+        Auth::login($vendor);
+
+        $transaction = new WalletTransaction([
+            'user_id' => 10,
+            'type' => 'PAYOUT',
+            'amount' => -50,
+            'status' => 'SUCCESS',
+            'reference' => 'PAY-TEST-1',
+            'details' => 'Payout requested to mobile money account',
+        ]);
+
+        $this->expectException(LogicException::class);
+        (new WalletTransactionObserver)->creating($transaction);
+    }
 }
