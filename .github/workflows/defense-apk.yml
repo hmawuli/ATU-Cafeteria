@@ -1,0 +1,44 @@
+name: ATU Cafeteria Phone-Only Defense APK
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - 'frontend/**'
+      - '.github/workflows/defense-apk.yml'
+
+jobs:
+  build-defense-apk:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+
+      - name: Get dependencies
+        run: flutter pub get
+
+      - name: Analyze
+        run: flutter analyze
+
+      - name: Build phone-only defense APK
+        run: flutter build apk --release --dart-define=ATU_DEFENSE_MODE=true
+
+      - name: Rename APK
+        run: cp build/app/outputs/flutter-apk/app-release.apk build/app/outputs/flutter-apk/ATU-Cafeteria-Defense.apk
+
+      - name: Upload defense APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: ATU-Cafeteria-Defense-APK
+          path: frontend/build/app/outputs/flutter-apk/ATU-Cafeteria-Defense.apk
+          if-no-files-found: error
+          retention-days: 30
