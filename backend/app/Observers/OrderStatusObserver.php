@@ -7,11 +7,10 @@ use Illuminate\Support\Facades\Auth;
 use LogicException;
 
 /**
- * Central server-side guard for order status changes.
+ * Central server-side guard for order creation and status changes.
  *
- * Controllers may expose more than one status endpoint, so the lifecycle is
- * enforced again at the model boundary. This prevents a newly added endpoint
- * or bulk operation from accidentally allowing a status to be skipped.
+ * Controllers may expose more than one order endpoint, so the important
+ * invariants are enforced again at the model boundary.
  */
 final class OrderStatusObserver
 {
@@ -26,6 +25,25 @@ final class OrderStatusObserver
         'DECLINED' => [],
         'CANCELLED' => [],
     ];
+
+    public function creating(Order $order): void
+    {
+        $actor = Auth::user();
+        if (! $actor || strtoupper((string) $actor->role) !== 'STUDENT') {
+            return;
+        }
+
+        // Never trust customer/student/user IDs supplied by a student client.
+        // The authenticated account is the sole owner of the new order.
+        $order->customer_id = $actor->id;
+        $order->student_id = $actor->id;
+        $order->user_id = $actor->id;
+
+        $status = strtoupper(trim((string) ($order->status ?: 'PENDING')));
+        if (! in_array($status, ['PENDING', 'ORDER_PLACED'], true)) {
+            throw new LogicException('A student order must start in PENDING or ORDER_PLACED status.');
+        }
+    }
 
     public function saving(Order $order): void
     {
