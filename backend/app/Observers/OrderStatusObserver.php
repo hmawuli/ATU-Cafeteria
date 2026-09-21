@@ -8,18 +8,16 @@ use LogicException;
 
 /**
  * Central server-side guard for order creation and status changes.
- *
- * Controllers may expose more than one order endpoint, so the important
- * invariants are enforced again at the model boundary.
  */
 final class OrderStatusObserver
 {
     private const TRANSITIONS = [
         'PENDING' => ['ORDER_PLACED', 'PREPARING', 'DECLINED', 'CANCELLED'],
         'ORDER_PLACED' => ['PREPARING', 'DECLINED', 'CANCELLED'],
-        'PREPARING' => ['READY', 'CANCELLED'],
+        'PREPARING' => ['READY', 'READY_FOR_PICKUP', 'CANCELLED'],
         'READY' => ['OUT_FOR_DELIVERY', 'COMPLETED'],
-        'OUT_FOR_DELIVERY' => ['COMPLETED'],
+        'READY_FOR_PICKUP' => ['COMPLETED', 'OUT_FOR_DELIVERY'],
+        'OUT_FOR_DELIVERY' => ['COMPLETED', 'DELIVERED'],
         'DELIVERED' => ['COMPLETED'],
         'COMPLETED' => [],
         'DECLINED' => [],
@@ -33,8 +31,6 @@ final class OrderStatusObserver
             return;
         }
 
-        // Never trust customer/student/user IDs supplied by a student client.
-        // The authenticated account is the sole owner of the new order.
         $order->customer_id = $actor->id;
         $order->student_id = $actor->id;
         $order->user_id = $actor->id;
@@ -58,8 +54,6 @@ final class OrderStatusObserver
             return;
         }
 
-        // Administrative intervention is intentionally allowed to repair or
-        // reconcile an order. All vendor/student transitions remain strict.
         $actor = Auth::user();
         if ($actor && strtoupper((string) $actor->role) === 'ADMIN') {
             return;
