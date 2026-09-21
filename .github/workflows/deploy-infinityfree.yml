@@ -1,0 +1,79 @@
+name: Deploy Backend to InfinityFree
+
+# InfinityFree has no git/SSH, so this workflow builds the Laravel API from the
+# repo and uploads it to your InfinityFree hosting account over FTP.
+#
+# Run it: GitHub -> Actions -> "Deploy Backend to InfinityFree" -> Run workflow
+# (works even before the secrets below are added — the build still produces a
+# downloadable ZIP; the FTP upload step is skipped if secrets are missing).
+#
+# Secrets to add once (repo Settings -> Secrets and variables -> Actions):
+#   APP_KEY      base64:... (php artisan key:generate --show)
+#   APP_URL      https://atucafeteria.free.nf
+#   DB_HOST      sql303.infinityfree.com
+#   DB_DATABASE  if0_42973998_atu_cafeteria
+#   DB_USERNAME  if0_42973998
+#   DB_PASSWORD  <your MySQL password>
+#   FTP_HOST     ftpupload.net
+#   FTP_USER     if0_42973998
+#   FTP_PASS     <your InfinityFree account password>
+#
+# After the secrets exist, changing this workflow's `on:` to include
+#   push: { branches: [main], paths: [backend/**] }
+# gives you push-to-deploy.
+
+on:
+  workflow_dispatch:
+    inputs:
+      upload:
+        description: 'Upload bundle to InfinityFree over FTP'
+        type: boolean
+        default: true
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup PHP 8.2
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.2'
+          extensions: mbstring, xml, ctype, iconv, json, bcmath, pdo_mysql, zip, fileinfo, openssl
+          coverage: none
+
+      - name: Build InfinityFree bundle
+        env:
+          APP_KEY: ${{ secrets.APP_KEY }}
+          APP_URL: ${{ secrets.APP_URL }}
+          DB_HOST: ${{ secrets.DB_HOST }}
+          DB_DATABASE: ${{ secrets.DB_DATABASE }}
+          DB_USERNAME: ${{ secrets.DB_USERNAME }}
+          DB_PASSWORD: ${{ secrets.DB_PASSWORD }}
+        run: bash scripts/build_infinityfree_bundle.sh deploy-artifacts
+
+      - name: Upload bundle as artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: infinityfree-webroot
+          path: deploy-artifacts/atu_cafeteria_webroot.zip
+          if-no-files-found: error
+
+      - name: Upload to InfinityFree (FTP)
+        if: inputs.upload && env.FTP_PASS != ''
+        env:
+          FTP_HOST: ${{ secrets.FTP_HOST }}
+          FTP_USER: ${{ secrets.FTP_USER }}
+          FTP_PASS: ${{ secrets.FTP_PASS }}
+        run: |
+          if [ -z "$FTP_PASS" ]; then
+            echo "::warning::FTP secrets not configured — skipping upload. Download the artifact instead."
+            exit 0
+          fi
+          curl --fail --show-error \
+            --user "${FTP_USER}:${FTP_PASS}" \
+            --upload-file deploy-artifacts/atu_cafeteria_webroot.zip \
+            "ftp://${FTP_HOST:-ftpupload.net}/htdocs/atu_cafeteria_webroot.zip"
+        shell: bash

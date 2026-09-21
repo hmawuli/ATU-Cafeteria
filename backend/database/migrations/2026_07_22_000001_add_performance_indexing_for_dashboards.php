@@ -48,8 +48,10 @@ return new class extends Migration
         // 4. Performance Indexes on CHAT_MESSAGES Table
         if (Schema::hasTable('chat_messages')) {
             Schema::table('chat_messages', function (Blueprint $table) {
-                // Index for order chat message history lookups
-                $table->index(['order_id', 'created_at'], 'idx_chat_messages_order_created');
+                // Index for chat history lookups by sender and by receiver
+                // (the chat_messages table has sender_id / receiver_id, not order_id)
+                $table->index(['sender_id', 'created_at'], 'idx_chat_messages_sender_created');
+                $table->index(['receiver_id', 'created_at'], 'idx_chat_messages_receiver_created');
             });
         }
     }
@@ -78,7 +80,8 @@ return new class extends Migration
 
         if (Schema::hasTable('chat_messages')) {
             Schema::table('chat_messages', function (Blueprint $table) {
-                $table->dropIndex('idx_chat_messages_order_created');
+                $table->dropIndex('idx_chat_messages_sender_created');
+                $table->dropIndex('idx_chat_messages_receiver_created');
             });
         }
     }
