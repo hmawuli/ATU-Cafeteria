@@ -31,10 +31,14 @@ Connect a physical Android phone with USB debugging enabled. Do **not** start an
 
 Close Chrome tabs and other applications, stop Laravel when it is not needed, and use a physical phone. Avoid running Android Studio and VS Code simultaneously.
 
-For the defense, prefer:
+## Release validation
+
+Use the normal release build when you need to validate the Android production configuration:
 
 ```bash
-flutter run --release
+cd frontend
+flutter build apk --release
+flutter build appbundle --release
 ```
 
-only after the normal build works. Release builds can take longer to compile, so do not rebuild unnecessarily immediately before the presentation.
+For actual distribution, use the protected production signing workflow rather than committing a keystore to the repository.
