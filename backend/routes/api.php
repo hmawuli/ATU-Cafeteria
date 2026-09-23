@@ -159,6 +159,8 @@ Route::middleware(['auth:sanctum', InactivityTimeout::class])->group(function ()
         Route::get('/vendor/menu-items', [VendorMenuItemController::class, 'index']);
         Route::get('/vendor/metrics', [VendorMetricsController::class, 'index']);
         Route::get('/vendor/performance', [VendorPerformanceController::class, 'index']);
+        Route::get('/vendor/inventory/movements', [InventoryController::class, 'index'])->middleware('permission:inventory.view');
+        Route::post('/vendor/inventory/adjust', [InventoryController::class, 'adjust'])->middleware(['permission:inventory.manage', 'idempotency:required']);
     });
 
     Route::middleware('role:STUDENT')->group(function () {
