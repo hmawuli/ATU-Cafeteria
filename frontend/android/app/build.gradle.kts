@@ -1,7 +1,6 @@
 plugins {
     id("com.android.application")
     id("kotlin-android")
-    // The Flutter Gradle Plugin must be applied after the Android and Kotlin Gradle plugins.
     id("dev.flutter.flutter-gradle-plugin")
 }
 
@@ -27,10 +26,8 @@ android {
         versionName = flutter.versionName
     }
 
-    // Production signing is supplied through environment variables or Gradle
-    // properties and is never committed to source control. Local/CI builds may
-    // continue using debug signing unless production signing is explicitly
-    // required with ATU_REQUIRE_PROD_SIGNING=true.
+    // Production signing is supplied only through environment variables.
+    // The keystore and credentials are never committed to source control.
     val requireProductionSigning =
         System.getenv("ATU_REQUIRE_PROD_SIGNING")?.toBoolean() == true
 
@@ -39,32 +36,35 @@ android {
     val keyAlias = System.getenv("ATU_KEY_ALIAS")
     val keyPassword = System.getenv("ATU_KEY_PASSWORD")
 
+    val hasProductionSigning =
+        !keystorePath.isNullOrBlank() &&
+        !keystorePassword.isNullOrBlank() &&
+        !keyAlias.isNullOrBlank() &&
+        !keyPassword.isNullOrBlank()
+
     signingConfigs {
-        if (!keystorePath.isNullOrBlank() && !keystorePassword.isNullOrBlank() &&
-            !keyAlias.isNullOrBlank() && !keyPassword.isNullOrBlank()) {
+        if (hasProductionSigning) {
             create("production") {
-                storeFile = file(keystorePath)
+                storeFile = file(keystorePath!!)
                 storePassword = keystorePassword
                 this.keyAlias = keyAlias
                 this.keyPassword = keyPassword
             }
         } else if (requireProductionSigning) {
             throw GradleException(
-                "Production signing is required but ATU_KEYSTORE_PATH, " +
-                    "ATU_KEYSTORE_PASSWORD, ATU_KEY_ALIAS and ATU_KEY_PASSWORD " +
-                    "were not supplied."
+                "Production signing is required but the production keystore " +
+                    "configuration was not supplied."
             )
         }
     }
 
     buildTypes {
         release {
-            if (!keystorePath.isNullOrBlank() && !keystorePassword.isNullOrBlank() &&
-                !keyAlias.isNullOrBlank() && !keyPassword.isNullOrBlank()) {
+            // Local release builds remain possible for development. Any
+            // production release job explicitly requires the protected signing key.
+            if (hasProductionSigning) {
                 signingConfig = signingConfigs.getByName("production")
             } else {
-                // Local/defense builds remain buildable. Production CI sets
-                // ATU_REQUIRE_PROD_SIGNING=true and therefore cannot use this fallback.
                 signingConfig = signingConfigs.getByName("debug")
             }
         }
