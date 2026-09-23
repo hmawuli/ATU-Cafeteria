@@ -8,41 +8,43 @@ use Symfony\Component\HttpFoundation\Response;
 
 class SecureHeadersMiddleware
 {
-    /**
-     * Handle an incoming request.
-     *
-     * @param  Closure(Request): (Response)  $next
-     */
     public function handle(Request $request, Closure $next): Response
     {
         $response = $next($request);
 
-        // Prevent Clickjacking (X-Frame-Options)
         $response->headers->set('X-Frame-Options', 'DENY');
-
-        // Prevent MIME Sniffing (X-Content-Type-Options)
         $response->headers->set('X-Content-Type-Options', 'nosniff');
+        $response->headers->set('Referrer-Policy', 'no-referrer');
+        $response->headers->set(
+            'Content-Security-Policy',
+            "default-src 'none'; frame-ancestors 'none'; form-action 'self'; base-uri 'none'"
+        );
+        $response->headers->set(
+            'Permissions-Policy',
+            'camera=(), microphone=(), geolocation=(), payment=(), usb=()'
+        );
+        $response->headers->set('Cross-Origin-Opener-Policy', 'same-origin');
+        $response->headers->set('Cross-Origin-Resource-Policy', 'same-origin');
 
-        // Enable XSS Protection (X-XSS-Protection)
-        $response->headers->set('X-XSS-Protection', '1; mode=block');
-
-        // Referrer Policy
-        $response->headers->set('Referrer-Policy', 'no-referrer-when-downgrade');
-
-        // Content Security Policy (CSP) for API - Secure-by-default, restrict source loading
-        $response->headers->set('Content-Security-Policy', "default-src 'none'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: https:; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://cdn.jsdelivr.net; connect-src 'self' https:; frame-ancestors 'none'; form-action 'self'; upgrade-insecure-requests");
-
-        // HTTP Strict Transport Security (HSTS) if connection is HTTPS or behind a reverse proxy
         if ($request->isSecure() || $request->header('X-Forwarded-Proto') === 'https') {
-            $response->headers->set('Strict-Transport-Security', 'max-age=31536000; includeSubDomains; preload');
+            $response->headers->set(
+                'Strict-Transport-Security',
+                'max-age=31536000; includeSubDomains; preload'
+            );
         }
 
-        // Permissions Policy (formerly Feature-Policy)
-        $response->headers->set('Permissions-Policy', 'geolocation=(), microphone=(), camera=(), interest-cohort=()');
+        // API responses should not be stored by shared/intermediary caches.
+        if ($request->is('api/*')) {
+            $response->headers->set(
+                'Cache-Control',
+                'no-store, no-cache, must-revalidate, max-age=0'
+            );
+            $response->headers->set('Pragma', 'no-cache');
+        }
 
-        // Prevent information disclosure of server software
         $response->headers->remove('X-Powered-By');
         $response->headers->remove('Server');
+        $response->headers->remove('X-XSS-Protection');
 
         return $response;
     }
