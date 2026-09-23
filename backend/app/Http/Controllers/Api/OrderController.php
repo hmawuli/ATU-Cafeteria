@@ -1146,36 +1146,63 @@ class OrderController extends Controller
 
         try {
             $order = DB::transaction(function () use ($request, $user, $securePin, $pointsToRedeem, $discount, $finalPrice, $menuItem) {
-                // Check and decrement stock
-                if ($menuItem->current_stock !== null) {
-                    $qty = intval($request->input('quantity'));
-                    if ($menuItem->current_stock < $qty) {
-                        throw new \Exception("Insufficient stock for {$menuItem->food_name}. Only {$menuItem->current_stock} items remaining.");
-                    }
-                    $menuItem->current_stock -= $qty;
-                    $menuItem->save();
+                $dbUser = User::whereKey($user->id)->lockForUpdate()->firstOrFail();
+                $lockedMenuItem = MenuItem::whereKey($menuItem->id)->lockForUpdate()->firstOrFail();
+                $qty = (int) $request->input('quantity');
+
+                if (! $lockedMenuItem->is_available) {
+                    throw new \RuntimeException('The selected menu item is no longer available.');
+                }
+                if ((int) $lockedMenuItem->vendor_id !== (int) $request->input('vendor_id')) {
+                    throw new \RuntimeException('The selected menu item is no longer assigned to that outlet.');
+                }
+                if ($lockedMenuItem->current_stock !== null && $lockedMenuItem->current_stock < $qty) {
+                    throw new \RuntimeException('The selected menu item is out of stock.');
+                }
+                if ((float) $dbUser->balance < $finalPrice) {
+                    throw new \RuntimeException('Insufficient wallet balance.');
                 }
 
-                // Deduct balance and loyalty points from user
-                $user->balance = $user->balance - $finalPrice;
+                $beforeBalance = round((float) $dbUser->balance, 2);
+
+                if ($lockedMenuItem->current_stock !== null) {
+                    $lockedMenuItem->current_stock -= $qty;
+                    $lockedMenuItem->is_available = $lockedMenuItem->current_stock > 0;
+                    $lockedMenuItem->save();
+                }
+
+                $dbUser->balance = round($beforeBalance - $finalPrice, 2);
                 if ($pointsToRedeem > 0) {
-                    $user->loyalty_points = ($user->loyalty_points ?? 0) - $pointsToRedeem;
+                    $dbUser->loyalty_points = ($dbUser->loyalty_points ?? 0) - $pointsToRedeem;
                 }
-                $user->save();
+                $dbUser->total_spent = round((float) ($dbUser->total_spent ?? 0) + $finalPrice, 2);
+                $dbUser->save();
 
-                // Create Order
+                $unitPrice = round((float) $lockedMenuItem->price, 2);
+                $orderNumber = 'CAF-'.now()->format('ymdHis').'-'.strtoupper(\Illuminate\Support\Str::random(5));
+
                 $createdOrder = Order::create([
-                    'customer_id' => $user->id,
-                    'student_id' => $user->id,
-                    'user_id' => $user->id,
-                    'vendor_id' => $request->input('vendor_id'),
+                    'order_number' => $orderNumber,
+                    'customer_id' => $dbUser->id,
+                    'student_id' => $dbUser->id,
+                    'user_id' => $dbUser->id,
+                    'vendor_id' => $lockedMenuItem->vendor_id,
                     'food_item_id' => $request->input('food_item_id'),
-                    'menu_item_id' => $request->input('menu_item_id'),
-                    'food_name' => $request->input('food_name'),
-                    'quantity' => $request->input('quantity'),
-                    'unit_price' => $request->input('unit_price'),
+                    'menu_item_id' => $lockedMenuItem->id,
+                    'food_name' => $lockedMenuItem->name ?: $lockedMenuItem->food_name,
+                    'quantity' => $qty,
+                    'unit_price' => $unitPrice,
+                    'subtotal' => round($unitPrice * $qty, 2),
+                    'discount_amount' => $discount,
                     'total_price' => $finalPrice,
+                    'grand_total' => $finalPrice,
+                    'currency' => 'GHS',
+                    'payment_method' => 'WALLET',
+                    'payment_status' => 'PAID',
+                    'order_type' => strtoupper((string) $request->input('order_type', 'TAKEAWAY')),
+                    'customer_note' => $request->input('customer_note'),
                     'order_timestamp' => time() * 1000,
+                    'placed_at' => now(),
                     'status' => 'PENDING',
                     'pickup_pin' => $securePin,
                     'estimated_pickup_time' => $request->input('estimated_pickup_time', 'Calculating...'),
@@ -1183,22 +1210,55 @@ class OrderController extends Controller
                     'discount_applied' => $discount,
                 ]);
 
-                // Create Wallet Transaction
+                $paymentReference = 'WAL-ORD-'.strtoupper(\Illuminate\Support\Str::random(14));
+                $payment = \App\Models\Payment::create([
+                    'order_id' => $createdOrder->id,
+                    'customer_id' => $dbUser->id,
+                    'reference' => $paymentReference,
+                    'gateway' => 'internal-wallet',
+                    'amount' => $finalPrice,
+                    'currency' => 'GHS',
+                    'purpose' => 'DIRECT_ORDER_PAY',
+                    'method' => 'WALLET',
+                    'status' => 'SUCCESS',
+                    'initiated_at' => now(),
+                    'paid_at' => now(),
+                ]);
+
                 WalletTransaction::create([
-                    'user_id' => $user->id,
+                    'user_id' => $dbUser->id,
+                    'order_id' => $createdOrder->id,
+                    'payment_id' => $payment->id,
                     'type' => 'PAYMENT',
                     'amount' => -$finalPrice,
                     'status' => 'SUCCESS',
-                    'reference' => 'TXN-ORD-'.uniqid().'-'.time(),
-                    'details' => "Paid for Pre-order #{$createdOrder->id} ('{$createdOrder->food_name}')".($discount > 0 ? ' with GHS '.number_format($discount, 2).' loyalty discount' : ''),
+                    'source' => 'ORDER',
+                    'performed_by' => $dbUser->id,
+                    'balance_before' => $beforeBalance,
+                    'balance_after' => $dbUser->balance,
+                    'reference' => $paymentReference,
+                    'details' => "Paid for order {$createdOrder->order_number}.".($discount > 0 ? ' Loyalty discount applied.' : ''),
                 ]);
 
-                // Register Audit Log
+                if ($request->input('food_item_id')) {
+                    \App\Models\OrderItem::create([
+                        'order_id' => $createdOrder->id,
+                        'food_item_id' => (int) $request->input('food_item_id'),
+                        'name' => $createdOrder->food_name,
+                        'name_snapshot' => $createdOrder->food_name,
+                        'quantity' => $qty,
+                        'unit_price' => $unitPrice,
+                        'total_price' => $finalPrice,
+                        'line_total' => $finalPrice,
+                        'discount_amount' => $discount,
+                    ]);
+                }
+
                 AuditLog::create([
-                    'user_id' => $user->id,
+                    'user_id' => $dbUser->id,
                     'timestamp' => time() * 1000,
                     'action' => 'ORDER_CREATED',
-                    'details' => "Pre-order #{$createdOrder->id} created securely for '{$createdOrder->food_name}' by Student {$user->fullName} with verification PIN: {$securePin}. Wallet debited: GHS {$finalPrice}.".($discount > 0 ? " Redeemed {$pointsToRedeem} loyalty points for GHS {$discount} discount." : ''),
+                    'details' => "Order {$createdOrder->order_number} created. Wallet payment recorded.",
                 ]);
 
                 return $createdOrder;
@@ -1226,7 +1286,6 @@ class OrderController extends Controller
             return response()->json([
                 'success' => false,
                 'message' => 'Failed to place order securely on server.',
-                'error' => $e->getMessage(),
             ], 500);
         }
     }
