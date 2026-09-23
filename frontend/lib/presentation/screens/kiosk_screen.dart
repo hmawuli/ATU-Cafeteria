@@ -49,8 +49,12 @@ class _KioskScreenState extends State<KioskScreen> {
   Widget build(BuildContext context) {
     final provider = context.watch<CafeteriaProvider>();
     final cart = context.watch<CartProvider>();
+    final sourceItems = provider.currentUser?.role == 'VENDOR' &&
+            provider.vendorFoodItems.isNotEmpty
+        ? provider.vendorFoodItems
+        : provider.allFoodItems;
     final available =
-        provider.allFoodItems.where((item) => item.isAvailable).toList();
+        sourceItems.where((item) => item.isAvailable).toList();
     final categories = [
       'All',
       ...available
