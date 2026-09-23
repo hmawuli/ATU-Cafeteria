@@ -27,8 +27,7 @@ Before deployment:
 - Paystack secret keys remain server-side
 - database backups are configured and restore-tested
 - authentication and authorization tests pass
-- release APKs use a protected production signing key
-- defense/offline mode is built only for explicitly labeled defense artifacts
+- release APKs and App Bundles use protected production signing credentials
 - dependency audits and automated tests pass
 
 Never commit `.env`, keystores, private keys, access tokens, payment secrets, or production database dumps.
