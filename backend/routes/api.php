@@ -152,7 +152,7 @@ Route::middleware(['auth:sanctum', InactivityTimeout::class])->group(function ()
     Route::middleware('role:VENDOR,ADMIN')->group(function () {
         Route::get('/vendor/orders', [OrderController::class, 'getVendorOrders']);
         Route::get('/vendor/orders/{id}', [OrderController::class, 'getVendorOrder']);
-        Route::patch('/vendor/orders/{id}/status', [OrderController::class, 'updateOrderStatus']);
+        Route::patch('/vendor/orders/{id}/status', [OrderController::class, 'updateStatus']);
         Route::post('/vendor/menu-items', [VendorMenuItemController::class, 'store']);
         Route::put('/vendor/menu-items/{id}', [VendorMenuItemController::class, 'update']);
         Route::delete('/vendor/menu-items/{id}', [VendorMenuItemController::class, 'destroy']);
