@@ -134,12 +134,84 @@ class PaystackPaymentController extends Controller
             }
         }
 
-        DB::transaction(function () use ($transaction, $user, $amountPaid, $purpose, $reference) {
-            $locked = WalletTransaction::whereKey($transaction->id)->lockForUpdate()->firstOrFail();
+        $this->completeWalletTransaction($transaction->id, $user->id, $amountPaid, $purpose, $reference);
+
+        return response()->json(['success' => true, 'message' => 'Paystack payment verified successfully.', 'reference' => $reference, 'amount' => $amountPaid, 'purpose' => $purpose]);
+    }
+
+    /**
+     * Paystack server-to-server webhook. This endpoint is deliberately outside
+     * Sanctum authentication: Paystack authenticates it with the HMAC signature.
+     * It only credits transactions that were initialized by this application.
+     */
+    public function webhook(Request $request)
+    {
+        $secret = $this->secretKey();
+        if ($secret === '' || $this->demoMode()) {
+            return response()->json(['success' => false, 'message' => 'Webhook processing is not configured.'], 503);
+        }
+
+        $signature = trim((string) $request->header('x-paystack-signature', ''));
+        $payload = $request->getContent();
+        $expectedSignature = hash_hmac('sha512', $payload, $secret);
+
+        if ($signature === '' || ! hash_equals($expectedSignature, $signature)) {
+            return response()->json(['success' => false, 'message' => 'Invalid webhook signature.'], 401);
+        }
+
+        $event = (string) $request->input('event', '');
+        if ($event !== 'charge.success') {
+            return response()->json(['success' => true, 'message' => 'Event acknowledged.']);
+        }
+
+        $reference = trim((string) $request->input('data.reference', ''));
+        if ($reference === '') {
+            return response()->json(['success' => false, 'message' => 'Webhook reference is missing.'], 422);
+        }
+
+        $transaction = WalletTransaction::where('reference', $reference)->first();
+        if (! $transaction) {
+            // A valid gateway event must never create an uninitialized wallet credit.
+            return response()->json(['success' => true, 'message' => 'Payment reference is not registered; no credit issued.']);
+        }
+
+        if ($transaction->status === 'SUCCESS') {
+            return response()->json(['success' => true, 'message' => 'Payment already processed.']);
+        }
+
+        if ($transaction->status !== 'PENDING') {
+            return response()->json(['success' => true, 'message' => 'Payment is not pending; no credit issued.']);
+        }
+
+        $gatewayStatus = (string) $request->input('data.status', '');
+        $gatewayAmount = ((int) $request->input('data.amount', 0)) / 100;
+        $expectedAmount = (float) $transaction->amount;
+        $gatewayUser = $request->input('data.metadata.user_id');
+
+        if ($gatewayStatus !== 'success' || $gatewayAmount <= 0 || abs($gatewayAmount - $expectedAmount) > 0.01) {
+            return response()->json(['success' => true, 'message' => 'Payment details did not pass validation; no credit issued.']);
+        }
+
+        if ($gatewayUser !== null && (int) $gatewayUser !== (int) $transaction->user_id) {
+            return response()->json(['success' => true, 'message' => 'Payment metadata did not match the registered user; no credit issued.']);
+        }
+
+        $purpose = str_contains((string) $transaction->details, 'DIRECT_ORDER_PAY') ? 'DIRECT_ORDER_PAY' : 'WALLET_TOPUP';
+        $this->completeWalletTransaction($transaction->id, (int) $transaction->user_id, $gatewayAmount, $purpose, $reference);
+
+        return response()->json(['success' => true, 'message' => 'Webhook processed successfully.']);
+    }
+
+    protected function completeWalletTransaction(int $transactionId, int $userId, float $amountPaid, string $purpose, string $reference): void
+    {
+        DB::transaction(function () use ($transactionId, $userId, $amountPaid, $purpose, $reference) {
+            $locked = WalletTransaction::whereKey($transactionId)->lockForUpdate()->firstOrFail();
             if ($locked->status === 'SUCCESS') return;
+            if ($locked->status !== 'PENDING') return;
+            if ((int) $locked->user_id !== $userId) throw new \RuntimeException('Payment ownership validation failed.');
 
             if ($purpose === 'WALLET_TOPUP') {
-                $dbUser = User::lockForUpdate()->findOrFail($user->id);
+                $dbUser = User::lockForUpdate()->findOrFail($userId);
                 $dbUser->balance = round((float) $dbUser->balance + $amountPaid, 2);
                 $dbUser->save();
             }
@@ -150,13 +222,11 @@ class PaystackPaymentController extends Controller
             $locked->save();
 
             AuditLog::create([
-                'user_id' => $user->id,
+                'user_id' => $userId,
                 'timestamp' => now()->getTimestampMs(),
                 'action' => $purpose === 'WALLET_TOPUP' ? 'PAYSTACK_WALLET_TOPUP' : 'PAYSTACK_DIRECT_PAY',
                 'details' => 'Verified GH₵ '.number_format($amountPaid, 2)." via Paystack. Ref: {$reference}.",
             ]);
         });
-
-        return response()->json(['success' => true, 'message' => 'Paystack payment verified successfully.', 'reference' => $reference, 'amount' => $amountPaid, 'purpose' => $purpose]);
     }
 }
