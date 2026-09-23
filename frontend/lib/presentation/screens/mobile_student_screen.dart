@@ -4,15 +4,15 @@ import 'package:atu_cafeteria/domain/models/models.dart';
 import 'package:atu_cafeteria/presentation/providers/cafeteria_provider.dart';
 import 'package:atu_cafeteria/presentation/providers/cart_provider.dart';
 
-/// Mobile-first student experience for the ATU Cafeteria application.
-class MobileStudentScreen extends StatefulWidget {
-  const MobileStudentScreen({super.key});
+/// Mobile-first customer experience for the ATU Cafeteria application.
+class MobilecustomerScreen extends StatefulWidget {
+  const MobilecustomerScreen({super.key});
 
   @override
-  State<MobileStudentScreen> createState() => _MobileStudentScreenState();
+  State<MobilecustomerScreen> createState() => _MobilecustomerScreenState();
 }
 
-class _MobileStudentScreenState extends State<MobileStudentScreen> {
+class _MobilecustomerScreenState extends State<MobilecustomerScreen> {
   static const navy = Color(0xFF073B82);
   static const blue = Color(0xFF0D55B5);
   static const yellow = Color(0xFFFFC400);
@@ -271,7 +271,7 @@ class _MobileStudentScreenState extends State<MobileStudentScreen> {
               color: yellow,
               shape: BoxShape.circle,
             ),
-            child: const Icon(Icons.school_rounded, color: navy, size: 34),
+            child: const Icon(Icons.restaurant_rounded, color: navy, size: 34),
           ),
         ],
       ),
@@ -722,7 +722,7 @@ class _MobileStudentScreenState extends State<MobileStudentScreen> {
                 const SizedBox(width: 10),
                 Expanded(
                   child: Text(
-                    'Wallet balance: GH₵ ${provider.studentWalletBalance.toStringAsFixed(2)}',
+                    'Wallet balance: GH₵ ${provider.customerWalletBalance.toStringAsFixed(2)}',
                     style: const TextStyle(color: navy, fontWeight: FontWeight.w800),
                   ),
                 ),
@@ -1019,7 +1019,7 @@ class _MobileStudentScreenState extends State<MobileStudentScreen> {
                   ),
                 ),
                 Text(
-                  'GH₵ ${provider.studentWalletBalance.toStringAsFixed(2)}',
+                  'GH₵ ${provider.customerWalletBalance.toStringAsFixed(2)}',
                   style: const TextStyle(
                     color: blue,
                     fontSize: 20,
@@ -1158,7 +1158,7 @@ class _MobileStudentScreenState extends State<MobileStudentScreen> {
                       final user = provider.currentUser;
                       final email = user?.email?.trim().isNotEmpty == true
                           ? user!.email!
-                          : '${user?.username ?? 'student'}@atu.edu.gh';
+                          : '${user?.username ?? 'customer'}@atu.edu.gh';
                       final payment = await provider.initializePaystackPayment(
                         amount: amount,
                         email: email,
