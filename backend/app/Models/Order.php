@@ -78,6 +78,30 @@ class Order extends Model
                 $builder->where('vendor_id', $user->id);
             }
         });
+
+        static::created(function (Order $order) {
+            OrderStatusHistory::create([
+                'order_id' => $order->id,
+                'from_status' => null,
+                'to_status' => strtoupper((string) $order->status),
+                'changed_by' => Auth::id(),
+                'reason' => 'Order created.',
+                'changed_at' => now(),
+            ]);
+        });
+
+        static::updated(function (Order $order) {
+            if (! $order->wasChanged('status')) return;
+
+            OrderStatusHistory::create([
+                'order_id' => $order->id,
+                'from_status' => strtoupper((string) $order->getOriginal('status')),
+                'to_status' => strtoupper((string) $order->status),
+                'changed_by' => Auth::id(),
+                'reason' => 'Order status changed.',
+                'changed_at' => now(),
+            ]);
+        });
     }
 
     /**
