@@ -1,6 +1,6 @@
 # ATU Cafeteria — Production Implementation
 
-This document records the production hardening now enforced in the repository and the deployment controls that must be supplied by the hosting environment.
+This document records the production hardening enforced in the repository and the deployment controls that must be supplied by the hosting environment.
 
 ## Implemented in source control
 
@@ -17,7 +17,6 @@ This document records the production hardening now enforced in the repository an
 - Paystack secret material remains server-side.
 - Payment verification is tied to the authenticated account, initialized transaction and verified gateway amount.
 - Wallet crediting is performed inside a database transaction with row locking and an already-successful guard.
-- The phone-only defense build remains an explicitly opt-in build-time mode and is not the normal application configuration.
 
 ## Required production environment controls
 
@@ -54,7 +53,7 @@ The production workflow reconstructs the keystore only for the build and deletes
 1. Run the backend test suite.
 2. Run Flutter analysis and tests.
 3. Run dependency audits.
-4. Build the signed Android artifact using the protected production workflow.
+4. Build the signed Android APK and App Bundle using the protected production workflow.
 5. Deploy Laravel with production environment variables.
 6. Run database migrations using the deployment process.
 7. Run the health endpoint and a small authenticated smoke test.
