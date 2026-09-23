@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'mobile_student_screen.dart';
+import 'customer_experience_screen.dart';
 
 /// Canonical customer-facing home for the restaurant application.
 /// The implementation lives in RestaurantCustomerHomeScreen to preserve the
