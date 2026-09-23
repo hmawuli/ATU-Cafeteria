@@ -51,12 +51,10 @@ class _LoginScreenState extends State<LoginScreen> {
         ? '/admin'
         : role == 'VENDOR'
             ? '/vendor'
-            : '/student';
+            : '/customer';
     Navigator.pushReplacementNamed(context, route);
   }
 
-  /// Lets the user point the app at a local (USB/Wi-Fi) or deployed backend
-  /// without rebuilding. The choice persists on the device.
   Future<void> _openServerSettings() async {
     final provider = context.read<CafeteriaProvider>();
     final controller = TextEditingController(
@@ -75,9 +73,8 @@ class _LoginScreenState extends State<LoginScreen> {
             children: [
               const Text(
                 'Address of the backend the app should talk to. Use the '
-                'default for USB, or the deployed URL (e.g. '
-                'https://your-app.up.railway.app) to run without your '
-                'computer.',
+                'default for local development, or a deployed HTTPS URL for '
+                'production.',
                 style: TextStyle(fontSize: 13),
               ),
               const SizedBox(height: 14),
@@ -87,7 +84,7 @@ class _LoginScreenState extends State<LoginScreen> {
                 autocorrect: false,
                 decoration: const InputDecoration(
                   labelText: 'Server base URL',
-                  hintText: 'https://your-app.up.railway.app',
+                  hintText: 'https://your-production-domain.example',
                   border: OutlineInputBorder(),
                   prefixIcon: Icon(Icons.dns_outlined),
                 ),
@@ -190,7 +187,7 @@ class _LoginScreenState extends State<LoginScreen> {
                           ),
                           const SizedBox(height: 3),
                           const Text(
-                            'SMART CAMPUS FOOD PLATFORM',
+                            'SMART FOOD ORDERING PLATFORM',
                             style: TextStyle(
                               color: Color(0xFF4F6783),
                               fontSize: 11,
@@ -200,7 +197,7 @@ class _LoginScreenState extends State<LoginScreen> {
                           ),
                           const SizedBox(height: 8),
                           const Text(
-                            'Secure access for students, vendors and administrators.',
+                            'Secure access for customers, vendors and administrators.',
                             textAlign: TextAlign.center,
                             style: TextStyle(
                               color: Color(0xFF65788D),
@@ -303,7 +300,7 @@ class _LoginScreenState extends State<LoginScreen> {
                               Icon(Icons.verified_user_outlined,
                                   size: 15, color: Color(0xFF20B95A)),
                               SizedBox(width: 6),
-                              Text('Secure ATU Cafeteria access',
+                              Text('Secure customer access',
                                   style: TextStyle(fontSize: 11)),
                             ],
                           ),
@@ -357,8 +354,7 @@ class _TwoFactorScreenState extends State<TwoFactorScreen> {
           ? '/admin'
           : role == 'VENDOR'
               ? '/vendor'
-              : '/student';
-      if (!mounted) return;
+              : '/customer';
       Navigator.pushReplacementNamed(context, route);
     } else {
       ScaffoldMessenger.of(context).showSnackBar(
