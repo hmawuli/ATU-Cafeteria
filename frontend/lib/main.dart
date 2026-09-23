@@ -22,6 +22,10 @@ import 'package:atu_cafeteria/presentation/screens/order_tracking_screen.dart';
 import 'package:atu_cafeteria/presentation/screens/group_order_screen.dart';
 import 'package:atu_cafeteria/presentation/screens/food_detail_screen.dart';
 import 'package:atu_cafeteria/presentation/screens/customer_home_screen.dart';
+import 'package:atu_cafeteria/presentation/screens/customer_account_screen.dart';
+import 'package:atu_cafeteria/presentation/screens/customer_addresses_screen.dart';
+import 'package:atu_cafeteria/presentation/screens/customer_devices_screen.dart';
+import 'package:atu_cafeteria/presentation/screens/customer_support_screen.dart';
 import 'package:atu_cafeteria/presentation/screens/reference_vendor_screen.dart';
 import 'package:atu_cafeteria/presentation/screens/reference_admin_screen.dart';
 import 'package:atu_cafeteria/presentation/screens/notifications_screen.dart';
@@ -61,6 +65,10 @@ class ATUCafeteriaApp extends StatelessWidget {
           '/login': (_) => const LoginScreen(),
           '/register': (_) => const RegisterScreen(),
           '/customer': (_) => const CustomerHomeScreen(),
+          '/customer-account': (_) => const CustomerAccountScreen(),
+          '/customer-addresses': (_) => const CustomerAddressesScreen(),
+          '/customer-devices': (_) => const CustomerDevicesScreen(),
+          '/customer-support': (_) => const CustomerSupportScreen(),
           // Kept as a compatibility route for existing deep links. New
           // customer-facing flows should use /customer.
           '/student': (_) => const CustomerHomeScreen(),
