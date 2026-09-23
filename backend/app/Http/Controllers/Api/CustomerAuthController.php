@@ -108,10 +108,16 @@ class CustomerAuthController extends Controller
 
         $credential = (string) $request->input('pin');
         $stored = (string) ($user->password ?? '');
+        $isBcrypt = str_starts_with($stored, '$2');
         $valid = $user && (
-            Hash::check($credential, $stored)
+            ($isBcrypt && Hash::check($credential, $stored))
             || hash_equals($stored, hash('sha256', $credential))
         );
+
+        if ($valid && ! $isBcrypt) {
+            $user->password = Hash::make($credential);
+            $user->saveQuietly();
+        }
 
         if (! $valid) {
             if ($user) {
