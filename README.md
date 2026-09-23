@@ -19,16 +19,16 @@ Production-oriented Flutter + Laravel implementation for Accra Technical Univers
 
 ```text
 ATU-Cafeteria/
-├── frontend/       # Flutter application — the only active UI
+├── frontend/       # Flutter application — active client
 ├── backend/        # Laravel REST API
-├── scripts/        # low-resource setup/utility scripts
-├── docs/           # architecture, deployment and defense material
+├── scripts/        # lightweight setup/utility scripts
+├── docs/           # architecture, deployment and operations documentation
 └── .vscode/        # lightweight editor settings
 ```
 
 ## Development philosophy
 
-The project is intentionally optimized for a machine with 4 GB RAM. Android Studio and an Android emulator are not required. VS Code, the Laravel server and a physical Android phone are the recommended development setup.
+The project is intentionally optimized for a machine with 4 GB RAM. Android Studio and an Android emulator are not required. VS Code, the Laravel server and a physical Android phone are recommended for low-resource development.
 
 The Laravel API is the production source of truth. Flutter SQLite is used for local resilience and offline reads.
 
@@ -48,26 +48,19 @@ Do not hard-code a deployment URL in source code. Supply it at runtime/build tim
 flutter run --dart-define=API_BASE_URL=https://your-api.example.com/api/
 ```
 
-### Running on a physical phone (no more changing the IP)
+### Running on a physical phone
 
 `127.0.0.1` inside the app means **the phone itself**, never your computer. Pick one mode:
 
 1. **USB (recommended, zero configuration)** — tunnel over the cable:
    ```bash
-   scripts/serve_backend.sh        # starts Laravel on 0.0.0.0:8001
-   scripts/connect_phone.sh        # adb reverse tcp:8001 tcp:8001
+   scripts/serve_backend.sh
+   scripts/connect_phone.sh
    flutter run
    ```
    The app's default `http://127.0.0.1:8001` then reaches your computer over USB.
-   Works regardless of Wi-Fi changes; re-run `connect_phone.sh` after unplugging.
 
-2. **Same Wi-Fi** — set the address once in `lib/core/config/app_config.dart`:
-   ```dart
-   static const String staticApiHost = '192.168.1.50'; // your `hostname -I` IP
-   ```
-   Start the backend with `scripts/serve_backend.sh` (binds `0.0.0.0` so the phone
-   can reach it). To make the laptop's IP truly fixed, pin it on your router
-   (DHCP reservation) or run: `sudo nmcli connection modify <wifi> ipv4.method manual ipv4.addresses 192.168.1.50/24 ipv4.gateway 192.168.1.1` and reconnect.
+2. **Same Wi-Fi** — set the address once in `lib/core/config/app_config.dart` and start the backend with `scripts/serve_backend.sh`.
 
 3. **Android emulator** — pass the emulator loopback alias at run time:
    ```bash
@@ -75,8 +68,7 @@ flutter run --dart-define=API_BASE_URL=https://your-api.example.com/api/
    ```
 
 Precedence: `--dart-define` → `staticApiHost` → `127.0.0.1:8001`.
-Android dev builds also need cleartext HTTP, enabled in
-`frontend/android/app/src/main/AndroidManifest.xml` (`usesCleartextTraffic`).
+Android development builds also need cleartext HTTP when using a local HTTP API.
 
 ## Quality gates
 
@@ -86,17 +78,20 @@ Before committing:
 cd backend && php artisan test
 cd backend && ./vendor/bin/pint --test
 cd frontend && flutter analyze
+cd frontend && flutter test
+cd frontend && flutter build apk --release
+cd frontend && flutter build appbundle --release
 ```
 
-See `docs/ARCHITECTURE.md` for the full architectural boundary.
+## Production standard
 
-
-## Production-standard architecture
 See `docs/PRODUCTION_STANDARD.md` for security, testing, deployment and architecture standards. The active application frontend is Flutter and the backend is Laravel 11 REST API with Sanctum.
+
+Production Android releases are built through GitHub Actions using protected signing credentials. The Android App Bundle (`.aab`) is the primary artifact for Google Play distribution; the signed APK is retained for direct distribution and verification.
 
 ## Smart Cafeteria Capabilities
 
-The platform now includes smart queue estimation, personalized food recommendations, vendor demand forecasting, food-waste analytics, QR collection passes, an administrative command center, security-alert review, real-time order events and audit-backed financial governance. See `docs/SMART_FEATURES.md` for the API contracts and design decisions.
+The platform includes smart queue estimation, personalized food recommendations, vendor demand forecasting, food-waste analytics, QR collection passes, an administrative command center, security-alert review, real-time order events and audit-backed financial governance. See `docs/SMART_FEATURES.md` for the API contracts and design decisions.
 
 ### Authentication security
 - Single API login endpoint with Laravel Sanctum
@@ -108,5 +103,8 @@ The platform now includes smart queue estimation, personalized food recommendati
 - Optional administrator 2FA with email verification codes
 - Existing sessions revoked after password reset
 
-### Authentication security
-The mobile client sends the credential over HTTPS to Laravel, where it is hashed and verified. Legacy SHA-256 client credentials are supported only for migration and are upgraded after successful login. Tokens are stored with Flutter Secure Storage. Admin 2FA, password reset, optional email verification, rate limiting, session expiry and security audit events are included.
+### Payment security
+- Paystack secret material remains server-side
+- Payment verification is performed by Laravel
+- Wallet crediting uses transactional safeguards and duplicate-success protection
+- Production environments keep payment demo mode disabled
