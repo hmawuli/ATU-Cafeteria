@@ -14,6 +14,7 @@ use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
 use Illuminate\Http\Middleware\HandleCors;
+use Illuminate\Support\Facades\Route;
 
 return Application::configure(basePath: dirname(__DIR__))
     ->withRouting(
@@ -22,16 +23,16 @@ return Application::configure(basePath: dirname(__DIR__))
         commands: __DIR__.'/../routes/console.php',
         health: '/up',
         then: function () {
-            require __DIR__.'/../routes/customer.php';
+            Route::middleware('api')
+                ->prefix('api')
+                ->group(base_path('routes/customer.php'));
         }
     )
     ->withMiddleware(function (Middleware $middleware) {
         $middleware->validateCsrfTokens(except: ['api/*']);
         $middleware->api(append: [
-            'throttle:api',
-            EnsureSecureTransport::class,
-            RequireAuthenticatedApiRoutes::class,
-            RequestIdMiddleware::class,
+            'throttle:api', EnsureSecureTransport::class,
+            RequireAuthenticatedApiRoutes::class, RequestIdMiddleware::class,
             IdempotencyMiddleware::class,
         ]);
         $middleware->alias([
@@ -46,5 +47,5 @@ return Application::configure(basePath: dirname(__DIR__))
         $middleware->append(AuditAndSanitizeOrderMiddleware::class);
     })
     ->withExceptions(function (Exceptions $exceptions) {
-        // Application exception configuration is intentionally centralized here.
+        //
     })->create();
