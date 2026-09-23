@@ -11,7 +11,6 @@ use App\Http\Controllers\Api\LoyaltyController;
 use App\Http\Controllers\Api\OrderController;
 use App\Http\Controllers\Api\StudentBudgetController;
 use App\Http\Controllers\Api\WalletController;
-use Illuminate\Http\Request;
 use App\Http\Middleware\InactivityTimeout;
 use Illuminate\Support\Facades\Route;
 
