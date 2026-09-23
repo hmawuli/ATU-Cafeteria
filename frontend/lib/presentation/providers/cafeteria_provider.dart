@@ -60,7 +60,10 @@ class CafeteriaProvider extends ChangeNotifier {
   /// mirrored onto [currentUser]. Every page reads this single value so a
   /// checkout, wallet top-up or admin adjustment is immediately reflected
   /// across the app instead of drifting from a hard-coded local figure.
-  double get studentWalletBalance => _currentUser?.balance ?? 0;
+  double get customerWalletBalance => _currentUser?.balance ?? 0;
+
+  /// Backward-compatible alias for legacy widgets during the domain migration.
+  double get studentWalletBalance => customerWalletBalance;
 
   String _vendorAnnouncement =
       "All meals prepared in alignment with Accra hygiene standards. Dine safe, study hard!";
@@ -394,7 +397,7 @@ class CafeteriaProvider extends ChangeNotifier {
       }
     }
 
-    // Every page reads `studentWalletBalance` from the authenticated user.
+    // Every page reads `customerWalletBalance` from the authenticated user.
     // Re-sync that user from the API so wallet changes made on the server
     // (checkouts, top-ups, admin adjustments) are visible on all pages.
     await _syncCurrentUserFromServer();
