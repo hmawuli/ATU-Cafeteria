@@ -13,13 +13,19 @@ class IdempotencyMiddleware
     private const TTL_SECONDS = 86400;
     private const KEY_MAX_LENGTH = 128;
 
-    public function handle(Request $request, Closure $next): Response
+    public function handle(Request $request, Closure $next, string $mode = 'optional'): Response
     {
         $idempotencyKey = trim((string) $request->header('Idempotency-Key'));
 
-        // The header is optional for backwards compatibility. Production
-        // clients should send it for financial/order mutations.
         if ($idempotencyKey === '') {
+            if ($mode === 'required') {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Idempotency-Key is required for this operation.',
+                    'error_code' => 'IDEMPOTENCY_KEY_REQUIRED',
+                ], 400);
+            }
+
             return $next($request);
         }
 
