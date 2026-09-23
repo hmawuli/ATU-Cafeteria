@@ -15,12 +15,17 @@ class PaystackPaymentController extends Controller
 {
     protected function secretKey(): string
     {
-        return trim((string) env('PAYSTACK_SECRET_KEY', ''));
+        return trim((string) config('services.paystack.secret', ''));
     }
 
     protected function demoMode(): bool
     {
-        return filter_var(env('PAYSTACK_DEMO_MODE', false), FILTER_VALIDATE_BOOL);
+        return (bool) config('services.paystack.demo_mode', false);
+    }
+
+    protected function baseUrl(): string
+    {
+        return rtrim((string) config('services.paystack.base_url', 'https://api.paystack.co'), '/');
     }
 
     public function initialize(Request $request)
@@ -69,7 +74,7 @@ class PaystackPaymentController extends Controller
         }
 
         try {
-            $response = Http::timeout(20)->withToken($secret)->acceptJson()->post('https://api.paystack.co/transaction/initialize', [
+            $response = Http::timeout(20)->withToken($secret)->acceptJson()->post($this->baseUrl().'/transaction/initialize', [
                 'email' => $email,
                 'amount' => (int) round($amount * 100),
                 'reference' => $reference,
@@ -116,7 +121,7 @@ class PaystackPaymentController extends Controller
         if (! $this->demoMode()) {
             if ($secret === '') return response()->json(['success' => false, 'message' => 'Paystack is not configured on this server.'], 503);
             try {
-                $response = Http::timeout(20)->withToken($secret)->acceptJson()->get("https://api.paystack.co/transaction/verify/{$reference}");
+                $response = Http::timeout(20)->withToken($secret)->acceptJson()->get($this->baseUrl().'/transaction/verify/'.rawurlencode($reference));
                 $data = $response->json('data');
                 if (! $response->successful() || data_get($response->json(), 'status') !== true || data_get($data, 'status') !== 'success') return response()->json(['success' => false, 'message' => 'Paystack has not confirmed this transaction as successful.'], 402);
                 $amountPaid = ((int) data_get($data, 'amount', 0)) / 100;
@@ -133,8 +138,6 @@ class PaystackPaymentController extends Controller
             $locked = WalletTransaction::whereKey($transaction->id)->lockForUpdate()->firstOrFail();
             if ($locked->status === 'SUCCESS') return;
 
-            // Only wallet deposits change the user's wallet balance. Direct
-            // order payments are recorded as successful gateway settlements.
             if ($purpose === 'WALLET_TOPUP') {
                 $dbUser = User::lockForUpdate()->findOrFail($user->id);
                 $dbUser->balance = round((float) $dbUser->balance + $amountPaid, 2);
