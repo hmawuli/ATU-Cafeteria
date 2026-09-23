@@ -11,68 +11,76 @@ use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Validator;
 
 /**
- * Restaurant-facing customer authentication.
+ * Customer-facing authentication for the restaurant application.
  *
- * The database continues to use the legacy STUDENT role for existing ATU
- * accounts so current orders, permissions and mobile clients remain compatible.
- * The public API deliberately exposes the account as a CUSTOMER domain concept.
+ * The database keeps the legacy STUDENT role for existing ATU accounts during
+ * the migration. The public API uses CUSTOMER terminology so the application
+ * is no longer coupled to an educational institution domain.
  */
 class CustomerAuthController extends Controller
 {
     public function register(Request $request)
     {
         $validator = Validator::make($request->all(), [
-            'name' => 'required|string|min:2|max:255',
+            'fullName' => 'required|string|min:2|max:255',
+            'username' => 'required|string|min:3|max:100|alpha_dash',
             'email' => 'required|email|max:255',
-            'password' => 'required|string|min:8|max:128',
-            'phone' => 'nullable|string|max:30',
+            'pin' => 'required|digits_between:4,6',
+            'pin_confirmation' => 'required|same:pin',
+            'info' => 'nullable|string|max:500',
         ]);
 
         if ($validator->fails()) {
             return response()->json([
                 'success' => false,
-                'message' => 'Please provide a valid customer name, email and password.',
+                'message' => 'Please correct the highlighted registration details.',
                 'errors' => $validator->errors(),
             ], 422);
         }
 
+        $username = trim((string) $request->input('username'));
         $email = strtolower(trim((string) $request->input('email')));
-        if (User::whereRaw('LOWER(username) = ?', [$email])->exists()) {
+
+        if (User::whereRaw('LOWER(username) = ?', [strtolower($username)])->exists()) {
             return response()->json([
                 'success' => false,
-                'message' => 'An account with this email address already exists.',
+                'message' => 'That username is already in use.',
             ], 409);
         }
 
-        $user = DB::transaction(function () use ($request, $email) {
-            $profile = [
-                'email' => $email,
-                'customer_type' => 'CUSTOMER',
-            ];
-            $phone = trim((string) $request->input('phone', ''));
-            if ($phone !== '') {
-                $profile['phone'] = $phone;
-            }
+        $emailExists = DB::connection()->getDriverName() === 'sqlite'
+            ? User::whereRaw("json_extract(profile_info, '$.email') = ?", [$email])->exists()
+            : User::whereRaw("JSON_UNQUOTE(JSON_EXTRACT(profile_info, '$.email')) = ?", [$email])->exists();
 
-            $user = User::create([
-                'username' => $email,
-                'password' => Hash::make((string) $request->input('password')),
-                // Keep the existing role for backwards-compatible order access.
+        if ($emailExists) {
+            return response()->json([
+                'success' => false,
+                'message' => 'An account with that email already exists.',
+            ], 409);
+        }
+
+        $user = DB::transaction(function () use ($request, $username, $email) {
+            $createdUser = User::create([
+                'username' => $username,
+                'password' => Hash::make((string) $request->input('pin')),
                 'role' => 'STUDENT',
-                'fullName' => trim((string) $request->input('name')),
-                'info' => '',
-                'profile_info' => $profile,
+                'fullName' => trim((string) $request->input('fullName')),
+                'info' => trim((string) $request->input('info', '')),
+                'profile_info' => [
+                    'email' => $email,
+                    'account_type' => 'CUSTOMER',
+                ],
                 'account_status' => 'ACTIVE',
             ]);
 
             AuditLog::create([
-                'user_id' => $user->id,
+                'user_id' => $createdUser->id,
                 'timestamp' => time() * 1000,
                 'action' => 'CUSTOMER_REGISTRATION',
-                'details' => 'Registered a restaurant customer account.',
+                'details' => "Registered customer {$createdUser->fullName}.",
             ]);
 
-            return $user;
+            return $createdUser;
         });
 
         return $this->sessionResponse($user, 201, 'Customer account created successfully.');
@@ -81,27 +89,36 @@ class CustomerAuthController extends Controller
     public function login(Request $request)
     {
         $validator = Validator::make($request->all(), [
-            'email' => 'required|email|max:255',
-            'password' => 'required|string|min:8|max:128',
+            'username' => 'required|string|max:255',
+            'pin' => 'required|string|min:4|max:128',
         ]);
 
         if ($validator->fails()) {
             return response()->json([
                 'success' => false,
-                'message' => 'Email and password are required.',
+                'message' => 'Username and PIN are required.',
                 'errors' => $validator->errors(),
             ], 422);
         }
 
-        $email = strtolower(trim((string) $request->input('email')));
-        $user = User::whereRaw('LOWER(username) = ?', [$email])
+        $username = trim((string) $request->input('username'));
+        $user = User::whereRaw('LOWER(username) = ?', [strtolower($username)])
             ->where('role', 'STUDENT')
             ->first();
 
-        if (! $user || ! Hash::check((string) $request->input('password'), (string) $user->password)) {
+        if (! $user || ! Hash::check((string) $request->input('pin'), (string) $user->password)) {
+            if ($user) {
+                AuditLog::create([
+                    'user_id' => $user->id,
+                    'timestamp' => time() * 1000,
+                    'action' => 'CUSTOMER_AUTH_FAILURE',
+                    'details' => 'Failed customer username/PIN login attempt.',
+                ]);
+            }
+
             return response()->json([
                 'success' => false,
-                'message' => 'Invalid email or password.',
+                'message' => 'Invalid username or PIN.',
             ], 401);
         }
 
@@ -138,7 +155,6 @@ class CustomerAuthController extends Controller
             'success' => true,
             'message' => $message,
             'customer' => $customer,
-            // Keep user for compatibility with existing clients.
             'user' => $customer,
             'token' => $token,
         ], $status)->header('X-Auth-Token', $token);
