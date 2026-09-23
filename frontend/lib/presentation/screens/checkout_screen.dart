@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:provider/provider.dart';
@@ -292,6 +293,9 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
         throw Exception('Payment gateway returned an incomplete response.');
       }
       final simulated = init['is_simulated'] == true;
+      if (simulated && !kDebugMode) {
+        throw Exception('Simulated payments are disabled in production.');
+      }
       if (!simulated) {
         final launched = await launchUrl(Uri.parse(authorizationUrl),
             mode: LaunchMode.externalApplication);
@@ -348,7 +352,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
             'Your login session has expired. Please sign in again.');
       }
 
-      final result = await _api.post('/student/cart-checkout', body: {
+      final result = await _api.post('/customer/cart-checkout', idempotencyKey: ApiClient.newIdempotencyKey(), body: {
         'items': cart.toCheckoutPayload(),
         'payment_method': 'momo',
         'payment_reference': reference,
@@ -358,7 +362,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                 ? _scheduledPickup!.toIso8601String()
                 : 'Calculating...',
         if (_noteController.text.trim().isNotEmpty)
-          'note': _noteController.text.trim(),
+          'customer_note': _noteController.text.trim(),
       });
       if (!context.mounted) return;
       final pageContext = context;
@@ -411,7 +415,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                                   ? orderId
                                   : int.tryParse(orderId.toString()));
                         } else {
-                          Navigator.pushReplacementNamed(context, '/student');
+                          Navigator.pushReplacementNamed(context, '/customer');
                         }
                       },
                       child: const Text('View order'))
@@ -489,7 +493,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
         (total - (points * 0.10)).clamp(0.0, double.infinity).toDouble();
     if (points > 0) {
       try {
-        await _api.post('/student/loyalty/preview-discount',
+        await _api.post('/customer/loyalty/preview-discount',
             body: {'points_to_redeem': points});
       } on ApiException catch (e) {
         if (context.mounted) {
@@ -568,7 +572,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                                   ? orderId
                                   : int.tryParse(orderId.toString()));
                         } else {
-                          Navigator.pushReplacementNamed(ctx, '/student');
+                          Navigator.pushReplacementNamed(ctx, '/customer');
                         }
                       },
                       child: const Text('View dashboard'))
