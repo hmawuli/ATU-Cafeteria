@@ -39,7 +39,7 @@ class ApiService {
   static Future<List<FoodItem>> getFoodItems() async {
     try {
       final response =
-          await http.get(Uri.parse('${baseUrl}food-items'), headers: _headers);
+          await http.get(Uri.parse('${baseUrl}catalog/food-items'), headers: _headers);
       if (response.statusCode == 200) {
         final List<dynamic> data = jsonDecode(response.body);
         return data.map((item) => FoodItem.fromJson(item)).toList();
