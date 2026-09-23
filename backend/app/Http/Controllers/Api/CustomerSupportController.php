@@ -31,6 +31,26 @@ class CustomerSupportController extends Controller
             return response()->json(['success' => false, 'message' => 'Invalid support request.', 'errors' => $validator->errors()], 422);
         }
 
+        $orderId = $request->input('order_id');
+        if ($orderId !== null) {
+            $ownsOrder = \App\Models\Order::query()
+                ->whereKey($orderId)
+                ->where(function ($query) use ($request) {
+                    $query->where('customer_id', $request->user()->id)
+                        ->orWhere('student_id', $request->user()->id)
+                        ->orWhere('user_id', $request->user()->id);
+                })
+                ->exists();
+
+            if (! $ownsOrder) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'The selected order does not belong to your account.',
+                    'error_code' => 'ORDER_NOT_OWNED',
+                ], 403);
+            }
+        }
+
         $ticket = SupportTicket::create([
             'customer_id' => $request->user()->id,
             'order_id' => $request->input('order_id'),
