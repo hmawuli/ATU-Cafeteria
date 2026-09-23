@@ -57,6 +57,11 @@ Route::post('/student/register', [StudentAuthController::class, 'register'])->mi
 Route::post('/student/login', [StudentAuthController::class, 'login'])->middleware('throttle:auth');
 Route::post('/vendor/login', [VendorAuthController::class, 'login'])->middleware('throttle:auth');
 
+// Public catalogue endpoints. Product availability is public information; customer
+// authentication is still required for cart, checkout and account operations.
+Route::get('/catalog/food-items', [FoodItemController::class, 'index']);
+Route::get('/catalog/menu-items', [MenuItemController::class, 'index']);
+
 // Documentation and monitoring.
 Route::get('/docs', [SwaggerController::class, 'index']);
 Route::get('/docs/openapi.json', [SwaggerController::class, 'openapiJson']);
