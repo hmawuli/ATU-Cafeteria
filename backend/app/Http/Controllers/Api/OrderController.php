@@ -102,6 +102,10 @@
                     if (! $verifiedPayment || abs((float) $verifiedPayment->amount - $finalTotal) > 0.01) {
                         throw new \RuntimeException('The online payment could not be verified for this order total.');
                     }
+
+                    if (Order::withoutGlobalScopes()->where('payment_id', $verifiedPayment->id)->exists()) {
+                        throw new \RuntimeException('This payment has already been applied to an order.');
+                    }
                 } else {
                     if ((float) $lockedUser->balance < $finalTotal) {
                         throw new \RuntimeException(
@@ -127,25 +131,6 @@
                     ]);
                 } else {
                     $checkoutPayment = $verifiedPayment;
-                }
-
-                if ($paymentMethod !== 'WALLET') {
-                    if ($paymentReference === '') {
-                        throw new \RuntimeException('A verified online payment reference is required.');
-                    }
-                    $verifiedPayment = AuditLog::where('user_id', $lockedUser->id)
-                        ->where('action', 'PAYSTACK_DIRECT_PAY')
-                        ->where('details', 'like', '%'.$paymentReference.'%')
-                        ->where('details', 'like', 'Cleared GH₵ '.number_format($finalTotal, 2).'%')
-                        ->exists();
-                    if (! $verifiedPayment) {
-                        throw new \RuntimeException('The online payment could not be verified for this order total.');
-                    }
-                } elseif ((float) $lockedUser->balance < $finalTotal) {
-                    throw new \RuntimeException(
-                        'Insufficient wallet balance. You need GH₵ '.number_format($finalTotal, 2).
-                        ', but your balance is GH₵'.number_format((float) $lockedUser->balance, 2).'.'
-                    );
                 }
 
                 $pin = (string) random_int(1000, 9999);
