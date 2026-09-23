@@ -5,14 +5,14 @@ import 'package:atu_cafeteria/presentation/providers/cafeteria_provider.dart';
 import 'package:atu_cafeteria/presentation/providers/cart_provider.dart';
 
 /// Mobile-first customer experience for the ATU Cafeteria application.
-class MobilecustomerScreen extends StatefulWidget {
-  const MobilecustomerScreen({super.key});
+class RestaurantCustomerHomeScreen extends StatefulWidget {
+  const RestaurantCustomerHomeScreen({super.key});
 
   @override
-  State<MobilecustomerScreen> createState() => _MobilecustomerScreenState();
+  State<RestaurantCustomerHomeScreen> createState() => _RestaurantCustomerHomeScreenState();
 }
 
-class _MobilecustomerScreenState extends State<MobilecustomerScreen> {
+class _RestaurantCustomerHomeScreenState extends State<RestaurantCustomerHomeScreen> {
   static const navy = Color(0xFF073B82);
   static const blue = Color(0xFF0D55B5);
   static const yellow = Color(0xFFFFC400);
