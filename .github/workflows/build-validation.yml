@@ -1,0 +1,78 @@
+name: ATU Cafeteria Build Validation
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  flutter-build-validation:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+          cache: gradle
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.35.4'
+          channel: stable
+          cache: true
+
+      - name: Verify toolchain
+        run: |
+          java -version
+          flutter --version
+
+      - name: Install dependencies
+        run: flutter pub get
+
+      - name: Analyze
+        run: flutter analyze
+
+      - name: Test
+        run: flutter test
+
+      - name: Build defense APK
+        run: flutter build apk --release --dart-define=ATU_DEFENSE_MODE=true
+
+      - name: Verify defense APK
+        run: |
+          test -s build/app/outputs/flutter-apk/app-release.apk
+          mv build/app/outputs/flutter-apk/app-release.apk build/app/outputs/flutter-apk/atu-cafeteria-defense.apk
+
+      - name: Build production Flutter APK (unsigned validation)
+        env:
+          ATU_REQUIRE_PROD_SIGNING: "false"
+        run: flutter build apk --release
+
+      - name: Verify production Flutter APK
+        run: |
+          test -s build/app/outputs/flutter-apk/app-release.apk
+          ls -lh build/app/outputs/flutter-apk/atu-cafeteria-defense.apk
+          ls -lh build/app/outputs/flutter-apk/app-release.apk
+
+      - name: Upload validated APKs
+        uses: actions/upload-artifact@v4
+        with:
+          name: atu-cafeteria-build-validation
+          path: |
+            frontend/build/app/outputs/flutter-apk/atu-cafeteria-defense.apk
+            frontend/build/app/outputs/flutter-apk/app-release.apk
+          if-no-files-found: error
+          retention-days: 14
