@@ -177,6 +177,58 @@ class PaystackPaymentController extends Controller
         }
 
         $event = (string) $request->input('event', '');
+        if (str_starts_with($event, 'refund.')) {
+            $transactionReference = trim((string) $request->input('data.transaction_reference', ''));
+            $refundStatus = strtolower((string) $request->input('data.status', ''));
+            if ($transactionReference === '') {
+                return response()->json(['success' => false, 'message' => 'Refund transaction reference is missing.'], 422);
+            }
+
+            $payment = Payment::where('reference', $transactionReference)->lockForUpdate()->first();
+            if (! $payment) {
+                return response()->json(['success' => true, 'message' => 'Refund payment reference is not registered.']);
+            }
+
+            $refund = \App\Models\Refund::where('payment_id', $payment->id)
+                ->whereIn('status', ['PENDING', 'PROCESSING'])
+                ->latest()
+                ->lockForUpdate()
+                ->first();
+
+            if (! $refund) {
+                return response()->json(['success' => true, 'message' => 'Refund already reconciled or not registered.']);
+            }
+
+            $refund->gateway_reference = (string) ($request->input('data.refund_reference') ?: $refund->gateway_reference);
+            $refund->status = match ($refundStatus) {
+                'processing' => 'PROCESSING',
+                'processed' => 'SUCCESS',
+                'failed' => 'FAILED',
+                default => 'PENDING',
+            };
+            if ($refund->status === 'SUCCESS') {
+                $refund->processed_at = now();
+                $payment->status = 'REFUNDED';
+                $payment->refunded_at = now();
+            } elseif ($refund->status === 'FAILED') {
+                $payment->status = 'SUCCESS';
+            } else {
+                $payment->status = 'REFUND_PENDING';
+            }
+
+            $refund->save();
+            $payment->save();
+
+            AuditLog::create([
+                'user_id' => $refund->customer_id,
+                'timestamp' => now()->getTimestampMs(),
+                'action' => 'PAYSTACK_REFUND_RECONCILED',
+                'details' => "Paystack refund {$refund->status} reconciled for payment {$payment->reference}.",
+            ]);
+
+            return response()->json(['success' => true, 'message' => 'Refund webhook processed successfully.']);
+        }
+
         if ($event !== 'charge.success') {
             return response()->json(['success' => true, 'message' => 'Event acknowledged.']);
         }
@@ -242,6 +294,8 @@ class PaystackPaymentController extends Controller
             if ($payment) {
                 $payment->status = 'SUCCESS';
                 $payment->amount = $amountPaid;
+                $payment->gateway_transaction_id = (string) data_get($data ?? [], 'id', $payment->gateway_transaction_id);
+                $payment->gateway_response = $data ?? $payment->gateway_response;
                 $payment->paid_at = now();
                 $payment->save();
             }
