@@ -1,7 +1,1719 @@
-                    $validator->errors()->add(
-                        "items.{$index}",
-                        'Each cart item must reference a menu item or food item.'
-                    );
+<?php
+
+namespace App\Http\Controllers\Api;
+
+use App\Events\OrderStatusCompleted;
+use App\Events\OrderStatusReady;
+use App\Events\OrderStatusUpdatedBroadcast;
+use App\Http\Controllers\Controller;
+use App\Http\Requests\StoreOrderRequest;
+use App\Http\Resources\OrderResource;
+use App\Models\AuditLog;
+use App\Models\DeliveredOrderReview;
+use App\Models\FoodItem;
+use App\Models\MenuItem;
+use App\Models\Order;
+use App\Models\User;
+use App\Models\WalletTransaction;
+use App\Notifications\NewIncomingOrderNotification;
+use App\Notifications\OrderStatusChangedNotification;
+use App\Services\ReceiptPdfWriter;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Validator;
+use Illuminate\Support\Str;
+
+class OrderController extends Controller
+{
+    /**
+     * Display all orders (Admin overview).
+     */
+    public function index(Request $request)
+    {
+        $query = Order::with(['customer', 'vendor', 'foodItem', 'menuItem', 'feedback'])->orderBy('order_timestamp', 'desc');
+        $user = $request->user();
+        if (strtoupper((string) $user->role) === 'STUDENT') {
+            $query->where(fn ($q) => $q->where('customer_id', $user->id)->orWhere('student_id', $user->id)->orWhere('user_id', $user->id));
+        } elseif (strtoupper((string) $user->role) === 'VENDOR') {
+            $query->where('vendor_id', $user->id);
+        } elseif (strtoupper((string) $user->role) !== 'ADMIN') {
+            abort(403);
+        }
+        $orders = $query->get();
+
+        return response()->json(OrderResource::collection($orders)->resolve(), 200);
+    }
+
+    /**
+     * Display the specified order details and status.
+     */
+    public function show($id)
+    {
+        $order = Order::with(['customer', 'vendor', 'foodItem', 'menuItem', 'feedback'])->find($id);
+        if (! $order) {
+            return response()->json(['success' => false, 'message' => 'Order not found.'], 404);
+        }
+        $user = request()->user();
+        $role = strtoupper((string) $user->role);
+        $allowed = $role === 'ADMIN' || ($role === 'VENDOR' && (int) $order->vendor_id === (int) $user->id) || ($role === 'STUDENT' && in_array((int) $user->id, [(int) $order->customer_id, (int) $order->student_id, (int) $order->user_id], true));
+        abort_unless($allowed, 403, 'You are not authorized to view this order.');
+
+        return response()->json(new OrderResource($order), 200);
+    }
+
+    /**
+     * Generate and download the printable PDF receipt for a completed order.
+     */
+    public function downloadReceipt($id)
+    {
+        $order = Order::with(['customer', 'vendor', 'foodItem', 'menuItem'])->find($id);
+        if (! $order) {
+            return response()->json(['success' => false, 'message' => 'Order not found.'], 404);
+        }
+        $user = request()->user();
+        $role = strtoupper((string) $user->role);
+        $allowed = $role === 'ADMIN' || ($role === 'VENDOR' && (int) $order->vendor_id === (int) $user->id) || ($role === 'STUDENT' && in_array((int) $user->id, [(int) $order->customer_id, (int) $order->student_id, (int) $order->user_id], true));
+        abort_unless($allowed, 403, 'You are not authorized to access this receipt.');
+
+        $pdfWriter = new ReceiptPdfWriter;
+        $pdfContent = $pdfWriter->generate($order);
+
+        $fileName = "receipt-order-{$id}.pdf";
+
+        return response($pdfContent, 200, [
+            'Content-Type' => 'application/pdf',
+            'Content-Disposition' => 'attachment; filename="'.$fileName.'"',
+            'Content-Length' => strlen($pdfContent),
+            'Cache-Control' => 'private, max-age=0, must-revalidate',
+            'Pragma' => 'public',
+        ]);
+    }
+
+    /**
+     * Get orders placed by a specific student.
+     * Supports filtering by status or searching by food name/status.
+     */
+    public function getPurchasedVendors(Request $request)
+    {
+        $user = $request->user();
+
+        $orders = Order::where(function ($query) use ($user) {
+            $query->where('customer_id', $user->id)
+                ->orWhere('student_id', $user->id);
+        })->whereNotNull('vendor_id')->orderByDesc('order_timestamp')->get();
+
+        $vendorIds = $orders->pluck('vendor_id')->unique()->values();
+        $reviewedOrderIds = DeliveredOrderReview::where('student_id', $user->id)
+            ->whereIn('order_id', $orders->pluck('id'))
+            ->pluck('order_id')
+            ->all();
+
+        $vendors = User::whereIn('id', $vendorIds)->get()->keyBy('id');
+
+        $result = $vendorIds->map(function ($vendorId) use ($orders, $vendors, $reviewedOrderIds) {
+            $vendorOrders = $orders->where('vendor_id', $vendorId);
+            $latest = $vendorOrders->first();
+            $vendor = $vendors->get($vendorId);
+            $hasCompletedOrder = $vendorOrders->contains(function ($order) {
+                return in_array(strtoupper((string) ($order->status ?? $order->order_status)), ['DELIVERED', 'COMPLETED'], true);
+            });
+            $hasUnreviewedCompletedOrder = $vendorOrders->contains(function ($order) use ($reviewedOrderIds) {
+                $status = strtoupper((string) ($order->status ?? $order->order_status));
+
+                return in_array($status, ['DELIVERED', 'COMPLETED'], true)
+                    && ! in_array($order->id, $reviewedOrderIds, true);
+            });
+
+            return [
+                'vendor_id' => (int) $vendorId,
+                'name' => $vendor?->fullName ?: 'Campus Vendor',
+                'store_name' => $vendor?->info ?: 'Campus Food Vendor',
+                'order_count' => $vendorOrders->count(),
+                'latest_order_id' => $latest?->id,
+                'latest_status' => $latest?->status ?? $latest?->order_status ?? 'PENDING',
+                'has_reviewed' => $vendorOrders->contains(function ($order) use ($reviewedOrderIds) {
+                    return in_array($order->id, $reviewedOrderIds, true);
+                }),
+                'review_order_id' => $hasUnreviewedCompletedOrder
+                    ? $vendorOrders->first(function ($order) use ($reviewedOrderIds) {
+                        $status = strtoupper((string) ($order->status ?? $order->order_status));
+
+                        return in_array($status, ['DELIVERED', 'COMPLETED'], true)
+                            && ! in_array($order->id, $reviewedOrderIds, true);
+                    })?->id
+                    : null,
+                'can_review' => $hasCompletedOrder && $hasUnreviewedCompletedOrder,
+            ];
+        })->values();
+
+        return response()->json([
+            'success' => true,
+            'vendors' => $result,
+        ], 200);
+    }
+
+    public function getCustomerOrders(Request $request, $customerId)
+    {
+        $user = $request->user();
+        $role = strtoupper((string) $user->role);
+        if ($role === 'STUDENT' && (int) $user->id !== (int) $customerId) {
+            abort(403, 'You may only view your own orders.');
+        }
+        if (! in_array($role, ['STUDENT', 'ADMIN'], true)) {
+            abort(403, 'You are not authorized to view student orders.');
+        }
+        $ordersQuery = Order::where(function ($query) use ($customerId) {
+            $query->where('customer_id', $customerId)
+                ->orWhere('student_id', $customerId);
+        });
+
+        // 1. Filter by Status
+        $status = $request->input('status');
+        if ($status && $status !== '') {
+            $normalizedStatus = strtoupper(trim($status));
+            if ($normalizedStatus === 'READY FOR PICKUP' || $normalizedStatus === 'READY_FOR_PICKUP' || $normalizedStatus === 'READY') {
+                $normalizedStatus = 'READY';
+            } elseif ($normalizedStatus === 'CANCEL' || $normalizedStatus === 'CANCELED') {
+                $normalizedStatus = 'CANCELLED';
+            }
+            $ordersQuery->where('status', $normalizedStatus);
+        }
+
+        // 2. Search filtering (food name, ID, or status)
+        $search = $request->input('search');
+        if ($search && $search !== '') {
+            $ordersQuery->where(function ($query) use ($search) {
+                $query->where('food_name', 'like', '%'.$search.'%')
+                    ->orWhere('id', 'like', '%'.$search.'%')
+                    ->orWhere('status', 'like', '%'.$search.'%');
+            });
+        }
+
+        $orders = $ordersQuery->orderBy('order_timestamp', 'desc')->get();
+
+        return response()->json($orders, 200);
+    }
+
+    /**
+     * Get pre-orders received by a specific vendor.
+     * Supports filtering by status, date range (start_date, end_date), or student identifier/ID.
+     */
+    public function getVendorOrders(Request $request, $vendorId)
+    {
+        $user = $request->user();
+        $role = strtoupper((string) $user->role);
+        if ($role === 'VENDOR' && (int) $user->id !== (int) $vendorId) {
+            abort(403, 'You may only view your own vendor orders.');
+        }
+        if (! in_array($role, ['VENDOR', 'ADMIN'], true)) {
+            abort(403, 'You are not authorized to view vendor orders.');
+        }
+        $ordersQuery = Order::where('vendor_id', $vendorId);
+
+        // 1. Filter by Status
+        $status = $request->input('status');
+        if ($status && $status !== '') {
+            $normalizedStatus = strtoupper(trim($status));
+            if ($normalizedStatus === 'READY FOR PICKUP' || $normalizedStatus === 'READY_FOR_PICKUP' || $normalizedStatus === 'READY') {
+                $normalizedStatus = 'READY';
+            } elseif ($normalizedStatus === 'CANCEL' || $normalizedStatus === 'CANCELED') {
+                $normalizedStatus = 'CANCELLED';
+            }
+            $ordersQuery->where('status', $normalizedStatus);
+        }
+
+        // 2. Filter by Date Range (start_date, end_date)
+        $startDate = $request->input('start_date');
+        if ($startDate && $startDate !== '') {
+            if (is_numeric($startDate)) {
+                $startMs = (float) $startDate;
+                if ($startMs < 10000000000) {
+                    $startMs *= 1000;
+                }
+            } else {
+                $startMs = strtotime($startDate.' 00:00:00') * 1000;
+            }
+            if ($startMs) {
+                $ordersQuery->where('order_timestamp', '>=', $startMs);
+            }
+        }
+
+        $endDate = $request->input('end_date');
+        if ($endDate && $endDate !== '') {
+            if (is_numeric($endDate)) {
+                $endMs = (float) $endDate;
+                if ($endMs < 10000000001) {
+                    $endMs *= 1000;
+                }
+            } else {
+                $endMs = strtotime($endDate.' 23:59:59') * 1000;
+            }
+            if ($endMs) {
+                $ordersQuery->where('order_timestamp', '<=', $endMs);
+            }
+        }
+
+        // 3. Filter by Student Identifier (ID, name, username, info)
+        $studentIdentifier = $request->input('student_identifier') ?: $request->input('student') ?: $request->input('search') ?: $request->input('student_id');
+        if ($studentIdentifier && $studentIdentifier !== '') {
+            $ordersQuery->where(function ($query) use ($studentIdentifier) {
+                if (is_numeric($studentIdentifier)) {
+                    $query->where('customer_id', $studentIdentifier);
+                } else {
+                    $query->whereHas('customer', function ($q) use ($studentIdentifier) {
+                        $q->where('fullName', 'like', '%'.$studentIdentifier.'%')
+                            ->orWhere('username', 'like', '%'.$studentIdentifier.'%')
+                            ->orWhere('info', 'like', '%'.$studentIdentifier.'%');
+                    });
+                }
+            });
+        }
+
+        $orders = $ordersQuery->orderBy('order_timestamp', 'desc')->get();
+
+        return response()->json($orders, 200);
+    }
+
+    /**
+     * Place a new pre-order order.
+     */
+    public function store(StoreOrderRequest $request)
+    {
+        // Fetch menu item to validate availability, ownership, and calculate total price
+        $menuItem = MenuItem::find($request->input('menu_item_id'));
+        if (! $menuItem) {
+            return response()->json([
+                'success' => false,
+                'message' => 'The selected menu item does not exist.',
+            ], 404);
+        }
+
+        if (! $menuItem->is_available) {
+            return response()->json([
+                'success' => false,
+                'message' => 'The selected menu item is currently unavailable.',
+            ], 400);
+        }
+
+        // Validate menu item owner matches vendor_id
+        if ($menuItem->vendor_id != $request->input('vendor_id')) {
+            return response()->json([
+                'success' => false,
+                'message' => 'The selected menu item does not belong to the specified vendor.',
+            ], 400);
+        }
+
+        // Calculate and validate order totals
+        $quantity = intval($request->input('quantity'));
+        $expectedUnitPrice = round($menuItem->price, 2);
+        $expectedTotalPrice = round($expectedUnitPrice * $quantity, 2);
+
+        $unitPriceInput = round($request->input('unit_price'), 2);
+        $totalPriceInput = round($request->input('total_price'), 2);
+
+        if (abs($expectedUnitPrice - $unitPriceInput) > 0.01) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Validation error: unit_price does not match the actual menu item price.',
+                'expected' => $expectedUnitPrice,
+                'received' => $unitPriceInput,
+            ], 400);
+        }
+
+        if (abs($expectedTotalPrice - $totalPriceInput) > 0.01) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Validation error: total_price is incorrect based on menu item price and quantity.',
+                'expected' => $expectedTotalPrice,
+                'received' => $totalPriceInput,
+            ], 400);
+        }
+
+        // Generate a secure, randomized 4-digit pickup PIN code
+        $securePin = (string) random_int(1000, 9999);
+
+        $order = DB::transaction(function () use ($request, $securePin, $menuItem) {
+            if ($menuItem->current_stock !== null) {
+                $qty = intval($request->input('quantity'));
+                if ($menuItem->current_stock < $qty) {
+                    throw new \Exception("Insufficient stock for {$menuItem->food_name}. Only {$menuItem->current_stock} items remaining.");
+                }
+                $menuItem->current_stock -= $qty;
+                $menuItem->save();
+            }
+
+            $createdOrder = Order::create([
+                'customer_id' => $request->input('customer_id'),
+                'student_id' => $request->input('student_id'),
+                'user_id' => $request->input('customer_id'),
+                'vendor_id' => $request->input('vendor_id'),
+                'food_item_id' => $request->input('food_item_id'),
+                'menu_item_id' => $request->input('menu_item_id'),
+                'food_name' => $request->input('food_name'),
+                'quantity' => $request->input('quantity'),
+                'unit_price' => $request->input('unit_price'),
+                'total_price' => $request->input('total_price'),
+                'order_timestamp' => time() * 1000,
+                'status' => 'ORDER_PLACED',
+                'pickup_pin' => $securePin,
+                'estimated_pickup_time' => $request->input('estimated_pickup_time', 'Calculating...'),
+            ]);
+
+            // Register Audit Log
+            AuditLog::create([
+                'user_id' => $createdOrder->customer_id,
+                'timestamp' => time() * 1000,
+                'action' => 'ORDER_CREATED',
+                'details' => "Pre-order #{$createdOrder->id} created for '{$createdOrder->food_name}' (QTY: {$createdOrder->quantity}). Pickup credential issued securely.",
+            ]);
+
+            return $createdOrder;
+        });
+
+        // Notify the vendor of the new incoming pre-order
+        if ($order->vendor_id) {
+            $vendor = User::find($order->vendor_id);
+            if ($vendor) {
+                try {
+                    $vendor->notify(new NewIncomingOrderNotification($order));
+                } catch (\Exception $e) {
+                    \Illuminate\Support\Facades\Log::error("Failed to notify vendor {$order->vendor_id} of new order #{$order->id}: ".$e->getMessage());
+                }
+            }
+        }
+
+        return response()->json($order, 201);
+    }
+
+    /**
+     * Patch route to allow vendors to update order status (e.g., 'preparing', 'ready', 'delivered') with validation.
+     */
+    public function patchStatus(Request $request, $id)
+    {
+        $order = Order::find($id);
+        if (! $order) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Order not found.',
+            ], 404);
+        }
+
+        $user = $request->user();
+        if (! $user) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Unauthenticated.',
+            ], 401);
+        }
+
+        $role = strtoupper($user->role);
+        if ($role !== 'VENDOR' && $role !== 'ADMIN') {
+            return response()->json([
+                'success' => false,
+                'message' => 'Unauthorized. Only vendors and administrators can perform this action.',
+            ], 403);
+        }
+
+        if ($role === 'VENDOR' && $order->vendor_id !== $user->id) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Unauthorized. You do not own this order.',
+            ], 403);
+        }
+
+        $validator = Validator::make($request->all(), [
+            'status' => 'required|string|max:50',
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Validation failed.',
+                'errors' => $validator->errors(),
+            ], 400);
+        }
+
+        $statusInput = strtoupper(trim($request->input('status')));
+
+        // Map user/vendor friendly values to DB enum
+        if ($statusInput === 'PREPARING') {
+            $normalizedStatus = 'PREPARING';
+        } elseif ($statusInput === 'READY' || $statusInput === 'READY_FOR_PICKUP' || $statusInput === 'READY FOR PICKUP') {
+            $normalizedStatus = 'READY';
+        } elseif ($statusInput === 'DELIVERED') {
+            $normalizedStatus = 'DELIVERED';
+        } elseif ($statusInput === 'OUT_FOR_DELIVERY' || $statusInput === 'OUT FOR DELIVERY') {
+            $normalizedStatus = 'OUT_FOR_DELIVERY';
+        } elseif ($statusInput === 'COMPLETED') {
+            $normalizedStatus = 'COMPLETED';
+        } elseif ($statusInput === 'CANCELLED' || $statusInput === 'CANCEL' || $statusInput === 'CANCELED') {
+            $normalizedStatus = 'CANCELLED';
+        } elseif ($statusInput === 'DECLINED') {
+            $normalizedStatus = 'DECLINED';
+        } elseif ($statusInput === 'PENDING' || $statusInput === 'ORDER_PLACED' || $statusInput === 'ORDER PLACED') {
+            $normalizedStatus = 'ORDER_PLACED';
+        } else {
+            return response()->json([
+                'success' => false,
+                'message' => 'Invalid order status. Allowed values: preparing, ready, delivered, out_for_delivery, completed, cancelled, declined, pending.',
+            ], 400);
+        }
+
+        $oldStatus = strtoupper((string) $order->status);
+        $allowedTransitions = [
+            'PENDING' => ['ORDER_PLACED', 'PREPARING', 'DECLINED', 'CANCELLED'],
+            'ORDER_PLACED' => ['PREPARING', 'DECLINED', 'CANCELLED'],
+            'PREPARING' => ['READY', 'CANCELLED'],
+            'READY' => ['OUT_FOR_DELIVERY', 'COMPLETED'],
+            'OUT_FOR_DELIVERY' => ['COMPLETED'],
+            'DELIVERED' => ['COMPLETED'],
+            'COMPLETED' => [],
+            'DECLINED' => [],
+            'CANCELLED' => [],
+        ];
+        if ($role !== 'ADMIN' && ! in_array($normalizedStatus, $allowedTransitions[$oldStatus] ?? [], true)) {
+            return response()->json([
+                'success' => false,
+                'message' => "Invalid order transition from {$oldStatus} to {$normalizedStatus}.",
+            ], 409);
+        }
+        $updatedOrder = DB::transaction(function () use ($order, $user, $normalizedStatus, $oldStatus) {
+            $order->status = $normalizedStatus;
+            $order->order_status = $normalizedStatus;
+            $timestampColumns = [
+                'ORDER_PLACED' => null, 'PENDING' => null, 'PREPARING' => 'preparing_at',
+                'READY' => 'ready_at', 'COMPLETED' => 'collected_at',
+            ];
+            if (isset($timestampColumns[$normalizedStatus]) && $timestampColumns[$normalizedStatus]) {
+                $order->{$timestampColumns[$normalizedStatus]} = now();
+            }
+            if ($normalizedStatus === 'PREPARING' && ! $order->accepted_at) {
+                $order->accepted_at = now();
+            }
+            $order->save();
+
+            // Register Audit Log
+            AuditLog::create([
+                'user_id' => $user->id,
+                'timestamp' => time() * 1000,
+                'action' => 'ORDER_STATUS_PATCHED',
+                'details' => "Order #{$order->id} status patched from '{$oldStatus}' to '{$normalizedStatus}' by Vendor/Admin {$user->fullName}.",
+            ]);
+
+            return $order;
+        });
+
+        // Notify the student user of the status change
+        $studentId = $updatedOrder->customer_id ?? $updatedOrder->student_id;
+        if ($studentId) {
+            $student = User::find($studentId);
+            if ($student) {
+                try {
+                    $student->notify(new OrderStatusChangedNotification($updatedOrder, $oldStatus, $normalizedStatus));
+                    event(new OrderStatusUpdatedBroadcast($updatedOrder, $oldStatus, $normalizedStatus));
+                } catch (\Exception $e) {
+                    \Illuminate\Support\Facades\Log::error("Failed to notify student {$studentId} of order status patched to {$normalizedStatus}: ".$e->getMessage());
+                }
+            }
+        }
+
+        if ($normalizedStatus === 'COMPLETED') {
+            event(new OrderStatusCompleted($updatedOrder));
+        }
+
+        // Never expose the pickup PIN to vendors; it is the student's secret.
+        if ($role === 'VENDOR') {
+            $updatedOrder->makeHidden('pickup_pin');
+        }
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Order status updated successfully.',
+            'order' => $updatedOrder,
+        ], 200);
+    }
+
+    /**
+     * Advancing order statuses (e.g. PENDING -> PREPARING -> READY -> DECLINED -> CANCELLED).
+     * Secured with Sanctum and supports both strict enums and user-friendly labels.
+     */
+    public function updateStatus(Request $request, $id)
+    {
+        $order = Order::find($id);
+        if (! $order) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Pre-order ticket not found.',
+            ], 404);
+        }
+
+        // Authenticated vendor/admin security check
+        $user = $request->user();
+        if (! $user) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Unauthenticated.',
+            ], 401);
+        }
+
+        $role = strtoupper($user->role);
+        if ($role !== 'VENDOR' && $role !== 'ADMIN' && $role !== 'STUDENT') {
+            return response()->json([
+                'success' => false,
+                'message' => 'Unauthorized. This resource requires STUDENT, VENDOR or ADMIN privileges.',
+            ], 403);
+        }
+
+        if ($role === 'VENDOR' && $order->vendor_id !== $user->id) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Unauthorized. You do not own this order.',
+            ], 403);
+        }
+
+        if ($role === 'STUDENT' && $order->customer_id !== $user->id) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Unauthorized. You do not own this order.',
+            ], 403);
+        }
+
+        // Preprocess user-friendly labels to strict database statuses
+        $statusInput = $request->input('status');
+        if ($statusInput) {
+            $normalized = strtoupper(trim($statusInput));
+            if ($normalized === 'READY FOR PICKUP' || $normalized === 'READY_FOR_PICKUP' || $normalized === 'READY') {
+                $statusInput = 'READY';
+            } elseif ($normalized === 'PREPARING') {
+                $statusInput = 'PREPARING';
+            } elseif ($normalized === 'PENDING' || $normalized === 'ORDER PLACED' || $normalized === 'ORDER_PLACED') {
+                $statusInput = 'ORDER_PLACED';
+            } elseif ($normalized === 'OUT FOR DELIVERY' || $normalized === 'OUT_FOR_DELIVERY') {
+                $statusInput = 'OUT_FOR_DELIVERY';
+            } elseif ($normalized === 'DELIVERED') {
+                $statusInput = 'DELIVERED';
+            } elseif ($normalized === 'COMPLETED') {
+                $statusInput = 'COMPLETED';
+            } elseif ($normalized === 'DECLINED') {
+                $statusInput = 'DECLINED';
+            } elseif ($normalized === 'CANCELLED' || $normalized === 'CANCEL' || $normalized === 'CANCELED') {
+                $statusInput = 'CANCELLED';
+            }
+            $request->merge(['status' => $statusInput]);
+        }
+
+        $validator = Validator::make($request->all(), [
+            'status' => 'required|string|in:PENDING,ORDER_PLACED,PREPARING,READY,OUT_FOR_DELIVERY,DELIVERED,COMPLETED,DECLINED,CANCELLED',
+            'estimated_pickup_time' => 'nullable|string',
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Valid status is required.',
+                'errors' => $validator->errors(),
+            ], 400);
+        }
+
+        // Student can only cancel PENDING/ORDER_PLACED orders
+        if ($role === 'STUDENT' && $request->input('status') !== 'CANCELLED') {
+            return response()->json([
+                'success' => false,
+                'message' => 'Unauthorized status transition. Students can only cancel orders.',
+            ], 403);
+        }
+
+        if ($role === 'STUDENT' && $order->status !== 'PENDING' && $order->status !== 'ORDER_PLACED' && $request->input('status') === 'CANCELLED') {
+            return response()->json([
+                'success' => false,
+                'message' => 'Completed or active orders cannot be cancelled.',
+            ], 400);
+        }
+
+        $vendorId = $order->vendor_id;
+        $oldStatus = $order->status;
+        $newStatus = $request->input('status');
+
+        // Enforce the order lifecycle on the server; clients cannot skip arbitrary states.
+        $allowedTransitions = [
+            'PENDING' => ['ORDER_PLACED', 'PREPARING', 'DECLINED', 'CANCELLED'],
+            'ORDER_PLACED' => ['PREPARING', 'DECLINED', 'CANCELLED'],
+            'PREPARING' => ['READY', 'CANCELLED'],
+            'READY' => ['OUT_FOR_DELIVERY', 'COMPLETED'],
+            'OUT_FOR_DELIVERY' => ['COMPLETED'],
+            'DELIVERED' => ['COMPLETED'],
+            'COMPLETED' => [],
+            'DECLINED' => [],
+            'CANCELLED' => [],
+        ];
+        if ($role !== 'ADMIN' && ! in_array($newStatus, $allowedTransitions[$oldStatus] ?? [], true)) {
+            return response()->json([
+                'success' => false,
+                'message' => "Invalid order transition from {$oldStatus} to {$newStatus}.",
+            ], 409);
+        }
+
+        $updatedOrder = DB::transaction(function () use ($order, $request, $oldStatus, $newStatus) {
+            $order->status = $newStatus;
+            $order->order_status = $newStatus;
+            if ($newStatus === 'PREPARING') {
+                $order->preparing_at = now();
+                if (! $order->accepted_at) {
+                    $order->accepted_at = now();
+                }
+            } elseif ($newStatus === 'READY') {
+                $order->ready_at = now();
+            } elseif ($newStatus === 'COMPLETED') {
+                $order->collected_at = now();
+            }
+            if ($request->has('estimated_pickup_time')) {
+                $order->estimated_pickup_time = $request->input('estimated_pickup_time');
+            }
+            $order->save();
+
+            // Register Audit Log
+            AuditLog::create([
+                'user_id' => $request->user()->id,
+                'timestamp' => time() * 1000,
+                'action' => 'ORDER_STATUS_CHANGED',
+                'details' => "Order #{$order->id} status moved from '{$oldStatus}' to '{$newStatus}' by {$request->user()->fullName} (ETA: {$order->estimated_pickup_time}).",
+            ]);
+
+            return $order;
+        });
+
+        // Notify the student user of the status change (e.g. preparation, readiness)
+        $studentId = $updatedOrder->customer_id ?? $updatedOrder->student_id;
+        if ($studentId) {
+            $student = User::find($studentId);
+            if ($student) {
+                try {
+                    $student->notify(new OrderStatusChangedNotification($updatedOrder, $oldStatus, $newStatus));
+                    // Fire real-time broadcast event to students
+                    event(new OrderStatusUpdatedBroadcast($updatedOrder, $oldStatus, $newStatus));
+                } catch (\Exception $e) {
+                    \Illuminate\Support\Facades\Log::error("Failed to notify student {$studentId} of order status updated to {$newStatus}: ".$e->getMessage());
+                }
+            }
+        }
+
+        if (strtoupper($newStatus) === 'COMPLETED') {
+            event(new OrderStatusCompleted($updatedOrder));
+        }
+
+        if ((strtoupper($oldStatus) === 'PENDING' || strtoupper($oldStatus) === 'ORDER_PLACED') && strtoupper($newStatus) === 'READY') {
+            event(new OrderStatusReady($updatedOrder));
+        }
+
+        // The pickup PIN is the student's secret; vendors must verify it with the
+        // student at the counter rather than reading it from the API response.
+        if ($role === 'VENDOR') {
+            $updatedOrder->makeHidden('pickup_pin');
+        }
+
+        return response()->json($updatedOrder, 200);
+    }
+
+    /**
+     * Bulk update statuses for multiple selected orders.
+     * Secured with Sanctum and validated to ensure the authenticated vendor owns the selected orders.
+     */
+    public function bulkUpdateStatus(Request $request)
+    {
+        $user = $request->user();
+        if (! $user) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Unauthenticated.',
+            ], 401);
+        }
+
+        $role = strtoupper($user->role);
+        if ($role !== 'VENDOR' && $role !== 'ADMIN') {
+            return response()->json([
+                'success' => false,
+                'message' => 'Unauthorized. This resource requires VENDOR or ADMIN privileges.',
+            ], 403);
+        }
+
+        $statusInput = $request->input('status');
+        if ($statusInput) {
+            $normalized = strtoupper(trim($statusInput));
+            if ($normalized === 'READY FOR PICKUP' || $normalized === 'READY_FOR_PICKUP' || $normalized === 'READY') {
+                $statusInput = 'READY';
+            } elseif ($normalized === 'PREPARING') {
+                $statusInput = 'PREPARING';
+            } elseif ($normalized === 'PENDING' || $normalized === 'ORDER PLACED' || $normalized === 'ORDER_PLACED') {
+                $statusInput = 'ORDER_PLACED';
+            } elseif ($normalized === 'OUT FOR DELIVERY' || $normalized === 'OUT_FOR_DELIVERY') {
+                $statusInput = 'OUT_FOR_DELIVERY';
+            } elseif ($normalized === 'DELIVERED') {
+                $statusInput = 'DELIVERED';
+            } elseif ($normalized === 'COMPLETED') {
+                $statusInput = 'COMPLETED';
+            } elseif ($normalized === 'DECLINED') {
+                $statusInput = 'DECLINED';
+            } elseif ($normalized === 'CANCELLED' || $normalized === 'CANCEL' || $normalized === 'CANCELED') {
+                $statusInput = 'CANCELLED';
+            }
+            $request->merge(['status' => $statusInput]);
+        }
+
+        $validator = Validator::make($request->all(), [
+            'order_ids' => 'required|array',
+            'order_ids.*' => 'integer|exists:orders,id',
+            'status' => 'required|string|in:PENDING,ORDER_PLACED,PREPARING,READY,OUT_FOR_DELIVERY,DELIVERED,COMPLETED,DECLINED,CANCELLED',
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Valid status and order IDs are required.',
+                'errors' => $validator->errors(),
+            ], 400);
+        }
+
+        $orderIds = $request->input('order_ids');
+        $newStatus = $request->input('status');
+
+        $orders = Order::whereIn('id', $orderIds)->get();
+
+        // Security check: ensure vendor owns all selected orders
+        if ($role === 'VENDOR') {
+            foreach ($orders as $order) {
+                if ($order->vendor_id !== $user->id) {
+                    return response()->json([
+                        'success' => false,
+                        'message' => 'Unauthorized. One or more selected orders do not belong to you.',
+                    ], 403);
+                }
+            }
+        }
+
+        $updatedOrders = [];
+        DB::transaction(function () use ($orders, $request, $newStatus, &$updatedOrders) {
+            foreach ($orders as $order) {
+                $oldStatus = $order->status;
+                $order->status = $newStatus;
+                $order->order_status = $newStatus;
+                $order->save();
+
+                // Register Audit Log
+                AuditLog::create([
+                    'user_id' => $request->user()->id,
+                    'timestamp' => time() * 1000,
+                    'action' => 'ORDER_STATUS_CHANGED',
+                    'details' => "Order #{$order->id} status moved from '{$oldStatus}' to '{$newStatus}' via bulk update by {$request->user()->fullName}.",
+                ]);
+
+                $updatedOrders[] = $order;
+
+                // Notify student of status change
+                $studentId = $order->customer_id ?? $order->student_id;
+                if ($studentId) {
+                    $student = User::find($studentId);
+                    if ($student) {
+                        try {
+                            $student->notify(new OrderStatusChangedNotification($order, $oldStatus, $newStatus));
+                            event(new OrderStatusUpdatedBroadcast($order, $oldStatus, $newStatus));
+                        } catch (\Exception $e) {
+                            \Illuminate\Support\Facades\Log::error("Failed to notify student {$studentId} in bulk status change: ".$e->getMessage());
+                        }
+                    }
+                }
+
+                if (strtoupper($newStatus) === 'COMPLETED') {
+                    event(new OrderStatusCompleted($order));
+                }
+
+                if ((strtoupper($oldStatus) === 'PENDING' || strtoupper($oldStatus) === 'ORDER_PLACED') && strtoupper($newStatus) === 'READY') {
+                    event(new OrderStatusReady($order));
+                }
+            }
+        });
+
+        // Keep the pickup PIN off vendor-facing responses.
+        if ($role === 'VENDOR') {
+            foreach ($updatedOrders as $updatedOrder) {
+                $updatedOrder->makeHidden('pickup_pin');
+            }
+        }
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Bulk update completed successfully.',
+            'updated_count' => count($updatedOrders),
+            'orders' => $updatedOrders,
+        ], 200);
+    }
+
+    /**
+     * Conclude pre-order custody hand-offs by evaluating user PIN input.
+     */
+    public function verifyAndCompletePickup(Request $request, $id)
+    {
+        $user = $request->user();
+        if (! $user) {
+            return response()->json(['success' => false, 'message' => 'Unauthenticated.'], 401);
+        }
+
+        if (! in_array(strtoupper($user->role), ['VENDOR', 'ADMIN'], true)) {
+            return response()->json(['success' => false, 'message' => 'Only an authorized vendor can verify pickup.'], 403);
+        }
+
+        $order = Order::find($id);
+        if (! $order) {
+            return response()->json(['success' => false, 'message' => 'Order not found.'], 404);
+        }
+
+        if (strtoupper($user->role) === 'VENDOR' && (int) $order->vendor_id !== (int) $user->id) {
+            return response()->json(['success' => false, 'message' => 'You are not authorized to verify this order.'], 403);
+        }
+
+        $validator = Validator::make($request->all(), [
+            'pickup_pin' => ['required', 'string', 'size:4', 'regex:/^\\d{4}$/'],
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json([
+                'success' => false,
+                'message' => 'A valid 4-digit pickup PIN is required.',
+                'errors' => $validator->errors(),
+            ], 422);
+        }
+
+        if (! in_array($order->status, ['READY', 'OUT_FOR_DELIVERY'], true)) {
+            return response()->json([
+                'success' => false,
+                'message' => 'This order is not ready for pickup.',
+            ], 409);
+        }
+
+        $inputPin = (string) $request->input('pickup_pin');
+
+        // Use a constant-time comparison and never accept a vendor_id supplied by the client.
+        if (! hash_equals((string) $order->pickup_pin, $inputPin)) {
+            AuditLog::create([
+                'user_id' => $user->id,
+                'timestamp' => time() * 1000,
+                'action' => 'PICKUP_FAIL',
+                'details' => "Invalid pickup PIN attempt for order #{$order->id}.",
+            ]);
+
+            return response()->json([
+                'success' => false,
+                'message' => 'Invalid pickup PIN.',
+            ], 401);
+        }
+
+        $updatedOrder = DB::transaction(function () use ($order, $user) {
+            $locked = Order::whereKey($order->id)->lockForUpdate()->firstOrFail();
+
+            if (! in_array($locked->status, ['READY', 'OUT_FOR_DELIVERY'], true)) {
+                throw new \RuntimeException('This order is no longer ready for pickup.');
+            }
+
+            $locked->status = 'COMPLETED';
+            $locked->order_status = 'COMPLETED';
+            $locked->collected_at = now();
+            $locked->save();
+
+            AuditLog::create([
+                'user_id' => $user->id,
+                'timestamp' => time() * 1000,
+                'action' => 'PICKUP_VALIDATED',
+                'details' => "Pickup PIN validated successfully for order #{$locked->id}.",
+            ]);
+
+            return $locked;
+        });
+
+        $studentId = $updatedOrder->customer_id ?? $updatedOrder->student_id;
+        if ($studentId) {
+            $student = User::find($studentId);
+            if ($student) {
+                try {
+                    $student->notify(new OrderStatusChangedNotification(
+                        $updatedOrder, 'READY', 'COMPLETED'
+                    ));
+                    event(new OrderStatusUpdatedBroadcast(
+                        $updatedOrder, 'READY', 'COMPLETED'
+                    ));
+                } catch (\Throwable $e) {
+                    Log::error("Failed to notify student {$studentId} after pickup: ".$e->getMessage());
+                }
+            }
+        }
+
+        event(new OrderStatusCompleted($updatedOrder));
+
+        if (strtoupper($user->role) === 'VENDOR') {
+            $updatedOrder->makeHidden('pickup_pin');
+        }
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Pickup verified and order completed successfully.',
+            'order' => $updatedOrder,
+        ], 200);
+    }
+
+    /**
+     * Retrieve the authenticated student's personal order history, filtered by date.
+     */
+    public function getPersonalOrderHistory(Request $request)
+    {
+        $user = $request->user();
+        if (! $user) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Unauthenticated.',
+            ], 401);
+        }
+
+        // Base query for the authenticated user's orders
+        $ordersQuery = Order::where(function ($query) use ($user) {
+            $query->where('customer_id', $user->id)
+                ->orWhere('student_id', $user->id)
+                ->orWhere('user_id', $user->id);
+        });
+
+        // 1. Single Date filter (format: YYYY-MM-DD)
+        $date = $request->input('date');
+        if ($date && $date !== '') {
+            $startTimestamp = strtotime($date.' 00:00:00') * 1000;
+            $endTimestamp = strtotime($date.' 23:59:59') * 1000;
+            if ($startTimestamp && $endTimestamp) {
+                $ordersQuery->whereBetween('order_timestamp', [$startTimestamp, $endTimestamp]);
+            }
+        }
+
+        // 2. Date Range filter (format: YYYY-MM-DD or milliseconds)
+        $startDate = $request->input('start_date');
+        if ($startDate && $startDate !== '') {
+            if (is_numeric($startDate)) {
+                $startMs = (float) $startDate;
+                if ($startMs < 10000000000) {
+                    $startMs *= 1000;
+                }
+            } else {
+                $startMs = strtotime($startDate.' 00:00:00') * 1000;
+            }
+            if ($startMs) {
+                $ordersQuery->where('order_timestamp', '>=', $startMs);
+            }
+        }
+
+        $endDate = $request->input('end_date');
+        if ($endDate && $endDate !== '') {
+            if (is_numeric($endDate)) {
+                $endMs = (float) $endDate;
+                if ($endMs < 10000000001) {
+                    $endMs *= 1000;
+                }
+            } else {
+                $endMs = strtotime($endDate.' 23:59:59') * 1000;
+            }
+            if ($endMs) {
+                $ordersQuery->where('order_timestamp', '<=', $endMs);
+            }
+        }
+
+        // Order by order_timestamp descending
+        $orders = $ordersQuery->orderBy('order_timestamp', 'desc')->get();
+
+        return response()->json([
+            'success' => true,
+            'orders' => $orders,
+        ], 200);
+    }
+
+    /**
+     * Get orders placed by the currently authenticated student.
+     */
+    public function getAuthenticatedStudentOrders(Request $request)
+    {
+        $user = $request->user();
+        if (! $user) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Unauthenticated.',
+            ], 401);
+        }
+
+        $orders = Order::where('customer_id', $user->id)
+            ->orWhere('student_id', $user->id)
+            ->orWhere('user_id', $user->id)
+            ->orderBy('order_timestamp', 'desc')
+            ->get();
+
+        return response()->json([
+            'success' => true,
+            'orders' => $orders,
+        ], 200);
+    }
+
+    /**
+     * Place a new secure order for the currently authenticated student.
+     */
+    public function storeAuthenticatedStudentOrder(Request $request)
+    {
+        $user = $request->user();
+        if (! $user) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Unauthenticated.',
+            ], 401);
+        }
+
+        $validator = Validator::make($request->all(), [
+            'vendor_id' => 'required|integer|exists:users,id',
+            'food_item_id' => 'nullable|integer',
+            'menu_item_id' => 'required|integer|exists:menu_items,id',
+            'food_name' => 'required|string|min:2',
+            'quantity' => 'required|integer|min:1',
+            'unit_price' => 'required|numeric|min:0.01',
+            'total_price' => 'required|numeric|min:0.01',
+            'order_type' => 'nullable|string|in:TAKEAWAY,PICKUP,DINE_IN,DELIVERY',
+            'customer_note' => 'nullable|string|max:1000',
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Validation failed.',
+                'errors' => $validator->errors(),
+            ], 400);
+        }
+
+        // Fetch menu item to validate availability, ownership, and calculate total price
+        $menuItem = MenuItem::find($request->input('menu_item_id'));
+        if (! $menuItem) {
+            return response()->json([
+                'success' => false,
+                'message' => 'The selected menu item does not exist.',
+            ], 404);
+        }
+
+        if (! $menuItem->is_available) {
+            return response()->json([
+                'success' => false,
+                'message' => 'The selected menu item is currently unavailable.',
+            ], 400);
+        }
+
+        // Validate menu item owner matches vendor_id
+        if ($menuItem->vendor_id != $request->input('vendor_id')) {
+            return response()->json([
+                'success' => false,
+                'message' => 'The selected menu item does not belong to the specified vendor.',
+            ], 400);
+        }
+
+        // Calculate and validate order totals
+        $quantity = intval($request->input('quantity'));
+        $expectedUnitPrice = round($menuItem->price, 2);
+        $expectedTotalPrice = round($expectedUnitPrice * $quantity, 2);
+
+        $unitPriceInput = round($request->input('unit_price'), 2);
+        $totalPriceInput = round($request->input('total_price'), 2);
+
+        if (abs($expectedUnitPrice - $unitPriceInput) > 0.01) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Validation error: unit_price does not match the actual menu item price.',
+                'expected' => $expectedUnitPrice,
+                'received' => $unitPriceInput,
+            ], 400);
+        }
+
+        if (abs($expectedTotalPrice - $totalPriceInput) > 0.01) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Validation error: total_price is incorrect based on menu item price and quantity.',
+                'expected' => $expectedTotalPrice,
+                'received' => $totalPriceInput,
+            ], 400);
+        }
+
+        // Verify loyalty points redemption if requested
+        $pointsToRedeem = intval($request->input('points_to_redeem', 0));
+        $discount = 0.00;
+        if ($pointsToRedeem > 0) {
+            if (($user->loyalty_points ?? 0) < $pointsToRedeem) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Insufficient loyalty points balance. You have '.($user->loyalty_points ?? 0).' points.',
+                ], 400);
+            }
+            // 10 points = 1.00 GHS discount
+            $discount = round($pointsToRedeem * 0.10, 2);
+        }
+
+        $finalPrice = max(0.00, round($totalPriceInput - $discount, 2));
+
+        // Verify balance
+        if ($user->balance < $finalPrice) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Insufficient wallet balance. Please top up your wallet first.',
+            ], 400);
+        }
+
+        // Generate a random secure 4-digit pickup PIN
+        $securePin = (string) random_int(1000, 9999);
+
+        try {
+            $order = DB::transaction(function () use ($request, $user, $securePin, $pointsToRedeem, $discount, $finalPrice, $menuItem) {
+                $dbUser = User::whereKey($user->id)->lockForUpdate()->firstOrFail();
+                $lockedMenuItem = MenuItem::whereKey($menuItem->id)->lockForUpdate()->firstOrFail();
+                $qty = (int) $request->input('quantity');
+
+                if (! $lockedMenuItem->is_available) {
+                    throw new \RuntimeException('The selected menu item is no longer available.');
+                }
+
+                if ((int) $lockedMenuItem->vendor_id !== (int) $request->input('vendor_id')) {
+                    throw new \RuntimeException('The selected menu item is no longer assigned to that outlet.');
+                }
+
+                if ($lockedMenuItem->current_stock !== null && $lockedMenuItem->current_stock < $qty) {
+                    throw new \RuntimeException('The selected menu item is out of stock.');
+                }
+
+                if ((float) $dbUser->balance < $finalPrice) {
+                    throw new \RuntimeException('Insufficient wallet balance.');
+                }
+
+                $beforeBalance = round((float) $dbUser->balance, 2);
+                if ($lockedMenuItem->current_stock !== null) {
+                    $lockedMenuItem->current_stock = max(0, (int) $lockedMenuItem->current_stock - $qty);
+                    $lockedMenuItem->is_available = $lockedMenuItem->current_stock > 0;
+                    $lockedMenuItem->save();
+                }
+
+                $dbUser->balance = round($beforeBalance - $finalPrice, 2);
+                if ($pointsToRedeem > 0) {
+                    $dbUser->loyalty_points = ($dbUser->loyalty_points ?? 0) - $pointsToRedeem;
+                }
+                $dbUser->total_spent = round((float) ($dbUser->total_spent ?? 0) + $finalPrice, 2);
+                $dbUser->save();
+
+                $unitPrice = round((float) $lockedMenuItem->price, 2);
+                $orderNumber = 'CAF-'.now()->format('ymdHis').'-'.strtoupper(Str::random(5));
+                $createdOrder = Order::create([
+                    'order_number' => $orderNumber,
+                    'order_type' => strtoupper((string) $request->input('order_type', 'TAKEAWAY')),
+                    'payment_method' => 'WALLET',
+                    'payment_status' => 'PAID',
+                    'subtotal' => round($unitPrice * $qty, 2),
+                    'discount_amount' => $discount,
+                    'tax_amount' => 0,
+                    'service_fee' => 0,
+                    'delivery_fee' => 0,
+                    'grand_total' => $finalPrice,
+                    'currency' => 'GHS',
+                    'customer_note' => $request->input('customer_note'),
+                    'customer_id' => $dbUser->id,
+                    'student_id' => $dbUser->id,
+                    'user_id' => $dbUser->id,
+                    'vendor_id' => $lockedMenuItem->vendor_id,
+                    'food_item_id' => $request->input('food_item_id'),
+                    'menu_item_id' => $lockedMenuItem->id,
+                    'food_name' => $lockedMenuItem->name ?: $lockedMenuItem->food_name,
+                    'quantity' => $qty,
+                    'unit_price' => $unitPrice,
+                    'total_price' => $finalPrice,
+                    'order_timestamp' => time() * 1000,
+                    'placed_at' => now(),
+                    'status' => 'PENDING',
+                    'pickup_pin' => $securePin,
+                    'estimated_pickup_time' => $request->input('estimated_pickup_time', 'Calculating...'),
+                    'points_redeemed' => $pointsToRedeem,
+                    'discount_applied' => $discount,
+                ]);
+
+                $paymentReference = 'WAL-ORD-'.strtoupper(Str::random(14));
+                $payment = \App\Models\Payment::create([
+                    'order_id' => $createdOrder->id,
+                    'customer_id' => $dbUser->id,
+                    'reference' => $paymentReference,
+                    'gateway' => 'internal-wallet',
+                    'amount' => $finalPrice,
+                    'currency' => 'GHS',
+                    'purpose' => 'DIRECT_ORDER_PAY',
+                    'method' => 'WALLET',
+                    'status' => 'SUCCESS',
+                    'initiated_at' => now(),
+                    'paid_at' => now(),
+                ]);
+
+                \App\Models\WalletTransaction::create([
+                    'user_id' => $dbUser->id,
+                    'order_id' => $createdOrder->id,
+                    'payment_id' => $payment->id,
+                    'type' => 'PAYMENT',
+                    'amount' => -$finalPrice,
+                    'status' => 'SUCCESS',
+                    'source' => 'ORDER',
+                    'performed_by' => $dbUser->id,
+                    'balance_before' => $beforeBalance,
+                    'balance_after' => $dbUser->balance,
+                    'reference' => $paymentReference,
+                    'details' => 'Wallet payment for order '.$createdOrder->order_number,
+                ]);
+
+                \App\Models\OrderItem::create([
+                    'order_id' => $createdOrder->id,
+                    'food_item_id' => $request->input('food_item_id'),
+                    'name' => $createdOrder->food_name,
+                    'name_snapshot' => $createdOrder->food_name,
+                    'quantity' => $qty,
+                    'unit_price' => $unitPrice,
+                    'total_price' => $finalPrice,
+                    'line_total' => $finalPrice,
+                    'discount_amount' => $discount,
+                ]);
+
+                AuditLog::create([
+                    'user_id' => $dbUser->id,
+                    'timestamp' => time() * 1000,
+                    'action' => 'ORDER_CREATED',
+                    'details' => "Order {$createdOrder->order_number} created. Wallet payment recorded.",
+                ]);
+
+                return $createdOrder;
+            });
+
+            // Notify vendor
+            if ($order->vendor_id) {
+                $vendor = User::find($order->vendor_id);
+                if ($vendor) {
+                    try {
+                        $vendor->notify(new NewIncomingOrderNotification($order));
+                    } catch (\Exception $e) {
+                        \Illuminate\Support\Facades\Log::error("Failed to notify vendor {$order->vendor_id} of secure order #{$order->id}: ".$e->getMessage());
+                    }
+                }
+            }
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Order placed successfully.',
+                'order' => $order,
+            ], 201);
+
+        } catch (\Exception $e) {
+            report($e);
+            return response()->json([
+                'success' => false,
+                'message' => 'We could not complete your order. No payment was taken. Please try again.',
+            ], 500);
+        }
+    }
+
+    /**
+     * Cancel an order.
+     * Users can only cancel orders if the current status is 'PENDING' or 'ORDER_PLACED'.
+     */
+    public function cancel(Request $request, $id)
+    {
+        $user = $request->user();
+        if (! $user) {
+            return response()->json(['success' => false, 'message' => 'Unauthenticated.'], 401);
+        }
+
+        $order = Order::withoutGlobalScopes()->find($id);
+        if (! $order) {
+            return response()->json(['success' => false, 'message' => 'Order not found.'], 404);
+        }
+
+        $role = strtoupper((string) $user->role);
+        $owned = in_array((int) $user->id, [
+            (int) $order->customer_id,
+            (int) $order->student_id,
+            (int) $order->user_id,
+        ], true);
+
+        if ($role === 'STUDENT' && ! $owned) {
+            return response()->json(['success' => false, 'message' => 'You can only cancel your own orders.'], 403);
+        }
+        if ($role === 'VENDOR' && (int) $order->vendor_id !== (int) $user->id) {
+            return response()->json(['success' => false, 'message' => 'You do not own this order.'], 403);
+        }
+        if (! in_array(strtoupper((string) $order->status), ['PENDING', 'ORDER_PLACED'], true)) {
+            return response()->json(['success' => false, 'message' => 'This order can no longer be cancelled.'], 409);
+        }
+
+        $validator = Validator::make($request->all(), [
+            'reason' => 'nullable|string|max:255',
+        ]);
+        if ($validator->fails()) {
+            return response()->json(['success' => false, 'message' => 'Invalid cancellation details.', 'errors' => $validator->errors()], 422);
+        }
+
+        try {
+            $updatedOrder = DB::transaction(function () use ($request, $order, $user, $role) {
+                $lockedOrder = Order::withoutGlobalScopes()->whereKey($order->id)->lockForUpdate()->firstOrFail();
+                if (! in_array(strtoupper((string) $lockedOrder->status), ['PENDING', 'ORDER_PLACED'], true)) {
+                    throw new \RuntimeException('This order can no longer be cancelled.');
+                }
+
+                $customerId = (int) ($lockedOrder->customer_id ?: $lockedOrder->user_id ?: $lockedOrder->student_id);
+                $customer = User::whereKey($customerId)->lockForUpdate()->firstOrFail();
+                $refundAmount = round((float) ($lockedOrder->grand_total ?: $lockedOrder->total_price), 2);
+
+                if ($lockedOrder->menu_item_id) {
+                    $menuItem = MenuItem::whereKey($lockedOrder->menu_item_id)->lockForUpdate()->first();
+                    if ($menuItem && $menuItem->current_stock !== null) {
+                        $menuItem->current_stock = (int) $menuItem->current_stock + (int) ($lockedOrder->quantity ?? 0);
+                        $menuItem->is_available = true;
+                        $menuItem->save();
+                    }
+                }
+
+                $lockedOrder->status = 'CANCELLED';
+                $lockedOrder->order_status = 'CANCELLED';
+                $lockedOrder->cancelled_at = now();
+                $lockedOrder->cancellation_reason = trim((string) $request->input('reason', 'Customer requested cancellation.'));
+                $lockedOrder->save();
+
+                $payment = \App\Models\Payment::where('id', $lockedOrder->payment_id)
+                    ->lockForUpdate()->first();
+
+                $walletPayment = strtoupper((string) ($lockedOrder->payment_method ?? '')) === 'WALLET';
+                if ($walletPayment) {
+                    $before = round((float) $customer->balance, 2);
+                    $customer->balance = round($before + $refundAmount, 2);
+                    $customer->save();
+
+                    $refund = \App\Models\Refund::create([
+                        'order_id' => $lockedOrder->id,
+                        'payment_id' => $payment?->id,
+                        'customer_id' => $customer->id,
+                        'requested_by' => $user->id,
+                        'amount' => $refundAmount,
+                        'reason' => trim((string) $request->input('reason', 'Order cancelled.')),
+                        'status' => 'SUCCESS',
+                        'processed_at' => now(),
+                    ]);
+
+                    \App\Models\WalletTransaction::create([
+                        'user_id' => $customer->id,
+                        'order_id' => $lockedOrder->id,
+                        'payment_id' => $payment?->id,
+                        'type' => 'REFUND',
+                        'amount' => $refundAmount,
+                        'status' => 'SUCCESS',
+                        'source' => 'REFUND',
+                        'performed_by' => $user->id,
+                        'balance_before' => $before,
+                        'balance_after' => $customer->balance,
+                        'reference' => 'REF-'.strtoupper(Str::random(14)),
+                        'details' => 'Wallet refund for cancelled order '.$lockedOrder->order_number,
+                    ]);
+
+                    if ($payment) {
+                        $payment->update(['status' => 'REFUNDED', 'refunded_at' => now()]);
+                    }
+                } else {
+                    if ($payment) {
+                        $payment->update(['status' => 'REFUND_PENDING']);
+                    }
+
+                    \App\Models\Refund::create([
+                        'order_id' => $lockedOrder->id,
+                        'payment_id' => $payment?->id,
+                        'customer_id' => $customer->id,
+                        'requested_by' => $user->id,
+                        'amount' => $refundAmount,
+                        'reason' => trim((string) $request->input('reason', 'Order cancelled.')),
+                        'status' => 'PENDING',
+                    ]);
+                }
+
+                AuditLog::create([
+                    'user_id' => $user->id,
+                    'timestamp' => now()->getTimestampMs(),
+                    'action' => 'ORDER_CANCELLED',
+                    'details' => "Order {$lockedOrder->order_number} cancelled. Refund workflow recorded.",
+                ]);
+
+                return $lockedOrder;
+            }, 3);
+
+            try {
+                $customerId = (int) ($updatedOrder->customer_id ?: $updatedOrder->user_id);
+                $customer = User::find($customerId);
+                if ($customer && $role !== 'STUDENT') {
+                    $customer->notify(new OrderStatusChangedNotification($updatedOrder, 'PENDING', 'CANCELLED'));
+                }
+            } catch (\Throwable $e) {
+                report($e);
+            }
+
+            return response()->json([
+                'success' => true,
+                'message' => strtoupper((string) $updatedOrder->payment_method) === 'WALLET'
+                    ? 'Order cancelled and wallet refund completed.'
+                    : 'Order cancelled. Refund has been queued for processing.',
+                'order' => $updatedOrder,
+            ], 200);
+        } catch (\RuntimeException $e) {
+            return response()->json(['success' => false, 'message' => $e->getMessage()], 409);
+        } catch (\Throwable $e) {
+            report($e);
+            return response()->json(['success' => false, 'message' => 'We could not cancel this order. Please try again.'], 500);
+        }
+    }
+    /**
+     * Real-time order status tracking with SSE (Server-Sent Events) and JSON fallback.
+     */
+    public function trackOrderRealTime(Request $request, $id)
+    {
+        $order = Order::find($id);
+        if (! $order) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Order not found.',
+            ], 404);
+        }
+
+        // If client requests text/event-stream or sets stream parameter of 1, stream in real-time
+        if ($request->header('Accept') === 'text/event-stream' || $request->input('stream') == 1) {
+            return response()->stream(function () use ($id) {
+                $lastStatus = '';
+                // Periodically check for updates for up to 15 cycles (~30 seconds)
+                for ($i = 0; $i < 15; $i++) {
+                    $order = Order::find($id);
+                    if (! $order) {
+                        echo "event: error\n";
+                        echo 'data: '.json_encode(['message' => 'Order deleted'])."\n\n";
+                        ob_flush();
+                        flush();
+                        break;
+                    }
+
+                    $currentStatus = $order->status;
+                    $stages = $this->getTrackingStages($currentStatus);
+
+                    if ($currentStatus !== $lastStatus) {
+                        echo "event: status_update\n";
+                        echo 'data: '.json_encode([
+                            'id' => $order->id,
+                            'status' => $currentStatus,
+                            'estimated_pickup_time' => $order->estimated_pickup_time,
+                            'stages' => $stages,
+                            'updated_at' => $order->updated_at ? $order->updated_at->toIso8601String() : null,
+                        ])."\n\n";
+                        ob_flush();
+                        flush();
+                        $lastStatus = $currentStatus;
+                    }
+
+                    if (in_array(strtoupper($currentStatus), ['DELIVERED', 'COMPLETED', 'CANCELLED', 'DECLINED'])) {
+                        break;
+                    }
+
+                    sleep(2);
+                }
+            }, 200, [
+                'Content-Type' => 'text/event-stream',
+                'Cache-Control' => 'no-cache',
+                'Connection' => 'keep-alive',
+                'X-Accel-Buffering' => 'no',
+            ]);
+        }
+
+        // Return direct single JSON snapshot
+        $user = $request->user();
+        $isOwner = in_array((int) $user->id, [
+            (int) $order->customer_id,
+            (int) $order->student_id,
+            (int) $order->user_id,
+        ], true);
+        $canViewPin = $isOwner || strtoupper($user->role ?? '') === 'ADMIN';
+
+        return response()->json([
+            'success' => true,
+            'id' => $order->id,
+            'status' => $order->status,
+            'estimated_pickup_time' => $order->estimated_pickup_time,
+            'pickup_pin' => $canViewPin ? $order->pickup_pin : null,
+            'stages' => $this->getTrackingStages($order->status),
+        ]);
+    }
+
+    /**
+     * Map order status to dynamic tracking stages.
+     */
+    private function getTrackingStages($status)
+    {
+        $statusUpper = strtoupper($status);
+
+        $stages = [
+            ['name' => 'Received', 'completed' => false, 'active' => false],
+            ['name' => 'Preparing', 'completed' => false, 'active' => false],
+            ['name' => 'Out for Delivery', 'completed' => false, 'active' => false],
+            ['name' => 'Delivered', 'completed' => false, 'active' => false],
+        ];
+
+        $index = -1;
+        if ($statusUpper === 'PENDING' || $statusUpper === 'ORDER_PLACED' || $statusUpper === 'RECEIVED') {
+            $index = 0;
+        } elseif ($statusUpper === 'PREPARING') {
+            $index = 1;
+        } elseif ($statusUpper === 'OUT_FOR_DELIVERY' || $statusUpper === 'READY' || $statusUpper === 'OUT FOR DELIVERY') {
+            $index = 2;
+        } elseif ($statusUpper === 'DELIVERED' || $statusUpper === 'COMPLETED') {
+            $index = 3;
+        }
+
+        for ($i = 0; $i < 4; $i++) {
+            if ($i < $index) {
+                $stages[$i]['completed'] = true;
+            } elseif ($i === $index) {
+                $stages[$i]['active'] = true;
+                $stages[$i]['completed'] = true;
+            }
+        }
+
+        return $stages;
+    }
+
+    /**
+     * Polling mechanism for students to fetch real-time updates and push alerts for READY orders.
+     */
+    public function pollOrderStatusReady(Request $request)
+    {
+        $user = $request->user();
+        if (! $user) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Unauthenticated.',
+            ], 401);
+        }
+
+        $studentId = $user->id;
+
+        // Find any active orders that are in 'READY' status
+        $readyOrders = Order::where(function ($query) use ($studentId) {
+            $query->where('customer_id', $studentId)
+                ->orWhere('student_id', $studentId)
+                ->orWhere('user_id', $studentId);
+        })
+            ->where(DB::raw('upper(status)'), 'READY')
+            ->get();
+
+        $alerts = [];
+        foreach ($readyOrders as $order) {
+            $alerts[] = [
+                'order_id' => $order->id,
+                'food_name' => $order->food_name,
+                'vendor_id' => $order->vendor_id,
+                'pickup_pin' => $order->pickup_pin,
+                'title' => 'Order Ready for Pickup! 🍽️',
+                'body' => "Your order #{$order->id} ('{$order->food_name}') is ready at the cafeteria. Hand-off PIN is {$order->pickup_pin}.",
+                'alert_push' => true,
+                'vibrate' => [100, 50, 100],
+            ];
+        }
+
+        return response()->json([
+            'success' => true,
+            'student_id' => $studentId,
+            'has_ready_orders' => count($alerts) > 0,
+            'ready_alerts' => $alerts,
+            'active_orders_count' => Order::where(function ($query) use ($studentId) {
+                $query->where('customer_id', $studentId)
+                    ->orWhere('student_id', $studentId)
+                    ->orWhere('user_id', $studentId);
+            })->whereNotIn(DB::raw('upper(status)'), ['COMPLETED', 'DELIVERED', 'CANCELLED', 'DECLINED'])->count(),
+            'polled_at' => date('c'),
+        ], 200);
+    }
+
+    /**
+     * Real-time SSE listener stream specifically alerting when active order statuses change to 'READY'.
+     */
+    public function streamOrderStatusReady(Request $request)
+    {
+        $user = $request->user();
+        if (! $user) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Unauthenticated.',
+            ], 401);
+        }
+
+        $studentId = $user->id;
+
+        return response()->stream(function () use ($studentId) {
+            $notifiedOrders = []; // Track already emitted ready order IDs in this session
+
+            // Loop for up to 20 cycles (approx 40 seconds) to maintain live stream connection
+            for ($cycle = 0; $cycle < 20; $cycle++) {
+                $readyOrders = Order::where(function ($query) use ($studentId) {
+                    $query->where('customer_id', $studentId)
+                        ->orWhere('student_id', $studentId)
+                        ->orWhere('user_id', $studentId);
+                })
+                    ->where(DB::raw('upper(status)'), 'READY')
+                    ->get();
+
+                foreach ($readyOrders as $order) {
+                    if (! in_array($order->id, $notifiedOrders)) {
+                        echo "event: order_ready_push\n";
+                        echo 'data: '.json_encode([
+                            'order_id' => $order->id,
+                            'food_name' => $order->food_name,
+                            'pickup_pin' => $order->pickup_pin,
+                            'message' => "Your order #{$order->id} ('{$order->food_name}') is ready for pickup!",
+                            'timestamp' => date('c'),
+                        ])."\n\n";
+                        ob_flush();
+                        flush();
+                        $notifiedOrders[] = $order->id;
+                    }
+                }
+
+                // Heartbeat to keep connection alive
+                echo "event: heartbeat\n";
+                echo 'data: '.json_encode(['status' => 'listening', 'cycle' => $cycle])."\n\n";
+                ob_flush();
+                flush();
+
+                sleep(2);
+            }
+        }, 200, [
+            'Content-Type' => 'text/event-stream',
+            'Cache-Control' => 'no-cache',
+            'Connection' => 'keep-alive',
+            'X-Accel-Buffering' => 'no',
+        ]);
+    }
+
+    /**
+     * Submit multiple order requests (shopping cart checkout) for the authenticated user.
+     */
+    public function cartCheckout(Request $request)
+    {
+        $validator = Validator::make($request->all(), [
+            'items' => 'required|array|min:1|max:50',
+            'items.*.menu_item_id' => 'nullable|integer|distinct|exists:menu_items,id',
+            'items.*.food_item_id' => 'nullable|integer|distinct|exists:food_items,id',
+            'items.*.quantity' => 'required|integer|min:1|max:50',
+            'points_to_redeem' => 'nullable|integer|min:0|max:100000',
+            'payment_method' => 'nullable|string|in:wallet,momo,card,WALLET,MOMO,CARD',
+            'payment_reference' => 'nullable|string|max:120',
+            'order_type' => 'nullable|string|in:TAKEAWAY,PICKUP,DINE_IN,DELIVERY',
+            'customer_note' => 'nullable|string|max:1000',
+        ]);
+
+        $validator->after(function ($validator) use ($request) {
+            foreach ((array) $request->input('items', []) as $index => $input) {
+                if (! ($input['menu_item_id'] ?? null) && ! ($input['food_item_id'] ?? null)) {
+                    $validator->errors()->add("items.{$index}", 'Each cart item must reference a menu item or food item.');
                 }
             }
         });
@@ -21,10 +1733,9 @@
 
         try {
             $result = DB::transaction(function () use ($request, $user) {
-                // Lock the wallet owner row so two simultaneous checkouts cannot spend the same balance.
                 $lockedUser = User::whereKey($user->id)->lockForUpdate()->firstOrFail();
                 $pointsToRedeem = (int) $request->input('points_to_redeem', 0);
-                $paymentMethod = strtoupper((string) $request->input('payment_method', 'wallet'));
+                $paymentMethod = strtoupper((string) $request->input('payment_method', 'WALLET'));
                 $orderType = strtoupper((string) $request->input('order_type', 'TAKEAWAY'));
                 $paymentReference = trim((string) $request->input('payment_reference', ''));
                 $total = 0.0;
@@ -35,41 +1746,25 @@
                     $foodItemId = $input['food_item_id'] ?? null;
 
                     if ($menuItemId) {
-                        $catalogItem = MenuItem::whereKey((int) $menuItemId)
-                            ->lockForUpdate()->first();
+                        $catalogItem = MenuItem::whereKey((int) $menuItemId)->lockForUpdate()->first();
                         $isMenuItem = true;
                     } else {
-                        $catalogItem = FoodItem::whereKey((int) $foodItemId)
-                            ->lockForUpdate()->first();
+                        $catalogItem = FoodItem::whereKey((int) $foodItemId)->lockForUpdate()->first();
                         $isMenuItem = false;
                     }
 
-                    if (! $catalogItem) {
-                        throw new \RuntimeException("Cart item at index {$index} is no longer available.");
-                    }
-
-                    if (! $catalogItem->is_available) {
-                        $itemName = $catalogItem->name ?: ($catalogItem->food_name ?? 'This item');
-                        throw new \RuntimeException("Menu item '{$itemName}' is currently unavailable.");
+                    if (! $catalogItem || ! $catalogItem->is_available) {
+                        throw new \RuntimeException('One of the selected menu items is no longer available.');
                     }
 
                     $quantity = (int) $input['quantity'];
-
-                    // Standalone menu_items track current stock. The legacy food_items
-                    // catalog exposes initial_stock but not a live current_stock field,
-                    // so availability is enforced there without decrementing a
-                    // non-live stock value.
-                    if ($isMenuItem) {
-                        $stock = $catalogItem->current_stock;
-                        if ($stock !== null && $stock < $quantity) {
-                            throw new \RuntimeException("Only {$stock} unit(s) of '{$catalogItem->name}' remain.");
-                        }
+                    if ($isMenuItem && $catalogItem->current_stock !== null && $catalogItem->current_stock < $quantity) {
+                        throw new \RuntimeException("Only {$catalogItem->current_stock} unit(s) remain for '".($catalogItem->name ?: $catalogItem->food_name)."'.");
                     }
 
                     $unitPrice = round((float) $catalogItem->price, 2);
                     $lineTotal = round($unitPrice * $quantity, 2);
                     $total = round($total + $lineTotal, 2);
-
                     $items[] = [
                         'catalog_item' => $catalogItem,
                         'quantity' => $quantity,
@@ -86,38 +1781,13 @@
                 $discount = round($pointsToRedeem * 0.10, 2);
                 $finalTotal = max(0.0, round($total - $discount, 2));
 
-                $verifiedPayment = null;
-                if ($paymentMethod !== 'WALLET') {
-                    if ($paymentReference === '') {
-                        throw new \RuntimeException('A verified online payment reference is required.');
-                    }
-
-                    $verifiedPayment = \App\Models\Payment::where('customer_id', $lockedUser->id)
-                        ->where('reference', $paymentReference)
-                        ->where('purpose', 'DIRECT_ORDER_PAY')
-                        ->where('status', 'SUCCESS')
-                        ->lockForUpdate()
-                        ->first();
-
-                    if (! $verifiedPayment || abs((float) $verifiedPayment->amount - $finalTotal) > 0.01) {
-                        throw new \RuntimeException('The online payment could not be verified for this order total.');
-                    }
-
-                    if (Order::withoutGlobalScopes()->where('payment_id', $verifiedPayment->id)->exists()) {
-                        throw new \RuntimeException('This payment has already been applied to an order.');
-                    }
-                } else {
-                    if ((float) $lockedUser->balance < $finalTotal) {
-                        throw new \RuntimeException(
-                            'Insufficient wallet balance. You need GH₵ '.number_format($finalTotal, 2).
-                            ', but your balance is GH₵'.number_format((float) $lockedUser->balance, 2).'.'
-                        );
-                    }
-                }
-
-                $checkoutPayment = null;
+                $payment = null;
                 if ($paymentMethod === 'WALLET') {
-                    $checkoutPayment = \App\Models\Payment::create([
+                    if ((float) $lockedUser->balance < $finalTotal) {
+                        throw new \RuntimeException('Insufficient wallet balance.');
+                    }
+
+                    $payment = \App\Models\Payment::create([
                         'customer_id' => $lockedUser->id,
                         'reference' => 'WAL-CART-'.strtoupper(Str::random(14)),
                         'gateway' => 'internal-wallet',
@@ -130,22 +1800,43 @@
                         'paid_at' => now(),
                     ]);
                 } else {
-                    $checkoutPayment = $verifiedPayment;
+                    if ($paymentReference === '') {
+                        throw new \RuntimeException('A verified online payment reference is required.');
+                    }
+
+                    $payment = \App\Models\Payment::where('customer_id', $lockedUser->id)
+                        ->where('reference', $paymentReference)
+                        ->where('purpose', 'DIRECT_ORDER_PAY')
+                        ->where('status', 'SUCCESS')
+                        ->lockForUpdate()
+                        ->first();
+
+                    if (! $payment || abs((float) $payment->amount - $finalTotal) > 0.01) {
+                        throw new \RuntimeException('The online payment could not be verified for this order total.');
+                    }
+
+                    if (Order::withoutGlobalScopes()->where('payment_id', $payment->id)->exists()) {
+                        throw new \RuntimeException('This payment has already been applied to an order.');
+                    }
                 }
 
-                $pin = (string) random_int(1000, 9999);
+                $beforeBalance = round((float) $lockedUser->balance, 2);
                 $createdOrders = [];
+                $remainingDiscount = $discount;
+                $remainingTotal = $total;
 
                 foreach ($items as $item) {
-                    $ratio = $total > 0 ? $item['lineTotal'] / $total : 0;
-                    $itemDiscount = round($discount * $ratio, 2);
                     $catalogItem = $item['catalog_item'];
                     $itemName = $catalogItem->name ?: ($catalogItem->food_name ?? 'Meal');
+                    $itemDiscount = $remainingTotal > 0
+                        ? round(min($remainingDiscount, $discount * ($item['lineTotal'] / $total)), 2)
+                        : 0.0;
 
+                    $lineGrandTotal = max(0.0, round($item['lineTotal'] - $itemDiscount, 2));
                     $order = Order::create([
                         'order_number' => 'CAF-'.now()->format('ymdHis').'-'.strtoupper(Str::random(5)),
                         'order_type' => $orderType,
-                        'payment_id' => $checkoutPayment->id,
+                        'payment_id' => $payment->id,
                         'payment_method' => $paymentMethod,
                         'payment_status' => 'PAID',
                         'subtotal' => $item['lineTotal'],
@@ -153,10 +1844,9 @@
                         'tax_amount' => 0,
                         'service_fee' => 0,
                         'delivery_fee' => 0,
-                        'grand_total' => max(0.0, round($item['lineTotal'] - $itemDiscount, 2)),
+                        'grand_total' => $lineGrandTotal,
                         'currency' => 'GHS',
                         'customer_note' => $request->input('customer_note'),
-                        'placed_at' => now(),
                         'customer_id' => $lockedUser->id,
                         'student_id' => $lockedUser->id,
                         'user_id' => $lockedUser->id,
@@ -166,10 +1856,11 @@
                         'food_name' => $itemName,
                         'quantity' => $item['quantity'],
                         'unit_price' => $item['unitPrice'],
-                        'total_price' => max(0.0, round($item['lineTotal'] - $itemDiscount, 2)),
+                        'total_price' => $lineGrandTotal,
                         'order_timestamp' => now()->getTimestampMs(),
+                        'placed_at' => now(),
                         'status' => 'PENDING',
-                        'pickup_pin' => $pin,
+                        'pickup_pin' => (string) random_int(1000, 9999),
                         'estimated_pickup_time' => $request->input('estimated_pickup_time', 'Calculating...'),
                         'points_redeemed' => 0,
                         'discount_applied' => $itemDiscount,
@@ -183,33 +1874,191 @@
 
                     \App\Models\OrderItem::create([
                         'order_id' => $order->id,
-                        'food_item_id' => $item['is_menu_item'] && ! empty($catalogItem->food_item_id) ? (int) $catalogItem->food_item_id : (! $item['is_menu_item'] ? (int) $catalogItem->id : null),
+                        'food_item_id' => $item['is_menu_item'] ? null : $catalogItem->id,
                         'name' => $itemName,
                         'name_snapshot' => $itemName,
                         'quantity' => $item['quantity'],
                         'unit_price' => $item['unitPrice'],
-                        'total_price' => $order->total_price,
+                        'total_price' => $lineGrandTotal,
                         'discount_amount' => $itemDiscount,
-                        'line_total' => $order->total_price,
+                        'line_total' => $lineGrandTotal,
                     ]);
 
-                    AuditLog::create([
-                        'user_id' => $lockedUser->id,
-                        'timestamp' => now()->getTimestampMs(),
-                        'action' => 'ORDER_CREATED',
-                        'details' => "Placed order #{$order->id} for '{$itemName}' x {$item['quantity']}",
-                    ]);
+                    if ($paymentMethod === 'WALLET') {
+                        $lockedUser->balance = round((float) $lockedUser->balance - $lineGrandTotal, 2);
+                        \App\Models\WalletTransaction::create([
+                            'user_id' => $lockedUser->id,
+                            'order_id' => $order->id,
+                            'payment_id' => $payment->id,
+                            'type' => 'PAYMENT',
+                            'amount' => -$lineGrandTotal,
+                            'status' => 'SUCCESS',
+                            'source' => 'ORDER',
+                            'performed_by' => $lockedUser->id,
+                            'balance_before' => $beforeBalance,
+                            'balance_after' => $lockedUser->balance,
+                            'reference' => 'CART-'.strtoupper(Str::random(14)),
+                            'details' => 'Wallet payment for order '.$order->order_number,
+                        ]);
+                        $beforeBalance = round((float) $lockedUser->balance, 2);
+                    }
+
                     $createdOrders[] = $order;
+                    $remainingDiscount = max(0.0, round($remainingDiscount - $itemDiscount, 2));
+                    $remainingTotal = max(0.0, round($remainingTotal - $item['lineTotal'], 2));
                 }
 
-                if ($paymentMethod === 'WALLET') {
-                    $lockedUser->balance = round((float) $lockedUser->balance - $finalTotal, 2);
-                }
                 $lockedUser->loyalty_points = (int) ($lockedUser->loyalty_points ?? 0) - $pointsToRedeem;
+                $lockedUser->total_spent = round((float) ($lockedUser->total_spent ?? 0) + $finalTotal, 2);
                 $lockedUser->save();
 
-                if ($paymentMethod === 'WALLET') {
-                    $beforeBalance = round((float) $lockedUser->balance + $finalTotal, 2);
-                    foreach ($createdOrders as $createdOrder) {
-                        WalletTransaction::create([
-                            'user_id' => $lockedUser->id,
+                return [
+                    'orders' => $createdOrders,
+                    'total_cost' => $total,
+                    'discount' => $discount,
+                    'final_total' => $finalTotal,
+                    'remaining_balance' => (float) $lockedUser->balance,
+                    'payment_reference' => $payment->reference,
+                ];
+            }, 3);
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Order placed successfully.',
+                'orders' => $result['orders'],
+                'total_cost' => $result['total_cost'],
+                'discount' => $result['discount'],
+                'final_total' => $result['final_total'],
+                'remaining_balance' => $result['remaining_balance'],
+                'payment_reference' => $result['payment_reference'],
+            ]);
+        } catch (\RuntimeException $e) {
+            return response()->json(['success' => false, 'message' => $e->getMessage()], 400);
+        } catch (\Throwable $e) {
+            report($e);
+            return response()->json([
+                'success' => false,
+                'message' => 'We could not complete your order. No payment was taken. Please try again.',
+            ], 500);
+        }
+    }
+    /**
+     * Remove the specified order from storage (Admin only).
+     */
+    public function destroy(Request $request, $id)
+    {
+        $order = Order::find($id);
+        if (! $order) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Order not found.',
+            ], 404);
+        }
+
+        $user = $request->user();
+        if (! $user || strtoupper($user->role) !== 'ADMIN') {
+            return response()->json([
+                'success' => false,
+                'message' => 'Unauthorized. Only administrative personnel can delete orders.',
+            ], 403);
+        }
+
+        DB::transaction(function () use ($order, $user) {
+            $order->delete(); // Soft delete
+
+            AuditLog::create([
+                'user_id' => $user->id,
+                'timestamp' => time() * 1000,
+                'action' => 'ORDER_DELETED',
+                'details' => "Administrator deleted order #{$order->id} ('{$order->food_name}').",
+            ]);
+        });
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Order deleted successfully.',
+        ], 200);
+    }
+
+    /**
+     * Calculates and returns the estimated wait time for a vendor's queue.
+     */
+    public function getVendorWaitTime(Request $request, $vendorId = null)
+    {
+        // If not specified in path, check query param or authenticated user
+        if (! $vendorId) {
+            if ($request->has('vendor_id')) {
+                $vendorId = (int) $request->input('vendor_id');
+            } else {
+                $user = $request->user();
+                if ($user && (strtoupper($user->role) === 'VENDOR' || strtoupper($user->role) === 'ADMIN')) {
+                    $vendorId = $user->id;
+                } else {
+                    return response()->json([
+                        'success' => false,
+                        'message' => 'Vendor ID is required.',
+                    ], 400);
+                }
+            }
+        }
+
+        $vendor = User::find($vendorId);
+        if (! $vendor) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Vendor not found.',
+            ], 444);
+        }
+
+        // Fetch all preparing or pending orders for this vendor
+        $activeOrders = Order::where('vendor_id', $vendorId)
+            ->whereIn(DB::raw('upper(status)'), ['PREPARING', 'PENDING', 'ORDER_PLACED', 'ORDERED'])
+            ->get();
+
+        $preparingCount = 0;
+        $pendingCount = 0;
+        $totalMinutes = 0;
+
+        foreach ($activeOrders as $order) {
+            $status = strtoupper($order->status);
+            $qty = intval($order->quantity ?: 1);
+
+            if ($status === 'PREPARING') {
+                $preparingCount++;
+                // Base 5 mins for preparing + 2 mins per extra item
+                $totalMinutes += 5 + (($qty - 1) * 2);
+            } else {
+                $pendingCount++;
+                // Base 3 mins for pending/placed + 1 min per extra item
+                $totalMinutes += 3 + (($qty - 1) * 1.5);
+            }
+        }
+
+        // Concurrency factor (vendors usually have multiple stoves or prepare 2 orders in parallel)
+        $concurrencyFactor = 2; // parallel processing capacity
+        $estimatedMinutes = $totalMinutes > 0 ? ceil($totalMinutes / $concurrencyFactor) : 0;
+
+        // Add a base buffer of 3 minutes if there are any active orders
+        if ($estimatedMinutes > 0) {
+            $estimatedMinutes += 3; // buffer time
+        } else {
+            $estimatedMinutes = 3; // minimum wait time (instant fulfillment prep)
+        }
+
+        return response()->json([
+            'success' => true,
+            'vendor_id' => (int) $vendorId,
+            'vendor_name' => $vendor->fullName,
+            'queue_metrics' => [
+                'total_active_orders' => count($activeOrders),
+                'preparing_orders_count' => $preparingCount,
+                'pending_orders_count' => $pendingCount,
+                'total_queue_quantity' => (int) $activeOrders->sum('quantity'),
+            ],
+            'estimated_wait_time_minutes' => (int) $estimatedMinutes,
+            'formatted_wait_time' => "{$estimatedMinutes} mins",
+            'congestion_level' => $preparingCount >= 8 ? 'CRITICAL' : ($preparingCount >= 4 ? 'HIGH' : ($preparingCount >= 1 ? 'MODERATE' : 'LOW')),
+            'calculated_at' => date('c'),
+        ], 200);
+    }
+}
