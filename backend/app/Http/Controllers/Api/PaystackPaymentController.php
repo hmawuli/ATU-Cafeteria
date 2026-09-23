@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\AuditLog;
+use App\Models\Payment;
 use App\Models\User;
 use App\Models\WalletTransaction;
 use Illuminate\Http\Request;
@@ -54,11 +55,24 @@ class PaystackPaymentController extends Controller
             return response()->json(['success' => false, 'message' => 'Paystack is not configured on this server.'], 503);
         }
 
+        $payment = Payment::create([
+            'customer_id' => $user->id,
+            'reference' => $reference,
+            'gateway' => 'paystack',
+            'amount' => $amount,
+            'currency' => 'GHS',
+            'purpose' => $purpose,
+            'status' => 'INITIATED',
+            'initiated_at' => now(),
+        ]);
+
         WalletTransaction::create([
             'user_id' => $user->id,
+            'payment_id' => $payment->id,
             'amount' => $amount,
             'type' => $purpose === 'WALLET_TOPUP' ? 'DEPOSIT' : 'PAYMENT',
             'status' => 'PENDING',
+            'source' => 'PAYSTACK',
             'reference' => $reference,
             'details' => "Paystack initialization for {$purpose}.",
         ]);
@@ -82,13 +96,16 @@ class PaystackPaymentController extends Controller
             ]);
 
             if ($response->successful() && data_get($response->json(), 'status') === true) {
+                $payment->update(['status' => 'PENDING', 'gateway_response' => $response->json('data')]);
                 return response()->json(['success' => true, 'message' => 'Paystack transaction initialized.', 'data' => $response->json('data')]);
             }
 
             WalletTransaction::where('reference', $reference)->update(['status' => 'FAILED', 'details' => 'Paystack initialization failed.']);
+            $payment->update(['status' => 'FAILED', 'failed_at' => now(), 'gateway_response' => $response->json()]);
             return response()->json(['success' => false, 'message' => 'Failed to initialize Paystack transaction.'], 502);
         } catch (\Throwable $e) {
             WalletTransaction::where('reference', $reference)->update(['status' => 'FAILED', 'details' => 'Paystack initialization connection failure.']);
+            $payment->update(['status' => 'FAILED', 'failed_at' => now()]);
             report($e);
             return response()->json(['success' => false, 'message' => 'Unable to connect to Paystack. Please try again.'], 502);
         }
@@ -220,6 +237,14 @@ class PaystackPaymentController extends Controller
             $locked->amount = $amountPaid;
             $locked->details = "Paystack payment verified for {$purpose}.";
             $locked->save();
+
+            $payment = Payment::where('reference', $reference)->lockForUpdate()->first();
+            if ($payment) {
+                $payment->status = 'SUCCESS';
+                $payment->amount = $amountPaid;
+                $payment->paid_at = now();
+                $payment->save();
+            }
 
             AuditLog::create([
                 'user_id' => $userId,
