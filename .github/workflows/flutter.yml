@@ -1,4 +1,4 @@
-name: ATU Cafeteria CI
+name: ATU Cafeteria Flutter CI
 
 on:
   push:
@@ -10,30 +10,6 @@ permissions:
   contents: read
 
 jobs:
-  backend:
-    runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: backend
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-      - name: Setup PHP
-        uses: shivammathur/setup-php@v2
-        with:
-          php-version: '8.2'
-          extensions: mbstring, sqlite3, pdo_sqlite
-          coverage: none
-          tools: composer:v2
-      - name: Validate Composer configuration
-        run: composer validate --strict
-      - name: Install PHP dependencies
-        run: composer install --no-interaction --prefer-dist --no-progress
-      - name: Audit PHP dependencies
-        run: composer audit --no-interaction
-      - name: Run Laravel tests
-        run: php artisan test
-
   frontend:
     runs-on: ubuntu-latest
     defaults:
@@ -42,42 +18,52 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+
       - name: Setup Java
         uses: actions/setup-java@v4
         with:
           distribution: temurin
           java-version: '17'
           cache: gradle
+
       - name: Setup Flutter
         uses: subosito/flutter-action@v2
         with:
           flutter-version: '3.35.4'
           channel: stable
           cache: true
+
       - name: Verify toolchain
         run: |
           java -version
           flutter --version
+
       - name: Install dependencies
         run: flutter pub get
+
       - name: Analyze
         run: flutter analyze
+
       - name: Test
         run: flutter test
+
       - name: Build release APK
         run: flutter build apk --release
+
       - name: Build release Android App Bundle
         run: flutter build appbundle --release
+
       - name: Verify release artifacts
         run: |
           test -s build/app/outputs/flutter-apk/app-release.apk
           test -s build/app/outputs/bundle/release/app-release.aab
           ls -lh build/app/outputs/flutter-apk/app-release.apk
           ls -lh build/app/outputs/bundle/release/app-release.aab
+
       - name: Upload release artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: atu-cafeteria-release-validation
+          name: atu-cafeteria-flutter-release-validation
           path: |
             frontend/build/app/outputs/flutter-apk/app-release.apk
             frontend/build/app/outputs/bundle/release/app-release.aab
