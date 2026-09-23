@@ -11,6 +11,8 @@ use App\Http\Controllers\Api\LoyaltyController;
 use App\Http\Controllers\Api\OrderController;
 use App\Http\Controllers\Api\StudentBudgetController;
 use App\Http\Controllers\Api\WalletController;
+use Illuminate\Http\Request;
+use App\Http\Middleware\InactivityTimeout;
 use Illuminate\Support\Facades\Route;
 
 /*
@@ -25,7 +27,7 @@ $customerRoutes = function () {
     Route::post('/register', [CustomerAuthController::class, 'register'])->middleware('throttle:auth');
     Route::post('/login', [CustomerAuthController::class, 'login'])->middleware('throttle:auth');
 
-    Route::middleware(['auth:sanctum', 'role:STUDENT,ADMIN'])->group(function () {
+    Route::middleware(['auth:sanctum', InactivityTimeout::class, 'role:STUDENT,ADMIN'])->group(function () {
         Route::get('/me', [AuthController::class, 'me']);
         Route::post('/logout', [AuthController::class, 'logout']);
 
