@@ -1,0 +1,85 @@
+name: ATU Cafeteria Production Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Release label, for example 1.2.0+3"
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+          cache: gradle
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.35.4'
+          channel: stable
+          cache: true
+      - name: Verify toolchain
+        run: |
+          java -version
+          flutter --version
+      - name: Install dependencies
+        run: flutter pub get
+      - name: Analyze
+        run: flutter analyze
+      - name: Test
+        run: flutter test
+      - name: Write production keystore
+        env:
+          KEYSTORE_BASE64: ${{ secrets.ATU_KEYSTORE_BASE64 }}
+        run: |
+          test -n "$KEYSTORE_BASE64"
+          echo "$KEYSTORE_BASE64" | base64 --decode > android/app/atu-production.jks
+          test -s android/app/atu-production.jks
+      - name: Build signed production APK
+        env:
+          ATU_REQUIRE_PROD_SIGNING: "true"
+          ATU_KEYSTORE_PATH: atu-production.jks
+          ATU_KEYSTORE_PASSWORD: ${{ secrets.ATU_KEYSTORE_PASSWORD }}
+          ATU_KEY_ALIAS: ${{ secrets.ATU_KEY_ALIAS }}
+          ATU_KEY_PASSWORD: ${{ secrets.ATU_KEY_PASSWORD }}
+        run: flutter build apk --release
+      - name: Build signed production Android App Bundle
+        env:
+          ATU_REQUIRE_PROD_SIGNING: "true"
+          ATU_KEYSTORE_PATH: atu-production.jks
+          ATU_KEYSTORE_PASSWORD: ${{ secrets.ATU_KEYSTORE_PASSWORD }}
+          ATU_KEY_ALIAS: ${{ secrets.ATU_KEY_ALIAS }}
+          ATU_KEY_PASSWORD: ${{ secrets.ATU_KEY_PASSWORD }}
+        run: flutter build appbundle --release
+      - name: Verify production artifacts
+        run: |
+          test -s build/app/outputs/flutter-apk/app-release.apk
+          test -s build/app/outputs/bundle/release/app-release.aab
+          ls -lh build/app/outputs/flutter-apk/app-release.apk
+          ls -lh build/app/outputs/bundle/release/app-release.aab
+      - name: Remove keystore
+        if: always()
+        run: rm -f android/app/atu-production.jks
+      - name: Publish production artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: atu-cafeteria-production-${{ inputs.version }}
+          path: |
+            frontend/build/app/outputs/flutter-apk/app-release.apk
+            frontend/build/app/outputs/bundle/release/app-release.aab
+          if-no-files-found: error
+          retention-days: 30
