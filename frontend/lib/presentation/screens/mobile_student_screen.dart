@@ -980,6 +980,16 @@ class _RestaurantCustomerHomeScreenState extends State<RestaurantCustomerHomeScr
         _profileAction(Icons.info_outline_rounded, 'About this app',
             () => _showAbout(context)),
         _profileAction(
+          Icons.account_circle_outlined,
+          'Account & privacy',
+          () => Navigator.pushNamed(context, '/customer-account'),
+        ),
+        _profileAction(
+          Icons.location_on_outlined,
+          'Saved addresses',
+          () => Navigator.pushNamed(context, '/customer-addresses'),
+        ),
+        _profileAction(
           Icons.notifications_none_rounded,
           'Notifications',
           () => Navigator.pushNamed(context, '/notifications'),
