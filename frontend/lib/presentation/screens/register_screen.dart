@@ -41,7 +41,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
     if (!_formKey.currentState!.validate()) return;
     setState(() => _busy = true);
     try {
-      await _api.post('/student/register', body: {
+      await _api.post('/customer/register', body: {
         'fullName': _name.text.trim(),
         'username': _username.text.trim(),
         'email': _email.text.trim().toLowerCase(),
@@ -56,7 +56,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
           icon: const Icon(Icons.check_circle_outline, size: 48),
           title: const Text('Account created'),
           content: const Text(
-              'Your student account is ready. Sign in with your username and PIN.'),
+              'Your customer account is ready. Sign in to browse meals and place orders.'),
           actions: [
             FilledButton(
                 onPressed: () => Navigator.pop(ctx),
@@ -87,7 +87,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
     return Scaffold(
-      appBar: AppBar(title: const Text('Create Student Account')),
+      appBar: AppBar(title: const Text('Create Customer Account')),
       body: Center(
         child: SingleChildScrollView(
           padding: const EdgeInsets.all(24),
@@ -112,7 +112,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                                 ?.copyWith(fontWeight: FontWeight.w900)),
                         const SizedBox(height: 6),
                         const Text(
-                            'Create your student account to browse meals and place orders.',
+                            'Create your customer account to browse meals, manage your cart and place orders.',
                             textAlign: TextAlign.center),
                         const SizedBox(height: 26),
                         TextFormField(
@@ -131,7 +131,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                           textInputAction: TextInputAction.next,
                           decoration: const InputDecoration(
                               labelText: 'Username',
-                              prefixIcon: Icon(Icons.badge_outlined)),
+                              prefixIcon: Icon(Icons.alternate_email)),
                           validator: (v) => v == null ||
                                   !RegExp(r'^[A-Za-z0-9_-]{3,100}$')
                                       .hasMatch(v.trim())
@@ -194,8 +194,9 @@ class _RegisterScreenState extends State<RegisterScreen> {
                           controller: _programme,
                           maxLines: 2,
                           decoration: const InputDecoration(
-                              labelText: 'Department / Programme (optional)',
-                              prefixIcon: Icon(Icons.school_outlined)),
+                              labelText: 'Optional profile information',
+                              hintText: 'Department, workplace, or other information',
+                              prefixIcon: Icon(Icons.info_outline)),
                         ),
                         const SizedBox(height: 24),
                         SizedBox(
