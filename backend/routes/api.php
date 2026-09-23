@@ -3,6 +3,8 @@
 use App\Events\OrderStatusCompleted;
 use App\Events\OrderStatusReady;
 use App\Http\Controllers\Api\AdminManagementController;
+use App\Http\Controllers\Api\AdminOperationsController;
+use App\Http\Controllers\Api\InventoryController;
 use App\Http\Controllers\Api\AdminReportController;
 use App\Http\Controllers\Api\AuditLogController;
 use App\Http\Controllers\Api\AuthController;
@@ -105,6 +107,22 @@ Route::middleware(['auth:sanctum', InactivityTimeout::class])->group(function ()
         Route::get('/security-alerts', [SmartCafeteriaController::class, 'securityAlerts'])->middleware('permission:audit.view');
         Route::get('/security/activity', [AdminManagementController::class, 'securityActivity'])->middleware('permission:audit.view');
         Route::patch('/security-alerts/{alert}/resolve', [SmartCafeteriaController::class, 'resolveSecurityAlert'])->middleware('permission:audit.view');
+
+        Route::get('/inventory/movements', [InventoryController::class, 'index'])->middleware('permission:inventory.view');
+        Route::post('/inventory/adjust', [InventoryController::class, 'adjust'])->middleware(['permission:inventory.manage', 'idempotency:required']);
+
+        Route::get('/promotions', [AdminOperationsController::class, 'promotions'])->middleware('permission:promotions.view');
+        Route::post('/promotions', [AdminOperationsController::class, 'createPromotion'])->middleware(['permission:promotions.manage', 'idempotency:required']);
+        Route::patch('/promotions/{promotion}', [AdminOperationsController::class, 'updatePromotion'])->middleware('permission:promotions.manage');
+
+        Route::get('/refunds', [AdminOperationsController::class, 'refunds'])->middleware('permission:refunds.view');
+        Route::post('/orders/{order}/refund', [AdminOperationsController::class, 'refundOrder'])->middleware(['permission:refunds.manage', 'idempotency:required']);
+
+        Route::get('/settlements', [AdminOperationsController::class, 'settlements'])->middleware('permission:settlements.view');
+        Route::post('/settlements/generate', [AdminOperationsController::class, 'generateSettlement'])->middleware(['permission:settlements.manage', 'idempotency:required']);
+
+        Route::get('/support/tickets', [AdminOperationsController::class, 'supportTickets'])->middleware('permission:support.view');
+        Route::patch('/support/tickets/{ticket}', [AdminOperationsController::class, 'updateSupportTicket'])->middleware('permission:support.manage');
         Route::get('/reports/sales.csv', [AdminReportController::class, 'exportVendorSalesAndOrdersCsv'])->middleware('permission:reports.view');
         Route::get('/reports/student-orders.csv', [AdminReportController::class, 'exportStudentOrdersCsv'])->middleware('permission:reports.view');
     });
@@ -119,7 +137,7 @@ Route::middleware(['auth:sanctum', InactivityTimeout::class])->group(function ()
     });
 
     // Legacy /student ordering API remains for existing installations.
-    Route::post('/paystack/initialize', [PaystackPaymentController::class, 'initialize'])->middleware('throttle:payments');
+    Route::post('/paystack/initialize', [PaystackPaymentController::class, 'initialize'])->middleware(['throttle:payments', 'idempotency:required']);
     Route::get('/paystack/verify/{reference}', [PaystackPaymentController::class, 'verify'])->middleware('throttle:payments');
 
     Route::middleware('role:STUDENT,VENDOR,ADMIN')->group(function () {
