@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:math';
 import 'package:http/http.dart' as http;
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:atu_cafeteria/core/config/server_config.dart';
@@ -17,8 +18,6 @@ class ApiClient {
   final http.Client _client;
   String? token;
 
-  // Keep this key identical to SecureSessionStore so login sessions are
-  // available to every API request, including checkout.
   static const _tokenKey = 'atu_auth_token';
   static const FlutterSecureStorage _storage = FlutterSecureStorage();
 
@@ -38,12 +37,14 @@ class ApiClient {
     await _storage.delete(key: _tokenKey);
   }
 
+  /// Send an API request.
+  ///
+  /// Critical financial/order mutations can provide an Idempotency-Key. The
+  /// same key may safely be retried after a timeout without creating a second
+  /// server-side transaction. Existing callers remain fully compatible when
+  /// the key is omitted.
   Future<dynamic> request(String method, String path,
-      {Map<String, dynamic>? body}) async {
-    // The token is session scoped. Read secure storage on every request so a
-    // single shared ApiClient can never serve a stale token after a logout /
-    // login as another user. The in-memory [token] is only a fallback (e.g.
-    // unit tests that inject a client without secure storage).
+      {Map<String, dynamic>? body, String? idempotencyKey}) async {
     final storedToken = await _storage.read(key: _tokenKey);
     final effectiveToken =
         (storedToken != null && storedToken.isNotEmpty) ? storedToken : token;
@@ -56,6 +57,9 @@ class ApiClient {
     };
     if (effectiveToken != null && effectiveToken.isNotEmpty) {
       headers['Authorization'] = 'Bearer $effectiveToken';
+    }
+    if (idempotencyKey != null && idempotencyKey.trim().isNotEmpty) {
+      headers['Idempotency-Key'] = idempotencyKey.trim();
     }
 
     final encodedBody = body == null ? null : jsonEncode(body);
@@ -88,10 +92,15 @@ class ApiClient {
     return decoded;
   }
 
-  /// Performs one HTTP request, re-sending it with a solved cookie if the
-  /// hosting answered with InfinityFree's JavaScript "browser check" page
-  /// (the free tier requires JS clients to prove they solved an AES challenge;
-  /// we solve it natively instead of running a browser).
+  /// Creates a cryptographically strong-enough client request key for a
+  /// single user action. Store and reuse the returned value when retrying the
+  /// exact same operation; do not generate a new key for a retry.
+  static String newIdempotencyKey() {
+    final random = Random.secure();
+    final bytes = List<int>.generate(24, (_) => random.nextInt(256));
+    return base64UrlEncode(bytes).replaceAll('=', '');
+  }
+
   Future<http.Response> _performWithBrowserCheck(
       String method, Uri uri, Map<String, String> headers, String? encodedBody) {
     Future<http.Response> perform() {
@@ -107,7 +116,7 @@ class ApiClient {
         return response;
       }
       final cookie = InfinityFreeChallengeSolver.solveFromHtml(response.body);
-      if (cookie == null) return response; // not a challenge we can solve
+      if (cookie == null) return response;
       return perform();
     });
   }
@@ -141,14 +150,18 @@ class ApiClient {
   }
 
   Future<dynamic> get(String path) => request('GET', path);
-  Future<dynamic> post(String path, {Map<String, dynamic>? body}) =>
-      request('POST', path, body: body);
-  Future<dynamic> put(String path, {Map<String, dynamic>? body}) =>
-      request('PUT', path, body: body);
-  Future<dynamic> patch(String path, {Map<String, dynamic>? body}) =>
-      request('PATCH', path, body: body);
-  Future<dynamic> delete(String path, {Map<String, dynamic>? body}) =>
-      request('DELETE', path, body: body);
+  Future<dynamic> post(String path,
+          {Map<String, dynamic>? body, String? idempotencyKey}) =>
+      request('POST', path, body: body, idempotencyKey: idempotencyKey);
+  Future<dynamic> put(String path,
+          {Map<String, dynamic>? body, String? idempotencyKey}) =>
+      request('PUT', path, body: body, idempotencyKey: idempotencyKey);
+  Future<dynamic> patch(String path,
+          {Map<String, dynamic>? body, String? idempotencyKey}) =>
+      request('PATCH', path, body: body, idempotencyKey: idempotencyKey);
+  Future<dynamic> delete(String path,
+          {Map<String, dynamic>? body, String? idempotencyKey}) =>
+      request('DELETE', path, body: body, idempotencyKey: idempotencyKey);
 
   void close() => _client.close();
 }
