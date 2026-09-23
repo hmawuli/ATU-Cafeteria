@@ -29,6 +29,7 @@ $customerRoutes = function () {
     Route::middleware(['auth:sanctum', InactivityTimeout::class, 'role:STUDENT'])->group(function () {
         Route::get('/me', [AuthController::class, 'me']);
         Route::post('/logout', [AuthController::class, 'logout']);
+        Route::post('/pin/change', [AuthController::class, 'changePin'])->middleware('idempotency:required');
 
         Route::get('/orders', [OrderController::class, 'getAuthenticatedStudentOrders']);
         Route::get('/purchased-vendors', [OrderController::class, 'getPurchasedVendors']);
