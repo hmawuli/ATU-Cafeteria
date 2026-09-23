@@ -32,6 +32,7 @@ return Application::configure(basePath: dirname(__DIR__))
             EnsureSecureTransport::class,
             RequireAuthenticatedApiRoutes::class,
             RequestIdMiddleware::class,
+            IdempotencyMiddleware::class,
         ]);
 
         $middleware->alias([
