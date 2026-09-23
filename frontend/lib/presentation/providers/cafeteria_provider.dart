@@ -267,7 +267,7 @@ class CafeteriaProvider extends ChangeNotifier {
   Future<List<FoodItem>> _syncRemoteFoodItems() async {
     try {
       final response = await http.get(
-        Uri.parse('$_laravelBaseUrl/api/food-items'),
+        Uri.parse('$_laravelBaseUrl/api/catalog/food-items'),
         headers: const {
           'Accept': 'application/json',
         },
