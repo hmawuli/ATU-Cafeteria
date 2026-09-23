@@ -26,7 +26,7 @@ $customerRoutes = function () {
     Route::post('/register', [CustomerAuthController::class, 'register'])->middleware('throttle:auth');
     Route::post('/login', [CustomerAuthController::class, 'login'])->middleware('throttle:auth');
 
-    Route::middleware(['auth:sanctum', InactivityTimeout::class, 'role:STUDENT,ADMIN'])->group(function () {
+    Route::middleware(['auth:sanctum', InactivityTimeout::class, 'role:STUDENT'])->group(function () {
         Route::get('/me', [AuthController::class, 'me']);
         Route::post('/logout', [AuthController::class, 'logout']);
 
