@@ -1,0 +1,47 @@
+name: ATU Cafeteria Defense APK
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build-defense:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.35.4'
+          cache: true
+
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+          cache: gradle
+
+      - name: Install dependencies
+        run: flutter pub get
+
+      - name: Analyze
+        run: flutter analyze
+
+      - name: Test
+        run: flutter test
+
+      - name: Build offline defense APK
+        run: flutter build apk --release --dart-define=ATU_DEFENSE_MODE=true
+
+      - name: Publish defense APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: atu-cafeteria-defense-apk
+          path: frontend/build/app/outputs/flutter-apk/app-release.apk
+          if-no-files-found: error
+          retention-days: 14
