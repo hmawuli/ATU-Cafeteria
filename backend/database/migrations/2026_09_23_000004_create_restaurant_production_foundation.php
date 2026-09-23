@@ -36,12 +36,10 @@ return new class extends Migration
                 ]);
             });
 
-            $indexes = [
-                ['orders_order_number_unique' => 'order_number'],
-            ];
-            foreach ($indexes as $index => $columns) {
-                $name = array_key_first($indexes[$index]);
-                try { Schema::table('orders', fn (Blueprint $table) => $table->unique($columns, $name)); } catch (\Throwable) {}
+            try {
+                Schema::table('orders', fn (Blueprint $table) => $table->unique('order_number', 'orders_order_number_unique'));
+            } catch (\Throwable) {
+                // Existing deployments may already contain this constraint.
             }
         }
 
