@@ -1,4 +1,4 @@
-name: ATU Cafeteria Flutter CI
+name: ATU Cafeteria CI
 
 on:
   push:
@@ -10,6 +10,54 @@ permissions:
   contents: read
 
 jobs:
+  backend:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.2'
+          extensions: mbstring, xml, ctype, iconv, json, bcmath, sqlite, pdo_sqlite
+          coverage: none
+          tools: composer:v2
+
+      - name: Validate Composer configuration
+        run: composer validate --strict
+
+      - name: Install PHP dependencies
+        run: composer install --no-ansi --no-interaction --no-progress --prefer-dist
+
+      - name: Prepare test environment
+        run: |
+          cp .env.example .env
+          mkdir -p database
+          touch database/database.sqlite
+          php artisan key:generate --force
+
+      - name: Run database migrations
+        env:
+          DB_CONNECTION: sqlite
+          DB_DATABASE: database/database.sqlite
+        run: php artisan migrate --force
+
+      - name: Audit PHP dependencies
+        run: composer audit --no-interaction
+
+      - name: Run Laravel tests
+        env:
+          DB_CONNECTION: sqlite
+          DB_DATABASE: database/database.sqlite
+        run: php artisan test
+
+      - name: Check PHP code style
+        run: ./vendor/bin/pint --test
+
   frontend:
     runs-on: ubuntu-latest
     defaults:
@@ -48,9 +96,13 @@ jobs:
         run: flutter test
 
       - name: Build release APK
+        env:
+          ATU_REQUIRE_PROD_SIGNING: "false"
         run: flutter build apk --release
 
       - name: Build release Android App Bundle
+        env:
+          ATU_REQUIRE_PROD_SIGNING: "false"
         run: flutter build appbundle --release
 
       - name: Verify release artifacts
@@ -60,10 +112,10 @@ jobs:
           ls -lh build/app/outputs/flutter-apk/app-release.apk
           ls -lh build/app/outputs/bundle/release/app-release.aab
 
-      - name: Upload release artifacts
+      - name: Upload release validation artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: atu-cafeteria-flutter-release-validation
+          name: atu-cafeteria-release-validation
           path: |
             frontend/build/app/outputs/flutter-apk/app-release.apk
             frontend/build/app/outputs/bundle/release/app-release.aab
