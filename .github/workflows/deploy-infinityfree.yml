@@ -55,7 +55,7 @@ jobs:
         run: bash scripts/build_infinityfree_bundle.sh deploy-artifacts
 
       - name: Upload bundle as artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: infinityfree-webroot
           path: deploy-artifacts/atu_cafeteria_webroot.zip
