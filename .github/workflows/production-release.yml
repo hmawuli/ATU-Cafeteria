@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
     inputs:
       version:
-        description: "Release version, for example 1.2.0+3"
+        description: "Release label, for example 1.2.0+3"
         required: true
         type: string
       confirm:
@@ -59,7 +59,7 @@ jobs:
           ATU_KEYSTORE_PASSWORD: ${{ secrets.ATU_KEYSTORE_PASSWORD }}
           ATU_KEY_ALIAS: ${{ secrets.ATU_KEY_ALIAS }}
           ATU_KEY_PASSWORD: ${{ secrets.ATU_KEY_PASSWORD }}
-        run: flutter build apk --release --build-name "${{ inputs.version }}"
+        run: flutter build apk --release
 
       - name: Remove keystore
         if: always()
