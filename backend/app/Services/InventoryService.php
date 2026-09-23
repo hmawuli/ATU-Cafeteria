@@ -2,10 +2,8 @@
 
 namespace App\Services;
 
-use App\Models\InventoryMovement;
 use App\Models\MenuItem;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Str;
 use RuntimeException;
 
 class InventoryService
@@ -28,17 +26,7 @@ class InventoryService
             if ($next === 0) $locked->is_available = false;
             $locked->save();
 
-            InventoryMovement::create([
-                'vendor_id' => $locked->vendor_id,
-                'menu_item_id' => $locked->id,
-                'order_id' => $orderId,
-                'type' => strtoupper($type),
-                'quantity' => $delta,
-                'balance_after' => $next,
-                'reference' => 'INV-'.strtoupper(Str::random(12)),
-                'reason' => $reason,
-                'performed_by' => $performedBy,
-            ]);
+
 
             return $locked;
         });
