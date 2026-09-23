@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:atu_cafeteria/core/theme/app_theme.dart';
-import 'package:atu_cafeteria/core/config/defense_config.dart';
 import 'package:atu_cafeteria/presentation/providers/cafeteria_provider.dart';
 import 'package:atu_cafeteria/presentation/providers/admin_state_provider.dart';
 import 'package:atu_cafeteria/presentation/providers/cart_provider.dart';
@@ -27,7 +26,6 @@ import 'package:atu_cafeteria/presentation/screens/reference_vendor_screen.dart'
 import 'package:atu_cafeteria/presentation/screens/reference_admin_screen.dart';
 import 'package:atu_cafeteria/presentation/screens/notifications_screen.dart';
 import 'package:atu_cafeteria/presentation/screens/splash_screen.dart';
-import 'package:atu_cafeteria/presentation/screens/defense_mode_screen.dart';
 import 'package:atu_cafeteria/core/config/server_config.dart';
 import 'package:atu_cafeteria/domain/models/models.dart';
 
@@ -42,15 +40,6 @@ class ATUCafeteriaApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    if (DefenseConfig.enabled) {
-      return MaterialApp(
-        title: 'ATU Cafeteria Defense',
-        debugShowCheckedModeBanner: false,
-        theme: AppTheme.light(),
-        home: const DefenseModeScreen(),
-      );
-    }
-
     return MultiProvider(
       providers: [
         Provider<ApiClient>(create: (_) => ApiClient()),
