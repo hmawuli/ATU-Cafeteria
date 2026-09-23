@@ -1648,6 +1648,8 @@ class OrderController extends Controller
             'points_to_redeem' => 'nullable|integer|min:0|max:100000',
             'payment_method' => 'nullable|string|in:wallet,momo,card,WALLET,MOMO,CARD',
             'payment_reference' => 'nullable|string|max:120',
+            'order_type' => 'nullable|string|in:TAKEAWAY,PICKUP,DINE_IN,DELIVERY',
+            'customer_note' => 'nullable|string|max:1000',
         ]);
 
         $validator->after(function ($validator) use ($request) {
@@ -1682,6 +1684,7 @@ class OrderController extends Controller
                 $lockedUser = User::whereKey($user->id)->lockForUpdate()->firstOrFail();
                 $pointsToRedeem = (int) $request->input('points_to_redeem', 0);
                 $paymentMethod = strtoupper((string) $request->input('payment_method', 'wallet'));
+                $orderType = strtoupper((string) $request->input('order_type', 'TAKEAWAY'));
                 $paymentReference = trim((string) $request->input('payment_reference', ''));
                 $total = 0.0;
                 $items = [];
@@ -1771,6 +1774,19 @@ class OrderController extends Controller
                     $itemName = $catalogItem->name ?: ($catalogItem->food_name ?? 'Meal');
 
                     $order = Order::create([
+                        'order_number' => 'CAF-'.now()->format('ymdHis').'-'.strtoupper(Str::random(5)),
+                        'order_type' => $orderType,
+                        'payment_method' => $paymentMethod,
+                        'payment_status' => 'PAID',
+                        'subtotal' => $item['lineTotal'],
+                        'discount_amount' => $itemDiscount,
+                        'tax_amount' => 0,
+                        'service_fee' => 0,
+                        'delivery_fee' => 0,
+                        'grand_total' => max(0.0, round($item['lineTotal'] - $itemDiscount, 2)),
+                        'currency' => 'GHS',
+                        'customer_note' => $request->input('customer_note'),
+                        'placed_at' => now(),
                         'customer_id' => $lockedUser->id,
                         'student_id' => $lockedUser->id,
                         'user_id' => $lockedUser->id,
@@ -1790,11 +1806,22 @@ class OrderController extends Controller
                     ]);
 
                     if ($item['is_menu_item'] && $catalogItem->current_stock !== null) {
-                        $catalogItem->decrement('current_stock', $item['quantity']);
-                        if (($catalogItem->current_stock - $item['quantity']) <= 0) {
-                            $catalogItem->update(['is_available' => false]);
-                        }
+                        $catalogItem->current_stock = max(0, (int) $catalogItem->current_stock - $item['quantity']);
+                        $catalogItem->is_available = $catalogItem->current_stock > 0;
+                        $catalogItem->save();
                     }
+
+                    \App\Models\OrderItem::create([
+                        'order_id' => $order->id,
+                        'food_item_id' => $item['is_menu_item'] ? (int) ($catalogItem->food_item_id ?? 0) : (int) $catalogItem->id,
+                        'name' => $itemName,
+                        'name_snapshot' => $itemName,
+                        'quantity' => $item['quantity'],
+                        'unit_price' => $item['unitPrice'],
+                        'total_price' => $order->total_price,
+                        'discount_amount' => $itemDiscount,
+                        'line_total' => $order->total_price,
+                    ]);
 
                     AuditLog::create([
                         'user_id' => $lockedUser->id,
@@ -1812,14 +1839,29 @@ class OrderController extends Controller
                 $lockedUser->save();
 
                 if ($paymentMethod === 'WALLET') {
-                    WalletTransaction::create([
-                        'user_id' => $lockedUser->id,
-                        'type' => 'PAYMENT',
-                        'amount' => -$finalTotal,
-                        'status' => 'SUCCESS',
-                        'reference' => 'CART-ORD-'.Str::upper(Str::random(20)),
-                        'details' => 'Cafeteria cart checkout payment.',
-                    ]);
+                    $beforeBalance = round((float) $lockedUser->balance + $finalTotal, 2);
+                    foreach ($createdOrders as $createdOrder) {
+                        WalletTransaction::create([
+                            'user_id' => $lockedUser->id,
+                            'order_id' => $createdOrder->id,
+                            'type' => 'PAYMENT',
+                            'amount' => -$createdOrder->total_price,
+                            'status' => 'SUCCESS',
+                            'source' => 'ORDER',
+                            'performed_by' => $lockedUser->id,
+                            'balance_before' => $beforeBalance,
+                            'balance_after' => round($beforeBalance - $createdOrder->total_price, 2),
+                            'reference' => 'CART-ORD-'.Str::upper(Str::random(20)),
+                            'details' => 'Cafeteria cart checkout payment for '.$createdOrder->order_number.'.',
+                        ]);
+                        $beforeBalance = round($beforeBalance - $createdOrder->total_price, 2);
+                    }
+                } else {
+                    foreach ($createdOrders as $createdOrder) {
+                        \App\Models\Payment::where('reference', $paymentReference)
+                            ->whereNull('order_id')
+                            ->update(['order_id' => $createdOrder->id]);
+                    }
                 }
 
                 return [
