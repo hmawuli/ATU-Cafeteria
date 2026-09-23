@@ -21,7 +21,6 @@ import 'package:atu_cafeteria/presentation/screens/kfc_ordering_screen.dart';
 import 'package:atu_cafeteria/presentation/screens/order_tracking_screen.dart';
 import 'package:atu_cafeteria/presentation/screens/group_order_screen.dart';
 import 'package:atu_cafeteria/presentation/screens/food_detail_screen.dart';
-import 'package:atu_cafeteria/presentation/screens/mobile_student_screen.dart';
 import 'package:atu_cafeteria/presentation/screens/customer_home_screen.dart';
 import 'package:atu_cafeteria/presentation/screens/reference_vendor_screen.dart';
 import 'package:atu_cafeteria/presentation/screens/reference_admin_screen.dart';
