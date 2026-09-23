@@ -2,6 +2,7 @@
 
 use App\Http\Middleware\AuditAndSanitizeOrderMiddleware;
 use App\Http\Middleware\EnsureSecureTransport;
+use App\Http\Middleware\IdempotencyMiddleware;
 use App\Http\Middleware\PermissionMiddleware;
 use App\Http\Middleware\RequestIdMiddleware;
 use App\Http\Middleware\RequestPerformanceLogMiddleware;
@@ -22,7 +23,6 @@ return Application::configure(basePath: dirname(__DIR__))
         health: '/up'
     )
     ->withMiddleware(function (Middleware $middleware) {
-        // Disable CSRF verification for API endpoints
         $middleware->validateCsrfTokens(except: [
             'api/*',
         ]);
@@ -37,21 +37,13 @@ return Application::configure(basePath: dirname(__DIR__))
         $middleware->alias([
             'role' => RoleMiddleware::class,
             'permission' => PermissionMiddleware::class,
+            'idempotency' => IdempotencyMiddleware::class,
         ]);
 
-        // Add CORS support
         $middleware->append(HandleCors::class);
-
-        // Security headers middleware
         $middleware->append(SecureHeadersMiddleware::class);
-
-        // Request performance logging middleware
         $middleware->append(RequestPerformanceLogMiddleware::class);
-
-        // System error database logger middleware
         $middleware->append(SystemErrorLoggerMiddleware::class);
-
-        // Audit and sanitize incoming order requests middleware
         $middleware->append(AuditAndSanitizeOrderMiddleware::class);
     })
     ->withExceptions(function (Exceptions $exceptions) {
