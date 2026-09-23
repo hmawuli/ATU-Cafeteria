@@ -1,62 +1,50 @@
 # Laravel API Deployment — Railway
 
-The deployable backend is the `backend/` directory. Railway builds it with
-Nixpacks (`railway.json`) and runs migrations before starting the HTTP service.
+The deployable backend is the `backend/` directory. Railway builds it with Nixpacks (`railway.json`) and runs migrations before starting the HTTP service.
 
-## Fastest path to a fully working demo
+## Production deployment
 
-1. **Create a Railway project** → **New Service → Deploy from GitHub repo**
-   (`hmawuli/ATU-Cafeteria`), set the **service root to `backend/`**.
-2. **Set environment variables** (Variables tab):
+1. **Create a Railway project** → **New Service → Deploy from GitHub repo** (`hmawuli/ATU-Cafeteria`), with the service root set to `backend/`.
+2. **Set environment variables** in Railway:
    ```env
    APP_ENV=production
    APP_DEBUG=false
-   APP_KEY=<paste from: php artisan key:generate --show>
+   APP_KEY=<generated application key>
    APP_URL=https://<your-railway-domain>
-   DB_CONNECTION=sqlite
-   PAYSTACK_SECRET_KEY=<optional, only for real payments>
+   DB_CONNECTION=pgsql
+   DB_HOST=<postgres-host>
+   DB_PORT=5432
+   DB_DATABASE=<database>
+   DB_USERNAME=<username>
+   DB_PASSWORD=<password>
+   PAYSTACK_SECRET_KEY=<production secret>
+   PAYSTACK_DEMO_MODE=false
    ```
-3. **Add a Volume** to the backend service:
-   - Mount path: **`/app/database`**
-   - This keeps the SQLite file (`database/database.sqlite`) on a persistent
-     disk — without it, all data is wiped on every redeploy/restart. Single
-     volume, ~1 GB is plenty.
-4. **Seed demo data once** after the first deploy (the app needs menu items,
-   vendors and users to be usable):
-   - Railway → backend service → **Connect shell** (or a one-off command):
-     ```
-     php artisan db:seed --force
-     ```
-   - This creates the demo users (students `PIN 1234`, vendors
-     `maryjoint/1111`, `atkitch/2222`, `snackbag/3333`, admin `admin123`),
-     the food catalogue, orders and wallet history.
-5. **Point the phone app at the backend** — no rebuild needed:
-   - Open the app → login screen → **API server settings** (link under the
-     "Secure ATU Cafeteria access" row).
-   - Enter `https://<your-railway-domain>` → **Save**.
-   - The same installed APK now works anywhere (4G/Wi-Fi, laptop off).
+3. **Use managed PostgreSQL for production** rather than relying on a local SQLite file for a long-lived multi-user deployment.
+4. Configure the production frontend origins through `CORS_ALLOWED_ORIGINS` and keep all secrets in Railway Variables.
+5. Run database migrations during deployment and seed only controlled production reference data. Do not use development credentials in production.
+6. Point the Flutter application to the deployed API using the production API configuration.
 
-## Notes
+## Security requirements
 
-- **Do not commit `.env` or secrets.** All config is set through Railway's
-  Variables panel.
-- **SQLite + volume is perfect for a demo/defense.** For a long-lived
-  multi-user production system, prefer a Railway-managed **PostgreSQL**
-  (set `DB_CONNECTION=pgsql`, `DB_HOST`, `DB_PORT`, `DB_DATABASE`,
-  `DB_USERNAME`, `DB_PASSWORD`) — the code works with either.
-- LLRT/stateless caveat: sessions and the file cache are ephemeral per
-  instance, which is fine for the API (token auth is stateless).
+- **Do not commit `.env` or secrets.**
+- Keep Paystack secret credentials server-side.
+- Keep `PAYSTACK_DEMO_MODE=false` in production.
+- Use HTTPS for the deployed API.
+- Use a managed PostgreSQL database for production workloads.
+- Restrict CORS to known production application origins.
+- Back up the production database and test restoration procedures.
 
 ## Health checks
 
 - Laravel health: `https://<domain>/up`
 - API health: `https://<domain>/api/health`
 
-## After deployment checklist
+## Post-deployment verification
 
-1. Open `/api/health` in a browser — expect `{"status":"UP",...}`.
-2. Seed data (step 4 above) if you want the demo catalogue.
-3. In the app, set the **API server** URL and sign in
-   (`maryjoint / 1111` for a vendor, `admin123` for admin).
-4. Confirm menu reads → order placement → vendor order workflow → admin
-   dashboard.
+1. Open `/api/health` and confirm the service reports healthy status.
+2. Verify authentication and authorization flows.
+3. Verify menu reads and order placement.
+4. Verify vendor order processing and pickup verification.
+5. Verify wallet and Paystack payment verification.
+6. Review application logs and audit records for unexpected errors.
