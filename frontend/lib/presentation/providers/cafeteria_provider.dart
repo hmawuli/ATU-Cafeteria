@@ -436,6 +436,12 @@ class CafeteriaProvider extends ChangeNotifier {
   }
 
   Future<void> _seedDatabaseIfEmpty() async {
+    // Demo identities/catalogue are development fixtures only. Production
+    // builds must never manufacture accounts or menu records on the device.
+    if (!kDebugMode) {
+      return;
+    }
+
     try {
       final userCount = await _db.getUserCount();
       if (userCount > 0) return;
