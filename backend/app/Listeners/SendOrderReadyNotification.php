@@ -4,6 +4,7 @@ namespace App\Listeners;
 
 use App\Events\OrderStatusReady;
 use App\Models\User;
+use App\Models\CustomerDevice;
 use App\Notifications\OrderReadyNotification;
 use App\Services\FcmService;
 
@@ -25,26 +26,20 @@ class SendOrderReadyNotification
             if ($student) {
                 $student->notify(new OrderReadyNotification($order));
 
-                // Dispatch FCM Push notification
-                $fcmToken = null;
-                if ($student->profile_info && is_array($student->profile_info)) {
-                    $fcmToken = $student->profile_info['fcm_token'] ?? null;
-                }
-
-                // Fallback token for simulation/development testing
-                if (! $fcmToken) {
-                    $fcmToken = "simulated-fcm-token-student-id-{$student->id}";
-                }
-
                 $title = 'Order Ready for Pickup! 🍔';
-                $body = "Your order #{$order->id} ('{$order->food_name}') is ready! Pickup PIN: {$order->pickup_pin}.";
+                $body = "Your order #{$order->id} ('{$order->food_name}') is ready.";
                 $data = [
                     'order_id' => strval($order->id),
-                    'pickup_pin' => strval($order->pickup_pin),
                     'status' => 'READY',
                 ];
 
-                FcmService::sendPush($fcmToken, $title, $body, $data);
+                CustomerDevice::where('customer_id', $student->id)
+                    ->active()
+                    ->whereNotNull('push_token')
+                    ->get()
+                    ->each(function (CustomerDevice $device) use ($title, $body, $data) {
+                        FcmService::sendPush($device->push_token, $title, $body, $data);
+                    });
             }
         }
     }
