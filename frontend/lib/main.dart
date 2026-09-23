@@ -22,6 +22,7 @@ import 'package:atu_cafeteria/presentation/screens/order_tracking_screen.dart';
 import 'package:atu_cafeteria/presentation/screens/group_order_screen.dart';
 import 'package:atu_cafeteria/presentation/screens/food_detail_screen.dart';
 import 'package:atu_cafeteria/presentation/screens/mobile_student_screen.dart';
+import 'package:atu_cafeteria/presentation/screens/customer_home_screen.dart';
 import 'package:atu_cafeteria/presentation/screens/reference_vendor_screen.dart';
 import 'package:atu_cafeteria/presentation/screens/reference_admin_screen.dart';
 import 'package:atu_cafeteria/presentation/screens/notifications_screen.dart';
@@ -45,9 +46,7 @@ class ATUCafeteriaApp extends StatelessWidget {
         Provider<ApiClient>(create: (_) => ApiClient()),
         ChangeNotifierProvider(create: (_) => CafeteriaProvider()),
         ChangeNotifierProvider(create: (_) => CartProvider()),
-        ChangeNotifierProvider(
-          create: (ctx) => AdminStateProvider(ctx.read<ApiClient>()),
-        ),
+        ChangeNotifierProvider(create: (ctx) => AdminStateProvider(ctx.read<ApiClient>())),
       ],
       child: MaterialApp(
         title: 'ATU Cafeteria',
@@ -60,6 +59,7 @@ class ATUCafeteriaApp extends StatelessWidget {
           '/home': (_) => const PublicHomeScreen(),
           '/login': (_) => const LoginScreen(),
           '/register': (_) => const RegisterScreen(),
+          '/customer': (_) => const CustomerHomeScreen(),
           '/student': (_) => const MobileStudentScreen(),
           '/vendor': (_) => const VendorOrderWorkflowScreen(),
           '/vendor-dashboard': (_) => const ReferenceVendorScreen(),
@@ -77,16 +77,12 @@ class ATUCafeteriaApp extends StatelessWidget {
           '/group-order': (_) => const GroupOrderScreen(),
           '/food-detail': (context) {
             final item = ModalRoute.of(context)?.settings.arguments;
-            return item is FoodItem
-                ? FoodDetailScreen(item: item)
-                : const Scaffold(body: Center(child: Text('Invalid food item.')));
+            return item is FoodItem ? FoodDetailScreen(item: item) : const Scaffold(body: Center(child: Text('Invalid food item.')));
           },
           '/order-tracking': (context) {
             final id = ModalRoute.of(context)?.settings.arguments;
             final orderId = id is int ? id : int.tryParse(id?.toString() ?? '');
-            return orderId == null
-                ? const Scaffold(body: Center(child: Text('Invalid order ID.')))
-                : OrderTrackingScreen(orderId: orderId);
+            return orderId == null ? const Scaffold(body: Center(child: Text('Invalid order ID.'))) : OrderTrackingScreen(orderId: orderId);
           },
         },
       ),
