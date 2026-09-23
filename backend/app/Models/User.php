@@ -98,7 +98,16 @@ class User extends Authenticatable
 
     public function routeNotificationForMail($notification)
     {
-        if (filter_var($this->username, FILTER_VALIDATE_EMAIL)) return $this->username;
-        return $this->username.'@atu.edu.gh';
+        $email = $this->emailAddress();
+        if ($email) {
+            return $email;
+        }
+
+        if (filter_var($this->username, FILTER_VALIDATE_EMAIL)) {
+            return $this->username;
+        }
+
+        // Legacy institutional fallback remains only for non-customer accounts.
+        return $this->isCustomer() ? null : $this->username.'@atu.edu.gh';
     }
 }
