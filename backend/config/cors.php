@@ -7,15 +7,15 @@ return [
     | Cross-Origin Resource Sharing (CORS) Configuration
     |--------------------------------------------------------------------------
     |
-    | Local Flutter web development uses a dynamically assigned localhost
-    | port, so development origins are matched by pattern. Production
-    | deployments should set CORS_ALLOWED_ORIGINS explicitly.
+    | Production origins must be supplied explicitly through
+    | CORS_ALLOWED_ORIGINS. Localhost patterns remain available for local
+    | Flutter web development.
     |
     */
 
     'paths' => ['api/*', 'sanctum/csrf-cookie'],
 
-    'allowed_methods' => ['*'],
+    'allowed_methods' => ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
 
     'allowed_origins' => array_values(array_filter(array_map(
         'trim',
@@ -30,11 +30,18 @@ return [
         '#^http://127\.0\.0\.1:\\d+$#',
     ],
 
-    'allowed_headers' => ['*'],
+    'allowed_headers' => [
+        'Accept',
+        'Authorization',
+        'Content-Type',
+        'Origin',
+        'X-Requested-With',
+        'X-Request-ID',
+    ],
 
-    'exposed_headers' => ['X-Auth-Token'],
+    'exposed_headers' => ['X-Request-ID', 'X-Auth-Token'],
 
-    'max_age' => 0,
+    'max_age' => 86400,
 
     'supports_credentials' => env('CORS_SUPPORTS_CREDENTIALS', false),
 
