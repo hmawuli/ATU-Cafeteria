@@ -123,7 +123,7 @@ class AdminOperationsController extends Controller
 
             $payment = Payment::where('order_id', $lockedOrder->id)->latest()->lockForUpdate()->first();
 
-            if ($lockedOrder->payment_method === 'WALLET' || ! $payment) {
+            if ($lockedOrder->payment_method === 'WALLET') {
                 $before = round((float) $customer->balance, 2);
                 $customer->balance = round($before + $amount, 2);
                 $customer->save();
@@ -213,7 +213,7 @@ class AdminOperationsController extends Controller
             ->whereBetween('created_at', [$start.' 00:00:00', $end.' 23:59:59'])
             ->sum(DB::raw('COALESCE(grand_total, total_price)'));
 
-        $refunds = (float) Refund::where('requested_by', '!=', null)
+        $refunds = (float) Refund::whereNotNull('requested_by')
             ->whereHas('order', fn ($q) => $q->where('vendor_id', $vendorId))
             ->where('status', 'SUCCESS')
             ->whereBetween('created_at', [$start.' 00:00:00', $end.' 23:59:59'])
