@@ -1,4 +1,4 @@
-name: Flutter CI
+name: ATU Cafeteria CI
 
 on:
   push:
@@ -7,7 +7,36 @@ on:
     branches: [main]
 
 jobs:
-  analyze:
+  backend:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.2'
+          extensions: mbstring, sqlite3, pdo_sqlite
+          coverage: none
+          tools: composer:v2
+
+      - name: Validate Composer configuration
+        run: composer validate --strict
+
+      - name: Install PHP dependencies
+        run: composer install --no-interaction --prefer-dist --no-progress
+
+      - name: Audit PHP dependencies
+        run: composer audit --no-interaction
+
+      - name: Run Laravel tests
+        run: php artisan test
+
+  frontend:
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -19,7 +48,7 @@ jobs:
       - name: Setup Flutter
         uses: subosito/flutter-action@v2
         with:
-          channel: stable
+          flutter-version: '3.35.4'
           cache: true
 
       - name: Install dependencies
@@ -40,3 +69,4 @@ jobs:
           name: atu-cafeteria-release-apk
           path: frontend/build/app/outputs/flutter-apk/app-release.apk
           if-no-files-found: error
+          retention-days: 14
