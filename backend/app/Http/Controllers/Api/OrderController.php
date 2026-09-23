@@ -1316,7 +1316,7 @@ class OrderController extends Controller
      * Cancel an order.
      * Users can only cancel orders if the current status is 'PENDING' or 'ORDER_PLACED'.
      */
-    public function cancel(Request $request, $id)
+    public function cancel(Request $request, $id, \App\Services\PaystackRefundService $paystackRefunds)
     {
         $user = $request->user();
         if (! $user) {
@@ -1442,6 +1442,23 @@ class OrderController extends Controller
                 return $lockedOrder;
             }, 3);
 
+            $gatewayRefund = null;
+            if (strtoupper((string) $updatedOrder->payment_method) !== 'WALLET' && $updatedOrder->payment_id) {
+                $payment = \App\Models\Payment::find($updatedOrder->payment_id);
+                $refund = \App\Models\Refund::where('order_id', $updatedOrder->id)
+                    ->where('status', 'PENDING')
+                    ->latest()
+                    ->first();
+
+                if ($payment && $refund) {
+                    try {
+                        $gatewayRefund = $paystackRefunds->initiate($payment, $refund);
+                    } catch (\Throwable $e) {
+                        report($e);
+                    }
+                }
+            }
+
             try {
                 $customerId = (int) ($updatedOrder->customer_id ?: $updatedOrder->user_id);
                 $customer = User::find($customerId);
@@ -1456,7 +1473,9 @@ class OrderController extends Controller
                 'success' => true,
                 'message' => strtoupper((string) $updatedOrder->payment_method) === 'WALLET'
                     ? 'Order cancelled and wallet refund completed.'
-                    : 'Order cancelled. Refund has been queued for processing.',
+                    : ($gatewayRefund && $gatewayRefund->status === 'FAILED'
+                        ? 'Order cancelled, but the gateway refund could not be initiated. Please review the refund record.'
+                        : 'Order cancelled. Refund has been submitted for processing.'),
                 'order' => $updatedOrder,
             ], 200);
         } catch (\RuntimeException $e) {
