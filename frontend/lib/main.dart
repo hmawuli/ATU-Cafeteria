@@ -46,7 +46,9 @@ class ATUCafeteriaApp extends StatelessWidget {
         Provider<ApiClient>(create: (_) => ApiClient()),
         ChangeNotifierProvider(create: (_) => CafeteriaProvider()),
         ChangeNotifierProvider(create: (_) => CartProvider()),
-        ChangeNotifierProvider(create: (ctx) => AdminStateProvider(ctx.read<ApiClient>())),
+        ChangeNotifierProvider(
+          create: (ctx) => AdminStateProvider(ctx.read<ApiClient>()),
+        ),
       ],
       child: MaterialApp(
         title: 'ATU Cafeteria',
@@ -60,7 +62,9 @@ class ATUCafeteriaApp extends StatelessWidget {
           '/login': (_) => const LoginScreen(),
           '/register': (_) => const RegisterScreen(),
           '/customer': (_) => const CustomerHomeScreen(),
-          '/student': (_) => const MobileStudentScreen(),
+          // Kept as a compatibility route for existing deep links. New
+          // customer-facing flows should use /customer.
+          '/student': (_) => const CustomerHomeScreen(),
           '/vendor': (_) => const VendorOrderWorkflowScreen(),
           '/vendor-dashboard': (_) => const ReferenceVendorScreen(),
           '/admin': (_) => const ReferenceAdminScreen(),
@@ -77,12 +81,16 @@ class ATUCafeteriaApp extends StatelessWidget {
           '/group-order': (_) => const GroupOrderScreen(),
           '/food-detail': (context) {
             final item = ModalRoute.of(context)?.settings.arguments;
-            return item is FoodItem ? FoodDetailScreen(item: item) : const Scaffold(body: Center(child: Text('Invalid food item.')));
+            return item is FoodItem
+                ? FoodDetailScreen(item: item)
+                : const Scaffold(body: Center(child: Text('Invalid food item.')));
           },
           '/order-tracking': (context) {
             final id = ModalRoute.of(context)?.settings.arguments;
             final orderId = id is int ? id : int.tryParse(id?.toString() ?? '');
-            return orderId == null ? const Scaffold(body: Center(child: Text('Invalid order ID.'))) : OrderTrackingScreen(orderId: orderId);
+            return orderId == null
+                ? const Scaffold(body: Center(child: Text('Invalid order ID.')))
+                : OrderTrackingScreen(orderId: orderId);
           },
         },
       ),
