@@ -31,6 +31,10 @@ class Order extends Model
         'estimated_pickup_time',
         'points_redeemed',
         'discount_applied',
+        'order_number', 'order_type', 'payment_method', 'payment_status',
+        'subtotal', 'discount_amount', 'tax_amount', 'service_fee', 'delivery_fee',
+        'grand_total', 'currency', 'customer_note', 'cancellation_reason',
+        'placed_at', 'confirmed_at', 'cancelled_at',
     ];
 
     protected $casts = [
@@ -47,6 +51,10 @@ class Order extends Model
         'order_status' => 'string',
         'points_redeemed' => 'integer',
         'discount_applied' => 'double',
+        'subtotal' => 'decimal:2', 'discount_amount' => 'decimal:2',
+        'tax_amount' => 'decimal:2', 'service_fee' => 'decimal:2',
+        'delivery_fee' => 'decimal:2', 'grand_total' => 'decimal:2',
+        'placed_at' => 'datetime', 'confirmed_at' => 'datetime', 'cancelled_at' => 'datetime',
     ];
 
     protected static function booted(): void
@@ -148,5 +156,25 @@ class Order extends Model
     public function feedback()
     {
         return $this->hasOne(Feedback::class, 'order_id');
+    }
+
+    public function statusHistory()
+    {
+        return $this->hasMany(OrderStatusHistory::class, 'order_id')->orderBy('changed_at');
+    }
+
+    public function payments()
+    {
+        return $this->hasMany(Payment::class, 'order_id');
+    }
+
+    public function inventoryMovements()
+    {
+        return $this->hasMany(InventoryMovement::class, 'order_id');
+    }
+
+    public function refunds()
+    {
+        return $this->hasMany(Refund::class, 'order_id');
     }
 }
