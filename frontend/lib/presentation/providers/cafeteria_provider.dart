@@ -191,7 +191,7 @@ class CafeteriaProvider extends ChangeNotifier {
     }
 
     try {
-      final url = Uri.parse("$_laravelBaseUrl/api/student/purchased-vendors");
+      final url = Uri.parse("$_laravelBaseUrl/api/customer/purchased-vendors");
       final client = HttpClient();
       client.connectionTimeout = const Duration(seconds: 4);
       final request = await client.getUrl(url);
@@ -623,7 +623,7 @@ class CafeteriaProvider extends ChangeNotifier {
   Future<void> pollReadyOrders() async {
     if (_authToken == null || _currentUser?.role != 'STUDENT') return;
     try {
-      final url = Uri.parse('$_laravelBaseUrl/api/student/orders/poll-ready');
+      final url = Uri.parse('$_laravelBaseUrl/api/customer/orders/poll-ready');
       final response = await http.get(url, headers: {
         'Accept': 'application/json',
         'Authorization': 'Bearer $_authToken',
@@ -1039,7 +1039,7 @@ class CafeteriaProvider extends ChangeNotifier {
     }
 
     try {
-      final registerUrl = Uri.parse('$_laravelBaseUrl/api/student/register');
+      final registerUrl = Uri.parse('$_laravelBaseUrl/api/customer/register');
       final response = await http
           .post(
             registerUrl,
