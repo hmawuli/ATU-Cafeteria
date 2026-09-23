@@ -153,6 +153,11 @@ class PaystackPaymentController extends Controller
 
         $this->completeWalletTransaction($transaction->id, $user->id, $amountPaid, $purpose, $reference);
 
+        Payment::where('reference', $reference)->update([
+            'gateway_transaction_id' => (string) data_get($data ?? [], 'id', ''),
+            'gateway_response' => $data ?? null,
+        ]);
+
         return response()->json(['success' => true, 'message' => 'Paystack payment verified successfully.', 'reference' => $reference, 'amount' => $amountPaid, 'purpose' => $purpose]);
     }
 
@@ -294,8 +299,6 @@ class PaystackPaymentController extends Controller
             if ($payment) {
                 $payment->status = 'SUCCESS';
                 $payment->amount = $amountPaid;
-                $payment->gateway_transaction_id = (string) data_get($data ?? [], 'id', $payment->gateway_transaction_id);
-                $payment->gateway_response = $data ?? $payment->gateway_response;
                 $payment->paid_at = now();
                 $payment->save();
             }
