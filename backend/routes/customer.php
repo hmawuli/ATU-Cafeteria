@@ -50,6 +50,10 @@ $customerRoutes = function () {
         Route::get('/loyalty', [LoyaltyController::class, 'index']);
         Route::get('/loyalty/summary', [LoyaltyController::class, 'summary']);
 
+        Route::get('/reviews', [\App\Http\Controllers\Api\DeliveredOrderReviewController::class, 'index']);
+        Route::post('/reviews', [\App\Http\Controllers\Api\DeliveredOrderReviewController::class, 'store'])
+            ->middleware('idempotency:required');
+
         Route::get('/wallet', [WalletController::class, 'index']);
         Route::post('/wallet/top-up', [WalletController::class, 'topUp'])
             ->middleware(['throttle:payments', 'idempotency:required']);
