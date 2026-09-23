@@ -18,6 +18,6 @@ return [
         'dashboard.view', 'orders.view', 'orders.create', 'wallet.view', 'wallet.transact', 'feedback.create', 'recommendations.view', 'queue.view',
     ],
     'vendor' => [
-        'dashboard.view', 'menu.view', 'menu.update', 'orders.view', 'orders.update', 'feedback.view', 'feedback.resolve', 'reports.view', 'queue.view', 'demand_forecast.view', 'waste.manage',
+        'dashboard.view', 'menu.view', 'menu.update', 'orders.view', 'orders.update', 'inventory.view', 'inventory.manage', 'feedback.view', 'feedback.resolve', 'reports.view', 'queue.view', 'demand_forecast.view', 'waste.manage',
     ],
 ];
