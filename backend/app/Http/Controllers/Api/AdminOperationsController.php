@@ -12,6 +12,7 @@ use App\Models\SupportTicket;
 use App\Models\User;
 use App\Models\VendorSettlement;
 use App\Models\WalletTransaction;
+use App\Services\PaystackRefundService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Validator;
@@ -95,7 +96,7 @@ class AdminOperationsController extends Controller
         return response()->json(['success' => true, 'refunds' => $query->paginate(50)]);
     }
 
-    public function refundOrder(Request $request, Order $order)
+    public function refundOrder(Request $request, Order $order, PaystackRefundService $paystackRefunds)
     {
         $validator = Validator::make($request->all(), [
             'amount' => 'nullable|numeric|min:0.01',
@@ -174,6 +175,17 @@ class AdminOperationsController extends Controller
             ]);
         });
 
+        if ($result->status === 'PENDING' && $result->payment_id) {
+            $payment = Payment::find($result->payment_id);
+            if ($payment) {
+                try {
+                    $result = $paystackRefunds->initiate($payment, $result);
+                } catch (\Throwable $e) {
+                    report($e);
+                }
+            }
+        }
+
         AuditLog::create([
             'user_id' => $request->user()->id,
             'timestamp' => now()->getTimestampMs(),
@@ -181,7 +193,17 @@ class AdminOperationsController extends Controller
             'details' => "Refund #{$result->id} created for order {$order->order_number}.",
         ]);
 
-        return response()->json(['success' => true, 'message' => $result->status === 'SUCCESS' ? 'Refund completed.' : 'Refund queued for gateway processing.', 'refund' => $result], $result->status === 'SUCCESS' ? 200 : 202);
+        $message = match ($result->status) {
+            'SUCCESS' => 'Refund completed.',
+            'FAILED' => 'Refund could not be initiated. Please review the payment record.',
+            default => 'Refund has been submitted and is being processed.',
+        };
+
+        return response()->json([
+            'success' => $result->status !== 'FAILED',
+            'message' => $message,
+            'refund' => $result,
+        ], $result->status === 'FAILED' ? 502 : ($result->status === 'SUCCESS' ? 200 : 202));
     }
 
     public function settlements(Request $request)
