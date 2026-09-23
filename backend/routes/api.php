@@ -61,8 +61,11 @@ Route::get('/docs/openapi.json', [SwaggerController::class, 'openapiJson']);
 Route::get('/health', [HealthController::class, 'check']);
 
 // Paystack calls this endpoint directly. It is protected by Paystack's HMAC
-// signature inside the controller, not by Sanctum.
-Route::post('/paystack/webhook', [PaystackPaymentController::class, 'webhook'])->middleware('throttle:payments');
+// signature inside the controller, not by Sanctum or application throttling.
+// Do not rate-limit gateway callbacks: a 429 response can cause Paystack to retry
+// a valid event unnecessarily. The controller is idempotent and validates the
+// signature, reference, amount, ownership metadata and transaction state.
+Route::post('/paystack/webhook', [PaystackPaymentController::class, 'webhook']);
 
 // All application APIs require an authenticated Sanctum session.
 Route::middleware(['auth:sanctum', InactivityTimeout::class])->group(function () {
