@@ -4,6 +4,7 @@ use App\Http\Controllers\Api\CustomerAccountController;
 use App\Http\Controllers\Api\CustomerAddressController;
 use App\Http\Controllers\Api\CustomerAuthController;
 use App\Http\Controllers\Api\CustomerDeviceController;
+use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\CustomerSupportController;
 use App\Http\Controllers\Api\FavoriteMenuItemController;
 use App\Http\Controllers\Api\LoyaltyController;
@@ -24,9 +25,9 @@ $customerRoutes = function () {
     Route::post('/register', [CustomerAuthController::class, 'register'])->middleware('throttle:auth');
     Route::post('/login', [CustomerAuthController::class, 'login'])->middleware('throttle:auth');
 
-    Route::middleware(['auth:sanctum'])->group(function () {
-        Route::get('/me', [CustomerAuthController::class, 'me']);
-        Route::post('/logout', [CustomerAuthController::class, 'logout']);
+    Route::middleware(['auth:sanctum', 'role:STUDENT,ADMIN'])->group(function () {
+        Route::get('/me', [AuthController::class, 'me']);
+        Route::post('/logout', [AuthController::class, 'logout']);
 
         Route::get('/orders', [OrderController::class, 'getAuthenticatedStudentOrders']);
         Route::get('/purchased-vendors', [OrderController::class, 'getPurchasedVendors']);
@@ -75,7 +76,7 @@ $customerRoutes = function () {
 };
 
 // New application paths.
-Route::prefix('customer')->middleware('role:STUDENT,ADMIN')->group($customerRoutes);
+Route::prefix('customer')->group($customerRoutes);
 
 // Versioned aliases for future clients.
-Route::prefix('v1/customer')->middleware('role:STUDENT,ADMIN')->group($customerRoutes);
+Route::prefix('v1/customer')->group($customerRoutes);
