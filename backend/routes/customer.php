@@ -49,6 +49,7 @@ $customerRoutes = function () {
         Route::put('/budget', [StudentBudgetController::class, 'update']);
         Route::get('/loyalty', [LoyaltyController::class, 'index']);
         Route::get('/loyalty/summary', [LoyaltyController::class, 'summary']);
+        Route::post('/loyalty/preview-discount', [LoyaltyController::class, 'previewDiscount']);
 
         Route::get('/reviews', [\App\Http\Controllers\Api\DeliveredOrderReviewController::class, 'index']);
         Route::post('/reviews', [\App\Http\Controllers\Api\DeliveredOrderReviewController::class, 'store'])
