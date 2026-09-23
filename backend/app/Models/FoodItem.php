@@ -20,7 +20,7 @@ class FoodItem extends Model
         'description',
         'is_available',
         'initial_stock',
-        'low_stock_threshold',
+        'low_stock_threshold', 'sku', 'preparation_minutes', 'dietary_tags', 'allergen_info', 'is_featured',
     ];
 
     protected $casts = [
@@ -28,6 +28,7 @@ class FoodItem extends Model
         'is_available' => 'boolean',
         'initial_stock' => 'integer',
         'low_stock_threshold' => 'integer',
+        'preparation_minutes' => 'integer', 'dietary_tags' => 'array', 'is_featured' => 'boolean',
     ];
 
     /**
