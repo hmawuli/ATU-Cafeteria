@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../core/config/server_config.dart';
@@ -305,13 +306,14 @@ class _LoginScreenState extends State<LoginScreen> {
                             ],
                           ),
                           const SizedBox(height: 4),
-                          TextButton.icon(
-                            onPressed: _openServerSettings,
-                            icon: const Icon(Icons.dns_outlined, size: 16),
-                            label: Text(ServerConfig.hasOverride
-                                ? 'API server: custom'
-                                : 'API server settings'),
-                          ),
+                          if (kDebugMode)
+                            TextButton.icon(
+                              onPressed: _openServerSettings,
+                              icon: const Icon(Icons.dns_outlined, size: 16),
+                              label: Text(ServerConfig.hasOverride
+                                  ? 'API server: custom'
+                                  : 'API server settings'),
+                            ),
                         ],
                       ),
                     ),
