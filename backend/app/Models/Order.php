@@ -31,7 +31,7 @@ class Order extends Model
         'estimated_pickup_time',
         'points_redeemed',
         'discount_applied',
-        'order_number', 'order_type', 'payment_method', 'payment_status',
+        'order_number', 'order_type', 'payment_id', 'payment_method', 'payment_status',
         'subtotal', 'discount_amount', 'tax_amount', 'service_fee', 'delivery_fee',
         'grand_total', 'currency', 'customer_note', 'cancellation_reason',
         'placed_at', 'confirmed_at', 'cancelled_at',
@@ -39,6 +39,7 @@ class Order extends Model
 
     protected $casts = [
         'customer_id' => 'integer',
+        'payment_id' => 'integer',
         'student_id' => 'integer',
         'user_id' => 'integer',
         'vendor_id' => 'integer',
@@ -190,6 +191,11 @@ class Order extends Model
     public function payments()
     {
         return $this->hasMany(Payment::class, 'order_id');
+    }
+
+    public function payment()
+    {
+        return $this->belongsTo(Payment::class, 'payment_id');
     }
 
     public function inventoryMovements()
