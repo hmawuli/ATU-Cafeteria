@@ -106,7 +106,14 @@ class CustomerAuthController extends Controller
             ->where('role', 'STUDENT')
             ->first();
 
-        if (! $user || ! Hash::check((string) $request->input('pin'), (string) $user->password)) {
+        $credential = (string) $request->input('pin');
+        $stored = (string) ($user->password ?? '');
+        $valid = $user && (
+            Hash::check($credential, $stored)
+            || hash_equals($stored, hash('sha256', $credential))
+        );
+
+        if (! $valid) {
             if ($user) {
                 AuditLog::create([
                     'user_id' => $user->id,
