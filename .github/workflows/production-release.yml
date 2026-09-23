@@ -12,6 +12,9 @@ on:
         required: true
         type: string
 
+permissions:
+  contents: read
+
 jobs:
   release:
     if: ${{ inputs.confirm == 'RELEASE' }}
@@ -23,18 +26,25 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Setup Flutter
-        uses: subosito/flutter-action@v2
-        with:
-          flutter-version: '3.35.4'
-          cache: true
-
       - name: Setup Java
         uses: actions/setup-java@v4
         with:
           distribution: temurin
           java-version: '17'
           cache: gradle
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.35.4'
+          channel: stable
+          cache: true
+
+      - name: Verify toolchain
+        run: |
+          java -version
+          flutter --version
+          flutter doctor -v
 
       - name: Install dependencies
         run: flutter pub get
@@ -51,6 +61,7 @@ jobs:
         run: |
           test -n "$KEYSTORE_BASE64"
           echo "$KEYSTORE_BASE64" | base64 --decode > android/app/atu-production.jks
+          test -s android/app/atu-production.jks
 
       - name: Build signed production APK
         env:
@@ -60,6 +71,11 @@ jobs:
           ATU_KEY_ALIAS: ${{ secrets.ATU_KEY_ALIAS }}
           ATU_KEY_PASSWORD: ${{ secrets.ATU_KEY_PASSWORD }}
         run: flutter build apk --release
+
+      - name: Verify production APK
+        run: |
+          test -s build/app/outputs/flutter-apk/app-release.apk
+          ls -lh build/app/outputs/flutter-apk/app-release.apk
 
       - name: Remove keystore
         if: always()
