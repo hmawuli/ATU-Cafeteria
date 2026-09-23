@@ -1,11 +1,12 @@
 import 'package:flutter/material.dart';
 import 'mobile_student_screen.dart';
 
-/// Restaurant-facing customer home.
+/// Primary restaurant customer experience.
 ///
-/// The implementation is shared with the existing mobile experience so the
-/// customer-domain migration does not duplicate UI or break current flows.
-/// The legacy class remains available for backwards compatibility.
+/// The underlying implementation remains shared with the mature mobile
+/// ordering flow, while the public application now presents the domain as
+/// Customer rather than Student. This keeps existing accounts and data
+/// compatible during the migration.
 class CustomerHomeScreen extends MobileStudentScreen {
   const CustomerHomeScreen({super.key});
 }
