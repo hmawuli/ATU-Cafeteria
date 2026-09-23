@@ -5,6 +5,7 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes;
+use Illuminate\Support\Facades\Auth;
 
 class MenuItem extends Model
 {
@@ -22,7 +23,7 @@ class MenuItem extends Model
         'is_available',
         'initial_stock',
         'current_stock',
-        'low_stock_threshold',
+        'low_stock_threshold', 'sku', 'preparation_minutes', 'dietary_tags', 'allergen_info', 'is_featured',
     ];
 
     protected static function boot()
@@ -36,6 +37,34 @@ class MenuItem extends Model
                 $model->food_name = $model->name;
             }
         });
+
+        static::updated(function (MenuItem $item) {
+            if (! $item->wasChanged('current_stock')) return;
+
+            $delta = (int) $item->current_stock - (int) $item->getOriginal('current_stock');
+            $route = null;
+            if (! app()->runningInConsole()) {
+                $route = request()->path();
+            }
+
+            $type = 'ADJUSTMENT';
+            if ($route && str_contains($route, 'cancel')) {
+                $type = 'RESTOCK';
+            } elseif ($route && (str_contains($route, 'customer/orders') || str_contains($route, 'cart-checkout') || str_contains($route, 'student/orders'))) {
+                $type = 'SALE';
+            }
+
+            InventoryMovement::create([
+                'vendor_id' => $item->vendor_id,
+                'menu_item_id' => $item->id,
+                'type' => $type,
+                'quantity' => $delta,
+                'balance_after' => $item->current_stock,
+                'reference' => 'INV-'.strtoupper(bin2hex(random_bytes(6))),
+                'reason' => 'Automatic stock audit from application inventory change.',
+                'performed_by' => Auth::id(),
+            ]);
+        });
     }
 
     protected $casts = [
@@ -45,6 +74,7 @@ class MenuItem extends Model
         'initial_stock' => 'integer',
         'current_stock' => 'integer',
         'low_stock_threshold' => 'integer',
+        'preparation_minutes' => 'integer', 'dietary_tags' => 'array', 'is_featured' => 'boolean',
     ];
 
     /**
