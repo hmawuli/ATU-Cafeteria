@@ -293,6 +293,55 @@ class AuthController extends Controller
         return response()->json(['success' => true, 'message' => 'PIN changed successfully.']);
     }
 
+    public function changePin(Request $request)
+    {
+        $user = $request->user();
+
+        if (! $user || ! $user->isActive()) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Authenticated active account required.',
+            ], 401);
+        }
+
+        $validator = Validator::make($request->all(), [
+            'current_pin' => 'required|string|min:4|max:128',
+            'new_pin' => 'required|digits_between:4,6|different:current_pin',
+            'new_pin_confirmation' => 'required|same:new_pin',
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Please provide valid PIN change details.',
+                'errors' => $validator->errors(),
+            ], 422);
+        }
+
+        if (! $this->verifyCredential($user, (string) $request->input('current_pin'))) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Current PIN is incorrect.',
+            ], 401);
+        }
+
+        $user->password = Hash::make((string) $request->input('new_pin'));
+        $user->saveQuietly();
+        $user->tokens()->delete();
+
+        AuditLog::create([
+            'user_id' => $user->id,
+            'timestamp' => now()->getTimestampMs(),
+            'action' => 'PIN_CHANGED',
+            'details' => 'Customer or user changed their PIN; all active sessions were revoked.',
+        ]);
+
+        return response()->json([
+            'success' => true,
+            'message' => 'PIN changed successfully. Please sign in again.',
+        ]);
+    }
+
     public function requestEmailVerification(Request $request)
     {
         $user = $request->user();
