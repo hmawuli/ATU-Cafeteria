@@ -79,7 +79,7 @@ class CustomerAddressController extends Controller
         DB::transaction(function () use ($request, $address) {
             if ($request->boolean('is_default')) {
                 CustomerAddress::where('customer_id', $request->user()->id)
-                    ->whereKeyNot($address->id)->update(['is_default' => false]);
+                    ->where('id', '!=', $address->id)->update(['is_default' => false]);
             }
             $address->fill($request->only([
                 'label','contact_name','phone','address_line1','address_line2',
