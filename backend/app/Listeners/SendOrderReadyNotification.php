@@ -19,12 +19,12 @@ class SendOrderReadyNotification
     {
         $order = $event->order;
 
-        // Retrieve the student user who placed the order and notify them
-        $studentId = $order->user_id ?? $order->customer_id; // Standardized or legacy ID
-        if ($studentId) {
-            $student = User::find($studentId);
-            if ($student) {
-                $student->notify(new OrderReadyNotification($order));
+        // Retrieve the customer who placed the order and notify them
+        $customerId = $order->customer_id ?? $order->user_id; // Standardized customer ID with legacy fallback
+        if ($customerId) {
+            $customer = User::find($customerId);
+            if ($customer) {
+                $customer->notify(new OrderReadyNotification($order));
 
                 $title = 'Order Ready for Pickup! 🍔';
                 $body = "Your order #{$order->id} ('{$order->food_name}') is ready.";
@@ -33,7 +33,7 @@ class SendOrderReadyNotification
                     'status' => 'READY',
                 ];
 
-                CustomerDevice::where('customer_id', $student->id)
+                CustomerDevice::where('customer_id', $customer->id)
                     ->active()
                     ->whereNotNull('push_token')
                     ->get()
