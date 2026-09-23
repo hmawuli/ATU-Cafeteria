@@ -23,6 +23,7 @@ use App\Http\Controllers\Api\OrderController;
 use App\Http\Controllers\Api\OrderItemMetricsController;
 use App\Http\Controllers\Api\PaystackPaymentController;
 use App\Http\Controllers\Api\SmartCafeteriaController;
+use App\Http\Controllers\Api\CustomerAuthController;
 use App\Http\Controllers\Api\StudentAuthController;
 use App\Http\Controllers\Api\StudentBudgetController;
 use App\Http\Controllers\Api\SwaggerController;
@@ -37,40 +38,41 @@ use App\Http\Controllers\Api\WeeklyReportCronController;
 use App\Http\Middleware\InactivityTimeout;
 use App\Listeners\SendOrderCompletedNotification;
 use App\Listeners\SendOrderReadyNotification;
-use App\Models\Order;
-use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Route;
 
 Event::listen(OrderStatusCompleted::class, SendOrderCompletedNotification::class);
 Event::listen(OrderStatusReady::class, SendOrderReadyNotification::class);
 
-// Public authentication endpoints
+// Public authentication endpoints.
 Route::post('/register', [AuthController::class, 'register'])->middleware('throttle:auth');
 Route::post('/login', [AuthController::class, 'login'])->middleware('throttle:auth');
 Route::post('/login/2fa', [AuthController::class, 'verifyTwoFactor'])->middleware('throttle:auth');
 Route::post('/password/forgot', [AuthController::class, 'forgotPassword'])->middleware('throttle:auth');
 Route::post('/password/reset', [AuthController::class, 'resetPassword'])->middleware('throttle:auth');
+
+// Customer API. Legacy student endpoints remain below for backward compatibility.
+Route::post('/customer/register', [CustomerAuthController::class, 'register'])->middleware('throttle:auth');
+Route::post('/customer/login', [CustomerAuthController::class, 'login'])->middleware('throttle:auth');
 Route::post('/student/register', [StudentAuthController::class, 'register'])->middleware('throttle:auth');
 Route::post('/student/login', [StudentAuthController::class, 'login'])->middleware('throttle:auth');
 Route::post('/vendor/login', [VendorAuthController::class, 'login'])->middleware('throttle:auth');
 
-// Documentation and monitoring
+// Documentation and monitoring.
 Route::get('/docs', [SwaggerController::class, 'index']);
 Route::get('/docs/openapi.json', [SwaggerController::class, 'openapiJson']);
 Route::get('/health', [HealthController::class, 'check']);
 
 // Paystack calls this endpoint directly. It is protected by Paystack's HMAC
 // signature inside the controller, not by Sanctum or application throttling.
-// Do not rate-limit gateway callbacks: a 429 response can cause Paystack to retry
-// a valid event unnecessarily. The controller is idempotent and validates the
-// signature, reference, amount, ownership metadata and transaction state.
 Route::post('/paystack/webhook', [PaystackPaymentController::class, 'webhook']);
 
-// All application APIs require an authenticated Sanctum session.
 Route::middleware(['auth:sanctum', InactivityTimeout::class])->group(function () {
     Route::get('/orders/{orderId}/queue', [SmartCafeteriaController::class, 'queue']);
+
+    // Existing recommendation endpoint retained for legacy clients.
     Route::middleware('role:STUDENT')->get('/student/recommendations', [SmartCafeteriaController::class, 'recommendations']);
+
     Route::middleware('role:VENDOR')->group(function () {
         Route::get('/vendor/demand-forecast', [SmartCafeteriaController::class, 'demandForecast']);
         Route::post('/vendor/waste', [SmartCafeteriaController::class, 'waste']);
@@ -119,7 +121,26 @@ Route::middleware(['auth:sanctum', InactivityTimeout::class])->group(function ()
         Route::delete('/menu-items/{id}', [MenuItemController::class, 'destroyAdmin']);
     });
 
+    // Customer ordering API. These are the public restaurant-domain aliases;
+    // legacy /student routes are retained so existing installations keep working.
     Route::middleware('role:STUDENT,ADMIN')->group(function () {
+        Route::get('/customer/orders', [OrderController::class, 'getAuthenticatedStudentOrders']);
+        Route::get('/customer/purchased-vendors', [OrderController::class, 'getPurchasedVendors']);
+        Route::get('/customer/order-history', [OrderController::class, 'getPersonalOrderHistory']);
+        Route::post('/customer/orders', [OrderController::class, 'storeAuthenticatedStudentOrder']);
+        Route::post('/v1/customer/orders', [OrderController::class, 'storeAuthenticatedStudentOrder']);
+        Route::post('/customer/cart-checkout', [OrderController::class, 'cartCheckout']);
+        Route::get('/customer/orders/poll-ready', [OrderController::class, 'pollOrderStatusReady']);
+        Route::get('/customer/orders/stream-ready', [OrderController::class, 'streamOrderStatusReady']);
+        Route::get('/customer/favorites', [FavoriteMenuItemController::class, 'index']);
+        Route::post('/customer/favorites', [FavoriteMenuItemController::class, 'store']);
+        Route::delete('/customer/favorites/{menuItem}', [FavoriteMenuItemController::class, 'destroy']);
+        Route::get('/customer/budget', [StudentBudgetController::class, 'show']);
+        Route::put('/customer/budget', [StudentBudgetController::class, 'update']);
+        Route::get('/customer/loyalty', [LoyaltyController::class, 'index']);
+        Route::get('/customer/loyalty/summary', [LoyaltyController::class, 'summary']);
+
+        // Backward-compatible routes for existing mobile clients.
         Route::get('/student/orders', [OrderController::class, 'getAuthenticatedStudentOrders']);
         Route::get('/student/purchased-vendors', [OrderController::class, 'getPurchasedVendors']);
         Route::get('/student/order-history', [OrderController::class, 'getPersonalOrderHistory']);
@@ -137,7 +158,6 @@ Route::middleware(['auth:sanctum', InactivityTimeout::class])->group(function ()
         Route::get('/student/loyalty/summary', [LoyaltyController::class, 'summary']);
     });
 
-    // Paystack initialize/verify are authenticated; webhook above is gateway-authenticated.
     Route::post('/paystack/initialize', [PaystackPaymentController::class, 'initialize'])->middleware('throttle:payments');
     Route::get('/paystack/verify/{reference}', [PaystackPaymentController::class, 'verify'])->middleware('throttle:payments');
 
@@ -163,6 +183,8 @@ Route::middleware(['auth:sanctum', InactivityTimeout::class])->group(function ()
     });
 
     Route::middleware('role:STUDENT')->group(function () {
+        Route::get('/customer/wallet', [WalletController::class, 'index']);
+        Route::post('/customer/wallet/top-up', [WalletController::class, 'topUp']);
         Route::get('/wallet', [WalletController::class, 'index']);
         Route::post('/wallet/top-up', [WalletController::class, 'topUp']);
     });
