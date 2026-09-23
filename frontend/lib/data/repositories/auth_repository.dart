@@ -6,11 +6,20 @@ class AuthRepository {
   AuthRepository(this.client);
 
   Future<(User user, String token)> login(String username, String pin) async {
-    final data = await client.request('POST', 'login', body: {
-      'username': username.trim(),
-      'pin': pin,
-    });
+    final data = await client.request('POST', 'login', body: {'username': username.trim(), 'pin': pin});
     final user = User.fromJson(Map<String, dynamic>.from(data['user'] ?? data));
+    final token = data['token']?.toString() ?? '';
+    client.token = token;
+    return (user, token);
+  }
+
+  /// Restaurant-domain customer login. Legacy student login remains supported.
+  Future<(User user, String token)> customerLogin(String email, String password) async {
+    final data = await client.request('POST', 'customer/login', body: {
+      'email': email.trim().toLowerCase(),
+      'password': password,
+    });
+    final user = User.fromJson(Map<String, dynamic>.from(data['customer'] ?? data['user'] ?? data));
     final token = data['token']?.toString() ?? '';
     client.token = token;
     return (user, token);
@@ -34,6 +43,25 @@ class AuthRepository {
     };
     final data = await client.request('POST', 'register', body: body);
     final user = User.fromJson(Map<String, dynamic>.from(data['user'] ?? data));
+    final token = data['token']?.toString() ?? '';
+    client.token = token;
+    return (user, token);
+  }
+
+  /// Restaurant-domain customer registration.
+  Future<(User user, String token)> customerRegister({
+    required String name,
+    required String email,
+    required String password,
+    String? phone,
+  }) async {
+    final data = await client.request('POST', 'customer/register', body: {
+      'name': name.trim(),
+      'email': email.trim().toLowerCase(),
+      'password': password,
+      if (phone != null && phone.trim().isNotEmpty) 'phone': phone.trim(),
+    });
+    final user = User.fromJson(Map<String, dynamic>.from(data['customer'] ?? data['user'] ?? data));
     final token = data['token']?.toString() ?? '';
     client.token = token;
     return (user, token);
