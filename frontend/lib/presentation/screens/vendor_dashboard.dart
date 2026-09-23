@@ -53,8 +53,8 @@ class _VendorDashboardScreenState extends State<VendorDashboardScreen> {
     return Scaffold(
       appBar: AppBar(
         title: Text(provider.isAdminActing
-            ? 'SIMULATION: ${user.fullName}'
-            : 'VENDOR PORTAL CONTROLLER'),
+            ? 'ADMIN VIEW • ${user.fullName}'
+            : 'VENDOR OPERATIONS'),
         leading: provider.isAdminActing
             ? IconButton(
                 icon: const Icon(Icons.admin_panel_settings,
@@ -595,7 +595,7 @@ class _VendorDashboardScreenState extends State<VendorDashboardScreen> {
                   _denseRatingBar("Culinary Preparation Quality", avgQuality),
                   _denseRatingBar("Stall & Booth Cleanliness", avgCleanliness),
                   _denseRatingBar("Logistical Delivery Speed", avgSpeed),
-                  _denseRatingBar("Student Fair-Price Quotient", avgPriceVal),
+                  _denseRatingBar("Price Value", avgPriceVal),
                 ],
               ),
             ),
@@ -672,7 +672,7 @@ class _VendorDashboardScreenState extends State<VendorDashboardScreen> {
           const SizedBox(height: 16),
 
           const SizedBox(height: 20),
-          const Text("Historic Scholar Review Comments",
+          const Text("Recent Customer Reviews",
               style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
           const SizedBox(height: 8),
           reviews.isEmpty
@@ -805,7 +805,7 @@ class _VendorDashboardScreenState extends State<VendorDashboardScreen> {
                     },
                   ),
                   const SizedBox(height: 16),
-                  const Text("Student Notice & Broadcaster Announcement:",
+                  const Text("Customer Notice & Announcement:",
                       style:
                           TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
                   const SizedBox(height: 8),
@@ -854,7 +854,7 @@ class _VendorDashboardScreenState extends State<VendorDashboardScreen> {
                 ScaffoldMessenger.of(context).showSnackBar(
                   const SnackBar(
                       content: Text(
-                          "CSV transaction spreadsheet exported securely to /downloads/ledger.csv.")),
+                          "Export is available from the reporting center.")),
                 );
               },
             ),
