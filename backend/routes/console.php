@@ -12,6 +12,7 @@ use Illuminate\Foundation\Inspiring;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\Schedule;
 
 Artisan::command('inspire', function () {
@@ -170,11 +171,7 @@ Artisan::command('database:backup', function () {
                 fclose($fileStream);
                 $this->info("Uploaded backup file to cloud storage: disk '{$disk}' / path: backups/{$fileName}");
             } else {
-                // Simulating uploading to external cloud storage bucket (AWS S3)
-                $this->comment("Cloud storage disk '{$disk}' not configured. Simulating secure AWS S3 cloud vault dump...");
-                $this->info('[SIMULATION] Establishing secure TLS 1.3 connection to S3 Bucket: '.env('AWS_BUCKET', 'atu-backups-bucket'));
-                $this->info("[SIMULATION] Streaming block payload of size {$fileSizeKb} KB...");
-                $this->info('[SIMULATION] Remote MD5 Verification successful. Backup stored in bucket: s3://'.env('AWS_BUCKET', 'atu-backups-bucket')."/backups/{$fileName}");
+                throw new \RuntimeException("Backup disk '{$disk}' is not configured.");
             }
 
             Log::info("Database daily backup completed successfully. File: {$fileName}, Size: {$fileSizeKb} KB, Transmitted to Cloud Storage: true");
@@ -300,3 +297,26 @@ Artisan::command('vendor:calculate-weekly-metrics', function () {
 
 // Schedule the weekly performance rating calculator to run every week
 Schedule::command('vendor:calculate-weekly-metrics')->weekly();
+
+
+Artisan::command('cafeteria:cleanup-production', function () {
+    $codes = DB::table('auth_verification_codes')
+        ->where(function ($query) {
+            $query->whereNotNull('used_at')
+                ->orWhere('expires_at', '<', now()->subDay());
+        })
+        ->delete();
+
+    $reservations = DB::table('inventory_reservations')
+        ->where('status', 'RESERVED')
+        ->where('reserved_until', '<', now())
+        ->update([
+            'status' => 'EXPIRED',
+            'released_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+    $this->info("Production cleanup completed: {$codes} auth codes removed, {$reservations} inventory reservations expired.");
+})->purpose('Clean expired authentication codes and inventory reservations');
+
+Schedule::command('cafeteria:cleanup-production')->hourly();
