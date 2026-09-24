@@ -92,6 +92,7 @@ class User extends Authenticatable
     public function refunds() { return $this->hasMany(Refund::class, 'customer_id'); }
     public function supportTickets() { return $this->hasMany(SupportTicket::class, 'customer_id'); }
     public function vendorSettlements() { return $this->hasMany(VendorSettlement::class, 'vendor_id'); }
+    public function payoutAccount() { return $this->hasOne(VendorPayoutAccount::class, 'vendor_id'); }
     public function submittedFeedback() { return $this->hasMany(Feedback::class, 'customer_id'); }
     public function receivedFeedback() { return $this->hasMany(Feedback::class, 'vendor_id'); }
     public function walletTransactions() { return $this->hasMany(WalletTransaction::class, 'user_id'); }
