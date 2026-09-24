@@ -179,7 +179,13 @@ class _VendorPayoutAccountScreenState extends State<VendorPayoutAccountScreen> {
                         child: Text(channel['name']?.toString() ?? channel['code']?.toString() ?? 'Channel'),
                       )).toList(),
                       onChanged: (value) {
-                        final selected = _channels.where((c) => c['code']?.toString() == value).firstOrNull;
+                        Map<String, dynamic>? selected;
+                        for (final channel in _channels) {
+                          if (channel['code']?.toString() == value) {
+                            selected = channel;
+                            break;
+                          }
+                        }
                         _bankCode.text = value ?? '';
                         _bankName.text = selected?['name']?.toString() ?? '';
                         setState(() {});
