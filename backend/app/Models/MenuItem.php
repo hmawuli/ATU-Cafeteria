@@ -50,7 +50,7 @@ class MenuItem extends Model
             $type = 'ADJUSTMENT';
             if ($route && str_contains($route, 'cancel')) {
                 $type = 'RESTOCK';
-            } elseif ($route && (str_contains($route, 'customer/orders') || str_contains($route, 'cart-checkout') || str_contains($route, 'student/orders'))) {
+            } elseif ($route && (str_contains($route, 'customer/orders') || str_contains($route, 'cart-checkout') || str_contains($route, 'student/orders') || str_contains($route, 'vendor/kiosk/orders'))) {
                 $type = 'SALE';
             }
 
