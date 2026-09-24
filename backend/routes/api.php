@@ -21,6 +21,7 @@ use App\Http\Controllers\Api\InventoryCronController;
 use App\Http\Controllers\Api\LoyaltyController;
 use App\Http\Controllers\Api\MenuController;
 use App\Http\Controllers\Api\MenuItemController;
+use App\Http\Controllers\Api\NotificationController;
 use App\Http\Controllers\Api\OrderController;
 use App\Http\Controllers\Api\OrderItemMetricsController;
 use App\Http\Controllers\Api\PaystackPaymentController;
@@ -87,6 +88,8 @@ Route::middleware(['auth:sanctum', InactivityTimeout::class])->group(function ()
     });
 
     Route::get('/me', [AuthController::class, 'me']);
+    Route::get('/notifications', [NotificationController::class, 'index']);
+    Route::post('/notifications/mark-read', [NotificationController::class, 'markAllRead']);
     Route::post('/logout', [AuthController::class, 'logout']);
     Route::post('/email/verification/request', [AuthController::class, 'requestEmailVerification']);
     Route::post('/email/verification/verify', [AuthController::class, 'verifyEmail']);
