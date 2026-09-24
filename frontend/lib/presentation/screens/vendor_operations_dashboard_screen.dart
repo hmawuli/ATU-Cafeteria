@@ -63,7 +63,7 @@ class _VendorOperationsDashboardScreenState extends State<VendorOperationsDashbo
 
       if (!mounted) return;
       setState(() {
-        _orders = rawOrders.whereType<Map>().map((e) => Map<String, dynamic>.from(e)).toList();
+        _orders = rawOrders.whereType<Map>().map(Map<String, dynamic>.from).toList();
         _inventory = inventory;
         _finance = finance;
         _storeOpen = me['is_open'] != false && me['is_open'] != 0;

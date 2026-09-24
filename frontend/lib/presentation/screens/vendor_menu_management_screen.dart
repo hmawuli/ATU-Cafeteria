@@ -40,7 +40,7 @@ class _VendorMenuManagementScreenState extends State<VendorMenuManagementScreen>
       final list = raw is List ? raw : const [];
       if (!mounted) return;
       setState(() {
-        _items = list.whereType<Map>().map((e) => Map<String, dynamic>.from(e)).toList();
+        _items = list.whereType<Map>().map(Map<String, dynamic>.from).toList();
         _loading = false;
       });
     } on ApiException catch (e) {
@@ -208,7 +208,7 @@ class _VendorMenuManagementScreenState extends State<VendorMenuManagementScreen>
         ],
       ),
       floatingActionButton: FloatingActionButton.extended(
-        onPressed: () => _save(),
+        onPressed: _save,
         icon: const Icon(Icons.add),
         label: const Text('Add Item'),
       ),

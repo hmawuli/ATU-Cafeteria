@@ -40,7 +40,7 @@ class _VendorInventoryScreenState extends State<VendorInventoryScreen> {
       if (!mounted) return;
       setState(() {
         _summary = summary;
-        _items = rawItems.whereType<Map>().map((e) => Map<String, dynamic>.from(e)).toList();
+        _items = rawItems.whereType<Map>().map(Map<String, dynamic>.from).toList();
         _loading = false;
       });
     } on ApiException catch (e) {
