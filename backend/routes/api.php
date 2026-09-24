@@ -29,6 +29,7 @@ use App\Http\Controllers\Api\StudentAuthController;
 use App\Http\Controllers\Api\StudentBudgetController;
 use App\Http\Controllers\Api\SwaggerController;
 use App\Http\Controllers\Api\VendorAuthController;
+use App\Http\Controllers\Api\VendorFinanceController;
 use App\Http\Controllers\Api\VendorController;
 use App\Http\Controllers\Api\VendorMenuItemController;
 use App\Http\Controllers\Api\VendorMetricsController;
@@ -164,6 +165,7 @@ Route::middleware(['auth:sanctum', InactivityTimeout::class])->group(function ()
         Route::get('/vendor/menu-items', [VendorMenuItemController::class, 'index']);
         Route::get('/vendor/metrics', [VendorMetricsController::class, 'index']);
         Route::get('/vendor/performance', [VendorPerformanceController::class, 'index']);
+        Route::get('/vendor/finance', [VendorFinanceController::class, 'index']);
         Route::get('/vendor/inventory/movements', [InventoryController::class, 'index'])->middleware('permission:inventory.view');
         Route::post('/vendor/inventory/adjust', [InventoryController::class, 'adjust'])->middleware(['permission:inventory.manage', 'idempotency:required']);
     });
