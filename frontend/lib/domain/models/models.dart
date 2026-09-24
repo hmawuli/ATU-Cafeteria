@@ -214,6 +214,54 @@ class FoodItem {
       );
 }
 
+class OrderLine {
+  final int? id;
+  final int? foodItemId;
+  final String name;
+  final String? sku;
+  final int quantity;
+  final double unitPrice;
+  final double discountAmount;
+  final double taxAmount;
+  final double lineTotal;
+
+  const OrderLine({
+    this.id,
+    this.foodItemId,
+    required this.name,
+    this.sku,
+    required this.quantity,
+    required this.unitPrice,
+    this.discountAmount = 0,
+    this.taxAmount = 0,
+    required this.lineTotal,
+  });
+
+  factory OrderLine.fromMap(Map<String, dynamic> map) => OrderLine(
+        id: _asInt(map['id']),
+        foodItemId: _asInt(map['foodItemId'] ?? map['food_item_id']),
+        name: _asString(map['name'] ?? map['name_snapshot'], fallback: 'Meal'),
+        sku: _asNullableString(map['sku'] ?? map['sku_snapshot']),
+        quantity: _asInt(map['quantity']) ?? 1,
+        unitPrice: _asDouble(map['unitPrice'] ?? map['unit_price']),
+        discountAmount: _asDouble(map['discountAmount'] ?? map['discount_amount']),
+        taxAmount: _asDouble(map['taxAmount'] ?? map['tax_amount']),
+        lineTotal: _asDouble(map['lineTotal'] ?? map['line_total']),
+      );
+
+  Map<String, dynamic> toJson() => {
+        'id': id,
+        'food_item_id': foodItemId,
+        'name': name,
+        'sku': sku,
+        'quantity': quantity,
+        'unit_price': unitPrice,
+        'discount_amount': discountAmount,
+        'tax_amount': taxAmount,
+        'line_total': lineTotal,
+      };
+}
+
 class Order {
   final int? id;
   final int customerId;
@@ -229,6 +277,9 @@ class Order {
   String? estimatedPickupTime;
   final int pointsRedeemed;
   final double discountApplied;
+  final String orderNumber;
+  final String salesChannel;
+  final List<OrderLine> items;
 
   Order({
     this.id,
@@ -245,6 +296,9 @@ class Order {
     this.estimatedPickupTime,
     this.pointsRedeemed = 0,
     this.discountApplied = 0.0,
+    this.orderNumber = '',
+    this.salesChannel = 'APP',
+    this.items = const [],
   });
 
   factory Order.fromMap(Map<String, dynamic> map) => Order(
@@ -252,25 +306,21 @@ class Order {
         customerId: _asInt(map['customerId'] ?? map['customer_id']) ?? 0,
         vendorId: _asInt(map['vendorId'] ?? map['vendor_id']) ?? 0,
         foodItemId: _asInt(map['foodItemId'] ?? map['food_item_id']) ?? 0,
-        foodName:
-            _asString(map['foodName'] ?? map['food_name'], fallback: 'Meal'),
+        foodName: _asString(map['foodName'] ?? map['food_name'], fallback: 'Meal'),
         quantity: _asInt(map['quantity']) ?? 1,
         unitPrice: _asDouble(map['unitPrice'] ?? map['unit_price']),
         totalPrice: _asDouble(map['totalPrice'] ?? map['total_price']),
-        orderTimestamp:
-            _asInt(map['orderTimestamp'] ?? map['order_timestamp']) ??
-                DateTime.now().millisecondsSinceEpoch,
-        status:
-            _asString(map['status'] ?? map['order_status'], fallback: 'PENDING')
-                .toUpperCase(),
-        pickupPin:
-            _asString(map['pickupPin'] ?? map['pickup_pin'], fallback: '0000'),
-        estimatedPickupTime: _asNullableString(
-            map['estimatedPickupTime'] ?? map['estimated_pickup_time']),
-        pointsRedeemed:
-            _asInt(map['pointsRedeemed'] ?? map['points_redeemed']) ?? 0,
-        discountApplied:
-            _asDouble(map['discountApplied'] ?? map['discount_applied']),
+        orderTimestamp: _asInt(map['orderTimestamp'] ?? map['order_timestamp']) ?? DateTime.now().millisecondsSinceEpoch,
+        status: _asString(map['status'] ?? map['order_status'], fallback: 'PENDING').toUpperCase(),
+        pickupPin: _asString(map['pickupPin'] ?? map['pickup_pin'], fallback: '0000'),
+        estimatedPickupTime: _asNullableString(map['estimatedPickupTime'] ?? map['estimated_pickup_time']),
+        pointsRedeemed: _asInt(map['pointsRedeemed'] ?? map['points_redeemed']) ?? 0,
+        discountApplied: _asDouble(map['discountApplied'] ?? map['discount_applied']),
+        orderNumber: _asString(map['orderNumber'] ?? map['order_number']),
+        salesChannel: _asString(map['salesChannel'] ?? map['sales_channel'], fallback: 'APP'),
+        items: map['items'] is List
+            ? (map['items'] as List).whereType<Map>().map((item) => OrderLine.fromMap(Map<String, dynamic>.from(item))).toList()
+            : const [],
       );
 
   factory Order.fromJson(Map<String, dynamic> json) => Order.fromMap(json);
@@ -304,6 +354,9 @@ class Order {
         'estimated_pickup_time': estimatedPickupTime,
         'points_redeemed': pointsRedeemed,
         'discount_applied': discountApplied,
+        'order_number': orderNumber,
+        'sales_channel': salesChannel,
+        'items': items.map((item) => item.toJson()).toList(),
       };
 
   String get displayStatus {
@@ -316,11 +369,12 @@ class Order {
         return 'Preparing';
       case 'READY':
       case 'READY_FOR_PICKUP':
+        return 'Ready for Pickup';
       case 'OUT_FOR_DELIVERY':
         return 'Out for Delivery';
       case 'COMPLETED':
       case 'DELIVERED':
-        return 'Delivered';
+        return 'Picked Up';
       default:
         return status;
     }
