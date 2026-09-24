@@ -1406,26 +1406,26 @@ class OrderController extends Controller
 
                 $customer->save();
 
-                // A promotion belongs to the whole checkout session. Release it
-                // only when every order in that session has been cancelled.
+                // Keep aggregate checkout state synchronized after any vendor
+                // order is cancelled. Promotion usage is released immediately
+                // only for settled wallet cancellations; gateway refunds release
+                // it after all pending refunds finish.
                 $sessionId = $lockedOrder->checkout_session_id;
-                if ($walletPayment) {
-                    if ($sessionId) {
-                        $hasOpenSibling = Order::withoutGlobalScopes()
-                            ->where('checkout_session_id', $sessionId)
-                            ->whereNotIn('status', ['CANCELLED', 'DECLINED'])
-                            ->exists();
+                if ($sessionId) {
+                    $hasOpenSibling = Order::withoutGlobalScopes()
+                        ->where('checkout_session_id', $sessionId)
+                        ->whereNotIn('status', ['CANCELLED', 'DECLINED'])
+                        ->exists();
 
-                        if (! $hasOpenSibling) {
-                            PromotionRedemption::where('checkout_session_id', $sessionId)->delete();
-                        }
+                    \App\Models\CheckoutSession::whereKey($sessionId)->update([
+                        'status' => $hasOpenSibling ? 'PARTIALLY_CANCELLED' : 'CANCELLED',
+                    ]);
 
-                        \App\Models\CheckoutSession::whereKey($sessionId)->update([
-                            'status' => $hasOpenSibling ? 'PARTIALLY_CANCELLED' : 'CANCELLED',
-                        ]);
-                    } else {
-                        PromotionRedemption::where('order_id', $lockedOrder->id)->delete();
+                    if ($walletPayment && ! $hasOpenSibling) {
+                        PromotionRedemption::where('checkout_session_id', $sessionId)->delete();
                     }
+                } elseif ($walletPayment) {
+                    PromotionRedemption::where('order_id', $lockedOrder->id)->delete();
                 }
 
                 AuditLog::create([
