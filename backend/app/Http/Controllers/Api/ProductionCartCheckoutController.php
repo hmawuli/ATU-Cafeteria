@@ -8,6 +8,8 @@ use App\Models\FoodItem;
 use App\Models\MenuItem;
 use App\Models\Order;
 use App\Models\OrderItem;
+use App\Models\InventoryMovement;
+use App\Models\PaymentAllocation;
 use App\Models\Promotion;
 use App\Models\PromotionRedemption;
 use App\Models\User;
@@ -61,7 +63,7 @@ class ProductionCartCheckoutController extends Controller
                 }
 
                 $qty = (int) $input['quantity'];
-                if ($isMenu && $item->current_stock !== null && (int) $item->current_stock < $qty) {
+                if ($item->current_stock !== null && (int) $item->current_stock < $qty) {
                     throw new RuntimeException("Only {$item->current_stock} unit(s) remain for '".($item->name ?: $item->food_name)."'.");
                 }
 
@@ -200,7 +202,7 @@ class ProductionCartCheckoutController extends Controller
                         throw new \RuntimeException('One of the selected meals is no longer available.');
                     }
 
-                    if ($isMenu && $item->current_stock !== null && (int) $item->current_stock < (int) $input['quantity']) {
+                    if ($item->current_stock !== null && (int) $item->current_stock < (int) $input['quantity']) {
                         throw new \RuntimeException(
                             "Only {$item->current_stock} unit(s) remain for '".($item->name ?: $item->food_name)."'."
                         );
@@ -409,15 +411,29 @@ class ProductionCartCheckoutController extends Controller
                             ? round($vendorDiscount * ($line['line_total'] / $vendorSubtotal), 2)
                             : 0.0;
 
-                        if ($line['is_menu'] && $item->current_stock !== null) {
+                        if ($item->current_stock !== null) {
                             $item->current_stock = max(0, (int) $item->current_stock - $line['quantity']);
                             $item->is_available = $item->current_stock > 0;
                             $item->save();
+
+                            InventoryMovement::create([
+                                'vendor_id' => $item->vendor_id,
+                                'food_item_id' => $line['is_menu'] ? null : $item->id,
+                                'menu_item_id' => $line['is_menu'] ? $item->id : null,
+                                'order_id' => $order->id,
+                                'type' => 'SALE',
+                                'quantity' => -$line['quantity'],
+                                'balance_after' => $item->current_stock,
+                                'reference' => 'ORD-'.$order->order_number,
+                                'reason' => 'Stock consumed by customer checkout.',
+                                'performed_by' => $user->id,
+                            ]);
                         }
 
                         OrderItem::create([
                             'order_id' => $order->id,
                             'food_item_id' => $line['is_menu'] ? null : $item->id,
+                            'menu_item_id' => $line['is_menu'] ? $item->id : null,
                             'name' => $itemName,
                             'name_snapshot' => $itemName,
                             'sku_snapshot' => $item->sku ?? null,
@@ -459,6 +475,13 @@ class ProductionCartCheckoutController extends Controller
                         $user->balance = $newBalance;
                         $balanceBefore = $newBalance;
                     }
+
+                    PaymentAllocation::create([
+                        'payment_id' => $payment->id,
+                        'order_id' => $order->id,
+                        'amount' => $vendorGrandTotal,
+                        'refunded_amount' => 0,
+                    ]);
 
                     $createdOrders[] = $order->load(['items', 'vendor']);
                 }
