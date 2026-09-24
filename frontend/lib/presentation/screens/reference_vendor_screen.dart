@@ -620,33 +620,39 @@ class _ReferenceVendorScreenState extends State<ReferenceVendorScreen> {
     final customerPhone = TextEditingController();
     String paymentMethod = 'CASH';
 
-    final confirmed = await showDialog<bool>(
+    final receiptLines = cart.lines.map((line) => <String, dynamic>{
+      'name': line.item.name,
+      'quantity': line.quantity,
+      'total': line.total,
+    }).toList();
+
+    final result = await showDialog<Map<String, dynamic>>(
       context: context,
       builder: (dialogContext) => StatefulBuilder(
         builder: (dialogContext, setDialogState) => AlertDialog(
-          title: const Text('Complete Walk-In Sale'),
+          title: const Row(
+            children: [
+              Icon(Icons.point_of_sale_rounded, color: AppTheme.primary),
+              SizedBox(width: 10),
+              Expanded(child: Text('Complete Walk-In Sale')),
+            ],
+          ),
           content: SizedBox(
             width: 460,
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                Text('Total: GH₵ ${cart.subtotal.toStringAsFixed(2)}', style: const TextStyle(fontWeight: FontWeight.w900)),
+                Text('Total: GH₵ ' + cart.subtotal.toStringAsFixed(2), style: const TextStyle(fontWeight: FontWeight.w900)),
                 const SizedBox(height: 14),
                 TextField(
                   controller: customerName,
-                  decoration: const InputDecoration(
-                    labelText: 'Customer name (optional)',
-                    prefixIcon: Icon(Icons.person_outline),
-                  ),
+                  decoration: const InputDecoration(labelText: 'Customer name (optional)', prefixIcon: Icon(Icons.person_outline)),
                 ),
                 const SizedBox(height: 10),
                 TextField(
                   controller: customerPhone,
                   keyboardType: TextInputType.phone,
-                  decoration: const InputDecoration(
-                    labelText: 'Phone number (optional)',
-                    prefixIcon: Icon(Icons.phone_outlined),
-                  ),
+                  decoration: const InputDecoration(labelText: 'Phone number (optional)', prefixIcon: Icon(Icons.phone_outlined)),
                 ),
                 const SizedBox(height: 10),
                 DropdownButtonFormField<String>(
@@ -657,28 +663,22 @@ class _ReferenceVendorScreenState extends State<ReferenceVendorScreen> {
                     DropdownMenuItem(value: 'CARD', child: Text('Card')),
                   ],
                   onChanged: (value) => setDialogState(() => paymentMethod = value ?? 'CASH'),
-                  decoration: const InputDecoration(
-                    labelText: 'Payment method',
-                    prefixIcon: Icon(Icons.payments_outlined),
-                  ),
+                  decoration: const InputDecoration(labelText: 'Payment method', prefixIcon: Icon(Icons.payments_outlined)),
                 ),
                 const SizedBox(height: 8),
                 const Align(
                   alignment: Alignment.centerLeft,
-                  child: Text(
-                    'The sale will appear in Orders and Finance as a Kiosk transaction.',
-                    style: TextStyle(fontSize: 11, color: AppTheme.textMuted),
-                  ),
+                  child: Text('Walk-in sales are completed immediately and included in Finance as Kiosk revenue.', style: TextStyle(fontSize: 11, color: AppTheme.textMuted)),
                 ),
               ],
             ),
           ),
           actions: [
-            TextButton(onPressed: () => Navigator.pop(dialogContext, false), child: const Text('Cancel')),
+            TextButton(onPressed: () => Navigator.pop(dialogContext), child: const Text('Cancel')),
             FilledButton(
               onPressed: () async {
                 try {
-                  await context.read<ApiClient>().post(
+                  final response = await context.read<ApiClient>().post(
                     '/vendor/kiosk/orders',
                     idempotencyKey: ApiClient.newIdempotencyKey(),
                     body: {
@@ -688,7 +688,8 @@ class _ReferenceVendorScreenState extends State<ReferenceVendorScreen> {
                       'payment_method': paymentMethod,
                     },
                   );
-                  if (dialogContext.mounted) Navigator.pop(dialogContext, true);
+                  final payload = response is Map ? Map<String, dynamic>.from(response) : <String, dynamic>{};
+                  if (dialogContext.mounted) Navigator.pop(dialogContext, payload);
                 } catch (e) {
                   if (dialogContext.mounted) {
                     ScaffoldMessenger.of(dialogContext).showSnackBar(
@@ -707,16 +708,79 @@ class _ReferenceVendorScreenState extends State<ReferenceVendorScreen> {
     customerName.dispose();
     customerPhone.dispose();
 
-    if (confirmed == true && mounted) {
-      cart.clear();
-      await context.read<CafeteriaProvider>().refreshAllData();
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Walk-in sale recorded successfully.')),
-      );
-    }
+    if (result == null || result['success'] != true || !mounted) return;
+
+    final order = result['order'] is Map
+        ? Map<String, dynamic>.from(result['order'])
+        : <String, dynamic>{};
+    cart.clear();
+    await context.read<CafeteriaProvider>().refreshAllData();
+    if (!mounted) return;
+    await _showKioskReceipt(order, receiptLines);
   }
 
+  Future<void> _showKioskReceipt(
+    Map<String, dynamic> order,
+    List<Map<String, dynamic>> lines,
+  ) async {
+    final number = order['order_number']?.toString() ?? order['id']?.toString() ?? '—';
+    final payment = order['payment_method']?.toString() ?? 'CASH';
+    final total = double.tryParse(order['grand_total']?.toString() ?? '') ?? 0;
+    final customer = (order['customer_name']?.toString().trim().isNotEmpty ?? false)
+        ? order['customer_name'].toString()
+        : 'Walk-in customer';
+
+    await showDialog<void>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Row(
+          children: [
+            Icon(Icons.receipt_long_rounded, color: AppTheme.primary),
+            SizedBox(width: 10),
+            Expanded(child: Text('Sale Receipt')),
+          ],
+        ),
+        content: SizedBox(
+          width: 480,
+          child: SingleChildScrollView(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Text(number, style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w900, color: AppTheme.primary)),
+                const SizedBox(height: 4),
+                Text(customer, style: const TextStyle(fontWeight: FontWeight.w700)),
+                Text('Payment: ' + payment, style: const TextStyle(color: AppTheme.textMuted)),
+                const Divider(height: 24),
+                ...lines.map((line) => Padding(
+                  padding: const EdgeInsets.only(bottom: 8),
+                  child: Row(
+                    children: [
+                      Expanded(child: Text(line['name']?.toString() ?? 'Meal')),
+                      Text('x' + (line['quantity'] ?? 1).toString()),
+                      const SizedBox(width: 12),
+                      Text('GH₵ ' + ((line['total'] as num?)?.toDouble() ?? 0).toStringAsFixed(2), style: const TextStyle(fontWeight: FontWeight.w800)),
+                    ],
+                  ),
+                )),
+                const Divider(height: 24),
+                Row(
+                  children: [
+                    const Expanded(child: Text('TOTAL', style: TextStyle(fontWeight: FontWeight.w900))),
+                    Text('GH₵ ' + total.toStringAsFixed(2), style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w900, color: AppTheme.primary)),
+                  ],
+                ),
+                const SizedBox(height: 10),
+                const Text('Sale completed and stock updated.', textAlign: TextAlign.center, style: TextStyle(fontSize: 11, color: AppTheme.textMuted)),
+              ],
+            ),
+          ),
+        ),
+        actions: [
+          FilledButton(onPressed: () => Navigator.pop(dialogContext), child: const Text('Done')),
+        ],
+      ),
+    );
+  }
   Widget _performance(CafeteriaProvider provider) {
     final vendorId = provider.currentUser?.id;
     if (!_metricsRequested) {
