@@ -221,6 +221,7 @@ class PaystackPaymentController extends Controller
         }
 
         if (str_starts_with($event, 'refund.')) {
+            return DB::transaction(function () use ($request, $event) {
             $transactionReference = trim((string) $request->input('data.transaction_reference', ''));
             $refundStatus = strtolower((string) $request->input('data.status', ''));
             if ($transactionReference === '') {
@@ -294,6 +295,7 @@ class PaystackPaymentController extends Controller
             ]);
 
             return response()->json(['success' => true, 'message' => 'Refund webhook processed successfully.']);
+            });
         }
 
         if ($event !== 'charge.success') {
