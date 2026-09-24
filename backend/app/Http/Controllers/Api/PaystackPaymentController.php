@@ -182,6 +182,44 @@ class PaystackPaymentController extends Controller
         }
 
         $event = (string) $request->input('event', '');
+        if (str_starts_with($event, 'transfer.')) {
+            $reference = trim((string) $request->input('data.reference', ''));
+            if ($reference === '') {
+                return response()->json(['success' => false, 'message' => 'Transfer reference is missing.'], 422);
+            }
+
+            $settlement = \App\Models\VendorSettlement::where('payout_reference', $reference)
+                ->lockForUpdate()
+                ->first();
+
+            if (! $settlement) {
+                return response()->json(['success' => true, 'message' => 'Transfer reference is not registered.']);
+            }
+
+            $transferStatus = strtolower((string) $request->input('data.status', ''));
+            $settlement->gateway_status = strtoupper($transferStatus ?: 'UNKNOWN');
+            $settlement->transfer_code = $request->input('data.transfer_code', $settlement->transfer_code);
+
+            $settlement->status = match ($event) {
+                'transfer.success' => 'PAID',
+                'transfer.failed', 'transfer.reversed' => 'FAILED',
+                default => 'PROCESSING',
+            };
+
+            if ($settlement->status === 'PAID') {
+                $settlement->settled_at = now();
+                $settlement->failure_reason = null;
+            }
+
+            if ($settlement->status === 'FAILED') {
+                $settlement->failure_reason = (string) ($request->input('data.reason') ?: $request->input('data.failures') ?: 'Paystack transfer did not complete.');
+            }
+
+            $settlement->save();
+
+            return response()->json(['success' => true, 'message' => 'Transfer webhook reconciled.']);
+        }
+
         if (str_starts_with($event, 'refund.')) {
             $transactionReference = trim((string) $request->input('data.transaction_reference', ''));
             $refundStatus = strtolower((string) $request->input('data.status', ''));
