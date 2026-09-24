@@ -24,6 +24,7 @@ class OrderItem extends Model
     protected $casts = [
         'order_id' => 'integer',
         'food_item_id' => 'integer',
+        'menu_item_id' => 'integer',
         'quantity' => 'integer',
         'unit_price' => 'decimal:2',
         'total_price' => 'decimal:2', 'discount_amount' => 'decimal:2', 'tax_amount' => 'decimal:2', 'line_total' => 'decimal:2',
