@@ -45,6 +45,13 @@ class AdminOperationsController extends Controller
             return response()->json(['success' => false, 'message' => 'Invalid promotion.', 'errors' => $validator->errors()], 422);
         }
 
+        if ($request->filled('vendor_id')) {
+            $vendor = User::find((int) $request->input('vendor_id'));
+            if (! $vendor || strtoupper((string) $vendor->role) !== 'VENDOR') {
+                return response()->json(['success' => false, 'message' => 'The promotion vendor must be a valid vendor account.'], 422);
+            }
+        }
+
         $promotion = Promotion::create([
             ...$request->only([
                 'vendor_id','name','type','value','minimum_order_amount','maximum_discount_amount',
