@@ -11,7 +11,7 @@ class SmartCafeteriaRepository {
   Future<Map<String, dynamic>> resolveSecurityAlert(int alertId) async =>
       _map(await api.request('PATCH', 'admin/security-alerts/$alertId/resolve'));
   Future<Map<String, dynamic>> recommendations() async =>
-      _map(await api.request('GET', 'student/recommendations'));
+      _map(await api.request('GET', 'customer/recommendations'));
   Future<Map<String, dynamic>> queue(int orderId) async =>
       _map(await api.request('GET', 'orders/$orderId/queue'));
   Future<Map<String, dynamic>> demandForecast() async =>
