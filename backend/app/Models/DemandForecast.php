@@ -9,7 +9,14 @@ class DemandForecast extends Model
 {
     use HasFactory;
 
-    protected $fillable = ['vendor_id', 'food_item_id', 'forecast_date', 'predicted_quantity', 'method', 'confidence'];
+    protected $fillable = ['vendor_id', 'food_item_id', 'menu_item_id', 'forecast_date', 'predicted_quantity', 'method', 'confidence'];
 
-    protected $casts = ['forecast_date' => 'date', 'predicted_quantity' => 'integer', 'confidence' => 'float'];
+    protected $casts = [
+        'vendor_id' => 'integer',
+        'food_item_id' => 'integer',
+        'menu_item_id' => 'integer',
+        'forecast_date' => 'date',
+        'predicted_quantity' => 'integer',
+        'confidence' => 'float',
+    ];
 }
