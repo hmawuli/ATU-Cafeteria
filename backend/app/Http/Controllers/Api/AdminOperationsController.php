@@ -12,7 +12,9 @@ use App\Models\Refund;
 use App\Models\SupportTicket;
 use App\Models\User;
 use App\Models\VendorSettlement;
+use App\Models\VendorPayoutAccount;
 use App\Models\WalletTransaction;
+use App\Services\PaystackPayoutService;
 use App\Services\PaystackRefundService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -289,6 +291,104 @@ class AdminOperationsController extends Controller
         );
 
         return response()->json(['success' => true, 'settlement' => $settlement], 201);
+    }
+
+    public function payoutSettlement(VendorSettlement $settlement, PaystackPayoutService $payouts)
+    {
+        $locked = DB::transaction(function () use ($settlement) {
+            $row = VendorSettlement::whereKey($settlement->id)->lockForUpdate()->firstOrFail();
+            if (in_array(strtoupper((string) $row->status), ['PAID', 'SETTLED', 'COMPLETED'], true)) {
+                throw new \RuntimeException('This settlement has already been paid.');
+            }
+            if (strtoupper((string) $row->status) === 'PROCESSING') {
+                throw new \RuntimeException('This settlement already has a payout in progress.');
+            }
+            if ((float) $row->net_amount <= 0) {
+                throw new \RuntimeException('Settlement amount must be greater than zero.');
+            }
+            $row->status = 'PROCESSING';
+            $row->payout_attempted_at = now();
+            $row->failure_reason = null;
+            if (! $row->payout_reference) {
+                $row->payout_reference = 'atu_settle_' . \Illuminate\Support\Str::lower(str_replace('-', '', (string) \Illuminate\Support\Str::uuid()));
+            }
+            $row->save();
+            return $row->fresh();
+        });
+
+        $account = VendorPayoutAccount::where('vendor_id', $locked->vendor_id)->where('status', 'ACTIVE')->first();
+        if (! $account) {
+            $locked->update(['status' => 'FAILED', 'failure_reason' => 'Vendor has no active payout account.']);
+            return response()->json(['success' => false, 'message' => 'Vendor has no active payout account.'], 422);
+        }
+
+        try {
+            $data = $payouts->initiateTransfer(
+                $account,
+                (float) $locked->net_amount,
+                'ATU Cafeteria settlement ' . $locked->period_start . ' to ' . $locked->period_end,
+                $locked->payout_reference,
+            );
+            $gatewayStatus = strtolower((string) ($data['status'] ?? 'pending'));
+            $locked->update([
+                'gateway_status' => strtoupper($gatewayStatus),
+                'transfer_code' => $data['transfer_code'] ?? null,
+                'status' => $gatewayStatus === 'success' ? 'PAID' : 'PROCESSING',
+                'settled_at' => $gatewayStatus === 'success' ? now() : $locked->settled_at,
+            ]);
+        } catch (\Throwable $e) {
+            report($e);
+            $locked->update(['status' => 'FAILED', 'gateway_status' => 'FAILED', 'failure_reason' => $e->getMessage()]);
+            return response()->json(['success' => false, 'message' => 'Vendor payout could not be initiated.'], 502);
+        }
+
+        AuditLog::create([
+            'user_id' => request()->user()->id,
+            'timestamp' => now()->getTimestampMs(),
+            'action' => 'VENDOR_SETTLEMENT_PAYOUT_INITIATED',
+            'details' => 'Settlement #' . $locked->id . ' payout reference ' . $locked->payout_reference . '.',
+        ]);
+
+        return response()->json([
+            'success' => true,
+            'message' => $locked->status === 'PAID' ? 'Vendor payout completed.' : 'Vendor payout queued for processing.',
+            'settlement' => $locked->fresh(),
+        ], $locked->status === 'PAID' ? 200 : 202);
+    }
+
+    public function finalizeSettlementPayout(Request $request, VendorSettlement $settlement, PaystackPayoutService $payouts)
+    {
+        $validator = Validator::make($request->all(), [
+            'otp' => 'required|string|min:4|max:12',
+        ]);
+        if ($validator->fails()) {
+            return response()->json(['success' => false, 'message' => 'A valid transfer OTP is required.', 'errors' => $validator->errors()], 422);
+        }
+
+        $locked = DB::transaction(fn () => VendorSettlement::whereKey($settlement->id)->lockForUpdate()->firstOrFail());
+        if (strtoupper((string) $locked->status) !== 'PROCESSING' || ! $locked->transfer_code) {
+            return response()->json(['success' => false, 'message' => 'This settlement is not awaiting transfer authorization.'], 409);
+        }
+
+        try {
+            $data = $payouts->finalizeTransfer($locked->transfer_code, trim((string) $request->input('otp')));
+            $gatewayStatus = strtolower((string) ($data['status'] ?? 'pending'));
+            $locked->update([
+                'gateway_status' => strtoupper($gatewayStatus),
+                'status' => $gatewayStatus === 'success' ? 'PAID' : 'PROCESSING',
+                'settled_at' => $gatewayStatus === 'success' ? now() : $locked->settled_at,
+            ]);
+        } catch (\Throwable $e) {
+            report($e);
+            $locked->update(['gateway_status' => 'FAILED', 'failure_reason' => $e->getMessage()]);
+            return response()->json(['success' => false, 'message' => 'Transfer authorization failed.'], 502);
+        }
+
+        return response()->json([
+            'success' => true,
+            'message' => $locked->status === 'PAID' ? 'Vendor payout finalized.' : 'Vendor payout remains processing.',
+            'settlement' => $locked->fresh(),
+        ], $locked->status === 'PAID' ? 200 : 202);
     }
 
     public function supportTickets()
