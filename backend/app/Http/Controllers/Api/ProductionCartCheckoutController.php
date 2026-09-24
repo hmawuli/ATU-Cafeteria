@@ -483,8 +483,7 @@ class ProductionCartCheckoutController extends Controller
                             'discount_amount' => $lineDiscount,
                             'tax_amount' => 0,
                             'line_total' => max(0, round($line['line_total'] - $lineDiscount, 2)),
-                ]);
-
+                        ]);
                     }
 
                     if ($paymentMethod === 'WALLET') {
