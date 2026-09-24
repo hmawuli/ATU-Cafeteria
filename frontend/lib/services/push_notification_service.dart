@@ -42,6 +42,7 @@ class PushNotificationService {
       _projectId.isNotEmpty;
 
   static bool _listenerAttached = false;
+  static bool _tokenRefreshAttached = false;
 
   static Future<void> syncRegisteredDevice() async {
     if (kIsWeb || (!Platform.isAndroid && !Platform.isIOS) || !isConfigured) {
@@ -103,8 +104,61 @@ class PushNotificationService {
           );
         });
       }
+
+      if (!_tokenRefreshAttached) {
+        _tokenRefreshAttached = true;
+        messaging.onTokenRefresh.listen((token) async {
+          try {
+            final deviceId = await _deviceId();
+            final api = ApiClient();
+            try {
+              await api.post(
+                '/customer/devices',
+                body: {
+                  'device_id': deviceId,
+                  'platform': Platform.isIOS ? 'ios' : 'android',
+                  'push_token': token,
+                  'app_version': _appVersion,
+                },
+              );
+            } finally {
+              api.close();
+            }
+          } catch (e) {
+            debugPrint('FCM token refresh sync skipped: ' + e.toString());
+          }
+        });
+      }
     } catch (e) {
       debugPrint('FCM registration skipped: ' + e.toString());
+    }
+  }
+
+  static Future<void> revokeRegisteredDevice() async {
+    if (kIsWeb || (!Platform.isAndroid && !Platform.isIOS)) return;
+
+    try {
+      final existing = await _storage.read(key: _deviceIdKey);
+      if (existing == null || existing.isEmpty) return;
+
+      final api = ApiClient();
+      try {
+        final response = await api.get('/customer/devices');
+        final raw = response is Map ? response['devices'] : response;
+        if (raw is! List) return;
+
+        for (final entry in raw.whereType<Map>()) {
+          if (entry['device_id']?.toString() != existing) continue;
+          final id = entry['id']?.toString();
+          if (id == null || id.isEmpty) continue;
+          await api.delete('/customer/devices/' + id);
+          break;
+        }
+      } finally {
+        api.close();
+      }
+    } catch (e) {
+      debugPrint('FCM device revoke skipped: ' + e.toString());
     }
   }
 
