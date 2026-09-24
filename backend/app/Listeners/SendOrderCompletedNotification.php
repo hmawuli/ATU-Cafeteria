@@ -4,7 +4,9 @@ namespace App\Listeners;
 
 use App\Events\OrderStatusCompleted;
 use App\Models\AuditLog;
+use App\Models\CustomerDevice;
 use App\Models\User;
+use App\Services\FcmService;
 use App\Notifications\OrderCompletedNotification;
 
 class SendOrderCompletedNotification
@@ -25,22 +27,42 @@ class SendOrderCompletedNotification
             if ($student) {
                 $student->notify(new OrderCompletedNotification($order));
 
-                // Award loyalty points based on total spending
-                // Let's award 1 point for every 1.00 GHS of the total price
-                $pointsEarned = intval(floor($order->total_price));
-                if ($pointsEarned > 0) {
-                    $student->loyalty_points = ($student->loyalty_points ?? 0) + $pointsEarned;
-                    $student->total_spent = ($student->total_spent ?? 0.00) + floatval($order->total_price);
-                    $student->save();
+                $alreadyAwarded = AuditLog::where('user_id', $student->id)
+                    ->where('action', 'LOYALTY_POINTS_EARNED')
+                    ->where('details', 'like', '%completed Order #'.$order->id.'%')
+                    ->exists();
 
-                    // Log audit entry
-                    AuditLog::create([
-                        'user_id' => $student->id,
-                        'timestamp' => time() * 1000,
-                        'action' => 'LOYALTY_POINTS_EARNED',
-                        'details' => "Earned {$pointsEarned} loyalty points for completed Order #{$order->id} (Total paid: GHS {$order->total_price}). Current points balance: {$student->loyalty_points}.",
-                    ]);
+                if (! $alreadyAwarded) {
+                    $pointsEarned = intval(floor((float) ($order->grand_total ?: $order->total_price)));
+                    if ($pointsEarned > 0) {
+                        $student->loyalty_points = ($student->loyalty_points ?? 0) + $pointsEarned;
+                        $student->total_spent = ($student->total_spent ?? 0.00) + floatval($order->grand_total ?: $order->total_price);
+                        $student->save();
+
+                        AuditLog::create([
+                            'user_id' => $student->id,
+                            'timestamp' => time() * 1000,
+                            'action' => 'LOYALTY_POINTS_EARNED',
+                            'details' => "Earned {$pointsEarned} loyalty points for completed Order #{$order->id} (Total paid: GHS ".($order->grand_total ?: $order->total_price)."). Current points balance: {$student->loyalty_points}.",
+                        ]);
+                    }
                 }
+
+                $title = 'Order completed';
+                $body = "Order #".($order->order_number ?: $order->id)." has been picked up. Thank you for ordering with ATU Cafeteria.";
+                $data = [
+                    'order_id' => (string) $order->id,
+                    'order_number' => (string) ($order->order_number ?: $order->id),
+                    'status' => 'COMPLETED',
+                ];
+
+                CustomerDevice::where('customer_id', $student->id)
+                    ->active()
+                    ->whereNotNull('push_token')
+                    ->get()
+                    ->each(function (CustomerDevice $device) use ($title, $body, $data) {
+                        FcmService::sendPush($device->push_token, $title, $body, $data);
+                    });
             }
         }
     }
