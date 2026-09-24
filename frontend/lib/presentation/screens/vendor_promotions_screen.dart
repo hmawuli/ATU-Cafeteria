@@ -62,6 +62,8 @@ class _VendorPromotionsScreenState extends State<VendorPromotionsScreen> {
     final usageLimit = TextEditingController();
     final customerLimit = TextEditingController();
     String type = 'PERCENTAGE';
+    DateTime? startsAt;
+    DateTime? endsAt;
 
     final ok = await showDialog<bool>(
       context: context,
@@ -118,6 +120,24 @@ class _VendorPromotionsScreenState extends State<VendorPromotionsScreen> {
                       keyboardType: TextInputType.number,
                       decoration: const InputDecoration(labelText: 'Per-customer limit (optional)'),
                     ),
+                    const SizedBox(height: 6),
+                    _dateField(
+                      label: startsAt == null ? 'Start date & time (optional)' : 'Starts: ' + _displayDate(startsAt!),
+                      onPressed: () async {
+                        final picked = await _pickDateTime(startsAt);
+                        if (picked != null) setDialogState(() => startsAt = picked);
+                      },
+                      onClear: startsAt == null ? null : () => setDialogState(() => startsAt = null),
+                    ),
+                    const SizedBox(height: 6),
+                    _dateField(
+                      label: endsAt == null ? 'End date & time (optional)' : 'Ends: ' + _displayDate(endsAt!),
+                      onPressed: () async {
+                        final picked = await _pickDateTime(endsAt ?? startsAt);
+                        if (picked != null) setDialogState(() => endsAt = picked);
+                      },
+                      onClear: endsAt == null ? null : () => setDialogState(() => endsAt = null),
+                    ),
                   ],
                 ),
               ),
@@ -141,6 +161,8 @@ class _VendorPromotionsScreenState extends State<VendorPromotionsScreen> {
                       'maximum_discount_amount': type == 'PERCENTAGE' ? _nullableDouble(maximumDiscount.text) : null,
                       'usage_limit': _nullableInt(usageLimit.text),
                       'per_customer_limit': _nullableInt(customerLimit.text),
+                      'starts_at': startsAt?.toUtc().toIso8601String(),
+                      'ends_at': endsAt?.toUtc().toIso8601String(),
                       'is_active': true,
                     },
                   );
@@ -167,6 +189,66 @@ class _VendorPromotionsScreenState extends State<VendorPromotionsScreen> {
     if (ok == true) _load();
   }
 
+  double? _nullableDouble(String value) {
+    final trimmed = value.trim();
+    if (trimmed.isEmpty) return null;
+    return double.tryParse(trimmed);
+  }
+
+  int? _nullableInt(String value) {
+    final trimmed = value.trim();
+    if (trimmed.isEmpty) return null;
+    return int.tryParse(trimmed);
+  }
+
+  Future<DateTime?> _pickDateTime(DateTime? initial) async {
+    final date = await showDatePicker(
+      context: context,
+      firstDate: DateTime.now().subtract(const Duration(days: 365)),
+      lastDate: DateTime.now().add(const Duration(days: 365 * 3)),
+      initialDate: initial ?? DateTime.now(),
+    );
+    if (date == null || !mounted) return null;
+    final time = await showTimePicker(
+      context: context,
+      initialTime: TimeOfDay.fromDateTime(initial ?? DateTime.now()),
+    );
+    if (time == null) return null;
+    return DateTime(date.year, date.month, date.day, time.hour, time.minute);
+  }
+
+  String _displayDate(DateTime date) {
+    final dd = date.day.toString().padLeft(2, '0');
+    final mm = date.month.toString().padLeft(2, '0');
+    final hh = date.hour.toString().padLeft(2, '0');
+    final min = date.minute.toString().padLeft(2, '0');
+    return dd + '/' + mm + '/' + date.year.toString() + ' ' + hh + ':' + min;
+  }
+
+  Widget _dateField({
+    required String label,
+    required VoidCallback onPressed,
+    required VoidCallback? onClear,
+  }) {
+    return Row(
+      children: [
+        Expanded(
+          child: OutlinedButton.icon(
+            onPressed: onPressed,
+            icon: const Icon(Icons.schedule_outlined),
+            label: Align(alignment: Alignment.centerLeft, child: Text(label)),
+          ),
+        ),
+        if (onClear != null)
+          IconButton(
+            tooltip: 'Clear',
+            onPressed: onClear,
+            icon: const Icon(Icons.clear_rounded),
+          ),
+      ],
+    );
+  }
+
   Future<void> _disable(Map<String, dynamic> promotion) async {
     final id = promotion['id'];
     if (id == null) return;
@@ -177,6 +259,23 @@ class _VendorPromotionsScreenState extends State<VendorPromotionsScreen> {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.toString().replaceFirst('Exception: ', ''))));
     }
+  }
+
+  String _constraints(Map<String, dynamic> promotion) {
+    final parts = <String>[];
+    if (promotion['minimum_order_amount'] != null) parts.add('Min GH₵ ' + promotion['minimum_order_amount'].toString());
+    if (promotion['maximum_discount_amount'] != null) parts.add('Max GH₵ ' + promotion['maximum_discount_amount'].toString());
+    if (promotion['usage_limit'] != null) parts.add('Total ' + promotion['usage_limit'].toString());
+    if (promotion['per_customer_limit'] != null) parts.add('Customer ' + promotion['per_customer_limit'].toString());
+    if (promotion['starts_at'] != null) parts.add('From ' + _formatIsoDate(promotion['starts_at']));
+    if (promotion['ends_at'] != null) parts.add('To ' + _formatIsoDate(promotion['ends_at']));
+    return parts.isEmpty ? 'No extra restrictions' : parts.join(' • ');
+  }
+
+  String _formatIsoDate(dynamic raw) {
+    final parsed = DateTime.tryParse(raw?.toString() ?? '')?.toLocal();
+    if (parsed == null) return raw?.toString() ?? '';
+    return parsed.day.toString().padLeft(2, '0') + '/' + parsed.month.toString().padLeft(2, '0') + '/' + parsed.year.toString();
   }
 
   @override
@@ -234,6 +333,8 @@ class _VendorPromotionsScreenState extends State<VendorPromotionsScreen> {
                             Text(promotion['name']?.toString() ?? 'Promotion', style: const TextStyle(color: AppTheme.textMuted)),
                             const SizedBox(height: 3),
                             Text(type == 'PERCENTAGE' ? '$value% off' : 'GH₵ $value off', style: const TextStyle(fontWeight: FontWeight.w800)),
+                            const SizedBox(height: 4),
+                            Text(_constraints(promotion), style: const TextStyle(color: AppTheme.textMuted, fontSize: 11), maxLines: 2, overflow: TextOverflow.ellipsis),
                           ],
                         ),
                       ),
