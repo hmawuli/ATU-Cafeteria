@@ -198,9 +198,15 @@ class OrderController extends Controller
      * Get pre-orders received by a specific vendor.
      * Supports filtering by status, date range (start_date, end_date), or student identifier/ID.
      */
-    public function getVendorOrders(Request $request, $vendorId)
+    public function getVendorOrders(Request $request, $vendorId = null)
     {
         $user = $request->user();
+        if ($vendorId === null && $user && strtoupper((string) $user->role) === 'VENDOR') {
+            $vendorId = $user->id;
+        }
+        if ($vendorId === null) {
+            return response()->json(['success' => false, 'message' => 'Vendor ID is required.'], 400);
+        }
         $role = strtoupper((string) $user->role);
         if ($role === 'VENDOR' && (int) $user->id !== (int) $vendorId) {
             abort(403, 'You may only view your own vendor orders.');
