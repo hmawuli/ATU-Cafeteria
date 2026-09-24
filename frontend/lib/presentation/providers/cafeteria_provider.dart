@@ -7,6 +7,7 @@ import 'package:atu_cafeteria/domain/models/models.dart';
 import 'package:atu_cafeteria/data/local/db_helper.dart';
 import 'package:atu_cafeteria/core/config/server_config.dart';
 import 'package:atu_cafeteria/core/storage/secure_session_store.dart';
+import 'package:atu_cafeteria/services/push_notification_service.dart';
 
 class CafeteriaProvider extends ChangeNotifier {
   final DbHelper _db = DbHelper.instance;
@@ -699,6 +700,12 @@ class CafeteriaProvider extends ChangeNotifier {
     }
   }
 
+  void _syncPushDeviceIfCustomer() {
+    if ((_currentUser?.role ?? '').toUpperCase() == 'STUDENT') {
+      unawaited(PushNotificationService.syncRegisteredDevice());
+    }
+  }
+
   Future<void> restoreSession() async {
     final token = await SecureSessionStore.token();
     if (token == null || token.isEmpty) return;
@@ -722,6 +729,7 @@ class CafeteriaProvider extends ChangeNotifier {
       final decoded = jsonDecode(response.body) as Map<String, dynamic>;
       _currentUser =
           User.fromJson(Map<String, dynamic>.from(decoded['user'] ?? {}));
+      _syncPushDeviceIfCustomer();
 
       // A browser refresh restores the session token, but it does not restore
       // the provider's in-memory catalogue/order state. Load the same live
@@ -809,6 +817,7 @@ class CafeteriaProvider extends ChangeNotifier {
           await SecureSessionStore.save(
               token: _authToken!, username: normalizedUsername);
         }
+        _syncPushDeviceIfCustomer();
 
         try {
           if (remoteUser.id != null) {
@@ -894,6 +903,7 @@ class CafeteriaProvider extends ChangeNotifier {
           await SecureSessionStore.save(
               token: _authToken!, username: username.trim());
         }
+        _syncPushDeviceIfCustomer();
         _isLoading = false;
         notifyListeners();
         try {
