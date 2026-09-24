@@ -34,6 +34,7 @@ use App\Http\Controllers\Api\VendorFinanceController;
 use App\Http\Controllers\Api\VendorKioskOrderController;
 use App\Http\Controllers\Api\VendorInventorySummaryController;
 use App\Http\Controllers\Api\VendorPromotionController;
+use App\Http\Controllers\Api\VendorPayoutAccountController;
 use App\Http\Controllers\Api\VendorController;
 use App\Http\Controllers\Api\VendorMenuItemController;
 use App\Http\Controllers\Api\VendorMetricsController;
@@ -132,6 +133,8 @@ Route::middleware(['auth:sanctum', InactivityTimeout::class])->group(function ()
 
         Route::get('/settlements', [AdminOperationsController::class, 'settlements'])->middleware('permission:settlements.view');
         Route::post('/settlements/generate', [AdminOperationsController::class, 'generateSettlement'])->middleware(['permission:settlements.manage', 'idempotency:required']);
+        Route::post('/settlements/{settlement}/payout', [AdminOperationsController::class, 'payoutSettlement'])->middleware(['permission:settlements.manage', 'idempotency:required']);
+        Route::post('/settlements/{settlement}/payout/finalize', [AdminOperationsController::class, 'finalizeSettlementPayout'])->middleware(['permission:settlements.manage', 'idempotency:required']);
 
         Route::get('/support/tickets', [AdminOperationsController::class, 'supportTickets'])->middleware('permission:support.view');
         Route::patch('/support/tickets/{ticket}', [AdminOperationsController::class, 'updateSupportTicket'])->middleware('permission:support.manage');
@@ -172,6 +175,9 @@ Route::middleware(['auth:sanctum', InactivityTimeout::class])->group(function ()
         Route::get('/vendor/metrics', [VendorMetricsController::class, 'index']);
         Route::get('/vendor/performance', [VendorPerformanceController::class, 'index']);
         Route::get('/vendor/finance', [VendorFinanceController::class, 'index']);
+        Route::get('/vendor/payout-account', [VendorPayoutAccountController::class, 'show']);
+        Route::get('/vendor/payout-banks', [VendorPayoutAccountController::class, 'banks']);
+        Route::post('/vendor/payout-account', [VendorPayoutAccountController::class, 'store'])->middleware('idempotency:required');
         Route::get('/vendor/inventory/summary', [VendorInventorySummaryController::class, 'index']);
         Route::patch('/vendor/status', [VendorController::class, 'toggleStatus'])->middleware('idempotency:required');
         Route::post('/vendor/kiosk/orders', [VendorKioskOrderController::class, 'store'])->middleware('idempotency:required');
