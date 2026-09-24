@@ -162,46 +162,26 @@ class VendorPerformanceController extends Controller
                 $completedTime = strtotime($order->updated_at);
 
                 $duration = $completedTime - $createdTime;
-                if ($duration <= 0) {
-                    // Fallback to random/realistic time between 5 to 15 minutes for instant seeded data
-                    $duration = (($order->id % 11) + 5) * 60;
+                if ($duration > 0) {
+                    $totalCompletionTimeSeconds += $duration;
                 }
-                $totalCompletionTimeSeconds += $duration;
             }
 
             $avgCompletionTimeMinutes = $completedCount > 0
                 ? round(($totalCompletionTimeSeconds / $completedCount) / 60, 1)
                 : 0.0;
 
-            if ($avgCompletionTimeMinutes == 0.0) {
-                // Return realistic seed value for display if no completed orders exist yet
-                $avgCompletionTimeMinutes = round(10.0 + ($vendor->id % 3) + ($vendor->id % 2 * 1.5), 1);
-            }
-
             $totalOrdersCount = Order::where('vendor_id', $vendor->id)->count();
             $fulfillmentRate = $totalOrdersCount > 0
                 ? round(($completedCount / $totalOrdersCount) * 100, 1)
-                : 100.0;
+                : 0.0;
 
-            // Fetch feedback ratings for this vendor
+            // Ratings are strictly derived from recorded feedback.
             $feedbacks = DB::table('feedback')->where('vendor_id', $vendor->id)->get();
-            $ratingFoodQuality = 4.5;
-            $ratingCleanliness = 4.2;
-            $ratingServiceSpeed = 4.3;
-            $ratingPriceValue = 4.6;
-
-            if ($feedbacks->isNotEmpty()) {
-                $ratingFoodQuality = round($feedbacks->avg('rating_food_quality'), 1);
-                $ratingCleanliness = round($feedbacks->avg('rating_cleanliness'), 1);
-                $ratingServiceSpeed = round($feedbacks->avg('rating_service_speed'), 1);
-                $ratingPriceValue = round($feedbacks->avg('rating_price_value'), 1);
-            } else {
-                // Realistic seeds based on vendor ID so different booths show varied metrics
-                $ratingFoodQuality = round(4.0 + (($vendor->id % 5) * 0.2) + (($vendor->id % 2) * 0.1), 1);
-                $ratingCleanliness = round(3.8 + (($vendor->id % 4) * 0.3), 1);
-                $ratingServiceSpeed = round(3.9 + (($vendor->id % 3) * 0.4), 1);
-                $ratingPriceValue = round(4.1 + (($vendor->id % 6) * 0.1), 1);
-            }
+            $ratingFoodQuality = $feedbacks->isNotEmpty() ? round((float) $feedbacks->avg('rating_food_quality'), 1) : 0.0;
+            $ratingCleanliness = $feedbacks->isNotEmpty() ? round((float) $feedbacks->avg('rating_cleanliness'), 1) : 0.0;
+            $ratingServiceSpeed = $feedbacks->isNotEmpty() ? round((float) $feedbacks->avg('rating_service_speed'), 1) : 0.0;
+            $ratingPriceValue = $feedbacks->isNotEmpty() ? round((float) $feedbacks->avg('rating_price_value'), 1) : 0.0;
             $ratingOverall = round(($ratingFoodQuality + $ratingCleanliness + $ratingServiceSpeed + $ratingPriceValue) / 4, 1);
 
             // Fetch popular menu items based on completed orders or overall orders
@@ -219,15 +199,6 @@ class VendorPerformanceController extends Controller
                         'sales' => round(floatval($item->total_sales), 2),
                     ];
                 })->toArray();
-
-            if (empty($popularItems)) {
-                // Generate high fidelity seed items for visual aesthetic if empty
-                $popularItems = [
-                    ['name' => 'Jollof with Grilled Chicken', 'quantity_sold' => 45 + ($vendor->id * 3), 'sales' => (45 + ($vendor->id * 3)) * 15.0],
-                    ['name' => 'Waakye Deluxe', 'quantity_sold' => 30 + ($vendor->id * 2), 'sales' => (30 + ($vendor->id * 2)) * 12.0],
-                    ['name' => 'Kelewele Box', 'quantity_sold' => 25 + ($vendor->id * 4), 'sales' => (25 + ($vendor->id * 4)) * 8.0],
-                ];
-            }
 
             // Check if they are in the new vendors table to pull extra operational status / contact info if joined
             $vendorMeta = Vendor::where('name', $vendor->fullName)
@@ -254,53 +225,6 @@ class VendorPerformanceController extends Controller
                 'rating_overall' => $ratingOverall,
                 'popular_menu_items' => $popularItems,
             ];
-        }
-
-        // 2. Also fetch from 'vendors' table directly to ensure no vendor is missed
-        $allDbVendors = Vendor::all();
-        foreach ($allDbVendors as $dbVendor) {
-            // Check if already in our array
-            $exists = false;
-            foreach ($performanceData as $item) {
-                if ($item['vendor_name'] === $dbVendor->name) {
-                    $exists = true;
-                    break;
-                }
-            }
-
-            if (! $exists) {
-                $ratingFoodQuality = round(4.0 + (($dbVendor->id % 5) * 0.2), 1);
-                $ratingCleanliness = round(3.8 + (($dbVendor->id % 4) * 0.3), 1);
-                $ratingServiceSpeed = round(4.1 + (($dbVendor->id % 3) * 0.3), 1);
-                $ratingPriceValue = round(4.3 + (($dbVendor->id % 4) * 0.1), 1);
-                $ratingOverall = round(($ratingFoodQuality + $ratingCleanliness + $ratingServiceSpeed + $ratingPriceValue) / 4, 1);
-
-                $popularItems = [
-                    ['name' => 'Fufu with Light Soup', 'quantity_sold' => 12, 'sales' => 180.0],
-                    ['name' => 'Banku and Grilled Tilapia', 'quantity_sold' => 9, 'sales' => 225.0],
-                ];
-
-                $performanceData[] = [
-                    'vendor_id' => $dbVendor->id,
-                    'vendor_name' => $dbVendor->name,
-                    'contact_info' => $dbVendor->contact_info ?? 'N/A',
-                    'operational_status' => $dbVendor->operational_status ?? 'active',
-                    'total_completed_orders' => 0,
-                    'total_orders' => 0,
-                    'total_sales' => 0.0,
-                    'avg_completion_time_minutes' => 11.5,
-                    'avg_completion_time_display' => '11.5 mins',
-                    'average_delivery_time' => 11.5,
-                    'average_delivery_time_display' => '11.5 mins',
-                    'order_fulfillment_rate' => 100.0,
-                    'rating_food_quality' => $ratingFoodQuality,
-                    'rating_cleanliness' => $ratingCleanliness,
-                    'rating_service_speed' => $ratingServiceSpeed,
-                    'rating_price_value' => $ratingPriceValue,
-                    'rating_overall' => $ratingOverall,
-                    'popular_menu_items' => $popularItems,
-                ];
-            }
         }
 
         return response()->json([
