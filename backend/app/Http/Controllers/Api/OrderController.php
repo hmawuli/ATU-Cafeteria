@@ -1052,9 +1052,12 @@ class OrderController extends Controller
             ], 401);
         }
 
-        $orders = Order::where('customer_id', $user->id)
-            ->orWhere('student_id', $user->id)
-            ->orWhere('user_id', $user->id)
+        $orders = Order::with(['items', 'vendor'])
+            ->where(function ($query) use ($user) {
+                $query->where('customer_id', $user->id)
+                    ->orWhere('student_id', $user->id)
+                    ->orWhere('user_id', $user->id);
+            })
             ->orderBy('order_timestamp', 'desc')
             ->get();
 
