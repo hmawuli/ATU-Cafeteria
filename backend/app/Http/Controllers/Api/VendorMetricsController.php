@@ -120,10 +120,9 @@ class VendorMetricsController extends Controller
                 $completedTime = strtotime($order->updated_at);
 
                 $duration = $completedTime - $createdTime;
-                if ($duration <= 0) {
-                    $duration = (($order->id % 11) + 5) * 60;
+                if ($duration > 0) {
+                    $totalSpeedSeconds += $duration;
                 }
-                $totalSpeedSeconds += $duration;
             }
 
             $avgCompletionTimeMinutes = $completedCount > 0
