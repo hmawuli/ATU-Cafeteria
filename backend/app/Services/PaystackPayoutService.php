@@ -80,7 +80,7 @@ class PaystackPayoutService
         return (array) $response->json('data', []);
     }
 
-    public function initiateTransfer(VendorPayoutAccount $account, float $amount, string $reason): array
+    public function initiateTransfer(VendorPayoutAccount $account, float $amount, string $reason, ?string $reference = null): array
     {
         if (! $account->recipient_code) {
             throw new \RuntimeException('The vendor payout recipient has not been created.');
@@ -89,7 +89,7 @@ class PaystackPayoutService
         $amountPesewas = (int) round($amount * 100);
         if ($amountPesewas < 1) throw new \RuntimeException('Settlement amount must be greater than zero.');
 
-        $reference = 'atu_settle_' . Str::lower(str_replace('-', '', (string) Str::uuid()));
+        $reference = $reference ?: ('atu_settle_' . Str::lower(str_replace('-', '', (string) Str::uuid())));
         $response = $this->request('POST', '/transfer', [
             'source' => 'balance',
             'amount' => $amountPesewas,
