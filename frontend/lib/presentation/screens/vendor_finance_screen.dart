@@ -115,37 +115,57 @@ class _VendorFinanceScreenState extends State<VendorFinanceScreen> {
     );
   }
 
-  Widget _header() => Row(
-        children: [
-          const Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text('Finance', style: TextStyle(fontSize: 24, fontWeight: FontWeight.w900, color: AppTheme.textDark)),
-                SizedBox(height: 4),
-                Text('Sales, refunds, transactions and settlements.', style: TextStyle(color: AppTheme.textMuted)),
-              ],
-            ),
-          ),
-          Wrap(
+  Widget _header() => LayoutBuilder(
+        builder: (context, constraints) {
+          final filters = Wrap(
             spacing: 6,
-            children: [for (final value in [7, 30, 90]) ChoiceChip(
-              label: Text('${value}D'),
-              selected: _days == value,
-              onSelected: (_) {
-                if (_days == value) return;
-                setState(() => _days = value);
-                _load();
-              },
-            )],
-          ),
-          const SizedBox(width: 8),
-          IconButton(
-            tooltip: 'Refresh',
-            onPressed: _loading ? null : _load,
-            icon: const Icon(Icons.refresh),
-          ),
-        ],
+            runSpacing: 6,
+            children: [
+              for (final value in [7, 30, 90])
+                ChoiceChip(
+                  label: Text('${value}D'),
+                  selected: _days == value,
+                  onSelected: (_) {
+                    if (_days == value) return;
+                    setState(() => _days = value);
+                    _load();
+                  },
+                ),
+              IconButton(
+                tooltip: 'Refresh',
+                onPressed: _loading ? null : _load,
+                icon: const Icon(Icons.refresh),
+              ),
+            ],
+          );
+
+          final title = const Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text('Finance', style: TextStyle(fontSize: 24, fontWeight: FontWeight.w900, color: AppTheme.textDark)),
+              SizedBox(height: 4),
+              Text('Sales, refunds, transactions and settlements.', style: TextStyle(color: AppTheme.textMuted)),
+            ],
+          );
+
+          if (constraints.maxWidth < 680) {
+            return Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                title,
+                const SizedBox(height: 10),
+                filters,
+              ],
+            );
+          }
+
+          return Row(
+            children: [
+              const Expanded(child: title),
+              filters,
+            ],
+          );
+        },
       );
 
   Widget _hero() {
