@@ -22,6 +22,8 @@ import 'package:atu_cafeteria/presentation/screens/vendor_promotions_screen.dart
 import 'package:atu_cafeteria/presentation/screens/vendor_payout_account_screen.dart';
 import 'package:atu_cafeteria/presentation/screens/vendor_order_display_screen.dart';
 import 'package:atu_cafeteria/presentation/screens/vendor_order_workflow_screen.dart';
+import 'package:atu_cafeteria/presentation/screens/vendor_menu_management_screen.dart';
+import 'package:atu_cafeteria/presentation/screens/vendor_inventory_screen.dart';
 import 'package:atu_cafeteria/presentation/screens/kfc_ordering_screen.dart';
 import 'package:atu_cafeteria/presentation/screens/order_tracking_screen.dart';
 import 'package:atu_cafeteria/presentation/screens/group_order_screen.dart';
@@ -73,15 +75,16 @@ class ATUCafeteriaApp extends StatelessWidget {
           '/customer-addresses': (_) => const CustomerAddressesScreen(),
           '/customer-devices': (_) => const CustomerDevicesScreen(),
           '/customer-support': (_) => const CustomerSupportScreen(),
-          // Kept as a compatibility route for existing deep links. New
-          // customer-facing flows should use /customer.
           '/student': (_) => const CustomerHomeScreen(),
+
           // Primary restaurant operations entry point.
           '/vendor': (_) => const VendorDashboardScreen(),
           '/vendor-dashboard': (_) => const VendorDashboardScreen(),
 
           // Dedicated operational modules.
           '/vendor-orders': (_) => const VendorOrderWorkflowScreen(),
+          '/vendor-menu': (_) => const VendorMenuManagementScreen(),
+          '/vendor-inventory': (_) => const VendorInventoryScreen(),
           '/vendor-finance': (_) => const VendorFinanceScreen(),
           '/vendor-promotions': (_) => const VendorPromotionsScreen(),
           '/vendor-payout-account': (_) => const VendorPayoutAccountScreen(),
@@ -102,9 +105,7 @@ class ATUCafeteriaApp extends StatelessWidget {
             return vendor is User
                 ? CustomerVendorMenuScreen(vendor: vendor)
                 : const Scaffold(
-                    body: Center(
-                      child: Text('Invalid restaurant.'),
-                    ),
+                    body: Center(child: Text('Invalid restaurant.')),
                   );
           },
           '/food-detail': (context) {
@@ -112,7 +113,8 @@ class ATUCafeteriaApp extends StatelessWidget {
             return item is FoodItem
                 ? FoodDetailScreen(item: item)
                 : const Scaffold(
-                    body: Center(child: Text('Invalid food item.')));
+                    body: Center(child: Text('Invalid food item.')),
+                  );
           },
           '/order-tracking': (context) {
             final id = ModalRoute.of(context)?.settings.arguments;
