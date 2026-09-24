@@ -175,9 +175,11 @@ Route::middleware(['auth:sanctum', InactivityTimeout::class])->group(function ()
         Route::get('/vendor/metrics', [VendorMetricsController::class, 'index']);
         Route::get('/vendor/performance', [VendorPerformanceController::class, 'index']);
         Route::get('/vendor/finance', [VendorFinanceController::class, 'index']);
-        Route::get('/vendor/payout-account', [VendorPayoutAccountController::class, 'show']);
-        Route::get('/vendor/payout-banks', [VendorPayoutAccountController::class, 'banks']);
-        Route::post('/vendor/payout-account', [VendorPayoutAccountController::class, 'store'])->middleware('idempotency:required');
+        Route::middleware('role:VENDOR')->group(function () {
+            Route::get('/vendor/payout-account', [VendorPayoutAccountController::class, 'show']);
+            Route::get('/vendor/payout-banks', [VendorPayoutAccountController::class, 'banks']);
+            Route::post('/vendor/payout-account', [VendorPayoutAccountController::class, 'store'])->middleware('idempotency:required');
+        });
         Route::get('/vendor/inventory/summary', [VendorInventorySummaryController::class, 'index']);
         Route::patch('/vendor/status', [VendorController::class, 'toggleStatus'])->middleware('idempotency:required');
         Route::post('/vendor/kiosk/orders', [VendorKioskOrderController::class, 'store'])->middleware('idempotency:required');
