@@ -35,7 +35,7 @@ class Order extends Model
         'order_number', 'order_type', 'payment_id', 'checkout_session_id', 'payment_method', 'payment_status',
         'subtotal', 'discount_amount', 'tax_amount', 'service_fee', 'delivery_fee',
         'grand_total', 'currency', 'customer_note', 'cancellation_reason',
-        'placed_at', 'confirmed_at', 'cancelled_at',
+        'placed_at', 'confirmed_at', 'accepted_at', 'preparing_at', 'ready_at', 'collected_at', 'cancelled_at',
     ];
 
     protected $casts = [
@@ -57,7 +57,9 @@ class Order extends Model
         'subtotal' => 'decimal:2', 'discount_amount' => 'decimal:2',
         'tax_amount' => 'decimal:2', 'service_fee' => 'decimal:2',
         'delivery_fee' => 'decimal:2', 'grand_total' => 'decimal:2',
-        'placed_at' => 'datetime', 'confirmed_at' => 'datetime', 'cancelled_at' => 'datetime',
+        'placed_at' => 'datetime', 'confirmed_at' => 'datetime', 'accepted_at' => 'datetime',
+        'preparing_at' => 'datetime', 'ready_at' => 'datetime', 'collected_at' => 'datetime',
+        'cancelled_at' => 'datetime',
     ];
 
     protected static function booted(): void
