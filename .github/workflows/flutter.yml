@@ -5,12 +5,18 @@ on:
     branches: [main]
   pull_request:
     branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: atu-cafeteria-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
 permissions:
   contents: read
 
 jobs:
   backend:
+    timeout-minutes: 25
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -40,6 +46,10 @@ jobs:
           touch database/database.sqlite
           php artisan key:generate --force
 
+      - name: PHP syntax smoke check
+        run: |
+          find app database routes tests -type f -name '*.php' -print0 | xargs -0 -n1 php -l
+
       - name: Run database migrations
         env:
           DB_CONNECTION: sqlite
@@ -59,6 +69,7 @@ jobs:
         run: ./vendor/bin/pint --test
 
   frontend:
+    timeout-minutes: 35
     runs-on: ubuntu-latest
     defaults:
       run:
