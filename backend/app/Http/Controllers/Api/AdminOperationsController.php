@@ -317,35 +317,41 @@ class AdminOperationsController extends Controller
 
     public function payoutSettlement(VendorSettlement $settlement, PaystackPayoutService $payouts)
     {
-        $locked = DB::transaction(function () use ($settlement) {
-            $row = VendorSettlement::whereKey($settlement->id)->lockForUpdate()->firstOrFail();
-            if (in_array(strtoupper((string) $row->status), ['PAID', 'SETTLED', 'COMPLETED'], true)) {
-                throw new \RuntimeException('This settlement has already been paid.');
-            }
-            if (strtoupper((string) $row->status) === 'PROCESSING') {
-                throw new \RuntimeException('This settlement already has a payout in progress.');
-            }
-            if ((float) $row->net_amount <= 0) {
-                throw new \RuntimeException('Settlement amount must be greater than zero.');
-            }
-            $wasFailed = strtoupper((string) $row->status) === 'FAILED';
+        try {
+            $locked = DB::transaction(function () use ($settlement) {
+                $row = VendorSettlement::whereKey($settlement->id)->lockForUpdate()->firstOrFail();
+                if (in_array(strtoupper((string) $row->status), ['PAID', 'SETTLED', 'COMPLETED'], true)) {
+                    throw new \RuntimeException('This settlement has already been paid.');
+                }
+                if (strtoupper((string) $row->status) === 'PROCESSING') {
+                    throw new \RuntimeException('This settlement already has a payout in progress.');
+                }
+                if ((float) $row->net_amount <= 0) {
+                    throw new \RuntimeException('Settlement amount must be greater than zero.');
+                }
 
-            $row->status = 'PROCESSING';
-            $row->payout_attempted_at = now();
-            $row->failure_reason = null;
-            $row->gateway_status = null;
-            $row->transfer_code = null;
+                $wasFailed = strtoupper((string) $row->status) === 'FAILED';
+                $row->status = 'PROCESSING';
+                $row->payout_attempted_at = now();
+                $row->failure_reason = null;
+                $row->gateway_status = null;
+                $row->transfer_code = null;
 
-            // Paystack transfer references must not be reused after a failed
-            // attempt; a retry receives a fresh reference.
-            if (! $row->payout_reference || $wasFailed) {
-                $row->payout_reference = 'atu_settle_' . \Illuminate\Support\Str::lower(
-                    str_replace('-', '', (string) \Illuminate\Support\Str::uuid())
-                );
-            }
-            $row->save();
-            return $row->fresh();
-        });
+                if (! $row->payout_reference || $wasFailed) {
+                    $row->payout_reference = 'atu_settle_' . \Illuminate\Support\Str::lower(
+                        str_replace('-', '', (string) \Illuminate\Support\Str::uuid())
+                    );
+                }
+
+                $row->save();
+                return $row->fresh();
+            });
+        } catch (\RuntimeException $e) {
+            return response()->json([
+                'success' => false,
+                'message' => $e->getMessage(),
+            ], 409);
+        }
 
         $account = VendorPayoutAccount::where('vendor_id', $locked->vendor_id)->where('status', 'ACTIVE')->first();
         if (! $account) {
