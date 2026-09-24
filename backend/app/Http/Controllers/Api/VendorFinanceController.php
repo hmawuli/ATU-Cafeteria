@@ -204,6 +204,17 @@ class VendorFinanceController extends Controller
                     : 0.0,
                 'pending_settlement' => round($pendingSettlement, 2),
                 'settled_amount' => round($settledAmount, 2),
+                'sales_channels' => collect($transactions)
+                    ->groupBy('sales_channel')
+                    ->map(function ($rows, $channel) {
+                        return [
+                            'sales_channel' => $channel,
+                            'orders' => count($rows),
+                            'net_sales' => round($rows->sum('net_sales'), 2),
+                        ];
+                    })
+                    ->values()
+                    ->all(),
             ],
             'trend' => array_values($trend),
             'transactions' => array_slice($transactions, 0, 20),
