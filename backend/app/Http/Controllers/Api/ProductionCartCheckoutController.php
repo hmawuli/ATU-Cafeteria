@@ -445,6 +445,10 @@ class ProductionCartCheckoutController extends Controller
                         $remainingVendorDiscount = max(0, round($remainingVendorDiscount - $lineDiscount, 2));
                         $remainingVendorSubtotal = max(0, round($remainingVendorSubtotal - $line['line_total'], 2));
 
+                        if ($line['is_menu']) {
+                            request()->merge(['inventory_order_id' => $order->id]);
+                        }
+
                         if ($item->current_stock !== null) {
                             $item->current_stock = max(0, (int) $item->current_stock - $line['quantity']);
                             $item->is_available = $item->current_stock > 0;
