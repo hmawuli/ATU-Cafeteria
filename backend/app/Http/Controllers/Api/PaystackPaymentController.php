@@ -183,6 +183,7 @@ class PaystackPaymentController extends Controller
 
         $event = (string) $request->input('event', '');
         if (str_starts_with($event, 'transfer.')) {
+            return DB::transaction(function () use ($request, $event) {
             $reference = trim((string) $request->input('data.reference', ''));
             if ($reference === '') {
                 return response()->json(['success' => false, 'message' => 'Transfer reference is missing.'], 422);
@@ -218,6 +219,7 @@ class PaystackPaymentController extends Controller
             $settlement->save();
 
             return response()->json(['success' => true, 'message' => 'Transfer webhook reconciled.']);
+            });
         }
 
         if (str_starts_with($event, 'refund.')) {
