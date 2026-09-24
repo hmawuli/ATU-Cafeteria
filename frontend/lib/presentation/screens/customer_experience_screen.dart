@@ -26,7 +26,6 @@ class _RestaurantCustomerHomeScreenState extends State<RestaurantCustomerHomeScr
   List<Map<String, dynamic>> _smartPicks = const [];
   List<Map<String, dynamic>> _discoveryVendors = const [];
   List<Map<String, dynamic>> _promotions = const [];
-  bool _loadingDiscovery = false;
 
   @override
   void initState() {
@@ -36,7 +35,6 @@ class _RestaurantCustomerHomeScreenState extends State<RestaurantCustomerHomeScr
 
   Future<void> _loadDiscovery() async {
     if (!mounted) return;
-    setState(() => _loadingDiscovery = true);
     try {
       final discovery = await _api.get('/customer/discovery');
       final data = discovery is Map ? discovery['data'] : null;
@@ -60,7 +58,6 @@ class _RestaurantCustomerHomeScreenState extends State<RestaurantCustomerHomeScr
     } catch (_) {
       // Existing cached catalogue remains usable if discovery is unavailable.
     } finally {
-      if (mounted) setState(() => _loadingDiscovery = false);
     }
   }
 
@@ -982,17 +979,52 @@ class _RestaurantCustomerHomeScreenState extends State<RestaurantCustomerHomeScr
               _progress(status),
               if (order.id != null) ...[
                 const SizedBox(height: 10),
-                Align(
-                  alignment: Alignment.centerRight,
-                  child: OutlinedButton.icon(
-                    onPressed: () => Navigator.pushNamed(
-                      context,
-                      '/order-tracking',
-                      arguments: order.id,
+                Row(
+                  children: [
+                    Expanded(
+                      child: OutlinedButton.icon(
+                        onPressed: () => Navigator.pushNamed(
+                          context,
+                          '/order-tracking',
+                          arguments: order.id,
+                        ),
+                        icon: const Icon(Icons.track_changes_rounded),
+                        label: const Text('Track Order'),
+                      ),
                     ),
-                    icon: const Icon(Icons.track_changes_rounded),
-                    label: const Text('Track Order'),
-                  ),
+                    const SizedBox(width: 8),
+                    Builder(
+                      builder: (_) {
+                        FoodItem? item;
+                        for (final candidate in context.read<CafeteriaProvider>().allFoodItems) {
+                          if (candidate.id == order.foodItemId && candidate.isAvailable) {
+                            item = candidate;
+                            break;
+                          }
+                        }
+                        return Expanded(
+                          child: OutlinedButton.icon(
+                            onPressed: item == null
+                                ? null
+                                : () {
+                                    context.read<CartProvider>().add(item!);
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      SnackBar(
+                                        content: Text(item.name + ' added to your cart.'),
+                                        action: SnackBarAction(
+                                          label: 'VIEW CART',
+                                          onPressed: () => Navigator.pushNamed(context, '/cart'),
+                                        ),
+                                      ),
+                                    );
+                                  },
+                            icon: const Icon(Icons.replay_rounded),
+                            label: const Text('Order Again'),
+                          ),
+                        );
+                      },
+                    ),
+                  ],
                 ),
               ],
             ],
