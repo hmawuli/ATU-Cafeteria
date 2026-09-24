@@ -538,20 +538,29 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
           const SnackBar(content: Text('Loyalty points cannot be negative.')));
       return;
     }
-    final total = cart.subtotal;
-    final finalTotal =
-        (total - (points * 0.10)).clamp(0.0, double.infinity).toDouble();
-    if (points > 0) {
-      try {
-        await _api.post('/customer/loyalty/preview-discount',
-            body: {'points_to_redeem': points});
-      } on ApiException catch (e) {
-        if (context.mounted) {
-          ScaffoldMessenger.of(context)
-              .showSnackBar(SnackBar(content: Text(e.message)));
-        }
-        return;
+    double finalTotal;
+    try {
+      final preview = await _api.post(
+        '/customer/cart-checkout/preview',
+        body: {
+          'items': cart.toCheckoutPayload(),
+          if (points > 0) 'points_to_redeem': points,
+          if (_promotionController.text.trim().isNotEmpty)
+            'promotion_code': _promotionController.text.trim().toUpperCase(),
+        },
+      );
+
+      if (preview is! Map || preview['final_total'] == null) {
+        throw const ApiException(500, 'The server returned an invalid checkout total.');
       }
+
+      finalTotal = double.tryParse(preview['final_total'].toString()) ?? 0;
+    } on ApiException catch (e) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text(e.message)));
+      }
+      return;
     }
     if (_method == 'Online') {
       if (!mounted) return;
