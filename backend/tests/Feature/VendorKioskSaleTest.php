@@ -3,6 +3,7 @@
 namespace Tests\Feature;
 
 use App\Models\MenuItem;
+use App\Models\InventoryMovement;
 use App\Models\Order;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -57,6 +58,7 @@ class VendorKioskSaleTest extends TestCase
             'vendor_id' => $vendor->id,
             'customer_id' => null,
             'sales_channel' => 'KIOSK',
+            'status' => 'COMPLETED',
             'grand_total' => 25,
         ]);
         $this->assertDatabaseHas('payments', [
@@ -67,6 +69,12 @@ class VendorKioskSaleTest extends TestCase
             'status' => 'SUCCESS',
         ]);
         $this->assertSame(8, (int) MenuItem::find($item->id)->current_stock);
+        $this->assertDatabaseHas('inventory_movements', [
+            'order_id' => $orderId,
+            'menu_item_id' => $item->id,
+            'quantity' => -2,
+            'type' => 'SALE',
+        ]);
         $this->assertSame(0, Order::withoutGlobalScopes()->where('id', $orderId)->whereNotNull('customer_id')->count());
     }
 }
