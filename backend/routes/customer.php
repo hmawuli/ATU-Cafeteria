@@ -7,6 +7,7 @@ use App\Http\Controllers\Api\CustomerDeviceController;
 use App\Http\Controllers\Api\CustomerDiscoveryController;
 use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\CustomerSupportController;
+use App\Http\Controllers\Api\ProductionCartCheckoutController;
 use App\Http\Controllers\Api\FavoriteMenuItemController;
 use App\Http\Controllers\Api\LoyaltyController;
 use App\Http\Controllers\Api\OrderController;
@@ -40,7 +41,7 @@ $customerRoutes = function () {
         Route::get('/order-history', [OrderController::class, 'getPersonalOrderHistory']);
         Route::post('/orders', [OrderController::class, 'storeAuthenticatedStudentOrder'])
             ->middleware(['throttle:payments', 'idempotency:required']);
-        Route::post('/cart-checkout', [OrderController::class, 'cartCheckout'])
+        Route::post('/cart-checkout', [ProductionCartCheckoutController::class, 'store'])
             ->middleware(['throttle:payments', 'idempotency:required']);
         Route::post('/orders/{id}/cancel', [OrderController::class, 'cancel'])
             ->middleware('idempotency:required');
