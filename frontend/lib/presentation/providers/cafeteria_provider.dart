@@ -949,10 +949,10 @@ class CafeteriaProvider extends ChangeNotifier {
   }
 
   Future<bool> logoutUser() async {
+    await PushNotificationService.revokeRegisteredDevice();
     try {
       if (_authToken != null) await _authRequest('POST', 'logout', {});
     } catch (_) {}
-    await PushNotificationService.revokeRegisteredDevice();
     _authToken = null;
     _currentUser = null;
     _requiresTwoFactor = false;
@@ -1175,6 +1175,7 @@ class CafeteriaProvider extends ChangeNotifier {
     _readyPollingTimer?.cancel();
     _readyPollingTimer = null;
     _announcedReadyOrders.clear();
+    await PushNotificationService.revokeRegisteredDevice();
     _authToken = null;
     _currentUser = null;
     _loginError = null;
