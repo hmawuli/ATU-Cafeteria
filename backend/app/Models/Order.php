@@ -205,6 +205,11 @@ class Order extends Model
         return $this->belongsTo(Payment::class, 'payment_id');
     }
 
+    public function paymentAllocation()
+    {
+        return $this->hasOne(PaymentAllocation::class, 'order_id');
+    }
+
     public function inventoryMovements()
     {
         return $this->hasMany(InventoryMovement::class, 'order_id');
