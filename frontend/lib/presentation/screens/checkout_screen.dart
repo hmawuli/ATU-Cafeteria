@@ -49,7 +49,8 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
     final cart = context.watch<CartProvider>();
     final total = cart.subtotal;
     final points = int.tryParse(_pointsController.text.trim()) ?? 0;
-    final discount = points * 0.10;
+    final hasPromotion = _promotionController.text.trim().isNotEmpty;
+    final discount = hasPromotion ? 0.0 : points * 0.10;
     final finalTotal =
         (total - discount).clamp(0.0, double.infinity).toDouble();
     return Scaffold(
@@ -129,6 +130,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                                   TextField(
                                       controller: _promotionController,
                                       textCapitalization: TextCapitalization.characters,
+                                      onChanged: (_) => setState(() {}),
                                       decoration: const InputDecoration(
                                         labelText: 'Promotion code',
                                         hintText: 'e.g. WELCOME10',
@@ -139,6 +141,13 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                                     'Promotion codes are checked securely against current offers and usage limits.',
                                     style: TextStyle(fontSize: 11, color: Colors.black54),
                                   ),
+                                  if (hasPromotion) ...[
+                                    const SizedBox(height: 6),
+                                    const Text(
+                                      'Final promotional discount is confirmed by the server at checkout.',
+                                      style: TextStyle(fontSize: 11, color: Colors.blueGrey),
+                                    ),
+                                  ],
                                 ],
                             ))),
                     const SizedBox(height: 18),
