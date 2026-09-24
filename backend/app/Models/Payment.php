@@ -35,4 +35,9 @@ class Payment extends Model
     public function order() { return $this->belongsTo(Order::class); }
     public function customer() { return $this->belongsTo(User::class, 'customer_id'); }
     public function refunds() { return $this->hasMany(Refund::class); }
+
+    public function allocations()
+    {
+        return $this->hasMany(PaymentAllocation::class);
+    }
 }
