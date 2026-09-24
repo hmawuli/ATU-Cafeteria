@@ -47,8 +47,8 @@ class AppTheme {
       labelSmall: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, height: 1.2),
     );
 
-    final rounded = RoundedRectangleBorder(
-      borderRadius: BorderRadius.circular(16),
+    const rounded = RoundedRectangleBorder(
+      borderRadius: BorderRadius.all(Radius.circular(16)),
     );
 
     return ThemeData(
@@ -93,7 +93,7 @@ class AppTheme {
         thickness: 1,
         color: Color(0xFFE2EAF3),
       ),
-      cardTheme: CardThemeData(
+      cardTheme: const CardThemeData(
         margin: EdgeInsets.zero,
         elevation: 1,
         color: Colors.white,
@@ -320,11 +320,13 @@ class AppTheme {
         elevation: 0,
         scrolledUnderElevation: 0,
       ),
-      cardTheme: CardThemeData(
-        color: const Color(0xFF102946),
+      cardTheme: const CardThemeData(
+        color: Color(0xFF102946),
         surfaceTintColor: Colors.transparent,
         elevation: 2,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.all(Radius.circular(16)),
+        ),
       ),
       inputDecorationTheme: InputDecorationTheme(
         filled: true,
