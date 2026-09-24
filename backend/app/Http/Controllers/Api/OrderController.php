@@ -1076,6 +1076,7 @@ class OrderController extends Controller
             'total_price' => 'required|numeric|min:0.01',
             'order_type' => 'nullable|string|in:TAKEAWAY,PICKUP,DINE_IN,DELIVERY',
             'customer_note' => 'nullable|string|max:1000',
+            'promotion_code' => 'nullable|string|max:50',
         ]);
 
         if ($validator->fails()) {
@@ -1797,7 +1798,53 @@ class OrderController extends Controller
                     throw new \RuntimeException('Insufficient loyalty points balance.');
                 }
 
-                $discount = round($pointsToRedeem * 0.10, 2);
+                $promotion = null;
+                $promotionDiscount = 0.0;
+                $promotionCode = strtoupper(trim((string) $request->input('promotion_code', '')));
+
+                if ($promotionCode !== '') {
+                    if ($pointsToRedeem > 0) {
+                        throw new \RuntimeException('Use either loyalty points or a promotion code for this order, not both.');
+                    }
+
+                    $promotion = \App\Models\Promotion::whereRaw('UPPER(code) = ?', [$promotionCode])
+                        ->lockForUpdate()
+                        ->first();
+
+                    if (! $promotion || ! $promotion->isCurrentlyActive()) {
+                        throw new \RuntimeException('This promotion is not active or has expired.');
+                    }
+
+                    if ($total < (float) $promotion->minimum_order_amount) {
+                        throw new \RuntimeException(
+                            'This promotion requires a minimum order of GH₵ '.
+                            number_format((float) $promotion->minimum_order_amount, 2).'.'
+                        );
+                    }
+
+                    if ($promotion->usage_limit !== null &&
+                        \App\Models\PromotionRedemption::where('promotion_id', $promotion->id)->count() >= $promotion->usage_limit) {
+                        throw new \RuntimeException('This promotion has reached its usage limit.');
+                    }
+
+                    if ($promotion->per_customer_limit !== null &&
+                        \App\Models\PromotionRedemption::where('promotion_id', $promotion->id)
+                            ->where('customer_id', $lockedUser->id)->count() >= $promotion->per_customer_limit) {
+                        throw new \RuntimeException('You have already used this promotion the maximum number of times allowed.');
+                    }
+
+                    $promotionDiscount = strtoupper((string) $promotion->type) === 'PERCENTAGE'
+                        ? round($total * ((float) $promotion->value / 100), 2)
+                        : round((float) $promotion->value, 2);
+
+                    if ($promotion->maximum_discount_amount !== null) {
+                        $promotionDiscount = min($promotionDiscount, (float) $promotion->maximum_discount_amount);
+                    }
+
+                    $promotionDiscount = min($promotionDiscount, $total);
+                }
+
+                $discount = round($promotion ? $promotionDiscount : ($pointsToRedeem * 0.10), 2);
                 $finalTotal = max(0.0, round($total - $discount, 2));
 
                 $payment = null;
@@ -1891,6 +1938,15 @@ class OrderController extends Controller
                         $catalogItem->save();
                     }
 
+                    if ($promotion) {
+                        \App\Models\PromotionRedemption::create([
+                            'promotion_id' => $promotion->id,
+                            'customer_id' => $lockedUser->id,
+                            'order_id' => $order->id,
+                            'discount_amount' => $itemDiscount,
+                        ]);
+                    }
+
                     \App\Models\OrderItem::create([
                         'order_id' => $order->id,
                         'food_item_id' => $item['is_menu_item'] ? null : $catalogItem->id,
@@ -1935,6 +1991,8 @@ class OrderController extends Controller
                     'orders' => $createdOrders,
                     'total_cost' => $total,
                     'discount' => $discount,
+                    'promotion_code' => $promotion?->code,
+                    'promotion_discount' => $promotionDiscount,
                     'final_total' => $finalTotal,
                     'remaining_balance' => (float) $lockedUser->balance,
                     'payment_reference' => $payment->reference,
@@ -1947,6 +2005,8 @@ class OrderController extends Controller
                 'orders' => $result['orders'],
                 'total_cost' => $result['total_cost'],
                 'discount' => $result['discount'],
+                'promotion_code' => $result['promotion_code'],
+                'promotion_discount' => $result['promotion_discount'],
                 'final_total' => $result['final_total'],
                 'remaining_balance' => $result['remaining_balance'],
                 'payment_reference' => $result['payment_reference'],
