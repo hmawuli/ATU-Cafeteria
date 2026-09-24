@@ -593,11 +593,9 @@ class _ReferenceVendorScreenState extends State<ReferenceVendorScreen> {
                       ]),
                       const SizedBox(height: 12),
                       FilledButton.icon(
-                        onPressed: cart.isEmpty
-                            ? null
-                            : () => Navigator.pushNamed(context, '/checkout'),
-                        icon: const Icon(Icons.arrow_forward_rounded),
-                        label: const Text('PROCEED TO CHECKOUT'),
+                        onPressed: cart.isEmpty ? null : () => _completeWalkInSale(cart),
+                        icon: const Icon(Icons.point_of_sale_outlined),
+                        label: const Text('COMPLETE WALK-IN SALE'),
                       ),
                       const SizedBox(height: 6),
                       TextButton(
@@ -615,6 +613,108 @@ class _ReferenceVendorScreenState extends State<ReferenceVendorScreen> {
         ),
       ],
     );
+  }
+
+  Future<void> _completeWalkInSale(CartProvider cart) async {
+    final customerName = TextEditingController();
+    final customerPhone = TextEditingController();
+    String paymentMethod = 'CASH';
+
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => StatefulBuilder(
+        builder: (dialogContext, setDialogState) => AlertDialog(
+          title: const Text('Complete Walk-In Sale'),
+          content: SizedBox(
+            width: 460,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text('Total: GH₵ ${cart.subtotal.toStringAsFixed(2)}', style: const TextStyle(fontWeight: FontWeight.w900)),
+                const SizedBox(height: 14),
+                TextField(
+                  controller: customerName,
+                  decoration: const InputDecoration(
+                    labelText: 'Customer name (optional)',
+                    prefixIcon: Icon(Icons.person_outline),
+                  ),
+                ),
+                const SizedBox(height: 10),
+                TextField(
+                  controller: customerPhone,
+                  keyboardType: TextInputType.phone,
+                  decoration: const InputDecoration(
+                    labelText: 'Phone number (optional)',
+                    prefixIcon: Icon(Icons.phone_outlined),
+                  ),
+                ),
+                const SizedBox(height: 10),
+                DropdownButtonFormField<String>(
+                  initialValue: paymentMethod,
+                  items: const [
+                    DropdownMenuItem(value: 'CASH', child: Text('Cash')),
+                    DropdownMenuItem(value: 'MOMO', child: Text('Mobile Money')),
+                    DropdownMenuItem(value: 'CARD', child: Text('Card')),
+                  ],
+                  onChanged: (value) => setDialogState(() => paymentMethod = value ?? 'CASH'),
+                  decoration: const InputDecoration(
+                    labelText: 'Payment method',
+                    prefixIcon: Icon(Icons.payments_outlined),
+                  ),
+                ),
+                const SizedBox(height: 8),
+                const Align(
+                  alignment: Alignment.centerLeft,
+                  child: Text(
+                    'The sale will appear in Orders and Finance as a Kiosk transaction.',
+                    style: TextStyle(fontSize: 11, color: AppTheme.textMuted),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(dialogContext, false), child: const Text('Cancel')),
+            FilledButton(
+              onPressed: () async {
+                try {
+                  await context.read<ApiClient>().post(
+                    '/vendor/kiosk/orders',
+                    idempotencyKey: ApiClient.newIdempotencyKey(),
+                    body: {
+                      'items': cart.toCheckoutPayload(),
+                      if (customerName.text.trim().isNotEmpty) 'customer_name': customerName.text.trim(),
+                      if (customerPhone.text.trim().isNotEmpty) 'customer_phone': customerPhone.text.trim(),
+                      'payment_method': paymentMethod,
+                    },
+                  );
+                  if (dialogContext.mounted) Navigator.pop(dialogContext, true);
+                } catch (e) {
+                  if (dialogContext.mounted) {
+                    ScaffoldMessenger.of(dialogContext).showSnackBar(
+                      SnackBar(content: Text(e.toString().replaceFirst('Exception: ', ''))),
+                    );
+                  }
+                }
+              },
+              child: const Text('Record Sale'),
+            ),
+          ],
+        ),
+      ),
+    );
+
+    customerName.dispose();
+    customerPhone.dispose();
+
+    if (confirmed == true && mounted) {
+      cart.clear();
+      await context.read<CafeteriaProvider>().refreshAllData();
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Walk-in sale recorded successfully.')),
+      );
+    }
   }
 
   Widget _performance(CafeteriaProvider provider) {
