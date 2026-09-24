@@ -230,44 +230,220 @@ class _RestaurantCustomerHomeScreenState extends State<RestaurantCustomerHomeScr
     final foods = provider.allFoodItems.where((f) => f.isAvailable).toList();
     final vendors = _vendorsFrom(provider, foods);
     final query = _query.trim().toLowerCase();
+
     final filtered = query.isEmpty
         ? foods
         : foods
-            .where((f) =>
-                '${f.name} ${f.category} ${f.description}'
-                    .toLowerCase()
-                    .contains(query))
+            .where(
+              (f) => '${f.name} ${f.category} ${f.description}'
+                  .toLowerCase()
+                  .contains(query),
+            )
             .toList();
+
+    final categories = <String>{
+      for (final food in foods)
+        if (food.category.trim().isNotEmpty) food.category.trim(),
+    }.take(8).toList();
+
+    final popularMeals = filtered.take(4).toList();
 
     return RefreshIndicator(
       onRefresh: provider.refreshAllData,
       child: ListView(
-        padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
+        padding: const EdgeInsets.fromLTRB(16, 16, 16, 32),
         children: [
           _welcome(user),
           const SizedBox(height: 16),
+
           _search(),
-          const SizedBox(height: 20),
-          _header('Featured Vendors', 'View All', () => setState(() => _tab = 1)),
+          const SizedBox(height: 18),
+
+          // Restaurant discovery banner.
+          Container(
+            padding: const EdgeInsets.fromLTRB(20, 20, 18, 20),
+            decoration: BoxDecoration(
+              gradient: const LinearGradient(
+                colors: [navy, blue],
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+              ),
+              borderRadius: BorderRadius.circular(20),
+              boxShadow: [
+                BoxShadow(
+                  color: navy.withValues(alpha: .14),
+                  blurRadius: 18,
+                  offset: const Offset(0, 8),
+                ),
+              ],
+            ),
+            child: Row(
+              children: [
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text(
+                        'GOOD FOOD, MADE SIMPLE',
+                        style: TextStyle(
+                          color: yellow,
+                          fontSize: 11,
+                          fontWeight: FontWeight.w900,
+                          letterSpacing: 1.1,
+                        ),
+                      ),
+                      const SizedBox(height: 7),
+                      const Text(
+                        'What are you craving today?',
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontSize: 21,
+                          height: 1.15,
+                          fontWeight: FontWeight.w900,
+                        ),
+                      ),
+                      const SizedBox(height: 7),
+                      Text(
+                        _promotions.isNotEmpty
+                            ? 'Discover fresh meals and today’s special offers.'
+                            : 'Discover fresh meals from our food vendors.',
+                        style: const TextStyle(
+                          color: Colors.white70,
+                          fontSize: 12,
+                          height: 1.35,
+                        ),
+                      ),
+                      const SizedBox(height: 14),
+                      SizedBox(
+                        height: 38,
+                        child: FilledButton(
+                          onPressed: () {
+                            if (_promotions.isNotEmpty) {
+                              setState(() => _tab = 0);
+                            } else {
+                              setState(() => _query = '');
+                            }
+                          },
+                          style: FilledButton.styleFrom(
+                            backgroundColor: yellow,
+                            foregroundColor: navy,
+                            padding: const EdgeInsets.symmetric(horizontal: 16),
+                          ),
+                          child: Text(
+                            _promotions.isNotEmpty
+                                ? 'View Today’s Offers'
+                                : 'Explore Menu',
+                            style: const TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w900,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Container(
+                  width: 76,
+                  height: 76,
+                  decoration: BoxDecoration(
+                    color: Colors.white.withValues(alpha: .10),
+                    shape: BoxShape.circle,
+                    border: Border.all(
+                      color: Colors.white.withValues(alpha: .16),
+                    ),
+                  ),
+                  child: const Icon(
+                    Icons.restaurant_menu_rounded,
+                    color: yellow,
+                    size: 40,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 22),
+
+          // Food categories.
+          if (categories.isNotEmpty) ...[
+            _header('Browse Categories', 'All', () {
+              setState(() => _query = '');
+            }),
+            const SizedBox(height: 10),
+            SizedBox(
+              height: 42,
+              child: ListView.separated(
+                scrollDirection: Axis.horizontal,
+                itemCount: categories.length,
+                separatorBuilder: (_, __) => const SizedBox(width: 8),
+                itemBuilder: (_, index) {
+                  final category = categories[index];
+                  final selected =
+                      _query.toLowerCase() == category.toLowerCase();
+
+                  return ChoiceChip(
+                    selected: selected,
+                    label: Text(category),
+                    avatar: const Icon(
+                      Icons.restaurant_rounded,
+                      size: 16,
+                    ),
+                    onSelected: (_) {
+                      setState(() => _query = category);
+                    },
+                  );
+                },
+              ),
+            ),
+            const SizedBox(height: 22),
+          ],
+
+          // Popular meals.
+          if (popularMeals.isNotEmpty) ...[
+            _header(
+              'Popular Meals',
+              '${filtered.length} available',
+              null,
+            ),
+            const SizedBox(height: 10),
+            ...popularMeals.map(_mealRow),
+            const SizedBox(height: 22),
+          ],
+
+          // Featured restaurant vendors.
+          _header(
+            'Featured Vendors',
+            'View All',
+            () => setState(() => _tab = 1),
+          ),
           const SizedBox(height: 10),
           _featuredVendors(vendors),
-          const SizedBox(height: 20),
+          const SizedBox(height: 22),
+
+          // Useful customer actions.
           _header('Quick Actions', null, null),
           const SizedBox(height: 10),
           _quickActions(),
-          const SizedBox(height: 20),
+          const SizedBox(height: 22),
+
+          // Personal recommendations.
           if (_smartPicks.isNotEmpty) ...[
-            _header('For You', 'Personal picks', null),
+            _header('Recommended For You', 'Personal picks', null),
             const SizedBox(height: 10),
             _smartPicksSection(provider),
-            const SizedBox(height: 20),
+            const SizedBox(height: 22),
           ],
+
+          // Promotions.
           if (_promotions.isNotEmpty) ...[
             _header('Today’s Deals', 'Live offers', null),
             const SizedBox(height: 10),
             _promotionsSection(),
-            const SizedBox(height: 20),
+            const SizedBox(height: 22),
           ],
+
+          // Full menu.
           _header(
             "Today's Menu",
             '${filtered.length} ${filtered.length == 1 ? 'meal' : 'meals'}',
@@ -278,7 +454,8 @@ class _RestaurantCustomerHomeScreenState extends State<RestaurantCustomerHomeScr
             _emptyMenu(provider.allFoodItems.isEmpty)
           else
             ...filtered.take(6).map(_mealRow),
-          const SizedBox(height: 16),
+
+          const SizedBox(height: 18),
           _checkoutHint(),
         ],
       ),
