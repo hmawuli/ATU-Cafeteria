@@ -1147,6 +1147,10 @@ class CafeteriaProvider extends ChangeNotifier {
   Future<void> logOut() async {
     final oldToken = _authToken;
     final oldUser = _currentUser;
+
+    // Revoke this installation while the current token is still valid.
+    await PushNotificationService.revokeRegisteredDevice();
+
     try {
       if (oldToken != null && oldToken.isNotEmpty) {
         final url = Uri.parse('$_laravelBaseUrl/api/logout');
@@ -1163,6 +1167,7 @@ class CafeteriaProvider extends ChangeNotifier {
         }
       }
     } catch (_) {}
+
     if (oldUser?.id != null) {
       try {
         await _db.insertAuditLog(AuditLog(
@@ -1172,10 +1177,10 @@ class CafeteriaProvider extends ChangeNotifier {
             timestamp: DateTime.now().millisecondsSinceEpoch));
       } catch (_) {}
     }
+
     _readyPollingTimer?.cancel();
     _readyPollingTimer = null;
     _announcedReadyOrders.clear();
-    await PushNotificationService.revokeRegisteredDevice();
     _authToken = null;
     _currentUser = null;
     _loginError = null;
