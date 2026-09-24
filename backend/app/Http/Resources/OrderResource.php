@@ -17,6 +17,14 @@ class OrderResource extends JsonResource
     {
         return [
             'id' => $this->id,
+            'order_number' => $this->order_number,
+            'checkout_session_id' => $this->checkout_session_id,
+            'order_type' => $this->order_type,
+            'payment_method' => $this->payment_method,
+            'payment_status' => $this->payment_status,
+            'subtotal' => (float) $this->subtotal,
+            'discount_amount' => (float) $this->discount_amount,
+            'grand_total' => (float) $this->grand_total,
             'customer_id' => $this->customer_id,
             'student_id' => $this->student_id,
             'user_id' => $this->user_id,
