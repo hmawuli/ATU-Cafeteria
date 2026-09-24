@@ -105,7 +105,15 @@ class PaystackRefundService
                         ->whereNotIn('status', ['CANCELLED', 'DECLINED'])
                         ->exists();
 
-                    if (! $hasOpenSibling) {
+                    $orderIds = Order::withoutGlobalScopes()
+                        ->where('checkout_session_id', $order->checkout_session_id)
+                        ->pluck('id');
+
+                    $hasPendingRefund = Refund::whereIn('order_id', $orderIds)
+                        ->whereIn('status', ['PENDING', 'PROCESSING'])
+                        ->exists();
+
+                    if (! $hasOpenSibling && ! $hasPendingRefund) {
                         PromotionRedemption::where('checkout_session_id', $order->checkout_session_id)->delete();
                     }
                 } elseif ($order) {
