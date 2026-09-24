@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\AuditLog;
 use App\Models\Order;
 use App\Models\Payment;
+use App\Models\PaymentAllocation;
 use App\Models\Promotion;
 use App\Models\Refund;
 use App\Models\SupportTicket;
@@ -119,11 +120,23 @@ class AdminOperationsController extends Controller
             $customer = User::whereKey($lockedOrder->customer_id ?: $lockedOrder->user_id ?: $lockedOrder->student_id)
                 ->lockForUpdate()->firstOrFail();
 
+            $allocation = $lockedOrder->payment_id
+                ? PaymentAllocation::where('payment_id', $lockedOrder->payment_id)
+                    ->where('order_id', $lockedOrder->id)
+                    ->lockForUpdate()
+                    ->first()
+                : null;
+
             $alreadyRefunded = (float) Refund::where('order_id', $lockedOrder->id)
-                ->whereIn('status', ['SUCCESS','PROCESSING'])
+                ->whereIn('status', ['SUCCESS','PROCESSING','PENDING'])
                 ->sum('amount');
-            $maxRefund = max(0, (float) $lockedOrder->grand_total ?: (float) $lockedOrder->total_price);
-            $remaining = round($maxRefund - $alreadyRefunded, 2);
+            $maxRefund = $allocation
+                ? (float) $allocation->amount
+                : max(0, (float) $lockedOrder->grand_total ?: (float) $lockedOrder->total_price);
+            $remaining = $allocation
+                ? round($allocation->refundableAmount() - (max(0, $alreadyRefunded - (float) $allocation->refunded_amount)), 2)
+                : round($maxRefund - $alreadyRefunded, 2);
+            $remaining = max(0, $remaining);
             $amount = round((float) ($request->input('amount') ?? $remaining), 2);
 
             if ($amount <= 0 || $amount > $remaining) {
@@ -165,13 +178,30 @@ class AdminOperationsController extends Controller
                     'details' => 'Admin refund for order '.$lockedOrder->order_number,
                 ]);
 
+                if ($allocation) {
+                    $allocation->refunded_amount = round(
+                        min((float) $allocation->amount, (float) $allocation->refunded_amount + $amount),
+                        2
+                    );
+                    $allocation->save();
+                }
+
                 if ($payment) {
-                    $payment->status = 'REFUNDED';
-                    $payment->refunded_at = now();
+                    $payment->load('allocations');
+                    $allAllocated = $payment->allocations->sum(fn ($row) => (float) $row->amount);
+                    $allRefunded = $payment->allocations->sum(fn ($row) => (float) $row->refunded_amount);
+                    $payment->status = $allAllocated > 0 && $allRefunded + 0.01 >= $allAllocated
+                        ? 'REFUNDED'
+                        : 'SUCCESS';
+                    $payment->refunded_at = $payment->status === 'REFUNDED' ? now() : $payment->refunded_at;
                     $payment->save();
                 }
 
                 return $refund;
+            }
+
+            if (! $payment) {
+                throw new \RuntimeException('No payment record is attached to this order.');
             }
 
             return Refund::create([
