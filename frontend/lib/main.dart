@@ -5,6 +5,7 @@ import 'package:atu_cafeteria/presentation/providers/cafeteria_provider.dart';
 import 'package:atu_cafeteria/presentation/providers/admin_state_provider.dart';
 import 'package:atu_cafeteria/presentation/providers/cart_provider.dart';
 import 'package:atu_cafeteria/core/network/api_client.dart';
+import 'presentation/screens/customer_vendor_menu_screen.dart';
 import 'package:atu_cafeteria/presentation/screens/login_screen.dart';
 import 'package:atu_cafeteria/presentation/screens/register_screen.dart';
 import 'package:atu_cafeteria/presentation/screens/password_reset_screen.dart';
@@ -86,11 +87,22 @@ class ATUCafeteriaApp extends StatelessWidget {
           '/vendor-display': (_) => const VendorOrderDisplayScreen(),
           '/kfc-ordering': (_) => const KfcOrderingScreen(),
           '/group-order': (_) => const GroupOrderScreen(),
+          '/restaurant-menu': (context) {
+            final vendor = ModalRoute.of(context)?.settings.arguments;
+            return vendor is User
+                ? CustomerVendorMenuScreen(vendor: vendor)
+                : const Scaffold(
+                    body: Center(
+                      child: Text('Invalid restaurant.'),
+                    ),
+                  );
+          },
           '/food-detail': (context) {
             final item = ModalRoute.of(context)?.settings.arguments;
             return item is FoodItem
                 ? FoodDetailScreen(item: item)
-                : const Scaffold(body: Center(child: Text('Invalid food item.')));
+                : const Scaffold(
+                    body: Center(child: Text('Invalid food item.')));
           },
           '/order-tracking': (context) {
             final id = ModalRoute.of(context)?.settings.arguments;

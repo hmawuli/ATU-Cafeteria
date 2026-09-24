@@ -10,10 +10,12 @@ class RestaurantCustomerHomeScreen extends StatefulWidget {
   const RestaurantCustomerHomeScreen({super.key});
 
   @override
-  State<RestaurantCustomerHomeScreen> createState() => _RestaurantCustomerHomeScreenState();
+  State<RestaurantCustomerHomeScreen> createState() =>
+      _RestaurantCustomerHomeScreenState();
 }
 
-class _RestaurantCustomerHomeScreenState extends State<RestaurantCustomerHomeScreen> {
+class _RestaurantCustomerHomeScreenState
+    extends State<RestaurantCustomerHomeScreen> {
   static const navy = Color(0xFF073B82);
   static const blue = Color(0xFF0D55B5);
   static const yellow = Color(0xFFFFC400);
@@ -42,23 +44,28 @@ class _RestaurantCustomerHomeScreenState extends State<RestaurantCustomerHomeScr
         final vendors = data['vendors'];
         final promotions = data['promotions'];
         if (vendors is List) {
-          _discoveryVendors = vendors.whereType<Map>().map(Map<String, dynamic>.from).toList();
+          _discoveryVendors =
+              vendors.whereType<Map>().map(Map<String, dynamic>.from).toList();
         }
         if (promotions is List) {
-          _promotions = promotions.whereType<Map>().map(Map<String, dynamic>.from).toList();
+          _promotions = promotions
+              .whereType<Map>()
+              .map(Map<String, dynamic>.from)
+              .toList();
         }
       }
 
       final recommendations = await _api.get('/customer/recommendations');
-      final raw = recommendations is Map ? recommendations['data'] : recommendations;
+      final raw =
+          recommendations is Map ? recommendations['data'] : recommendations;
       if (raw is List) {
-        _smartPicks = raw.whereType<Map>().map(Map<String, dynamic>.from).toList();
+        _smartPicks =
+            raw.whereType<Map>().map(Map<String, dynamic>.from).toList();
       }
       if (mounted) setState(() {});
     } catch (_) {
       // Existing cached catalogue remains usable if discovery is unavailable.
-    } finally {
-    }
+    } finally {}
   }
 
   @override
@@ -66,7 +73,6 @@ class _RestaurantCustomerHomeScreenState extends State<RestaurantCustomerHomeScr
     _api.close();
     super.dispose();
   }
-
 
   @override
   Widget build(BuildContext context) {
@@ -81,8 +87,7 @@ class _RestaurantCustomerHomeScreenState extends State<RestaurantCustomerHomeScr
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                const Icon(Icons.lock_outline_rounded,
-                    size: 64, color: navy),
+                const Icon(Icons.lock_outline_rounded, size: 64, color: navy),
                 const SizedBox(height: 16),
                 const Text(
                   'Please sign in to continue.',
@@ -559,7 +564,8 @@ class _RestaurantCustomerHomeScreenState extends State<RestaurantCustomerHomeScr
           }
           final name = (pick['name'] ?? pick['food_name'] ?? 'Meal').toString();
           final price = pick['price'];
-          final priceText = price is num ? 'GH₵ ${price.toStringAsFixed(2)}' : 'View price';
+          final priceText =
+              price is num ? 'GH₵ ${price.toStringAsFixed(2)}' : 'View price';
           return SizedBox(
             width: 176,
             child: Material(
@@ -569,22 +575,32 @@ class _RestaurantCustomerHomeScreenState extends State<RestaurantCustomerHomeScr
               child: InkWell(
                 onTap: local == null
                     ? null
-                    : () => Navigator.pushNamed(context, '/food-detail', arguments: local),
+                    : () => Navigator.pushNamed(context, '/food-detail',
+                        arguments: local),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    SizedBox(height: 108, width: double.infinity, child: _foodImage('${pick['image_url'] ?? ''}')),
+                    SizedBox(
+                        height: 108,
+                        width: double.infinity,
+                        child: _foodImage('${pick['image_url'] ?? ''}')),
                     Padding(
                       padding: const EdgeInsets.fromLTRB(11, 9, 11, 10),
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text(name, maxLines: 2, overflow: TextOverflow.ellipsis,
-                            style: const TextStyle(color: navy, fontWeight: FontWeight.w900)),
+                          Text(name,
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(
+                                  color: navy, fontWeight: FontWeight.w900)),
                           const SizedBox(height: 6),
-                          Text(priceText, style: const TextStyle(color: blue, fontWeight: FontWeight.w900)),
+                          Text(priceText,
+                              style: const TextStyle(
+                                  color: blue, fontWeight: FontWeight.w900)),
                           const SizedBox(height: 5),
-                          const Text('Based on your ordering history', style: TextStyle(fontSize: 10, color: muted)),
+                          const Text('Based on your ordering history',
+                              style: TextStyle(fontSize: 10, color: muted)),
                         ],
                       ),
                     ),
@@ -624,14 +640,21 @@ class _RestaurantCustomerHomeScreenState extends State<RestaurantCustomerHomeScr
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(headline, style: const TextStyle(color: yellow, fontWeight: FontWeight.w900, fontSize: 18)),
+                Text(headline,
+                    style: const TextStyle(
+                        color: yellow,
+                        fontWeight: FontWeight.w900,
+                        fontSize: 18)),
                 const SizedBox(height: 5),
                 Text((promo['name'] ?? 'Today’s offer').toString(),
-                  maxLines: 1, overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w800)),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                        color: Colors.white, fontWeight: FontWeight.w800)),
                 const Spacer(),
                 Text('Code: ${(promo['code'] ?? 'AUTO').toString()}',
-                  style: const TextStyle(color: Colors.white70, fontSize: 11)),
+                    style:
+                        const TextStyle(color: Colors.white70, fontSize: 11)),
               ],
             ),
           );
@@ -724,7 +747,8 @@ class _RestaurantCustomerHomeScreenState extends State<RestaurantCustomerHomeScr
       return _panel(
         const Padding(
           padding: EdgeInsets.all(16),
-          child: Text('Vendors will appear here when their menus are available.'),
+          child:
+              Text('Vendors will appear here when their menus are available.'),
         ),
       );
     }
@@ -755,15 +779,11 @@ class _RestaurantCustomerHomeScreenState extends State<RestaurantCustomerHomeScr
         clipBehavior: Clip.antiAlias,
         child: InkWell(
           onTap: () {
-            if (foods.isNotEmpty) {
-              Navigator.pushNamed(
-                context,
-                '/food-detail',
-                arguments: foods.first,
-              );
-            } else {
-              setState(() => _tab = 1);
-            }
+            Navigator.pushNamed(
+              context,
+              '/restaurant-menu',
+              arguments: vendor,
+            );
           },
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -845,8 +865,16 @@ class _RestaurantCustomerHomeScreenState extends State<RestaurantCustomerHomeScr
     final actions = [
       ('All Vendors', Icons.storefront_rounded, () => setState(() => _tab = 1)),
       ('My Orders', Icons.receipt_long_rounded, () => setState(() => _tab = 2)),
-      ('Cart', Icons.shopping_cart_rounded, () => Navigator.pushNamed(context, '/cart')),
-      ('Wallet', Icons.account_balance_wallet_rounded, () => setState(() => _tab = 3)),
+      (
+        'Cart',
+        Icons.shopping_cart_rounded,
+        () => Navigator.pushNamed(context, '/cart')
+      ),
+      (
+        'Wallet',
+        Icons.account_balance_wallet_rounded,
+        () => setState(() => _tab = 3)
+      ),
     ];
 
     return Row(
@@ -1010,7 +1038,8 @@ class _RestaurantCustomerHomeScreenState extends State<RestaurantCustomerHomeScr
       children: [
         const Text(
           'Featured Vendors',
-          style: TextStyle(color: navy, fontSize: 27, fontWeight: FontWeight.w900),
+          style:
+              TextStyle(color: navy, fontSize: 27, fontWeight: FontWeight.w900),
         ),
         const SizedBox(height: 14),
         ...vendors.map(_vendorListCard),
@@ -1048,13 +1077,11 @@ class _RestaurantCustomerHomeScreenState extends State<RestaurantCustomerHomeScr
             style: const TextStyle(color: muted),
           ),
           trailing: _openPill(vendor.isOpen),
-          onTap: foods.isEmpty
-              ? null
-              : () => Navigator.pushNamed(
-                    context,
-                    '/food-detail',
-                    arguments: foods.first,
-                  ),
+          onTap: () => Navigator.pushNamed(
+            context,
+            '/restaurant-menu',
+            arguments: vendor,
+          ),
         ),
       ),
     );
@@ -1067,7 +1094,8 @@ class _RestaurantCustomerHomeScreenState extends State<RestaurantCustomerHomeScr
       children: [
         const Text(
           'My Orders',
-          style: TextStyle(color: navy, fontSize: 27, fontWeight: FontWeight.w900),
+          style:
+              TextStyle(color: navy, fontSize: 27, fontWeight: FontWeight.w900),
         ),
         const SizedBox(height: 14),
         if (orders.isEmpty)
@@ -1090,7 +1118,8 @@ class _RestaurantCustomerHomeScreenState extends State<RestaurantCustomerHomeScr
                 Expanded(
                   child: Text(
                     'Wallet balance: GH₵ ${provider.customerWalletBalance.toStringAsFixed(2)}',
-                    style: const TextStyle(color: navy, fontWeight: FontWeight.w800),
+                    style: const TextStyle(
+                        color: navy, fontWeight: FontWeight.w800),
                   ),
                 ),
                 TextButton(
@@ -1173,8 +1202,10 @@ class _RestaurantCustomerHomeScreenState extends State<RestaurantCustomerHomeScr
                     Builder(
                       builder: (_) {
                         FoodItem? item;
-                        for (final candidate in context.read<CafeteriaProvider>().allFoodItems) {
-                          if (candidate.id == order.foodItemId && candidate.isAvailable) {
+                        for (final candidate
+                            in context.read<CafeteriaProvider>().allFoodItems) {
+                          if (candidate.id == order.foodItemId &&
+                              candidate.isAvailable) {
                             item = candidate;
                             break;
                           }
@@ -1187,10 +1218,12 @@ class _RestaurantCustomerHomeScreenState extends State<RestaurantCustomerHomeScr
                                     context.read<CartProvider>().add(item!);
                                     ScaffoldMessenger.of(context).showSnackBar(
                                       SnackBar(
-                                        content: Text('${item.name} added to your cart.'),
+                                        content: Text(
+                                            '${item.name} added to your cart.'),
                                         action: SnackBarAction(
                                           label: 'VIEW CART',
-                                          onPressed: () => Navigator.pushNamed(context, '/cart'),
+                                          onPressed: () => Navigator.pushNamed(
+                                              context, '/cart'),
                                         ),
                                       ),
                                     );
@@ -1220,7 +1253,8 @@ class _RestaurantCustomerHomeScreenState extends State<RestaurantCustomerHomeScr
       ),
       child: Text(
         text,
-        style: TextStyle(color: color, fontWeight: FontWeight.w900, fontSize: 11),
+        style:
+            TextStyle(color: color, fontWeight: FontWeight.w900, fontSize: 11),
       ),
     );
   }
@@ -1249,7 +1283,8 @@ class _RestaurantCustomerHomeScreenState extends State<RestaurantCustomerHomeScr
             color: yellow,
             borderRadius: BorderRadius.circular(18),
           ),
-          child: const Icon(Icons.restaurant_menu_rounded, color: navy, size: 38),
+          child:
+              const Icon(Icons.restaurant_menu_rounded, color: navy, size: 38),
         ),
         title: const Text('ATU Cafeteria',
             textAlign: TextAlign.center,
@@ -1275,8 +1310,12 @@ class _RestaurantCustomerHomeScreenState extends State<RestaurantCustomerHomeScr
     final normalized = status.toLowerCase();
     var active = 0;
     if (normalized.contains('prepar')) active = 1;
-    if (normalized.contains('ready') || normalized.contains('delivery')) active = 2;
-    if (normalized.contains('deliver') || normalized.contains('picked')) active = 3;
+    if (normalized.contains('ready') || normalized.contains('delivery')) {
+      active = 2;
+    }
+    if (normalized.contains('deliver') || normalized.contains('picked')) {
+      active = 3;
+    }
     if (normalized.contains('completed')) active = 3;
 
     return Row(
@@ -1294,9 +1333,7 @@ class _RestaurantCustomerHomeScreenState extends State<RestaurantCustomerHomeScr
                         ? (i == active ? yellow : navy)
                         : Colors.white,
                     border: Border.all(
-                      color: i <= active
-                          ? navy
-                          : const Color(0xFF9FB7D3),
+                      color: i <= active ? navy : const Color(0xFF9FB7D3),
                       width: 2,
                     ),
                   ),
@@ -1375,7 +1412,9 @@ class _RestaurantCustomerHomeScreenState extends State<RestaurantCustomerHomeScr
           ),
         ),
         const SizedBox(height: 14),
-        Center(child: _status(user.accountStatus, _statusColor(user.accountStatus))),
+        Center(
+            child:
+                _status(user.accountStatus, _statusColor(user.accountStatus))),
         const SizedBox(height: 18),
         _walletCard(context, provider),
         const SizedBox(height: 14),
@@ -1523,7 +1562,8 @@ class _RestaurantCustomerHomeScreenState extends State<RestaurantCustomerHomeScr
                 TextField(
                   controller: amountController,
                   autofocus: true,
-                  keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                  keyboardType:
+                      const TextInputType.numberWithOptions(decimal: true),
                   decoration: const InputDecoration(
                     labelText: 'Amount',
                     prefixText: 'GH₵ ',
@@ -1617,7 +1657,8 @@ class _RestaurantCustomerHomeScreenState extends State<RestaurantCustomerHomeScr
     double amount,
   ) {
     var isVerifying = false;
-    String message = 'Confirm the payment after completing the Paystack checkout.';
+    String message =
+        'Confirm the payment after completing the Paystack checkout.';
 
     showDialog<void>(
       context: context,
@@ -1651,7 +1692,8 @@ class _RestaurantCustomerHomeScreenState extends State<RestaurantCustomerHomeScr
               const SizedBox(height: 10),
               Text(
                 message,
-                style: const TextStyle(color: navy, fontWeight: FontWeight.w700),
+                style:
+                    const TextStyle(color: navy, fontWeight: FontWeight.w700),
               ),
             ],
           ),
@@ -1666,7 +1708,8 @@ class _RestaurantCustomerHomeScreenState extends State<RestaurantCustomerHomeScr
                   : () async {
                       final reference = payment['reference']?.toString();
                       if (reference == null || reference.isEmpty) {
-                        setState(() => message = 'Payment reference was not returned.');
+                        setState(() =>
+                            message = 'Payment reference was not returned.');
                         return;
                       }
 
