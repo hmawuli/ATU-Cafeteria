@@ -192,10 +192,21 @@ class AdminOperationsController extends Controller
                     $payment->load('allocations');
                     $allAllocated = $payment->allocations->sum(fn ($row) => (float) $row->amount);
                     $allRefunded = $payment->allocations->sum(fn ($row) => (float) $row->refunded_amount);
-                    $payment->status = $allAllocated > 0 && $allRefunded + 0.01 >= $allAllocated
-                        ? 'REFUNDED'
-                        : 'SUCCESS';
-                    $payment->refunded_at = $payment->status === 'REFUNDED' ? now() : $payment->refunded_at;
+                    $pendingRefunds = Refund::where('payment_id', $payment->id)
+                        ->whereIn('status', ['PENDING', 'PROCESSING'])
+                        ->exists();
+
+                    if ($allAllocated > 0 && $allRefunded + 0.01 >= $allAllocated) {
+                        $payment->status = 'REFUNDED';
+                    } elseif ($pendingRefunds) {
+                        $payment->status = 'REFUND_PENDING';
+                    } else {
+                        $payment->status = 'SUCCESS';
+                    }
+
+                    $payment->refunded_at = $payment->status === 'REFUNDED'
+                        ? now()
+                        : $payment->refunded_at;
                     $payment->save();
                 }
 
