@@ -189,7 +189,7 @@ class OrderController extends Controller
             });
         }
 
-        $orders = $ordersQuery->orderBy('order_timestamp', 'desc')->get();
+        $orders = $ordersQuery->with(['items', 'customer'])->orderBy('order_timestamp', 'desc')->get();
 
         return response()->json($orders, 200);
     }
