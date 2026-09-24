@@ -89,6 +89,18 @@ class ProductionCartCheckoutController extends Controller
                     throw new RuntimeException('This promotion is not active or has expired.');
                 }
 
+                if ($promotion->usage_limit !== null &&
+                    PromotionRedemption::where('promotion_id', $promotion->id)->count() >= $promotion->usage_limit) {
+                    throw new \RuntimeException('This promotion has reached its usage limit.');
+                }
+
+                if ($promotion->per_customer_limit !== null &&
+                    PromotionRedemption::where('promotion_id', $promotion->id)
+                        ->where('customer_id', $user->id)
+                        ->count() >= $promotion->per_customer_limit) {
+                    throw new \RuntimeException('You have reached this promotion’s usage limit.');
+                }
+
                 $uniqueVendors = array_values(array_unique($vendorIds));
                 if ($promotion->vendor_id !== null &&
                     (count($uniqueVendors) !== 1 || (int) $promotion->vendor_id !== (int) $uniqueVendors[0])) {
