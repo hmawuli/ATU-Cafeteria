@@ -21,8 +21,13 @@ Flutter is the customer/staff client. Laravel is the business-logic API and syst
 - Customer saved addresses
 - Customer support tickets
 - Customer account closure with audit retention
-- Promotions and promotion redemptions data model
-- Vendor settlement data model and generation endpoint
+- Promotions, vendor-owned promotions and promotion redemptions
+- Vendor settlement data model, vendor finance dashboard and generation endpoint
+- Aggregate checkout sessions with one payment spanning one or more vendor orders
+- Multi-line vendor orders and server-authoritative checkout price preview
+- Vendor-operated walk-in kiosk sales recorded as KIOSK channel transactions
+- Inventory health summary with low-stock and out-of-stock visibility
+- Database-backed notification center for customers and vendors
 - FCM delivery that reports failure when production credentials are missing
 - Debug-only local demo data
 - Debug-only backend URL override
@@ -41,8 +46,9 @@ Flutter is the customer/staff client. Laravel is the business-logic API and syst
 6. Configure staging and run the full migration/test suite.
 7. Complete privacy policy, terms, refund and cancellation policy review.
 8. Validate tax/fees and accounting treatment for the operating jurisdiction.
-9. Run concurrency tests for inventory, payments, wallet debits, refunds and webhook duplication.
-10. Complete release smoke testing on a physical Android device.
+9. Run concurrency tests for inventory, payments, wallet debits, refunds, checkout sessions and webhook duplication.
+10. Configure and test vendor payout account/settlement operations before enabling live payouts.
+11. Complete release smoke testing on a physical Android device.
 
 ## Operational rule
 
