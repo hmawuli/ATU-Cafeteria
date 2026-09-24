@@ -532,7 +532,7 @@ class _RestaurantCustomerHomeScreenState extends State<RestaurantCustomerHomeScr
             id: food.vendorId,
             username: 'vendor_${food.vendorId}',
             role: 'VENDOR',
-            fullName: 'Campus Vendor ${food.vendorId}',
+            fullName: 'Restaurant Vendor ${food.vendorId}',
             info: food.category,
           ),
         );
@@ -603,7 +603,7 @@ class _RestaurantCustomerHomeScreenState extends State<RestaurantCustomerHomeScr
                   children: [
                     Text(
                       vendor.fullName.isEmpty
-                          ? 'Campus Vendor'
+                          ? 'Restaurant Vendor'
                           : vendor.fullName,
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
@@ -614,7 +614,7 @@ class _RestaurantCustomerHomeScreenState extends State<RestaurantCustomerHomeScr
                     ),
                     const SizedBox(height: 3),
                     Text(
-                      vendor.info.isEmpty ? 'Campus Food' : vendor.info,
+                      vendor.info.isEmpty ? 'Food & Meals' : vendor.info,
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                       style: const TextStyle(fontSize: 11, color: muted),
@@ -832,7 +832,7 @@ class _RestaurantCustomerHomeScreenState extends State<RestaurantCustomerHomeScr
       padding: const EdgeInsets.fromLTRB(16, 18, 16, 24),
       children: [
         const Text(
-          'Campus Vendors',
+          'Featured Vendors',
           style: TextStyle(color: navy, fontSize: 27, fontWeight: FontWeight.w900),
         ),
         const SizedBox(height: 14),
