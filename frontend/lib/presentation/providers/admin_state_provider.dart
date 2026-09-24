@@ -24,6 +24,7 @@ class AdminStateProvider extends ChangeNotifier {
   List<dynamic> orders = [];
   Map<String, dynamic> financeData = {};
   List<dynamic> auditLogs = [];
+  List<dynamic> settlements = [];
   List<dynamic> settings = [];
   Map<String, dynamic> commandCenterData = {};
   List<dynamic> securityAlerts = [];
@@ -76,6 +77,10 @@ class AdminStateProvider extends ChangeNotifier {
       _assign(
         repository.auditLogs,
         (v) => auditLogs = _items(v['data']),
+      ),
+      _assign(
+        repository.settlements,
+        (v) => settlements = _items(v['settlements']),
       ),
       _assign(
         smart.commandCenter,
@@ -166,6 +171,18 @@ class AdminStateProvider extends ChangeNotifier {
         await loadAll();
         return result['message']?.toString();
       });
+  Future<bool> payoutSettlement(int id) async => _run(() async {
+    final result = await repository.payoutSettlement(id);
+    await loadAll(includeFinance: true);
+    return result['message']?.toString();
+  });
+
+  Future<bool> finalizeSettlementPayout(int id, String otp) async => _run(() async {
+    final result = await repository.finalizeSettlementPayout(id, otp);
+    await loadAll(includeFinance: true);
+    return result['message']?.toString();
+  });
+
   Future<bool> adjustWallet(
           int id, double amount, String type, String reason) async =>
       _run(() async {
