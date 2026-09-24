@@ -1762,9 +1762,39 @@ class CafeteriaProvider extends ChangeNotifier {
     notifyListeners();
   }
 
-  void setStoreClosedState(bool isClosed) {
+  Future<void> setStoreClosedState(bool isClosed) async {
+    final previous = _isStoreClosed;
     _isStoreClosed = isClosed;
     notifyListeners();
+
+    if (_authToken == null || _authToken!.isEmpty) {
+      return;
+    }
+
+    try {
+      final response = await http.patch(
+        Uri.parse('$_laravelBaseUrl/api/vendor/status'),
+        headers: {
+          'Accept': 'application/json',
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $_authToken',
+        },
+        body: jsonEncode({'is_open': !isClosed}),
+      ).timeout(const Duration(seconds: 8));
+
+      if (response.statusCode != 200) {
+        _isStoreClosed = previous;
+        notifyListeners();
+        debugPrint('Vendor store status update failed: ${response.body}');
+        return;
+      }
+
+      await refreshAllData();
+    } catch (e) {
+      _isStoreClosed = previous;
+      notifyListeners();
+      debugPrint('Vendor store status update failed: ${e}');
+    }
   }
 
   Future<void> updateFoodAvailability(FoodItem item, bool isAvailable) async {
