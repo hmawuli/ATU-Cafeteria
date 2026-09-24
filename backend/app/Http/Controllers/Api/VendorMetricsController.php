@@ -45,9 +45,9 @@ class VendorMetricsController extends Controller
         $totalRatingsCount = count($allRatings);
         $avgRating = $totalRatingsCount > 0 ? round(array_sum($allRatings) / $totalRatingsCount, 2) : null;
 
-        // Fallback realistic rating based on vendor ID if no reviews yet
+        // Do not fabricate ratings for vendors with no recorded reviews.
         if ($avgRating === null) {
-            $avgRating = round(4.0 + (($vendorId % 5) * 0.2), 2);
+            $avgRating = 0.0;
         }
 
         // 2. Calculate Order Completion Speed using existing Orders data
@@ -63,16 +63,14 @@ class VendorMetricsController extends Controller
             $completedTime = strtotime($order->updated_at);
 
             $duration = $completedTime - $createdTime;
-            if ($duration <= 0) {
-                // Fallback realistic duration between 5 to 15 minutes
-                $duration = (($order->id % 11) + 5) * 60;
+            if ($duration > 0) {
+                $totalSpeedSeconds += $duration;
             }
-            $totalSpeedSeconds += $duration;
         }
 
         $avgCompletionTimeMinutes = $completedCount > 0
             ? round(($totalSpeedSeconds / $completedCount) / 60, 2)
-            : round(10.0 + ($vendorId % 3), 2); // Fallback realistic speed
+            : 0.0;
 
         return response()->json([
             'success' => true,
@@ -106,7 +104,7 @@ class VendorMetricsController extends Controller
             $avgRating = $totalRatingsCount > 0 ? round(array_sum($allRatings) / $totalRatingsCount, 2) : null;
 
             if ($avgRating === null) {
-                $avgRating = round(4.0 + (($vendor->id % 5) * 0.2), 2);
+                $avgRating = 0.0;
             }
 
             // 2. Calculate Order Completion Speed
@@ -130,7 +128,7 @@ class VendorMetricsController extends Controller
 
             $avgCompletionTimeMinutes = $completedCount > 0
                 ? round(($totalSpeedSeconds / $completedCount) / 60, 2)
-                : round(10.0 + ($vendor->id % 3), 2);
+                : 0.0;
 
             $metricsBreakdown[] = [
                 'vendor_id' => $vendor->id,
