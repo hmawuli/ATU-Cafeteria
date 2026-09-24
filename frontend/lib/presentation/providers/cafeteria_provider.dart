@@ -427,7 +427,7 @@ class CafeteriaProvider extends ChangeNotifier {
       if (raw is Map) {
         final fresh = User.fromJson(Map<String, dynamic>.from(raw));
         if (_currentUser != null) {
-          _currentUser = _currentUser!.copyWith(balance: fresh.balance);
+          _currentUser = _currentUser!.copyWith(balance: fresh.balance, isOpen: fresh.isOpen);
         }
       }
     } catch (e) {
