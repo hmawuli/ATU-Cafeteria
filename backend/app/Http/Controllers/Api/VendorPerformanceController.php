@@ -360,26 +360,7 @@ class VendorPerformanceController extends Controller
             return $a['hour'] <=> $b['hour'];
         });
 
-        // Fallback demo/seed data if database orders table has sparse data
-        if (empty($byDateMap)) {
-            // Generate realistic fallback peak hours if empty
-            if ($maxHourlyOrders === 0) {
-                $peakHours = [
-                    ['hour' => 7, 'time_label' => '7 AM', 'orders' => 5, 'sales' => 75.0, 'is_peak' => false],
-                    ['hour' => 8, 'time_label' => '8 AM', 'orders' => 24, 'sales' => 360.0, 'is_peak' => true],
-                    ['hour' => 9, 'time_label' => '9 AM', 'orders' => 14, 'sales' => 210.0, 'is_peak' => false],
-                    ['hour' => 10, 'time_label' => '10 AM', 'orders' => 10, 'sales' => 150.0, 'is_peak' => false],
-                    ['hour' => 11, 'time_label' => '11 AM', 'orders' => 18, 'sales' => 270.0, 'is_peak' => false],
-                    ['hour' => 12, 'time_label' => '12 PM', 'orders' => 45, 'sales' => 675.0, 'is_peak' => true],
-                    ['hour' => 13, 'time_label' => '1 PM', 'orders' => 48, 'sales' => 720.0, 'is_peak' => true],
-                    ['hour' => 14, 'time_label' => '2 PM', 'orders' => 32, 'sales' => 480.0, 'is_peak' => false],
-                    ['hour' => 15, 'time_label' => '3 PM', 'orders' => 15, 'sales' => 225.0, 'is_peak' => false],
-                    ['hour' => 16, 'time_label' => '4 PM', 'orders' => 28, 'sales' => 420.0, 'is_peak' => true],
-                    ['hour' => 17, 'time_label' => '5 PM', 'orders' => 19, 'sales' => 285.0, 'is_peak' => false],
-                    ['hour' => 18, 'time_label' => '6 PM', 'orders' => 8, 'sales' => 120.0, 'is_peak' => false],
-                ];
-            }
-        }
+        // Empty periods intentionally return empty peak-hour data; no demo values are fabricated.
 
         // Clean values & format keys
         $byDate = array_values(array_map(function ($item) {
