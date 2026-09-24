@@ -271,6 +271,17 @@ class AdminOperationsController extends Controller
         $vendorId = (int) $request->input('vendor_id');
         $fees = round((float) $request->input('fees', 0), 2);
 
+        $vendor = User::whereKey($vendorId)
+            ->whereRaw('upper(role) = ?', ['VENDOR'])
+            ->first();
+
+        if (! $vendor) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Settlement vendor must be a valid vendor account.',
+            ], 422);
+        }
+
         $gross = (float) Order::withoutGlobalScopes()
             ->where('vendor_id', $vendorId)
             ->whereIn('status', ['COMPLETED','DELIVERED'])
