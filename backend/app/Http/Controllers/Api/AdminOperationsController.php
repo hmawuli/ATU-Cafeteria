@@ -123,7 +123,9 @@ class AdminOperationsController extends Controller
                 throw new \RuntimeException('Refund amount exceeds the remaining refundable order value.');
             }
 
-            $payment = Payment::where('order_id', $lockedOrder->id)->latest()->lockForUpdate()->first();
+            $payment = $lockedOrder->payment_id
+                ? Payment::whereKey($lockedOrder->payment_id)->lockForUpdate()->first()
+                : Payment::where('order_id', $lockedOrder->id)->latest()->lockForUpdate()->first();
 
             if ($lockedOrder->payment_method === 'WALLET') {
                 $before = round((float) $customer->balance, 2);
