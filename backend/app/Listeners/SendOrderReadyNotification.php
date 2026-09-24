@@ -38,7 +38,13 @@ class SendOrderReadyNotification
                     ->whereNotNull('push_token')
                     ->get()
                     ->each(function (CustomerDevice $device) use ($title, $body, $data) {
-                        FcmService::sendPush($device->push_token, $title, $body, $data);
+                        $delivery = FcmService::sendPushResult($device->push_token, $title, $body, $data);
+                        if (($delivery['invalid_token'] ?? false) === true) {
+                            $device->update([
+                                'revoked_at' => now(),
+                                'push_token' => null,
+                            ]);
+                        }
                     });
             }
         }
