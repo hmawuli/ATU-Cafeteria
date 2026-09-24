@@ -74,7 +74,7 @@ class OrderStatusChangedNotification extends Notification
     {
         $customerId = $this->order->customer_id ?? $this->order->student_id;
 
-        return ['orders-customer-'.$studentId];
+        return ['orders-customer-'.$customerId];
     }
 
     /**
