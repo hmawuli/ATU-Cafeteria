@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'dart:math';
+import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:atu_cafeteria/core/config/server_config.dart';
@@ -51,6 +52,13 @@ class ApiClient {
 
     final uri = Uri.parse(
         '${ServerConfig.baseUrl}/api/${path.replaceFirst(RegExp(r'^/'), '')}');
+
+    if (kReleaseMode && uri.scheme != 'https') {
+      throw const ApiException(
+        0,
+        'Production builds require a secure HTTPS API endpoint.',
+      );
+    }
     final headers = <String, String>{
       'Accept': 'application/json',
       'Content-Type': 'application/json',
