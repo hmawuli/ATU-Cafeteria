@@ -1067,27 +1067,34 @@ class OrderController extends Controller
     /**
      * Place a new secure order for the currently authenticated student.
      */
+    /**
+     * Legacy compatibility endpoint for the old single-item customer flow.
+     * It deliberately delegates to the canonical production cart checkout so
+     * pricing, promotion, loyalty, inventory, payments and idempotency use
+     * exactly one business implementation.
+     */
     public function storeAuthenticatedStudentOrder(Request $request)
     {
         $user = $request->user();
-        if (! $user) {
+        if (! $user || ! $user->isActive()) {
             return response()->json([
                 'success' => false,
-                'message' => 'Unauthenticated.',
+                'message' => 'Your authenticated session is no longer valid.',
             ], 401);
         }
 
         $validator = Validator::make($request->all(), [
-            'vendor_id' => 'required|integer|exists:users,id',
-            'food_item_id' => 'nullable|integer',
-            'menu_item_id' => 'required|integer|exists:menu_items,id',
-            'food_name' => 'required|string|min:2',
-            'quantity' => 'required|integer|min:1',
-            'unit_price' => 'required|numeric|min:0.01',
-            'total_price' => 'required|numeric|min:0.01',
+            'vendor_id' => 'nullable|integer',
+            'food_item_id' => 'nullable|integer|exists:food_items,id',
+            'menu_item_id' => 'nullable|integer|exists:menu_items,id',
+            'food_name' => 'nullable|string|min:2',
+            'quantity' => 'required|integer|min:1|max:50',
+            'unit_price' => 'nullable|numeric|min:0.01',
+            'total_price' => 'nullable|numeric|min:0.01',
+            'points_to_redeem' => 'nullable|integer|min:0|max:100000',
             'order_type' => 'nullable|string|in:TAKEAWAY,PICKUP,DINE_IN,DELIVERY',
             'customer_note' => 'nullable|string|max:1000',
-            'promotion_code' => 'nullable|string|max:50',
+            'promotion_code' => 'nullable|string|max:50|alpha_dash',
         ]);
 
         if ($validator->fails()) {
@@ -1095,233 +1102,42 @@ class OrderController extends Controller
                 'success' => false,
                 'message' => 'Validation failed.',
                 'errors' => $validator->errors(),
-            ], 400);
+            ], 422);
         }
 
-        // Fetch menu item to validate availability, ownership, and calculate total price
-        $menuItem = MenuItem::find($request->input('menu_item_id'));
-        if (! $menuItem) {
+        $hasMenuItem = $request->filled('menu_item_id');
+        $hasFoodItem = $request->filled('food_item_id');
+
+        if ($hasMenuItem === $hasFoodItem) {
             return response()->json([
                 'success' => false,
-                'message' => 'The selected menu item does not exist.',
-            ], 404);
+                'message' => 'Provide exactly one menu item or food item.',
+            ], 422);
         }
 
-        if (! $menuItem->is_available) {
-            return response()->json([
-                'success' => false,
-                'message' => 'The selected menu item is currently unavailable.',
-            ], 400);
-        }
+        $normalized = $request->all();
+        $normalized['items'] = [[
+            $hasMenuItem ? 'menu_item_id' : 'food_item_id' => (int) $request->input(
+                $hasMenuItem ? 'menu_item_id' : 'food_item_id'
+            ),
+            'quantity' => (int) $request->input('quantity'),
+        ]];
+        $normalized['payment_method'] = 'WALLET';
+        $normalized['points_to_redeem'] = (int) $request->input('points_to_redeem', 0);
 
-        // Validate menu item owner matches vendor_id
-        if ($menuItem->vendor_id != $request->input('vendor_id')) {
-            return response()->json([
-                'success' => false,
-                'message' => 'The selected menu item does not belong to the specified vendor.',
-            ], 400);
-        }
+        // Never trust client-supplied vendor, price, or food-name fields.
+        unset(
+            $normalized['vendor_id'],
+            $normalized['food_item_id'],
+            $normalized['menu_item_id'],
+            $normalized['food_name'],
+            $normalized['unit_price'],
+            $normalized['total_price']
+        );
 
-        // Calculate and validate order totals
-        $quantity = intval($request->input('quantity'));
-        $expectedUnitPrice = round($menuItem->price, 2);
-        $expectedTotalPrice = round($expectedUnitPrice * $quantity, 2);
+        $request->replace($normalized);
 
-        $unitPriceInput = round($request->input('unit_price'), 2);
-        $totalPriceInput = round($request->input('total_price'), 2);
-
-        if (abs($expectedUnitPrice - $unitPriceInput) > 0.01) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Validation error: unit_price does not match the actual menu item price.',
-                'expected' => $expectedUnitPrice,
-                'received' => $unitPriceInput,
-            ], 400);
-        }
-
-        if (abs($expectedTotalPrice - $totalPriceInput) > 0.01) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Validation error: total_price is incorrect based on menu item price and quantity.',
-                'expected' => $expectedTotalPrice,
-                'received' => $totalPriceInput,
-            ], 400);
-        }
-
-        // Verify loyalty points redemption if requested
-        $pointsToRedeem = intval($request->input('points_to_redeem', 0));
-        $discount = 0.00;
-        if ($pointsToRedeem > 0) {
-            if (($user->loyalty_points ?? 0) < $pointsToRedeem) {
-                return response()->json([
-                    'success' => false,
-                    'message' => 'Insufficient loyalty points balance. You have '.($user->loyalty_points ?? 0).' points.',
-                ], 400);
-            }
-            // 10 points = 1.00 GHS discount
-            $discount = round($pointsToRedeem * 0.10, 2);
-        }
-
-        $finalPrice = max(0.00, round($totalPriceInput - $discount, 2));
-
-        // Verify balance
-        if ($user->balance < $finalPrice) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Insufficient wallet balance. Please top up your wallet first.',
-            ], 400);
-        }
-
-        // Generate a random secure 4-digit pickup PIN
-        $securePin = (string) random_int(1000, 9999);
-
-        try {
-            $order = DB::transaction(function () use ($request, $user, $securePin, $pointsToRedeem, $discount, $finalPrice, $menuItem) {
-                $dbUser = User::whereKey($user->id)->lockForUpdate()->firstOrFail();
-                $lockedMenuItem = MenuItem::whereKey($menuItem->id)->lockForUpdate()->firstOrFail();
-                $qty = (int) $request->input('quantity');
-
-                if (! $lockedMenuItem->is_available) {
-                    throw new \RuntimeException('The selected menu item is no longer available.');
-                }
-
-                if ((int) $lockedMenuItem->vendor_id !== (int) $request->input('vendor_id')) {
-                    throw new \RuntimeException('The selected menu item is no longer assigned to that outlet.');
-                }
-
-                if ($lockedMenuItem->current_stock !== null && $lockedMenuItem->current_stock < $qty) {
-                    throw new \RuntimeException('The selected menu item is out of stock.');
-                }
-
-                if ((float) $dbUser->balance < $finalPrice) {
-                    throw new \RuntimeException('Insufficient wallet balance.');
-                }
-
-                $beforeBalance = round((float) $dbUser->balance, 2);
-                if ($lockedMenuItem->current_stock !== null) {
-                    $lockedMenuItem->current_stock = max(0, (int) $lockedMenuItem->current_stock - $qty);
-                    $lockedMenuItem->is_available = $lockedMenuItem->current_stock > 0;
-                    $lockedMenuItem->save();
-                }
-
-                $dbUser->balance = round($beforeBalance - $finalPrice, 2);
-                if ($pointsToRedeem > 0) {
-                    $dbUser->loyalty_points = ($dbUser->loyalty_points ?? 0) - $pointsToRedeem;
-                }
-                $dbUser->total_spent = round((float) ($dbUser->total_spent ?? 0) + $finalPrice, 2);
-                $dbUser->save();
-
-                $unitPrice = round((float) $lockedMenuItem->price, 2);
-                $orderNumber = 'CAF-'.now()->format('ymdHis').'-'.strtoupper(Str::random(5));
-                $createdOrder = Order::create([
-                    'order_number' => $orderNumber,
-                    'order_type' => strtoupper((string) $request->input('order_type', 'TAKEAWAY')),
-                    'payment_method' => 'WALLET',
-                    'payment_status' => 'PAID',
-                    'subtotal' => round($unitPrice * $qty, 2),
-                    'discount_amount' => $discount,
-                    'tax_amount' => 0,
-                    'service_fee' => 0,
-                    'delivery_fee' => 0,
-                    'grand_total' => $finalPrice,
-                    'currency' => 'GHS',
-                    'customer_note' => $request->input('customer_note'),
-                    'customer_id' => $dbUser->id,
-                    'student_id' => $dbUser->id,
-                    'user_id' => $dbUser->id,
-                    'vendor_id' => $lockedMenuItem->vendor_id,
-                    'food_item_id' => $request->input('food_item_id'),
-                    'menu_item_id' => $lockedMenuItem->id,
-                    'food_name' => $lockedMenuItem->name ?: $lockedMenuItem->food_name,
-                    'quantity' => $qty,
-                    'unit_price' => $unitPrice,
-                    'total_price' => $finalPrice,
-                    'order_timestamp' => time() * 1000,
-                    'placed_at' => now(),
-                    'status' => 'PENDING',
-                    'pickup_pin' => $securePin,
-                    'estimated_pickup_time' => $request->input('estimated_pickup_time', 'Calculating...'),
-                    'points_redeemed' => $pointsToRedeem,
-                    'discount_applied' => $discount,
-                ]);
-
-                $paymentReference = 'WAL-ORD-'.strtoupper(Str::random(14));
-                $payment = \App\Models\Payment::create([
-                    'order_id' => $createdOrder->id,
-                    'customer_id' => $dbUser->id,
-                    'reference' => $paymentReference,
-                    'gateway' => 'internal-wallet',
-                    'amount' => $finalPrice,
-                    'currency' => 'GHS',
-                    'purpose' => 'DIRECT_ORDER_PAY',
-                    'method' => 'WALLET',
-                    'status' => 'SUCCESS',
-                    'initiated_at' => now(),
-                    'paid_at' => now(),
-                ]);
-
-                \App\Models\WalletTransaction::create([
-                    'user_id' => $dbUser->id,
-                    'order_id' => $createdOrder->id,
-                    'payment_id' => $payment->id,
-                    'type' => 'PAYMENT',
-                    'amount' => -$finalPrice,
-                    'status' => 'SUCCESS',
-                    'source' => 'ORDER',
-                    'performed_by' => $dbUser->id,
-                    'balance_before' => $beforeBalance,
-                    'balance_after' => $dbUser->balance,
-                    'reference' => $paymentReference,
-                    'details' => 'Wallet payment for order '.$createdOrder->order_number,
-                ]);
-
-                \App\Models\OrderItem::create([
-                    'order_id' => $createdOrder->id,
-                    'food_item_id' => $request->input('food_item_id'),
-                    'name' => $createdOrder->food_name,
-                    'name_snapshot' => $createdOrder->food_name,
-                    'quantity' => $qty,
-                    'unit_price' => $unitPrice,
-                    'total_price' => $finalPrice,
-                    'line_total' => $finalPrice,
-                    'discount_amount' => $discount,
-                ]);
-
-                AuditLog::create([
-                    'user_id' => $dbUser->id,
-                    'timestamp' => time() * 1000,
-                    'action' => 'ORDER_CREATED',
-                    'details' => "Order {$createdOrder->order_number} created. Wallet payment recorded.",
-                ]);
-
-                return $createdOrder;
-            });
-
-            // Notify vendor
-            if ($order->vendor_id) {
-                $vendor = User::find($order->vendor_id);
-                if ($vendor) {
-                    try {
-                        $vendor->notify(new NewIncomingOrderNotification($order));
-                    } catch (\Exception $e) {
-                        \Illuminate\Support\Facades\Log::error("Failed to notify vendor {$order->vendor_id} of secure order #{$order->id}: ".$e->getMessage());
-                    }
-                }
-            }
-
-            return response()->json([
-                'success' => true,
-                'message' => 'Order placed successfully.',
-                'order' => $order,
-            ], 201);
-
-        } catch (\Exception $e) {
-            report($e);
-            return response()->json([
-                'success' => false,
-                'message' => 'We could not complete your order. No payment was taken. Please try again.',
-            ], 500);
-        }
+        return app(ProductionCartCheckoutController::class)->store($request);
     }
 
     /**
