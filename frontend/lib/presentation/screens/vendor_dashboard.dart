@@ -13,8 +13,9 @@ class VendorDashboardScreen extends StatefulWidget {
 }
 
 class _VendorDashboardScreenState extends State<VendorDashboardScreen> {
-  int _activeTab =
-      0; // 0: Orders, 1: Menu List, 2: Ratings/Analytics, 3: Settings & Hub
+  // Restaurant operations tabs:
+  // 0: Overview, 1: Orders, 2: Menu, 3: Analytics, 4: Store
+  int _activeTab = 0;
 
   // Add food form controllers
   final _foodFormKey = GlobalKey<FormState>();
@@ -46,20 +47,32 @@ class _VendorDashboardScreenState extends State<VendorDashboardScreen> {
 
     if (user == null) {
       return const Scaffold(
-          body: Center(
-              child: Text("Access session expired. Please re-authenticate.")));
+        body: Center(
+          child: Text('Access session expired. Please re-authenticate.'),
+        ),
+      );
     }
 
     return Scaffold(
       appBar: AppBar(
-        title: Text(provider.isAdminActing
-            ? 'ADMIN VIEW • ${user.fullName}'
-            : 'VENDOR OPERATIONS'),
+        title: Row(
+          children: [
+            const Icon(Icons.restaurant_rounded, size: 22),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Text(
+                provider.isAdminActing
+                    ? 'ADMIN VIEW • ${user.fullName}'
+                    : 'RESTAURANT OPERATIONS',
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
+          ],
+        ),
         leading: provider.isAdminActing
             ? IconButton(
-                icon: const Icon(Icons.admin_panel_settings,
-                    color: Color(0xFFFFA000)),
-                tooltip: "Return to Admin Console",
+                icon: const Icon(Icons.admin_panel_settings),
+                tooltip: 'Return to Admin Console',
                 onPressed: () {
                   provider.stopImpersonation();
                   Navigator.pushReplacementNamed(context, '/admin');
@@ -69,18 +82,13 @@ class _VendorDashboardScreenState extends State<VendorDashboardScreen> {
         actions: [
           if (provider.isAdminActing)
             Padding(
-              padding: const EdgeInsets.only(right: 8.0),
+              padding: const EdgeInsets.only(right: 8),
               child: ElevatedButton.icon(
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFFE8751A),
-                  foregroundColor: Colors.white,
-                  padding: const EdgeInsets.symmetric(horizontal: 12),
-                  minimumSize: const Size(64, 36),
-                ),
                 icon: const Icon(Icons.exit_to_app, size: 16),
-                label: const Text("EXIT",
-                    style:
-                        TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
+                label: const Text(
+                  'EXIT',
+                  style: TextStyle(fontWeight: FontWeight.bold),
+                ),
                 onPressed: () {
                   provider.stopImpersonation();
                   Navigator.pushReplacementNamed(context, '/admin');
@@ -89,18 +97,22 @@ class _VendorDashboardScreenState extends State<VendorDashboardScreen> {
             )
           else ...[
             IconButton(
-              tooltip: 'Open order display',
+              tooltip: 'Kitchen order display',
               icon: const Icon(Icons.tv_outlined),
-              onPressed: () => Navigator.pushNamed(context, '/vendor-display'),
+              onPressed: () {
+                Navigator.pushNamed(context, '/vendor-display');
+              },
             ),
             IconButton(
-              tooltip: 'Open self-service kiosk',
+              tooltip: 'Self-service kiosk',
               icon: const Icon(Icons.point_of_sale_outlined),
-              onPressed: () => Navigator.pushNamed(context, '/kiosk'),
+              onPressed: () {
+                Navigator.pushNamed(context, '/kiosk');
+              },
             ),
             IconButton(
+              tooltip: 'Logout',
               icon: const Icon(Icons.logout),
-              tooltip: "Logout Securely",
               onPressed: () {
                 provider.logOut();
                 Navigator.pushReplacementNamed(context, '/login');
@@ -113,18 +125,37 @@ class _VendorDashboardScreenState extends State<VendorDashboardScreen> {
         selectedIndex: _activeTab,
         onDestinationSelected: (value) {
           setState(() => _activeTab = value);
-          if (value == 2) {
+
+          if (value == 3 && user.id != null) {
             provider.fetchVendorPerformanceMetrics(user.id!);
           }
         },
         destinations: const [
           NavigationDestination(
-              icon: Icon(Icons.receipt), label: 'Incoming Orders'),
+            icon: Icon(Icons.dashboard_outlined),
+            selectedIcon: Icon(Icons.dashboard),
+            label: 'Overview',
+          ),
           NavigationDestination(
-              icon: Icon(Icons.breakfast_dining), label: 'Menu Catalog'),
-          NavigationDestination(icon: Icon(Icons.insights), label: 'Analytics'),
+            icon: Icon(Icons.receipt_long_outlined),
+            selectedIcon: Icon(Icons.receipt_long),
+            label: 'Orders',
+          ),
           NavigationDestination(
-              icon: Icon(Icons.settings_suggest), label: 'Storefront Hub'),
+            icon: Icon(Icons.restaurant_menu_outlined),
+            selectedIcon: Icon(Icons.restaurant_menu),
+            label: 'Menu',
+          ),
+          NavigationDestination(
+            icon: Icon(Icons.insights_outlined),
+            selectedIcon: Icon(Icons.insights),
+            label: 'Analytics',
+          ),
+          NavigationDestination(
+            icon: Icon(Icons.storefront_outlined),
+            selectedIcon: Icon(Icons.storefront),
+            label: 'Store',
+          ),
         ],
       ),
       body: provider.isLoading
@@ -133,6 +164,7 @@ class _VendorDashboardScreenState extends State<VendorDashboardScreen> {
               child: IndexedStack(
                 index: _activeTab,
                 children: [
+                  _buildOverview(context, provider, user),
                   _buildIncomingOrders(context, provider),
                   _buildMenuCatalog(context, provider),
                   _buildAnalytics(context, provider, user),
@@ -142,6 +174,530 @@ class _VendorDashboardScreenState extends State<VendorDashboardScreen> {
             ),
     );
   }
+
+  // ==========================================
+  // RESTAURANT OPERATIONS OVERVIEW
+  // ==========================================
+  Widget _buildOverview(
+    BuildContext context,
+    CafeteriaProvider provider,
+    User vendor,
+  ) {
+    final orders = provider.vendorOrders;
+
+    final pending = orders.where((order) {
+      final status = order.status.toUpperCase();
+      return status == 'PENDING' || status == 'ORDER_PLACED';
+    }).length;
+
+    final preparing = orders.where((order) {
+      return order.status.toUpperCase() == 'PREPARING';
+    }).length;
+
+    final ready = orders.where((order) {
+      final status = order.status.toUpperCase();
+      return status == 'READY' || status == 'READY_FOR_PICKUP';
+    }).length;
+
+    final completed = orders.where((order) {
+      final status = order.status.toUpperCase();
+      return status == 'COMPLETED' || status == 'DELIVERED';
+    }).length;
+
+    final today = DateTime.now();
+
+    final todayOrders = orders.where((order) {
+      final created =
+          DateTime.fromMillisecondsSinceEpoch(order.orderTimestamp);
+
+      return created.year == today.year &&
+          created.month == today.month &&
+          created.day == today.day;
+    }).toList();
+
+    return RefreshIndicator(
+      onRefresh: () async {
+        await provider.refreshAllData();
+      },
+      child: ListView(
+        padding: const EdgeInsets.fromLTRB(16, 18, 16, 28),
+        children: [
+          _buildRestaurantHeader(
+            context,
+            provider,
+            vendor,
+            todayOrders.length,
+          ),
+          const SizedBox(height: 18),
+
+          Row(
+            children: [
+              Expanded(
+                child: _overviewMetric(
+                  title: 'Today',
+                  value: '${todayOrders.length}',
+                  subtitle: 'Orders',
+                  icon: Icons.receipt_long,
+                ),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: _overviewMetric(
+                  title: 'Needs Action',
+                  value: '$pending',
+                  subtitle: 'New orders',
+                  icon: Icons.notifications_active_outlined,
+                ),
+              ),
+            ],
+          ),
+
+          const SizedBox(height: 10),
+
+          Row(
+            children: [
+              Expanded(
+                child: _overviewMetric(
+                  title: 'Kitchen',
+                  value: '$preparing',
+                  subtitle: 'Preparing',
+                  icon: Icons.soup_kitchen_outlined,
+                ),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: _overviewMetric(
+                  title: 'Pickup',
+                  value: '$ready',
+                  subtitle: 'Ready',
+                  icon: Icons.shopping_bag_outlined,
+                ),
+              ),
+            ],
+          ),
+
+          const SizedBox(height: 22),
+
+          _sectionTitle(
+            'Order Pipeline',
+            'Live restaurant workload',
+          ),
+
+          const SizedBox(height: 10),
+
+          Card(
+            child: Padding(
+              padding: const EdgeInsets.all(16),
+              child: Row(
+                children: [
+                  _pipelineItem('New', pending, Icons.fiber_new_outlined),
+                  _pipelineConnector(),
+                  _pipelineItem(
+                    'Preparing',
+                    preparing,
+                    Icons.soup_kitchen_outlined,
+                  ),
+                  _pipelineConnector(),
+                  _pipelineItem(
+                    'Ready',
+                    ready,
+                    Icons.check_circle_outline,
+                  ),
+                ],
+              ),
+            ),
+          ),
+
+          const SizedBox(height: 22),
+
+          _sectionTitle(
+            'Quick Actions',
+            'Common restaurant operations',
+          ),
+
+          const SizedBox(height: 10),
+
+          Row(
+            children: [
+              Expanded(
+                child: _quickAction(
+                  context,
+                  icon: Icons.receipt_long,
+                  label: 'Orders',
+                  onTap: () => setState(() => _activeTab = 1),
+                ),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: _quickAction(
+                  context,
+                  icon: Icons.restaurant_menu,
+                  label: 'Menu',
+                  onTap: () => setState(() => _activeTab = 2),
+                ),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: _quickAction(
+                  context,
+                  icon: Icons.insights,
+                  label: 'Analytics',
+                  onTap: () {
+                    setState(() => _activeTab = 3);
+                    if (vendor.id != null) {
+                      provider.fetchVendorPerformanceMetrics(vendor.id!);
+                    }
+                  },
+                ),
+              ),
+            ],
+          ),
+
+          const SizedBox(height: 10),
+
+          Row(
+            children: [
+              Expanded(
+                child: _quickAction(
+                  context,
+                  icon: Icons.tv_outlined,
+                  label: 'Kitchen',
+                  onTap: () {
+                    Navigator.pushNamed(context, '/vendor-display');
+                  },
+                ),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: _quickAction(
+                  context,
+                  icon: Icons.point_of_sale_outlined,
+                  label: 'Kiosk',
+                  onTap: () {
+                    Navigator.pushNamed(context, '/kiosk');
+                  },
+                ),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: _quickAction(
+                  context,
+                  icon: Icons.storefront_outlined,
+                  label: 'Store',
+                  onTap: () => setState(() => _activeTab = 4),
+                ),
+              ),
+            ],
+          ),
+
+          const SizedBox(height: 22),
+
+          _sectionTitle(
+            'Restaurant Status',
+            'Control customer ordering availability',
+          ),
+
+          const SizedBox(height: 10),
+
+          Card(
+            child: ListTile(
+              contentPadding: const EdgeInsets.symmetric(
+                horizontal: 16,
+                vertical: 6,
+              ),
+              leading: CircleAvatar(
+                child: Icon(
+                  provider.isStoreClosed
+                      ? Icons.storefront_outlined
+                      : Icons.storefront,
+                ),
+              ),
+              title: Text(
+                provider.isStoreClosed
+                    ? 'Restaurant is Closed'
+                    : 'Restaurant is Open',
+                style: const TextStyle(fontWeight: FontWeight.w800),
+              ),
+              subtitle: Text(
+                provider.isStoreClosed
+                    ? 'Customers cannot place new orders.'
+                    : 'Customers can currently place orders.',
+              ),
+              trailing: Switch(
+                value: !provider.isStoreClosed,
+                onChanged: (open) {
+                  provider.setStoreClosedState(!open);
+                },
+              ),
+            ),
+          ),
+
+          const SizedBox(height: 22),
+
+          _sectionTitle(
+            'Today at a Glance',
+            'Operational summary',
+          ),
+
+          const SizedBox(height: 10),
+
+          Card(
+            child: Column(
+              children: [
+                ListTile(
+                  leading: const Icon(Icons.receipt_long_outlined),
+                  title: const Text('Orders today'),
+                  trailing: Text(
+                    '${todayOrders.length}',
+                    style: const TextStyle(fontWeight: FontWeight.w800),
+                  ),
+                ),
+                const Divider(height: 1),
+                ListTile(
+                  leading: const Icon(Icons.pending_actions_outlined),
+                  title: const Text('Orders needing attention'),
+                  trailing: Text(
+                    '$pending',
+                    style: const TextStyle(fontWeight: FontWeight.w800),
+                  ),
+                ),
+                const Divider(height: 1),
+                ListTile(
+                  leading: const Icon(Icons.check_circle_outline),
+                  title: const Text('Completed orders'),
+                  trailing: Text(
+                    '$completed',
+                    style: const TextStyle(fontWeight: FontWeight.w800),
+                  ),
+                ),
+              ],
+            ),
+          ),
+
+          const SizedBox(height: 16),
+
+          Text(
+            'Sales and settlement details are available in the restaurant finance area. '
+            'This overview intentionally shows only database-backed operational figures.',
+            style: Theme.of(context).textTheme.bodySmall,
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildRestaurantHeader(
+    BuildContext context,
+    CafeteriaProvider provider,
+    User vendor,
+    int todayOrders,
+  ) {
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(18),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                const CircleAvatar(
+                  radius: 27,
+                  child: Icon(Icons.restaurant_rounded, size: 28),
+                ),
+                const SizedBox(width: 14),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        vendor.fullName,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          fontSize: 19,
+                          fontWeight: FontWeight.w900,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        'Restaurant Operations',
+                        style: Theme.of(context).textTheme.bodySmall,
+                      ),
+                    ],
+                  ),
+                ),
+                _storeStatusPill(provider.isStoreClosed),
+              ],
+            ),
+            const SizedBox(height: 16),
+            Text(
+              provider.isStoreClosed
+                  ? 'Your restaurant is currently closed.'
+                  : 'Your restaurant is open and accepting customer orders.',
+              style: const TextStyle(fontWeight: FontWeight.w600),
+            ),
+            const SizedBox(height: 4),
+            Text(
+              '$todayOrders orders recorded today.',
+              style: Theme.of(context).textTheme.bodySmall,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _storeStatusPill(bool closed) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(30),
+        color: closed
+            ? Colors.red.withValues(alpha: 0.10)
+            : Colors.green.withValues(alpha: 0.10),
+      ),
+      child: Text(
+        closed ? 'CLOSED' : 'OPEN',
+        style: TextStyle(
+          fontSize: 11,
+          fontWeight: FontWeight.w900,
+          color: closed ? Colors.red.shade700 : Colors.green.shade700,
+        ),
+      ),
+    );
+  }
+
+  Widget _overviewMetric({
+    required String title,
+    required String value,
+    required String subtitle,
+    required IconData icon,
+  }) {
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(14),
+        child: Row(
+          children: [
+            CircleAvatar(
+              child: Icon(icon, size: 19),
+            ),
+            const SizedBox(width: 11),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    title,
+                    style: const TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    value,
+                    style: const TextStyle(
+                      fontSize: 22,
+                      fontWeight: FontWeight.w900,
+                    ),
+                  ),
+                  Text(
+                    subtitle,
+                    style: const TextStyle(fontSize: 11),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _sectionTitle(String title, String subtitle) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          title,
+          style: const TextStyle(
+            fontSize: 17,
+            fontWeight: FontWeight.w900,
+          ),
+        ),
+        const SizedBox(height: 3),
+        Text(
+          subtitle,
+          style: const TextStyle(fontSize: 12),
+        ),
+      ],
+    );
+  }
+
+  Widget _pipelineItem(String label, int count, IconData icon) {
+    return Expanded(
+      child: Column(
+        children: [
+          Icon(icon, size: 22),
+          const SizedBox(height: 6),
+          Text(
+            '$count',
+            style: const TextStyle(
+              fontSize: 20,
+              fontWeight: FontWeight.w900,
+            ),
+          ),
+          Text(
+            label,
+            textAlign: TextAlign.center,
+            style: const TextStyle(fontSize: 10),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _pipelineConnector() {
+    return const Padding(
+      padding: EdgeInsets.symmetric(horizontal: 3),
+      child: Icon(Icons.chevron_right, size: 18),
+    );
+  }
+
+  Widget _quickAction(
+    BuildContext context, {
+    required IconData icon,
+    required String label,
+    required VoidCallback onTap,
+  }) {
+    return Card(
+      clipBehavior: Clip.antiAlias,
+      child: InkWell(
+        onTap: onTap,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(
+            vertical: 16,
+            horizontal: 8,
+          ),
+          child: Column(
+            children: [
+              Icon(icon, size: 23),
+              const SizedBox(height: 8),
+              Text(
+                label,
+                textAlign: TextAlign.center,
+                style: const TextStyle(
+                  fontSize: 11,
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
 
   // ==========================================
   // TAB 1: INCOMING ORDERS
@@ -161,7 +717,7 @@ class _VendorDashboardScreenState extends State<VendorDashboardScreen> {
     if (activeOrders.isEmpty) {
       return const Center(
           child: Text(
-              "No incoming culinary streams. Storefront operating at idle."));
+              "No active orders. New customer orders will appear here."));
     }
 
     return ListView.builder(
@@ -309,7 +865,7 @@ class _VendorDashboardScreenState extends State<VendorDashboardScreen> {
       body: list.isEmpty
           ? const Center(
               child: Text(
-                  "Menu Catalog empty. Add food items to begin storefront trade."))
+                  "Your menu is empty. Add a menu item to start selling."))
           : ListView.builder(
               padding: const EdgeInsets.all(12),
               itemCount: list.length,
@@ -788,16 +1344,16 @@ class _VendorDashboardScreenState extends State<VendorDashboardScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Text("BOOTH CONTROL CENTRE",
+                  const Text("RESTAURANT OPERATIONS",
                       style:
                           TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
                   const Divider(height: 24),
                   SwitchListTile(
-                    title: const Text("Kitchen Active & Operations Open",
+                    title: const Text("Restaurant Open for Orders",
                         style: TextStyle(
                             fontSize: 14, fontWeight: FontWeight.bold)),
                     subtitle: const Text(
-                        "Toggling closed disables order flows instantly.",
+                        "Closing the restaurant stops new customer orders.",
                         style: TextStyle(fontSize: 11)),
                     value: !provider.isStoreClosed,
                     onChanged: (val) {
@@ -805,7 +1361,7 @@ class _VendorDashboardScreenState extends State<VendorDashboardScreen> {
                     },
                   ),
                   const SizedBox(height: 16),
-                  const Text("Customer Notice & Announcement:",
+                  const Text("Customer Announcement",
                       style:
                           TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
                   const SizedBox(height: 8),
@@ -834,7 +1390,7 @@ class _VendorDashboardScreenState extends State<VendorDashboardScreen> {
             ),
           ),
           const SizedBox(height: 24),
-          const Text("Digital Ledger Export",
+          const Text("Reporting & Records",
               style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
           const SizedBox(height: 8),
           ListTile(
@@ -842,10 +1398,10 @@ class _VendorDashboardScreenState extends State<VendorDashboardScreen> {
                 borderRadius: BorderRadius.circular(8),
                 side: const BorderSide(color: Colors.blueGrey)),
             leading: const Icon(Icons.import_export, color: Color(0xFF1565C0)),
-            title: const Text("Compile Secure CSV Excel Audit Logs",
+            title: const Text("Export Restaurant Reports",
                 style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold)),
             subtitle: const Text(
-                "Writes total digital earnings and feedback metrics.",
+                "Access restaurant sales and customer performance records.",
                 style: TextStyle(fontSize: 11)),
             trailing: IconButton(
               icon:
@@ -872,7 +1428,7 @@ class _VendorDashboardScreenState extends State<VendorDashboardScreen> {
       context: context,
       builder: (context) {
         return AlertDialog(
-          title: const Text("SECURITY ACCOUNT VERIFICATION",
+          title: const Text("CUSTOMER PICKUP VERIFICATION",
               style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
           content: Column(
             mainAxisSize: MainAxisSize.min,
@@ -887,7 +1443,7 @@ class _VendorDashboardScreenState extends State<VendorDashboardScreen> {
                 obscureText: true,
                 maxLength: 4,
                 decoration: const InputDecoration(
-                    labelText: "Scholar Handshake PIN (Numeric)",
+                    labelText: "Customer Pickup PIN",
                     border: OutlineInputBorder(),
                     counterText: ""),
               ),
@@ -914,7 +1470,7 @@ class _VendorDashboardScreenState extends State<VendorDashboardScreen> {
                   ),
                 );
               },
-              child: const Text("VERIFY TRANSIT HANDOVER"),
+              child: const Text("VERIFY PICKUP"),
             )
           ],
         );
@@ -929,7 +1485,7 @@ class _VendorDashboardScreenState extends State<VendorDashboardScreen> {
         return StatefulBuilder(
           builder: (context, setDialogState) {
             return AlertDialog(
-              title: const Text("ADD DELICACY TO CATALOG",
+              title: const Text("ADD MENU ITEM",
                   style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
               content: SingleChildScrollView(
                 child: Form(
@@ -940,7 +1496,7 @@ class _VendorDashboardScreenState extends State<VendorDashboardScreen> {
                       TextFormField(
                         controller: _foodNameController,
                         decoration: const InputDecoration(
-                            labelText: "Dish Name",
+                            labelText: "Menu Item Name",
                             border: OutlineInputBorder()),
                         validator: (val) => val == null || val.trim().isEmpty
                             ? "Enter dish name"
@@ -963,7 +1519,7 @@ class _VendorDashboardScreenState extends State<VendorDashboardScreen> {
                       DropdownButtonFormField<String>(
                         initialValue: _selectedCategory,
                         decoration: const InputDecoration(
-                            labelText: "Category Classification",
+                            labelText: "Category",
                             border: OutlineInputBorder()),
                         items: _categories
                             .map((c) =>
@@ -979,7 +1535,7 @@ class _VendorDashboardScreenState extends State<VendorDashboardScreen> {
                       TextFormField(
                         controller: _foodDescController,
                         decoration: const InputDecoration(
-                            labelText: "Menu Description",
+                            labelText: "Description",
                             border: OutlineInputBorder()),
                         maxLines: 2,
                       )
@@ -1007,7 +1563,7 @@ class _VendorDashboardScreenState extends State<VendorDashboardScreen> {
                     _foodDescController.clear();
                     Navigator.pop(context);
                   },
-                  child: const Text("INGREDIENT RECIPE"),
+                  child: const Text("ADD MENU ITEM"),
                 )
               ],
             );
