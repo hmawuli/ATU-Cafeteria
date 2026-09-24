@@ -56,7 +56,14 @@ jobs:
           ATU_KEYSTORE_PASSWORD: ${{ secrets.ATU_KEYSTORE_PASSWORD }}
           ATU_KEY_ALIAS: ${{ secrets.ATU_KEY_ALIAS }}
           ATU_KEY_PASSWORD: ${{ secrets.ATU_KEY_PASSWORD }}
-        run: flutter build apk --release
+        run: |
+          flutter build apk --release \
+          --dart-define=ATU_FIREBASE_API_KEY=${{ secrets.ATU_FIREBASE_API_KEY }} \
+          --dart-define=ATU_FIREBASE_APP_ID=${{ secrets.ATU_FIREBASE_APP_ID }} \
+          --dart-define=ATU_FIREBASE_MESSAGING_SENDER_ID=${{ secrets.ATU_FIREBASE_MESSAGING_SENDER_ID }} \
+          --dart-define=ATU_FIREBASE_PROJECT_ID=${{ secrets.ATU_FIREBASE_PROJECT_ID }} \
+          --dart-define=ATU_FIREBASE_STORAGE_BUCKET=${{ secrets.ATU_FIREBASE_STORAGE_BUCKET }} \
+          --dart-define=ATU_APP_VERSION=${{ inputs.version }}
       - name: Build signed production Android App Bundle
         env:
           ATU_REQUIRE_PROD_SIGNING: "true"
@@ -64,7 +71,14 @@ jobs:
           ATU_KEYSTORE_PASSWORD: ${{ secrets.ATU_KEYSTORE_PASSWORD }}
           ATU_KEY_ALIAS: ${{ secrets.ATU_KEY_ALIAS }}
           ATU_KEY_PASSWORD: ${{ secrets.ATU_KEY_PASSWORD }}
-        run: flutter build appbundle --release
+        run: |
+          flutter build appbundle --release \
+          --dart-define=ATU_FIREBASE_API_KEY=${{ secrets.ATU_FIREBASE_API_KEY }} \
+          --dart-define=ATU_FIREBASE_APP_ID=${{ secrets.ATU_FIREBASE_APP_ID }} \
+          --dart-define=ATU_FIREBASE_MESSAGING_SENDER_ID=${{ secrets.ATU_FIREBASE_MESSAGING_SENDER_ID }} \
+          --dart-define=ATU_FIREBASE_PROJECT_ID=${{ secrets.ATU_FIREBASE_PROJECT_ID }} \
+          --dart-define=ATU_FIREBASE_STORAGE_BUCKET=${{ secrets.ATU_FIREBASE_STORAGE_BUCKET }} \
+          --dart-define=ATU_APP_VERSION=${{ inputs.version }}
       - name: Verify production artifacts
         run: |
           test -s build/app/outputs/flutter-apk/app-release.apk
