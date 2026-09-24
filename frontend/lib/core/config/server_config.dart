@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'app_config.dart';
 
@@ -21,9 +22,20 @@ class ServerConfig {
   static String get baseUrl {
     final manual = _manual?.trim() ?? '';
     final value = manual.isNotEmpty ? manual : AppConfig.backendBaseUrl;
-    return value.endsWith('/')
+    final normalized = value.endsWith('/')
         ? value.substring(0, value.length - 1)
         : value;
+
+    if (kReleaseMode) {
+      final uri = Uri.tryParse(normalized);
+      if (uri == null || uri.scheme != 'https') {
+        throw StateError(
+          'Production builds require an HTTPS backend endpoint.',
+        );
+      }
+    }
+
+    return normalized;
   }
 
   /// URL shown in the settings dialog (the manual override is kept verbatim
