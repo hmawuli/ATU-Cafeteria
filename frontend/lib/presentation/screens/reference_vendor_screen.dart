@@ -5,6 +5,7 @@ import '../../domain/models/models.dart';
 import '../providers/cafeteria_provider.dart';
 import '../providers/cart_provider.dart';
 import '../widgets/reference_design.dart';
+import 'vendor_finance_screen.dart';
 
 class ReferenceVendorScreen extends StatefulWidget {
   const ReferenceVendorScreen({super.key});
@@ -47,6 +48,9 @@ class _ReferenceVendorScreenState extends State<ReferenceVendorScreen> {
                           label: 'Kiosk'),
                       NavigationDestination(
                           icon: Icon(Icons.insights), label: 'Performance'),
+                      NavigationDestination(
+                          icon: Icon(Icons.account_balance_wallet_outlined),
+                          label: 'Finance'),
                     ],
                   ),
                 ],
@@ -109,7 +113,8 @@ class _ReferenceVendorScreenState extends State<ReferenceVendorScreen> {
     'Menu Catalog',
     'Orders',
     'Kiosk',
-    'Performance'
+    'Performance',
+    'Finance'
   ];
   int get _index => _pages.indexOf(page).clamp(0, _pages.length - 1);
 
@@ -144,6 +149,8 @@ class _ReferenceVendorScreenState extends State<ReferenceVendorScreen> {
         return _kiosk(provider);
       case 'Performance':
         return _performance(provider);
+      case 'Finance':
+        return const VendorFinanceScreen();
       default:
         return _dashboard(provider);
     }
