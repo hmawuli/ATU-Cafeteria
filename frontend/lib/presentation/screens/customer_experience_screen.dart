@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:atu_cafeteria/core/network/api_client.dart';
 import 'package:provider/provider.dart';
 import 'package:atu_cafeteria/domain/models/models.dart';
 import 'package:atu_cafeteria/presentation/providers/cafeteria_provider.dart';
@@ -21,6 +22,54 @@ class _RestaurantCustomerHomeScreenState extends State<RestaurantCustomerHomeScr
 
   int _tab = 0;
   String _query = '';
+  final ApiClient _api = ApiClient();
+  List<Map<String, dynamic>> _smartPicks = const [];
+  List<Map<String, dynamic>> _discoveryVendors = const [];
+  List<Map<String, dynamic>> _promotions = const [];
+  bool _loadingDiscovery = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadDiscovery();
+  }
+
+  Future<void> _loadDiscovery() async {
+    if (!mounted) return;
+    setState(() => _loadingDiscovery = true);
+    try {
+      final discovery = await _api.get('/customer/discovery');
+      final data = discovery is Map ? discovery['data'] : null;
+      if (data is Map) {
+        final vendors = data['vendors'];
+        final promotions = data['promotions'];
+        if (vendors is List) {
+          _discoveryVendors = vendors.whereType<Map>().map((e) => Map<String, dynamic>.from(e)).toList();
+        }
+        if (promotions is List) {
+          _promotions = promotions.whereType<Map>().map((e) => Map<String, dynamic>.from(e)).toList();
+        }
+      }
+
+      final recommendations = await _api.get('/customer/recommendations');
+      final raw = recommendations is Map ? recommendations['data'] : recommendations;
+      if (raw is List) {
+        _smartPicks = raw.whereType<Map>().map((e) => Map<String, dynamic>.from(e)).toList();
+      }
+      if (mounted) setState(() {});
+    } catch (_) {
+      // Existing cached catalogue remains usable if discovery is unavailable.
+    } finally {
+      if (mounted) setState(() => _loadingDiscovery = false);
+    }
+  }
+
+  @override
+  void dispose() {
+    _api.close();
+    super.dispose();
+  }
+
 
   @override
   Widget build(BuildContext context) {
@@ -210,6 +259,18 @@ class _RestaurantCustomerHomeScreenState extends State<RestaurantCustomerHomeScr
           const SizedBox(height: 10),
           _quickActions(),
           const SizedBox(height: 20),
+          if (_smartPicks.isNotEmpty) ...[
+            _header('For You', 'Personal picks', null),
+            const SizedBox(height: 10),
+            _smartPicksSection(provider),
+            const SizedBox(height: 20),
+          ],
+          if (_promotions.isNotEmpty) ...[
+            _header('Today’s Deals', 'Live offers', null),
+            const SizedBox(height: 10),
+            _promotionsSection(),
+            const SizedBox(height: 20),
+          ],
           _header(
             "Today's Menu",
             '${filtered.length} ${filtered.length == 1 ? 'meal' : 'meals'}',
@@ -241,9 +302,9 @@ class _RestaurantCustomerHomeScreenState extends State<RestaurantCustomerHomeScr
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text(
-                  'Good Morning,',
-                  style: TextStyle(color: Colors.white70, fontSize: 15),
+                Text(
+                  _greeting(),
+                  style: const TextStyle(color: Colors.white70, fontSize: 15),
                 ),
                 const SizedBox(height: 2),
                 Text(
@@ -274,6 +335,133 @@ class _RestaurantCustomerHomeScreenState extends State<RestaurantCustomerHomeScr
             child: const Icon(Icons.restaurant_rounded, color: navy, size: 34),
           ),
         ],
+      ),
+    );
+  }
+
+  String _greeting() {
+    final hour = DateTime.now().hour;
+    if (hour < 12) return 'Good Morning,';
+    if (hour < 17) return 'Good Afternoon,';
+    return 'Good Evening,';
+  }
+
+  String? _vendorRating(int? vendorId) {
+    for (final vendor in _discoveryVendors) {
+      if (int.tryParse('${vendor['id']}') == vendorId) {
+        final rating = vendor['rating'];
+        if (rating is num) return rating.toStringAsFixed(1);
+      }
+    }
+    return null;
+  }
+
+  int _vendorReviewCount(int? vendorId) {
+    for (final vendor in _discoveryVendors) {
+      if (int.tryParse('${vendor['id']}') == vendorId) {
+        return int.tryParse('${vendor['reviews_count'] ?? 0}') ?? 0;
+      }
+    }
+    return 0;
+  }
+
+  Widget _smartPicksSection(CafeteriaProvider provider) {
+    final picks = _smartPicks.take(6).toList();
+    return SizedBox(
+      height: 216,
+      child: ListView.separated(
+        scrollDirection: Axis.horizontal,
+        itemCount: picks.length,
+        separatorBuilder: (_, __) => const SizedBox(width: 10),
+        itemBuilder: (_, index) {
+          final pick = picks[index];
+          final id = int.tryParse('${pick['id']}');
+          FoodItem? local;
+          for (final item in provider.allFoodItems) {
+            if (item.id == id) {
+              local = item;
+              break;
+            }
+          }
+          final name = (pick['name'] ?? pick['food_name'] ?? 'Meal').toString();
+          final price = pick['price'];
+          final priceText = price is num ? 'GH₵ ${price.toStringAsFixed(2)}' : 'View price';
+          return SizedBox(
+            width: 176,
+            child: Material(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(15),
+              clipBehavior: Clip.antiAlias,
+              child: InkWell(
+                onTap: local == null
+                    ? null
+                    : () => Navigator.pushNamed(context, '/food-detail', arguments: local),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    SizedBox(height: 108, width: double.infinity, child: _foodImage('${pick['image_url'] ?? ''}')),
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(11, 9, 11, 10),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(name, maxLines: 2, overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(color: navy, fontWeight: FontWeight.w900)),
+                          const SizedBox(height: 6),
+                          Text(priceText, style: const TextStyle(color: blue, fontWeight: FontWeight.w900)),
+                          const SizedBox(height: 5),
+                          const Text('Based on your ordering history', style: TextStyle(fontSize: 10, color: muted)),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          );
+        },
+      ),
+    );
+  }
+
+  Widget _promotionsSection() {
+    return SizedBox(
+      height: 122,
+      child: ListView.separated(
+        scrollDirection: Axis.horizontal,
+        itemCount: _promotions.length,
+        separatorBuilder: (_, __) => const SizedBox(width: 10),
+        itemBuilder: (_, index) {
+          final promo = _promotions[index];
+          final value = promo['value'];
+          final type = (promo['type'] ?? 'OFFER').toString();
+          final headline = type == 'PERCENTAGE' && value is num
+              ? '${value.toStringAsFixed(0)}% OFF'
+              : value is num
+                  ? 'GH₵ ${value.toStringAsFixed(2)} OFF'
+                  : 'SPECIAL OFFER';
+          return Container(
+            width: 240,
+            padding: const EdgeInsets.all(15),
+            decoration: BoxDecoration(
+              gradient: const LinearGradient(colors: [navy, blue]),
+              borderRadius: BorderRadius.circular(15),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(headline, style: const TextStyle(color: yellow, fontWeight: FontWeight.w900, fontSize: 18)),
+                const SizedBox(height: 5),
+                Text((promo['name'] ?? 'Today’s offer').toString(),
+                  maxLines: 1, overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w800)),
+                const Spacer(),
+                Text('Code: ${(promo['code'] ?? 'AUTO').toString()}',
+                  style: const TextStyle(color: Colors.white70, fontSize: 11)),
+              ],
+            ),
+          );
+        },
       ),
     );
   }
@@ -438,10 +626,15 @@ class _RestaurantCustomerHomeScreenState extends State<RestaurantCustomerHomeScr
                     Row(
                       children: [
                         const Icon(Icons.star, color: yellow, size: 17),
-                        const Text(
-                          ' 4.6',
-                          style: TextStyle(fontWeight: FontWeight.w800),
+                        Text(
+                          _vendorRating(vendor.id) ?? 'New',
+                          style: const TextStyle(fontWeight: FontWeight.w800),
                         ),
+                        if (_vendorReviewCount(vendor.id) > 0)
+                          Text(
+                            ' (' + _vendorReviewCount(vendor.id).toString() + ')',
+                            style: const TextStyle(fontSize: 9, color: muted),
+                          ),
                         const Spacer(),
                         _openPill(vendor.isOpen),
                       ],
@@ -673,7 +866,7 @@ class _RestaurantCustomerHomeScreenState extends State<RestaurantCustomerHomeScr
             ),
           ),
           title: Text(
-            vendor.fullName.isEmpty ? 'Campus Vendor' : vendor.fullName,
+            vendor.fullName.isEmpty ? 'Food Vendor' : vendor.fullName,
             style: const TextStyle(color: navy, fontWeight: FontWeight.w900),
           ),
           subtitle: Text(
