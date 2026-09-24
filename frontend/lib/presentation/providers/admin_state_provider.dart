@@ -83,12 +83,6 @@ class AdminStateProvider extends ChangeNotifier {
         (v) => auditLogs = _items(v['data']),
       ),
       _assign(
-        repository.settlements,
-        (v) => settlements = _items(v['settlements']),
-        onError: (_) => settlementsError =
-            'You do not have permission to view settlements.',
-      ),
-      _assign(
         smart.commandCenter,
         (v) => commandCenterData = Map<String, dynamic>.from(v['data'] ?? {}),
       ),
@@ -106,6 +100,12 @@ class AdminStateProvider extends ChangeNotifier {
         },
         onError: (_) => financeError =
             'You do not have permission to view finance. Contact a SUPER_ADMIN or FINANCE_ADMIN.',
+      ));
+      futures.add(_assign(
+        repository.settlements,
+        (v) => settlements = _items(v['settlements']),
+        onError: (_) => settlementsError =
+            'You do not have permission to view settlements.',
       ));
     }
     if (includeSettings) {
