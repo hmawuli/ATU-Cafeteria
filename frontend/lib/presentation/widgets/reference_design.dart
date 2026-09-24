@@ -263,7 +263,8 @@ class Sidebar extends StatelessWidget {
                       'Orders',
                       'Kiosk',
                       'Performance',
-                      'Finance'
+                      'Finance',
+                      'Promotions'
                     ]
                   : [
                       'Dashboard',
