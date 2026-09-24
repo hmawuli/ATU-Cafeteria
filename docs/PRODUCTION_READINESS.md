@@ -54,3 +54,5 @@ Flutter is the customer/staff client. Laravel is the business-logic API and syst
 ## Operational rule
 
 Never treat a simulated payment, simulated notification, fabricated report, or client-calculated total as a production result.
+
+- Release Android builds enforce HTTPS for API traffic; local cleartext HTTP is limited to debug builds.
