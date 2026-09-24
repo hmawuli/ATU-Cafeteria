@@ -57,7 +57,7 @@ class ProductionCartCheckoutController extends Controller
                     : FoodItem::find($id);
 
                 if (! $item || ! $item->is_available) {
-                    throw new RuntimeException('One of the selected meals is no longer available.');
+                    throw new \RuntimeException('One of the selected meals is no longer available.');
                 }
 
                 $qty = (int) $input['quantity'];
@@ -121,7 +121,7 @@ class ProductionCartCheckoutController extends Controller
                 'currency' => 'GHS',
                 'promotion_code' => $promotion?->code,
             ]);
-        } catch (RuntimeException $e) {
+        } catch (\RuntimeException $e) {
             return response()->json(['success' => false, 'message' => $e->getMessage()], 400);
         }
     }
