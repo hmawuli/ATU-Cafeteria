@@ -19,6 +19,113 @@ use Illuminate\Support\Str;
 
 class ProductionCartCheckoutController extends Controller
 {
+    public function preview(Request $request)
+    {
+        $validator = Validator::make($request->all(), [
+            'items' => 'required|array|min:1|max:50',
+            'items.*.menu_item_id' => 'nullable|integer|distinct|exists:menu_items,id',
+            'items.*.food_item_id' => 'nullable|integer|distinct|exists:food_items,id',
+            'items.*.quantity' => 'required|integer|min:1|max:50',
+            'points_to_redeem' => 'nullable|integer|min:0|max:100000',
+            'promotion_code' => 'nullable|string|max:50|alpha_dash',
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Please review your cart.',
+                'errors' => $validator->errors(),
+            ], 422);
+        }
+
+        $user = $request->user();
+        if (! $user || ! $user->isActive()) {
+            return response()->json(['success' => false, 'message' => 'Your session is no longer valid.'], 401);
+        }
+
+        try {
+            $points = (int) $request->input('points_to_redeem', 0);
+            $promotionCode = strtoupper(trim((string) $request->input('promotion_code', '')));
+            $subtotal = 0.0;
+            $vendorIds = [];
+
+            foreach ($request->input('items', []) as $input) {
+                $isMenu = ! empty($input['menu_item_id']);
+                $id = (int) ($input['menu_item_id'] ?? $input['food_item_id']);
+                $item = $isMenu
+                    ? MenuItem::find($id)
+                    : FoodItem::find($id);
+
+                if (! $item || ! $item->is_available) {
+                    throw new RuntimeException('One of the selected meals is no longer available.');
+                }
+
+                $qty = (int) $input['quantity'];
+                if ($isMenu && $item->current_stock !== null && (int) $item->current_stock < $qty) {
+                    throw new RuntimeException("Only {$item->current_stock} unit(s) remain for '".($item->name ?: $item->food_name)."'.");
+                }
+
+                $vendorIds[] = (int) $item->vendor_id;
+                $subtotal = round($subtotal + ((float) $item->price * $qty), 2);
+            }
+
+            if ($points > (int) ($user->loyalty_points ?? 0)) {
+                throw new RuntimeException('Insufficient loyalty points balance.');
+            }
+
+            $discount = 0.0;
+            $promotion = null;
+
+            if ($promotionCode !== '') {
+                if ($points > 0) {
+                    throw new RuntimeException('Use either loyalty points or a promotion code, not both.');
+                }
+
+                $promotion = Promotion::whereRaw('UPPER(code) = ?', [$promotionCode])->first();
+
+                if (! $promotion || ! $promotion->isCurrentlyActive()) {
+                    throw new RuntimeException('This promotion is not active or has expired.');
+                }
+
+                $uniqueVendors = array_values(array_unique($vendorIds));
+                if ($promotion->vendor_id !== null &&
+                    (count($uniqueVendors) !== 1 || (int) $promotion->vendor_id !== (int) $uniqueVendors[0])) {
+                    throw new RuntimeException('This promotion applies only to that vendor’s menu.');
+                }
+
+                if ($subtotal < (float) $promotion->minimum_order_amount) {
+                    throw new RuntimeException(
+                        'This promotion requires a minimum order of GH₵ '.
+                        number_format((float) $promotion->minimum_order_amount, 2).'.'
+                    );
+                }
+
+                $discount = strtoupper((string) $promotion->type) === 'PERCENTAGE'
+                    ? round($subtotal * ((float) $promotion->value / 100), 2)
+                    : round((float) $promotion->value, 2);
+
+                if ($promotion->maximum_discount_amount !== null) {
+                    $discount = min($discount, (float) $promotion->maximum_discount_amount);
+                }
+
+                $discount = min($discount, $subtotal);
+            } else {
+                $discount = min($subtotal, round($points * 0.10, 2));
+            }
+
+            return response()->json([
+                'success' => true,
+                'subtotal' => round($subtotal, 2),
+                'discount' => round($discount, 2),
+                'final_total' => max(0, round($subtotal - $discount, 2)),
+                'currency' => 'GHS',
+                'promotion_code' => $promotion?->code,
+            ]);
+        } catch (RuntimeException $e) {
+            return response()->json(['success' => false, 'message' => $e->getMessage()], 400);
+        }
+    }
+
     public function store(Request $request)
     {
         $validator = Validator::make($request->all(), [
@@ -290,7 +397,7 @@ class ProductionCartCheckoutController extends Controller
                         'placed_at' => now(),
                         'status' => 'PENDING',
                         'pickup_pin' => (string) random_int(1000, 9999),
-                        'estimated_pickup_time' => 'Calculating...',
+                        'estimated_pickup_time' => $request->input('estimated_pickup_time', 'Calculating...'),
                         'points_redeemed' => 0,
                         'discount_applied' => $vendorDiscount,
                     ]);
