@@ -30,6 +30,7 @@ use App\Http\Controllers\Api\StudentBudgetController;
 use App\Http\Controllers\Api\SwaggerController;
 use App\Http\Controllers\Api\VendorAuthController;
 use App\Http\Controllers\Api\VendorFinanceController;
+use App\Http\Controllers\Api\VendorInventorySummaryController;
 use App\Http\Controllers\Api\VendorPromotionController;
 use App\Http\Controllers\Api\VendorController;
 use App\Http\Controllers\Api\VendorMenuItemController;
@@ -167,6 +168,7 @@ Route::middleware(['auth:sanctum', InactivityTimeout::class])->group(function ()
         Route::get('/vendor/metrics', [VendorMetricsController::class, 'index']);
         Route::get('/vendor/performance', [VendorPerformanceController::class, 'index']);
         Route::get('/vendor/finance', [VendorFinanceController::class, 'index']);
+        Route::get('/vendor/inventory/summary', [VendorInventorySummaryController::class, 'index']);
         Route::get('/vendor/promotions', [VendorPromotionController::class, 'index']);
         Route::post('/vendor/promotions', [VendorPromotionController::class, 'store'])->middleware('idempotency:required');
         Route::patch('/vendor/promotions/{promotion}', [VendorPromotionController::class, 'update']);
