@@ -77,15 +77,19 @@ class PaystackRefundService
                 }
             }
 
-            if ($localStatus === 'SUCCESS') {
-                $payment->load('allocations');
-                $allocated = (float) $payment->allocations->sum(fn ($row) => (float) $row->amount);
-                $refunded = (float) $payment->allocations->sum(fn ($row) => (float) $row->refunded_amount);
-                $paymentStatus = $allocated > 0 && $refunded + 0.01 >= $allocated
-                    ? 'REFUNDED'
-                    : 'SUCCESS';
+            $payment->load('allocations');
+            $allocated = (float) $payment->allocations->sum(fn ($row) => (float) $row->amount);
+            $refunded = (float) $payment->allocations->sum(fn ($row) => (float) $row->refunded_amount);
+            $pendingRefunds = Refund::where('payment_id', $payment->id)
+                ->whereIn('status', ['PENDING', 'PROCESSING'])
+                ->exists();
+
+            if ($allocated > 0 && $refunded + 0.01 >= $allocated) {
+                $paymentStatus = 'REFUNDED';
+            } elseif ($pendingRefunds) {
+                $paymentStatus = 'REFUND_PENDING';
             } else {
-                $paymentStatus = $localStatus === 'FAILED' ? 'SUCCESS' : 'REFUND_PENDING';
+                $paymentStatus = 'SUCCESS';
             }
 
             $payment->update([
