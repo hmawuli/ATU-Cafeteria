@@ -89,6 +89,21 @@ See `docs/PRODUCTION_STANDARD.md` for security, testing, deployment and architec
 
 Production Android releases are built through GitHub Actions using protected signing credentials. The Android App Bundle (`.aab`) is the primary artifact for Google Play distribution; the signed APK is retained for direct distribution and verification.
 
+## Standout Customer Experience
+
+The customer app is designed as a modern restaurant platform rather than a student portal.
+
+- Personalized **For You** recommendations based on actual order history.
+- **Live deals** sourced from active promotion campaigns.
+- **Real vendor ratings** with review counts; no fabricated ratings.
+- **One-tap Order Again** from order history.
+- Live order tracking with queue position and estimated wait support.
+- Secure digital collection passes and pickup verification.
+- Saved addresses, device/session controls and customer support.
+- Wallet, loyalty points, secure online payments and transactional refunds.
+- Server-side pricing, promotion validation and idempotent checkout.
+- Lightweight Flutter + Laravel architecture suitable for constrained development hardware.
+
 ## Smart Cafeteria Capabilities
 
 The platform includes smart queue estimation, personalized food recommendations, vendor demand forecasting, food-waste analytics, QR collection passes, an administrative command center, security-alert review, real-time order events and audit-backed financial governance. See `docs/SMART_FEATURES.md` for the API contracts and design decisions.
