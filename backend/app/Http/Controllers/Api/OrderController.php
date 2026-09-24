@@ -1212,6 +1212,7 @@ class OrderController extends Controller
                         $quantity = max(0, (int) $orderItem->quantity);
 
                         if ($orderItem->menu_item_id) {
+                            request()->merge(['inventory_order_id' => $lockedOrder->id]);
                             $menuItem = MenuItem::whereKey($orderItem->menu_item_id)
                                 ->lockForUpdate()
                                 ->first();
