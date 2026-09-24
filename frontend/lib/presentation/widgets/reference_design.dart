@@ -264,7 +264,8 @@ class Sidebar extends StatelessWidget {
                       'Kiosk',
                       'Performance',
                       'Finance',
-                      'Promotions'
+                      'Promotions',
+                      'Payout Account'
                     ]
                   : [
                       'Dashboard',
