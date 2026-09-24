@@ -404,12 +404,21 @@ class ProductionCartCheckoutController extends Controller
                         'discount_applied' => $vendorDiscount,
                     ]);
 
-                    foreach ($vendorLines as $line) {
+                    $remainingVendorDiscount = $vendorDiscount;
+                    $remainingVendorSubtotal = $vendorSubtotal;
+
+                    foreach ($vendorLines as $lineIndex => $line) {
                         $item = $line['item'];
                         $itemName = ($item->name ?? $item->food_name) ?: 'Meal';
-                        $lineDiscount = $vendorSubtotal > 0
-                            ? round($vendorDiscount * ($line['line_total'] / $vendorSubtotal), 2)
-                            : 0.0;
+                        $isLastLine = $lineIndex === array_key_last($vendorLines);
+                        $lineDiscount = $isLastLine
+                            ? $remainingVendorDiscount
+                            : ($remainingVendorSubtotal > 0
+                                ? round($vendorDiscount * ($line['line_total'] / $vendorSubtotal), 2)
+                                : 0.0);
+                        $lineDiscount = min($lineDiscount, $line['line_total']);
+                        $remainingVendorDiscount = max(0, round($remainingVendorDiscount - $lineDiscount, 2));
+                        $remainingVendorSubtotal = max(0, round($remainingVendorSubtotal - $line['line_total'], 2));
 
                         if ($item->current_stock !== null) {
                             $item->current_stock = max(0, (int) $item->current_stock - $line['quantity']);
