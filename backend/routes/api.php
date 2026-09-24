@@ -173,6 +173,7 @@ Route::middleware(['auth:sanctum', InactivityTimeout::class])->group(function ()
         Route::get('/vendor/performance', [VendorPerformanceController::class, 'index']);
         Route::get('/vendor/finance', [VendorFinanceController::class, 'index']);
         Route::get('/vendor/inventory/summary', [VendorInventorySummaryController::class, 'index']);
+        Route::patch('/vendor/status', [VendorController::class, 'toggleStatus'])->middleware('idempotency:required');
         Route::post('/vendor/kiosk/orders', [VendorKioskOrderController::class, 'store'])->middleware('idempotency:required');
         Route::get('/vendor/promotions', [VendorPromotionController::class, 'index']);
         Route::post('/vendor/promotions', [VendorPromotionController::class, 'store'])->middleware('idempotency:required');
