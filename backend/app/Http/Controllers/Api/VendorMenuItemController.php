@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\AuditLog;
+use App\Models\InventoryMovement;
 use App\Models\MenuItem;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -62,6 +63,19 @@ class VendorMenuItemController extends Controller
                 'current_stock' => $initialStock,
                 'low_stock_threshold' => $threshold,
             ]);
+
+            if ($initialStock !== null && $initialStock > 0) {
+                InventoryMovement::create([
+                    'vendor_id' => $user->id,
+                    'menu_item_id' => $createdItem->id,
+                    'type' => 'RESTOCK',
+                    'quantity' => $initialStock,
+                    'balance_after' => $initialStock,
+                    'reference' => 'OPEN-'.strtoupper(bin2hex(random_bytes(6))),
+                    'reason' => 'Opening stock recorded when menu item was created.',
+                    'performed_by' => $user->id,
+                ]);
+            }
 
             AuditLog::create([
                 'user_id' => $user->id,
