@@ -78,6 +78,21 @@ class OrderResource extends JsonResource
                 'image_url' => $this->foodItem->image_url,
             ] : null,
 
+            'items' => $this->relationLoaded('items') ? $this->items->map(function ($item) {
+                return [
+                    'id' => $item->id,
+                    'food_item_id' => $item->food_item_id,
+                    'name' => $item->name,
+                    'name_snapshot' => $item->name_snapshot,
+                    'sku_snapshot' => $item->sku_snapshot,
+                    'quantity' => (int) $item->quantity,
+                    'unit_price' => (float) $item->unit_price,
+                    'discount_amount' => (float) $item->discount_amount,
+                    'tax_amount' => (float) $item->tax_amount,
+                    'line_total' => (float) $item->line_total,
+                ];
+            })->values() : [],
+
             'menu_item' => $this->relationLoaded('menuItem') && $this->menuItem ? [
                 'id' => $this->menuItem->id,
                 'name' => $this->menuItem->name,
