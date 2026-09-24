@@ -40,34 +40,45 @@ class _VendorPayoutAccountScreenState extends State<VendorPayoutAccountScreen> {
   }
 
   Future<void> _load() async {
-    setState(() { _loading = true; _error = null; });
+    setState(() {
+      _loading = true;
+      _error = null;
+    });
+
+    final api = context.read<ApiClient>();
+    Map<String, dynamic>? account;
+    List<Map<String, dynamic>> channels = <Map<String, dynamic>>[];
+    String? accountError;
+    String? channelError;
+
     try {
-      final api = context.read<ApiClient>();
-      final results = await Future.wait<dynamic>([
-        api.get('/vendor/payout-account'),
-        api.get('/vendor/payout-banks?type=' + _type),
-      ]);
-      final accountResponse = results[0];
-      final bankResponse = results[1];
-      final channels = bankResponse is Map && bankResponse['channels'] is List
-          ? bankResponse['channels'].whereType<Map>().map(Map<String, dynamic>.from).toList()
-          : <Map<String, dynamic>>[];
-      final account = accountResponse is Map && accountResponse['account'] is Map
-          ? Map<String, dynamic>.from(accountResponse['account'])
-          : null;
-      if (!mounted) return;
-      setState(() {
-        _channels = channels;
-        _account = account;
-        _loading = false;
-      });
+      final response = await api.get('/vendor/payout-account');
+      if (response is Map && response['account'] is Map) {
+        account = Map<String, dynamic>.from(response['account']);
+      }
     } catch (e) {
-      if (!mounted) return;
-      setState(() {
-        _error = e.toString().replaceFirst('Exception: ', '');
-        _loading = false;
-      });
+      accountError = e.toString().replaceFirst('Exception: ', '');
     }
+
+    try {
+      final response = await api.get('/vendor/payout-banks?type=' + _type);
+      if (response is Map && response['channels'] is List) {
+        channels = response['channels']
+            .whereType<Map>()
+            .map(Map<String, dynamic>.from)
+            .toList();
+      }
+    } catch (_) {
+      channelError = 'Payout channels are unavailable until Paystack transfers are configured.';
+    }
+
+    if (!mounted) return;
+    setState(() {
+      _channels = channels;
+      _account = account;
+      _error = accountError ?? channelError;
+      _loading = false;
+    });
   }
 
   Future<void> _changeType(String value) async {
