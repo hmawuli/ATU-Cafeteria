@@ -36,19 +36,19 @@ class AdminRepository {
   Future<Map<String, dynamic>> finance() async =>
       _map(await api.request('GET', 'admin/finance/summary'));
   Future<Map<String, dynamic>> settlements() async =>
-      _map(await api.request('GET', 'settlements'));
+      _map(await api.request('GET', 'admin/settlements'));
 
   Future<Map<String, dynamic>> payoutSettlement(int id) async =>
       _map(await api.request(
         'POST',
-        'settlements/$id/payout',
+        'admin/settlements/$id/payout',
         idempotencyKey: ApiClient.newIdempotencyKey(),
       ));
 
   Future<Map<String, dynamic>> finalizeSettlementPayout(int id, String otp) async =>
       _map(await api.request(
         'POST',
-        'settlements/$id/payout/finalize',
+        'admin/settlements/$id/payout/finalize',
         idempotencyKey: ApiClient.newIdempotencyKey(),
         body: {'otp': otp},
       ));
