@@ -22,13 +22,13 @@ Flutter is the customer/staff client. Laravel is the business-logic API and syst
 - Customer support tickets
 - Customer account closure with audit retention
 - Promotions, vendor-owned promotions and promotion redemptions
-- Vendor settlement data model, vendor finance dashboard and generation endpoint
-- Aggregate checkout sessions with one payment spanning one or more vendor orders
+- Vendor settlement data model, vendor finance dashboard, payout account verification and Paystack settlement disbursement
+- Aggregate checkout sessions with one payment spanning one or more vendor orders, with per-order payment allocations
 - Multi-line vendor orders and server-authoritative checkout price preview
-- Vendor-operated walk-in kiosk sales recorded as KIOSK channel transactions
+- Vendor-operated walk-in kiosk sales recorded as immediately completed KIOSK channel transactions with receipt presentation
 - Inventory health summary with low-stock and out-of-stock visibility
 - Database-backed notification center for customers and vendors
-- FCM delivery that reports failure when production credentials are missing
+- FCM device registration, token refresh/logout revocation and real delivery that reports failure when production credentials are missing
 - Debug-only local demo data
 - Debug-only backend URL override
 - Production release signing through protected CI credentials
@@ -43,12 +43,13 @@ Flutter is the customer/staff client. Laravel is the business-logic API and syst
 3. Configure Firebase Cloud Messaging credentials and register real device tokens.
 4. Configure Paystack production credentials and complete webhook verification.
 5. Configure remote encrypted backups and test a restore.
-6. Configure staging and run the full migration/test suite.
-7. Complete privacy policy, terms, refund and cancellation policy review.
-8. Validate tax/fees and accounting treatment for the operating jurisdiction.
-9. Run concurrency tests for inventory, payments, wallet debits, refunds, checkout sessions and webhook duplication.
-10. Configure and test vendor payout account/settlement operations before enabling live payouts.
-11. Complete release smoke testing on a physical Android device.
+6. Add the production Firebase dart-define secrets to the release workflow; do not commit Firebase or signing secrets.
+7. Configure staging and run the full migration/test suite.
+8. Complete privacy policy, terms, refund and cancellation policy review.
+9. Validate tax/fees and accounting treatment for the operating jurisdiction.
+10. Run concurrency tests for inventory, payments, wallet debits, refunds, checkout sessions and webhook duplication.
+11. Configure and test vendor payout accounts, Paystack transfer balance/authorization and settlement operations before enabling live payouts.
+12. Complete release smoke testing on a physical Android device.
 
 ## Operational rule
 
