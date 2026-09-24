@@ -1068,9 +1068,6 @@ class OrderController extends Controller
     }
 
     /**
-     * Place a new secure order for the currently authenticated student.
-     */
-    /**
      * Legacy compatibility endpoint for the old single-item customer flow.
      * It deliberately delegates to the canonical production cart checkout so
      * pricing, promotion, loyalty, inventory, payments and idempotency use
