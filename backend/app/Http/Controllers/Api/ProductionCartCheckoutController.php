@@ -352,20 +352,33 @@ class ProductionCartCheckoutController extends Controller
                 $createdOrders = [];
                 $remainingDiscount = $discount;
                 $remainingSubtotal = $subtotal;
+                $remainingPoints = $points;
                 $balanceBefore = round((float) $user->balance, 2);
 
                 foreach ($groups as $vendorId => $vendorLines) {
                     $vendorSubtotal = round(array_sum(array_column($vendorLines, 'line_total')), 2);
                     $isLastVendor = $vendorId === array_key_last($groups);
-                    $vendorDiscount = $isLastVendor
-                        ? $remainingDiscount
-                        : ($remainingSubtotal > 0
-                            ? round($discount * ($vendorSubtotal / $remainingSubtotal), 2)
-                            : 0.0);
+                    $vendorPoints = $points > 0
+                        ? ($isLastVendor
+                            ? $remainingPoints
+                            : (int) floor($remainingPoints * ($vendorSubtotal / max(0.01, $remainingSubtotal))))
+                        : 0;
+                    $vendorPoints = min($vendorPoints, $remainingPoints);
+
+                    $vendorDiscount = $points > 0
+                        ? round($vendorPoints * 0.10, 2)
+                        : ($isLastVendor
+                            ? $remainingDiscount
+                            : ($remainingSubtotal > 0
+                                ? round($discount * ($vendorSubtotal / $remainingSubtotal), 2)
+                                : 0.0));
 
                     $vendorDiscount = min($vendorDiscount, $vendorSubtotal);
                     $vendorGrandTotal = max(0, round($vendorSubtotal - $vendorDiscount, 2));
-                    $remainingDiscount = max(0, round($remainingDiscount - $vendorDiscount, 2));
+                    if ($points === 0) {
+                        $remainingDiscount = max(0, round($remainingDiscount - $vendorDiscount, 2));
+                    }
+                    $remainingPoints = max(0, $remainingPoints - $vendorPoints);
                     $remainingSubtotal = max(0, round($remainingSubtotal - $vendorSubtotal, 2));
 
                     $order = Order::create([
@@ -400,7 +413,7 @@ class ProductionCartCheckoutController extends Controller
                         'status' => 'PENDING',
                         'pickup_pin' => (string) random_int(1000, 9999),
                         'estimated_pickup_time' => $request->input('estimated_pickup_time', 'Calculating...'),
-                        'points_redeemed' => 0,
+                        'points_redeemed' => $vendorPoints,
                         'discount_applied' => $vendorDiscount,
                     ]);
 
@@ -458,15 +471,6 @@ class ProductionCartCheckoutController extends Controller
 
                     }
 
-                    if ($promotion) {
-                        PromotionRedemption::create([
-                            'promotion_id' => $promotion->id,
-                            'customer_id' => $user->id,
-                            'order_id' => $order->id,
-                            'discount_amount' => $vendorDiscount,
-                        ]);
-                    }
-
                     if ($paymentMethod === 'WALLET') {
                         $newBalance = round((float) $user->balance - $vendorGrandTotal, 2);
                         WalletTransaction::create([
@@ -495,6 +499,16 @@ class ProductionCartCheckoutController extends Controller
                     ]);
 
                     $createdOrders[] = $order->load(['items', 'vendor']);
+                }
+
+                if ($promotion) {
+                    PromotionRedemption::create([
+                        'promotion_id' => $promotion->id,
+                        'customer_id' => $user->id,
+                        'order_id' => $createdOrders[0]->id ?? null,
+                        'checkout_session_id' => $session->id,
+                        'discount_amount' => $discount,
+                    ]);
                 }
 
                 $user->loyalty_points = max(0, (int) ($user->loyalty_points ?? 0) - $points);
