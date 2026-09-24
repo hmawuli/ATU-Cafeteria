@@ -4,6 +4,7 @@ use App\Http\Controllers\Api\CustomerAccountController;
 use App\Http\Controllers\Api\CustomerAddressController;
 use App\Http\Controllers\Api\CustomerAuthController;
 use App\Http\Controllers\Api\CustomerDeviceController;
+use App\Http\Controllers\Api\CustomerDiscoveryController;
 use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\CustomerSupportController;
 use App\Http\Controllers\Api\FavoriteMenuItemController;
@@ -30,6 +31,9 @@ $customerRoutes = function () {
         Route::get('/me', [AuthController::class, 'me']);
         Route::post('/logout', [AuthController::class, 'logout']);
         Route::post('/pin/change', [AuthController::class, 'changePin'])->middleware('idempotency:required');
+
+        Route::get('/discovery', [CustomerDiscoveryController::class, 'index']);
+        Route::get('/recommendations', [\App\Http\Controllers\Api\SmartCafeteriaController::class, 'recommendations']);
 
         Route::get('/orders', [OrderController::class, 'getAuthenticatedStudentOrders']);
         Route::get('/purchased-vendors', [OrderController::class, 'getPurchasedVendors']);
