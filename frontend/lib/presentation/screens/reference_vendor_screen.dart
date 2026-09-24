@@ -8,6 +8,7 @@ import '../providers/cart_provider.dart';
 import '../widgets/reference_design.dart';
 import 'vendor_finance_screen.dart';
 import 'vendor_promotions_screen.dart';
+import 'vendor_payout_account_screen.dart';
 
 class ReferenceVendorScreen extends StatefulWidget {
   const ReferenceVendorScreen({super.key});
@@ -150,6 +151,11 @@ class _ReferenceVendorScreenState extends State<ReferenceVendorScreen> {
             IconButton(
                 onPressed: provider.refreshAllData,
                 icon: const Icon(Icons.refresh, color: Colors.white)),
+            PopupMenuButton<String>(
+                icon: const Icon(Icons.account_balance_outlined, color: Colors.white),
+                onSelected: (value) => setState(() => page = value),
+                itemBuilder: (context) => const [PopupMenuItem(value: 'Payout Account', child: Text('Payout Account'))],
+              ),
             IconButton(
                 onPressed: () {
                   provider.logOut();
@@ -174,6 +180,8 @@ class _ReferenceVendorScreenState extends State<ReferenceVendorScreen> {
         return const VendorFinanceScreen();
       case 'Promotions':
         return const VendorPromotionsScreen();
+      case 'Payout Account':
+        return const VendorPayoutAccountScreen();
       default:
         return _dashboard(provider);
     }
