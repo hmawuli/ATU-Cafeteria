@@ -17,6 +17,7 @@ import 'package:atu_cafeteria/presentation/screens/admin_security_screen.dart';
 import 'package:atu_cafeteria/presentation/screens/smart_insights_screen.dart';
 import 'package:atu_cafeteria/presentation/screens/kiosk_screen.dart';
 import 'package:atu_cafeteria/presentation/screens/vendor_dashboard.dart';
+import 'package:atu_cafeteria/presentation/screens/vendor_operations_dashboard_screen.dart';
 import 'package:atu_cafeteria/presentation/screens/vendor_finance_screen.dart';
 import 'package:atu_cafeteria/presentation/screens/vendor_promotions_screen.dart';
 import 'package:atu_cafeteria/presentation/screens/vendor_payout_account_screen.dart';
@@ -77,9 +78,9 @@ class ATUCafeteriaApp extends StatelessWidget {
           '/customer-support': (_) => const CustomerSupportScreen(),
           '/student': (_) => const CustomerHomeScreen(),
 
-          // Primary restaurant operations entry point.
-          '/vendor': (_) => const VendorDashboardScreen(),
-          '/vendor-dashboard': (_) => const VendorDashboardScreen(),
+          // Primary production restaurant command centre.
+          '/vendor': (_) => const VendorOperationsDashboardScreen(),
+          '/vendor-dashboard': (_) => const VendorOperationsDashboardScreen(),
 
           // Dedicated operational modules.
           '/vendor-orders': (_) => const VendorOrderWorkflowScreen(),
@@ -88,6 +89,7 @@ class ATUCafeteriaApp extends StatelessWidget {
           '/vendor-finance': (_) => const VendorFinanceScreen(),
           '/vendor-promotions': (_) => const VendorPromotionsScreen(),
           '/vendor-payout-account': (_) => const VendorPayoutAccountScreen(),
+          '/vendor-legacy-dashboard': (_) => const VendorDashboardScreen(),
           '/admin': (_) => const ReferenceAdminScreen(),
           '/reset-password': (_) => const PasswordResetScreen(),
           '/verify-email': (_) => const EmailVerificationScreen(),
@@ -104,17 +106,13 @@ class ATUCafeteriaApp extends StatelessWidget {
             final vendor = ModalRoute.of(context)?.settings.arguments;
             return vendor is User
                 ? CustomerVendorMenuScreen(vendor: vendor)
-                : const Scaffold(
-                    body: Center(child: Text('Invalid restaurant.')),
-                  );
+                : const Scaffold(body: Center(child: Text('Invalid restaurant.')));
           },
           '/food-detail': (context) {
             final item = ModalRoute.of(context)?.settings.arguments;
             return item is FoodItem
                 ? FoodDetailScreen(item: item)
-                : const Scaffold(
-                    body: Center(child: Text('Invalid food item.')),
-                  );
+                : const Scaffold(body: Center(child: Text('Invalid food item.')));
           },
           '/order-tracking': (context) {
             final id = ModalRoute.of(context)?.settings.arguments;
