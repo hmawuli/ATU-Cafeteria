@@ -6,6 +6,7 @@ use App\Models\CheckoutSession;
 use App\Models\MenuItem;
 use App\Models\Order;
 use App\Models\Payment;
+use App\Models\PaymentAllocation;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Laravel\Sanctum\Sanctum;
@@ -108,5 +109,72 @@ class ProductionCheckoutTest extends TestCase
         $this->assertSame(18, (int) MenuItem::find($drink->id)->current_stock);
         $this->assertNotNull(CheckoutSession::find($sessionId));
         $this->assertNotNull(Payment::where('checkout_session_id', $sessionId)->first());
+        $this->assertDatabaseHas('payment_allocations', [
+            'payment_id' => Payment::where('checkout_session_id', $sessionId)->value('id'),
+            'order_id' => $orderIds->first(),
+            'amount' => 25,
+            'refunded_amount' => 0,
+        ]);
+    }
+
+    public function test_multi_vendor_checkout_creates_allocations_for_each_vendor_order(): void
+    {
+        $customer = User::factory()->create([
+            'role' => 'STUDENT',
+            'account_status' => 'ACTIVE',
+            'balance' => 100,
+            'loyalty_points' => 0,
+        ]);
+        $vendorA = User::factory()->create(['role' => 'VENDOR', 'account_status' => 'ACTIVE']);
+        $vendorB = User::factory()->create(['role' => 'VENDOR', 'account_status' => 'ACTIVE']);
+
+        $mealA = MenuItem::create([
+            'vendor_id' => $vendorA->id,
+            'food_name' => 'Vendor A Meal',
+            'name' => 'Vendor A Meal',
+            'price' => 18,
+            'description' => 'Meal A.',
+            'category' => 'Meals',
+            'is_available' => true,
+            'initial_stock' => 10,
+            'current_stock' => 10,
+            'low_stock_threshold' => 2,
+        ]);
+        $mealB = MenuItem::create([
+            'vendor_id' => $vendorB->id,
+            'food_name' => 'Vendor B Meal',
+            'name' => 'Vendor B Meal',
+            'price' => 7,
+            'description' => 'Meal B.',
+            'category' => 'Meals',
+            'is_available' => true,
+            'initial_stock' => 10,
+            'current_stock' => 10,
+            'low_stock_threshold' => 2,
+        ]);
+
+        Sanctum::actingAs($customer, ['customer']);
+
+        $response = $this->postJson('/api/customer/cart-checkout', [
+            'items' => [
+                ['menu_item_id' => $mealA->id, 'quantity' => 1],
+                ['menu_item_id' => $mealB->id, 'quantity' => 1],
+            ],
+            'payment_method' => 'WALLET',
+        ], [
+            'Idempotency-Key' => 'checkout-split-test-001',
+        ]);
+
+        $response->assertOk()->assertJsonPath('success', true);
+
+        $sessionId = $response->json('checkout_session.id');
+        $paymentId = Payment::where('checkout_session_id', $sessionId)->value('id');
+        $orders = Order::withoutGlobalScopes()->where('checkout_session_id', $sessionId)->get();
+
+        $this->assertCount(2, $orders);
+        $this->assertSame(25.0, (float) Payment::find($paymentId)->amount);
+        $this->assertSame(2, PaymentAllocation::where('payment_id', $paymentId)->count());
+        $this->assertSame(18.0, (float) PaymentAllocation::where('payment_id', $paymentId)->where('order_id', $orders->first(fn ($o) => $o->vendor_id === $vendorA->id)->id)->value('amount'));
+        $this->assertSame(7.0, (float) PaymentAllocation::where('payment_id', $paymentId)->where('order_id', $orders->first(fn ($o) => $o->vendor_id === $vendorB->id)->id)->value('amount'));
     }
 }
