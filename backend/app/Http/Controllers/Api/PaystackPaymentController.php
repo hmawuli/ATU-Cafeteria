@@ -250,15 +250,6 @@ class PaystackPaymentController extends Controller
                     ->lockForUpdate()
                     ->first();
 
-                if (! $refund) {
-                    // Some Paystack payloads expose a numeric refund id while
-                    // others expose refund_reference. Both are stored locally
-                    // as gateway_reference during initiation.
-                    $refund = (clone $refundQuery)
-                        ->whereRaw('CAST(gateway_reference AS TEXT) = ?', [$gatewayReference])
-                        ->lockForUpdate()
-                        ->first();
-                }
             } else {
                 $pendingCount = (clone $refundQuery)->count();
                 if ($pendingCount !== 1) {
