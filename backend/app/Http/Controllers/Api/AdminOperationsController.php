@@ -28,6 +28,7 @@ class AdminOperationsController extends Controller
     public function createPromotion(Request $request)
     {
         $validator = Validator::make($request->all(), [
+            'vendor_id' => 'nullable|integer|exists:users,id',
             'code' => 'required|string|min:3|max:50|alpha_dash',
             'name' => 'required|string|max:160',
             'type' => 'required|string|in:PERCENTAGE,FIXED',
@@ -46,7 +47,7 @@ class AdminOperationsController extends Controller
 
         $promotion = Promotion::create([
             ...$request->only([
-                'name','type','value','minimum_order_amount','maximum_discount_amount',
+                'vendor_id','name','type','value','minimum_order_amount','maximum_discount_amount',
                 'usage_limit','per_customer_limit','starts_at','ends_at',
             ]),
             'code' => strtoupper(trim($request->input('code'))),
