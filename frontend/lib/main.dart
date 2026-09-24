@@ -16,6 +16,10 @@ import 'package:atu_cafeteria/presentation/screens/checkout_screen.dart';
 import 'package:atu_cafeteria/presentation/screens/admin_security_screen.dart';
 import 'package:atu_cafeteria/presentation/screens/smart_insights_screen.dart';
 import 'package:atu_cafeteria/presentation/screens/kiosk_screen.dart';
+import 'package:atu_cafeteria/presentation/screens/vendor_dashboard.dart';
+import 'package:atu_cafeteria/presentation/screens/vendor_finance_screen.dart';
+import 'package:atu_cafeteria/presentation/screens/vendor_promotions_screen.dart';
+import 'package:atu_cafeteria/presentation/screens/vendor_payout_account_screen.dart';
 import 'package:atu_cafeteria/presentation/screens/vendor_order_display_screen.dart';
 import 'package:atu_cafeteria/presentation/screens/vendor_order_workflow_screen.dart';
 import 'package:atu_cafeteria/presentation/screens/kfc_ordering_screen.dart';
@@ -27,7 +31,6 @@ import 'package:atu_cafeteria/presentation/screens/customer_account_screen.dart'
 import 'package:atu_cafeteria/presentation/screens/customer_addresses_screen.dart';
 import 'package:atu_cafeteria/presentation/screens/customer_devices_screen.dart';
 import 'package:atu_cafeteria/presentation/screens/customer_support_screen.dart';
-import 'package:atu_cafeteria/presentation/screens/reference_vendor_screen.dart';
 import 'package:atu_cafeteria/presentation/screens/reference_admin_screen.dart';
 import 'package:atu_cafeteria/presentation/screens/notifications_screen.dart';
 import 'package:atu_cafeteria/presentation/screens/splash_screen.dart';
@@ -73,8 +76,15 @@ class ATUCafeteriaApp extends StatelessWidget {
           // Kept as a compatibility route for existing deep links. New
           // customer-facing flows should use /customer.
           '/student': (_) => const CustomerHomeScreen(),
-          '/vendor': (_) => const VendorOrderWorkflowScreen(),
-          '/vendor-dashboard': (_) => const ReferenceVendorScreen(),
+          // Primary restaurant operations entry point.
+          '/vendor': (_) => const VendorDashboardScreen(),
+          '/vendor-dashboard': (_) => const VendorDashboardScreen(),
+
+          // Dedicated operational modules.
+          '/vendor-orders': (_) => const VendorOrderWorkflowScreen(),
+          '/vendor-finance': (_) => const VendorFinanceScreen(),
+          '/vendor-promotions': (_) => const VendorPromotionsScreen(),
+          '/vendor-payout-account': (_) => const VendorPayoutAccountScreen(),
           '/admin': (_) => const ReferenceAdminScreen(),
           '/reset-password': (_) => const PasswordResetScreen(),
           '/verify-email': (_) => const EmailVerificationScreen(),

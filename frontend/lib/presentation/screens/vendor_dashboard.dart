@@ -324,7 +324,9 @@ class _VendorDashboardScreenState extends State<VendorDashboardScreen> {
                   context,
                   icon: Icons.receipt_long,
                   label: 'Orders',
-                  onTap: () => setState(() => _activeTab = 1),
+                  onTap: () {
+                    Navigator.pushNamed(context, '/vendor-orders');
+                  },
                 ),
               ),
               const SizedBox(width: 10),
@@ -385,6 +387,45 @@ class _VendorDashboardScreenState extends State<VendorDashboardScreen> {
                   icon: Icons.storefront_outlined,
                   label: 'Store',
                   onTap: () => setState(() => _activeTab = 4),
+                ),
+              ),
+            ],
+          ),
+
+          const SizedBox(height: 10),
+
+          Row(
+            children: [
+              Expanded(
+                child: _quickAction(
+                  context,
+                  icon: Icons.account_balance_wallet_outlined,
+                  label: 'Finance',
+                  onTap: () {
+                    Navigator.pushNamed(context, '/vendor-finance');
+                  },
+                ),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: _quickAction(
+                  context,
+                  icon: Icons.local_offer_outlined,
+                  label: 'Promotions',
+                  onTap: () {
+                    Navigator.pushNamed(context, '/vendor-promotions');
+                  },
+                ),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: _quickAction(
+                  context,
+                  icon: Icons.payments_outlined,
+                  label: 'Payouts',
+                  onTap: () {
+                    Navigator.pushNamed(context, '/vendor-payout-account');
+                  },
                 ),
               ),
             ],
