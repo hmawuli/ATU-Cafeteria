@@ -233,17 +233,50 @@ class PaystackPaymentController extends Controller
                 return response()->json(['success' => true, 'message' => 'Refund payment reference is not registered.']);
             }
 
-            $refund = \App\Models\Refund::where('payment_id', $payment->id)
-                ->whereIn('status', ['PENDING', 'PROCESSING'])
-                ->latest()
-                ->lockForUpdate()
-                ->first();
+            $gatewayReference = trim((string) (
+                $request->input('data.refund_reference')
+                ?: $request->input('data.id')
+                ?: ''
+            ));
+
+            $refundQuery = \App\Models\Refund::where('payment_id', $payment->id)
+                ->whereIn('status', ['PENDING', 'PROCESSING']);
+
+            if ($gatewayReference !== '') {
+                $refund = (clone $refundQuery)
+                    ->where(function ($query) use ($gatewayReference) {
+                        $query->where('gateway_reference', $gatewayReference);
+                    })
+                    ->lockForUpdate()
+                    ->first();
+
+                if (! $refund) {
+                    // Some Paystack payloads expose a numeric refund id while
+                    // others expose refund_reference. Both are stored locally
+                    // as gateway_reference during initiation.
+                    $refund = (clone $refundQuery)
+                        ->whereRaw('CAST(gateway_reference AS TEXT) = ?', [$gatewayReference])
+                        ->lockForUpdate()
+                        ->first();
+                }
+            } else {
+                $pendingCount = (clone $refundQuery)->count();
+                if ($pendingCount !== 1) {
+                    return response()->json([
+                        'success' => false,
+                        'message' => 'Refund webhook could not uniquely identify a pending refund.',
+                    ], 409);
+                }
+                $refund = $refundQuery->lockForUpdate()->first();
+            }
 
             if (! $refund) {
                 return response()->json(['success' => true, 'message' => 'Refund already reconciled or not registered.']);
             }
 
-            $refund->gateway_reference = (string) ($request->input('data.refund_reference') ?: $refund->gateway_reference);
+            $refund->gateway_reference = $gatewayReference !== ''
+                ? $gatewayReference
+                : $refund->gateway_reference;
             $refund->status = match ($refundStatus) {
                 'processing' => 'PROCESSING',
                 'processed' => 'SUCCESS',
@@ -274,10 +307,21 @@ class PaystackPaymentController extends Controller
                 $payment->load('allocations');
                 $allocated = (float) $payment->allocations->sum(fn ($row) => (float) $row->amount);
                 $refunded = (float) $payment->allocations->sum(fn ($row) => (float) $row->refunded_amount);
-                $payment->status = $allocated > 0 && $refunded + 0.01 >= $allocated
-                    ? 'REFUNDED'
-                    : 'SUCCESS';
-                $payment->refunded_at = $payment->status === 'REFUNDED' ? now() : $payment->refunded_at;
+                $pendingRefunds = \App\Models\Refund::where('payment_id', $payment->id)
+                    ->whereIn('status', ['PENDING', 'PROCESSING'])
+                    ->exists();
+
+                if ($allocated > 0 && $refunded + 0.01 >= $allocated) {
+                    $payment->status = 'REFUNDED';
+                } elseif ($pendingRefunds) {
+                    $payment->status = 'REFUND_PENDING';
+                } else {
+                    $payment->status = 'SUCCESS';
+                }
+
+                $payment->refunded_at = $payment->status === 'REFUNDED'
+                    ? now()
+                    : $payment->refunded_at;
             } elseif ($refund->status === 'FAILED') {
                 $payment->status = 'SUCCESS';
             } else {
