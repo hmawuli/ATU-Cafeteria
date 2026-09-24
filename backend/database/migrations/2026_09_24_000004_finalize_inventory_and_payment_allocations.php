@@ -2,7 +2,6 @@
 
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
-use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 
 return new class extends Migration
@@ -19,14 +18,8 @@ return new class extends Migration
 
         if (Schema::hasTable('food_items') && ! Schema::hasColumn('food_items', 'current_stock')) {
             Schema::table('food_items', function (Blueprint $table) {
-                $table->integer('current_stock')->nullable()->after('initial_stock');
+                $table->integer('current_stock')->nullable()->after('is_available');
             });
-
-            DB::table('food_items')
-                ->whereNull('current_stock')
-                ->update([
-                    'current_stock' => DB::raw('COALESCE(initial_stock, 50)'),
-                ]);
         }
 
         if (Schema::hasTable('demand_forecasts') && ! Schema::hasColumn('demand_forecasts', 'menu_item_id')) {
