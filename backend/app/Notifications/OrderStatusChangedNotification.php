@@ -72,9 +72,9 @@ class OrderStatusChangedNotification extends Notification
      */
     public function broadcastOn()
     {
-        $studentId = $this->order->customer_id ?? $this->order->student_id;
+        $customerId = $this->order->customer_id ?? $this->order->student_id;
 
-        return ['orders-student-'.$studentId];
+        return ['orders-customer-'.$studentId];
     }
 
     /**
