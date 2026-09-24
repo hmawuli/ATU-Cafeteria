@@ -8,6 +8,7 @@ use App\Models\MenuItem;
 use App\Models\Order;
 use App\Models\OrderItem;
 use App\Models\Payment;
+use App\Models\InventoryMovement;
 use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -71,7 +72,7 @@ class VendorKioskOrderController extends Controller
                     }
 
                     $quantity = (int) $input['quantity'];
-                    if ($isMenu && $item->current_stock !== null && (int) $item->current_stock < $quantity) {
+                    if ($item->current_stock !== null && (int) $item->current_stock < $quantity) {
                         throw new \RuntimeException("Only {$item->current_stock} unit(s) remain for '".($item->name ?: $item->food_name)."'.");
                     }
 
@@ -118,24 +119,44 @@ class VendorKioskOrderController extends Controller
                     'total_price' => $subtotal,
                     'order_timestamp' => now()->getTimestampMs(),
                     'placed_at' => now(),
-                    'status' => 'PENDING',
+                    'status' => 'COMPLETED',
+                    'order_status' => 'COMPLETED',
+                    'accepted_at' => now(),
+                    'preparing_at' => now(),
+                    'ready_at' => now(),
+                    'collected_at' => now(),
+                    'confirmed_at' => now(),
                     'pickup_pin' => (string) random_int(1000, 9999),
-                    'estimated_pickup_time' => 'Ready at counter',
+                    'estimated_pickup_time' => 'Collected at counter',
                 ]);
 
                 foreach ($lines as $line) {
                     $item = $line['item'];
                     $itemName = $item->name ?? $item->food_name;
 
-                    if ($line['is_menu'] && $item->current_stock !== null) {
+                    if ($item->current_stock !== null) {
                         $item->current_stock = max(0, (int) $item->current_stock - $line['quantity']);
                         $item->is_available = $item->current_stock > 0;
                         $item->save();
+
+                        InventoryMovement::create([
+                            'vendor_id' => $item->vendor_id,
+                            'food_item_id' => $line['is_menu'] ? null : $item->id,
+                            'menu_item_id' => $line['is_menu'] ? $item->id : null,
+                            'order_id' => $order->id,
+                            'type' => 'SALE',
+                            'quantity' => -$line['quantity'],
+                            'balance_after' => $item->current_stock,
+                            'reference' => 'KSK-'.$order->order_number,
+                            'reason' => 'Stock consumed by walk-in kiosk sale.',
+                            'performed_by' => $lockedVendor->id,
+                        ]);
                     }
 
                     OrderItem::create([
                         'order_id' => $order->id,
                         'food_item_id' => $line['is_menu'] ? null : $item->id,
+                        'menu_item_id' => $line['is_menu'] ? $item->id : null,
                         'name' => $itemName ?: 'Meal',
                         'name_snapshot' => $itemName ?: 'Meal',
                         'sku_snapshot' => $item->sku ?? null,
