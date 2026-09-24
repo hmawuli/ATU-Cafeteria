@@ -53,9 +53,14 @@ class PaystackRefundService
             default => 'PENDING',
         };
 
-        DB::transaction(function () use ($payment, $refund, $localStatus) {
+        DB::transaction(function () use ($payment, $refund, $localStatus, $data) {
             $refund->update([
                 'status' => $localStatus,
+                'gateway_reference' => (string) (
+                    data_get($data, 'refund_reference')
+                    ?: data_get($data, 'id')
+                    ?: $refund->gateway_reference
+                ),
                 'processed_at' => $localStatus === 'SUCCESS' ? now() : $refund->processed_at,
             ]);
 
