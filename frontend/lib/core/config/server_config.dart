@@ -57,6 +57,16 @@ class ServerConfig {
   /// Set (or clear, with `null`/empty) the manual override and persist it.
   static Future<void> setOverride(String? url) async {
     final value = url?.trim() ?? '';
+
+    if (kReleaseMode && value.isNotEmpty) {
+      final uri = Uri.tryParse(value);
+      if (uri == null || uri.scheme != 'https') {
+        throw StateError(
+          'Production builds only allow HTTPS backend endpoints.',
+        );
+      }
+    }
+
     _manual = value.isEmpty ? null : value;
     try {
       if (_manual == null) {
