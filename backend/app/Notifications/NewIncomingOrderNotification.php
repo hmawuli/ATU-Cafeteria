@@ -68,7 +68,7 @@ class NewIncomingOrderNotification extends Notification
      */
     public function toDatabase($notifiable)
     {
-        $customerName = 'A student';
+        $customerName = 'A customer';
         if ($this->order->customer) {
             $customerName = $this->order->customer->fullName;
         }
@@ -79,7 +79,7 @@ class NewIncomingOrderNotification extends Notification
             'food_name' => $this->order->food_name,
             'quantity' => $this->order->quantity,
             'total_price' => $this->order->total_price,
-            'message' => "New Order Alert! Pre-order #{$this->order->id} for '{$this->order->food_name}' (QTY: {$this->order->quantity}) placed by {$customerName}. Total: GH₵".number_format($this->order->total_price, 2).'.',
+            'message' => "New Order Alert! Order #{$this->order->id} for '{$this->order->food_name}' (QTY: {$this->order->quantity}) placed by {$customerName}. Total: GH₵".number_format($this->order->total_price, 2).'.',
             'time' => date('Y-m-d H:i:s'),
         ];
     }
