@@ -1249,6 +1249,7 @@ class OrderController extends Controller
                     }
                 } elseif ($lockedOrder->menu_item_id) {
                     // Legacy single-line menu order fallback.
+                    request()->merge(['inventory_order_id' => $lockedOrder->id]);
                     $menuItem = MenuItem::whereKey($lockedOrder->menu_item_id)
                         ->lockForUpdate()
                         ->first();
