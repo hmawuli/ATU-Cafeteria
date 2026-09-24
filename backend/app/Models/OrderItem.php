@@ -18,6 +18,7 @@ class OrderItem extends Model
         'quantity',
         'unit_price',
         'total_price', 'name_snapshot', 'sku_snapshot', 'discount_amount', 'tax_amount', 'line_total',
+        'menu_item_id',
     ];
 
     protected $casts = [
