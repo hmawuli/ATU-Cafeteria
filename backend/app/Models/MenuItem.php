@@ -54,9 +54,15 @@ class MenuItem extends Model
                 $type = 'SALE';
             }
 
+            $orderId = null;
+            if ($route && request()->has('inventory_order_id')) {
+                $orderId = (int) request()->input('inventory_order_id');
+            }
+
             InventoryMovement::create([
                 'vendor_id' => $item->vendor_id,
                 'menu_item_id' => $item->id,
+                'order_id' => $orderId,
                 'type' => $type,
                 'quantity' => $delta,
                 'balance_after' => $item->current_stock,
