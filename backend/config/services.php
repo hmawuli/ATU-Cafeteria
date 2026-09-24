@@ -1,6 +1,10 @@
 <?php
 
 return [
+    'fcm' => [
+        'project_id' => env('FCM_PROJECT_ID', ''),
+        'access_token' => env('FCM_ACCESS_TOKEN', ''),
+    ],
     'paystack' => [
         'secret' => env('PAYSTACK_SECRET_KEY', ''),
         'public' => env('PAYSTACK_PUBLIC_KEY', ''),
