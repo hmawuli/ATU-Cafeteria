@@ -33,6 +33,7 @@ class AdminStateProvider extends ChangeNotifier {
   /// CAFETERIA_ADMIN lacking `payments.view`). Other sections must keep
   /// loading normally, so this is tracked separately from [_error].
   String? financeError;
+  String? settlementsError;
 
   bool get loading => _loading;
   String? get error => _error;
@@ -50,7 +51,10 @@ class AdminStateProvider extends ChangeNotifier {
       {bool includeFinance = true, bool includeSettings = false}) async {
     _loading = true;
     _error = null;
-    if (includeFinance) financeError = null;
+    if (includeFinance) {
+      financeError = null;
+      settlementsError = null;
+    }
     notifyListeners();
 
     // Each section loads independently: a single forbidden/failed endpoint
@@ -81,6 +85,8 @@ class AdminStateProvider extends ChangeNotifier {
       _assign(
         repository.settlements,
         (v) => settlements = _items(v['settlements']),
+        onError: (_) => settlementsError =
+            'You do not have permission to view settlements.',
       ),
       _assign(
         smart.commandCenter,
