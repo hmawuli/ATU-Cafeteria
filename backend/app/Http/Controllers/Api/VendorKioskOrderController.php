@@ -134,6 +134,10 @@ class VendorKioskOrderController extends Controller
                     $item = $line['item'];
                     $itemName = $item->name ?? $item->food_name;
 
+                    if ($line['is_menu']) {
+                        request()->merge(['inventory_order_id' => $order->id]);
+                    }
+
                     if ($item->current_stock !== null) {
                         $item->current_stock = max(0, (int) $item->current_stock - $line['quantity']);
                         $item->is_available = $item->current_stock > 0;
