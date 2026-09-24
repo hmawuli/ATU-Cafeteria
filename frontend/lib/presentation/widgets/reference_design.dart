@@ -354,6 +354,8 @@ class Sidebar extends StatelessWidget {
         return Icons.people_outline;
       case 'Vendors':
         return Icons.storefront_outlined;
+      case 'Payout Account':
+        return Icons.account_balance_outlined;
       case 'Food & Menu':
         return Icons.fastfood_outlined;
       default:
