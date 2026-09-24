@@ -328,11 +328,20 @@ class AdminOperationsController extends Controller
             if ((float) $row->net_amount <= 0) {
                 throw new \RuntimeException('Settlement amount must be greater than zero.');
             }
+            $wasFailed = strtoupper((string) $row->status) === 'FAILED';
+
             $row->status = 'PROCESSING';
             $row->payout_attempted_at = now();
             $row->failure_reason = null;
-            if (! $row->payout_reference) {
-                $row->payout_reference = 'atu_settle_' . \Illuminate\Support\Str::lower(str_replace('-', '', (string) \Illuminate\Support\Str::uuid()));
+            $row->gateway_status = null;
+            $row->transfer_code = null;
+
+            // Paystack transfer references must not be reused after a failed
+            // attempt; a retry receives a fresh reference.
+            if (! $row->payout_reference || $wasFailed) {
+                $row->payout_reference = 'atu_settle_' . \Illuminate\Support\Str::lower(
+                    str_replace('-', '', (string) \Illuminate\Support\Str::uuid())
+                );
             }
             $row->save();
             return $row->fresh();
