@@ -1419,6 +1419,10 @@ class OrderController extends Controller
                         if (! $hasOpenSibling) {
                             PromotionRedemption::where('checkout_session_id', $sessionId)->delete();
                         }
+
+                        \App\Models\CheckoutSession::whereKey($sessionId)->update([
+                            'status' => $hasOpenSibling ? 'PARTIALLY_CANCELLED' : 'CANCELLED',
+                        ]);
                     } else {
                         PromotionRedemption::where('order_id', $lockedOrder->id)->delete();
                     }
