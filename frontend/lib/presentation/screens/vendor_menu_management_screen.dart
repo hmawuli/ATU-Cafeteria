@@ -73,6 +73,8 @@ class _VendorMenuManagementScreenState extends State<VendorMenuManagementScreen>
     final price = TextEditingController(text: item == null ? '' : '${item['price'] ?? ''}');
     final description = TextEditingController(text: '${item?['description'] ?? ''}');
     final category = TextEditingController(text: '${item?['category'] ?? 'General'}');
+    final stock = TextEditingController(text: item == null ? '' : '${item['current_stock'] ?? ''}');
+    final threshold = TextEditingController(text: item == null ? '3' : '${item['low_stock_threshold'] ?? 3}');
     bool available = item == null ? true : item['is_available'] != false && item['is_available'] != 0;
     String? error;
 
@@ -93,6 +95,22 @@ class _VendorMenuManagementScreenState extends State<VendorMenuManagementScreen>
                   TextField(controller: category, decoration: const InputDecoration(labelText: 'Category')),
                   const SizedBox(height: 10),
                   TextField(controller: description, maxLines: 3, decoration: const InputDecoration(labelText: 'Description')),
+                  const SizedBox(height: 10),
+                  TextField(
+                    controller: stock,
+                    keyboardType: TextInputType.number,
+                    enabled: item == null,
+                    decoration: InputDecoration(
+                      labelText: item == null ? 'Opening stock (optional)' : 'Current stock',
+                      helperText: item == null ? 'Leave blank to keep stock untracked.' : 'Use Inventory to adjust current stock.',
+                    ),
+                  ),
+                  const SizedBox(height: 10),
+                  TextField(
+                    controller: threshold,
+                    keyboardType: TextInputType.number,
+                    decoration: const InputDecoration(labelText: 'Low-stock threshold'),
+                  ),
                   const SizedBox(height: 6),
                   SwitchListTile.adaptive(
                     contentPadding: EdgeInsets.zero,
@@ -113,8 +131,12 @@ class _VendorMenuManagementScreenState extends State<VendorMenuManagementScreen>
               FilledButton(
                 onPressed: () async {
                   final parsed = double.tryParse(price.text.trim());
-                  if (name.text.trim().isEmpty || parsed == null || parsed < 0) {
-                    setDialogState(() => error = 'Enter a valid name and price.');
+                  final parsedStock = stock.text.trim().isEmpty ? null : int.tryParse(stock.text.trim());
+                  final parsedThreshold = int.tryParse(threshold.text.trim());
+                  if (name.text.trim().isEmpty || parsed == null || parsed < 0 ||
+                      (stock.text.trim().isNotEmpty && (parsedStock == null || parsedStock < 0)) ||
+                      parsedThreshold == null || parsedThreshold < 0) {
+                    setDialogState(() => error = 'Enter a valid name, price, stock and threshold.');
                     return;
                   }
                   try {
@@ -124,6 +146,8 @@ class _VendorMenuManagementScreenState extends State<VendorMenuManagementScreen>
                       'description': description.text.trim(),
                       'category': category.text.trim().isEmpty ? 'General' : category.text.trim(),
                       'is_available': available,
+                      'low_stock_threshold': parsedThreshold,
+                      if (item == null && parsedStock != null) 'initial_stock': parsedStock,
                     };
                     if (item == null) {
                       await _api.post('/vendor/menu-items', body: body, idempotencyKey: ApiClient.newIdempotencyKey());
@@ -149,6 +173,8 @@ class _VendorMenuManagementScreenState extends State<VendorMenuManagementScreen>
       price.dispose();
       description.dispose();
       category.dispose();
+      stock.dispose();
+      threshold.dispose();
     }
   }
 
@@ -204,7 +230,7 @@ class _VendorMenuManagementScreenState extends State<VendorMenuManagementScreen>
       appBar: AppBar(
         title: const Text('Menu Management'),
         actions: [
-          IconButton(onPressed: _load, tooltip: 'Refresh menu', icon: const Icon(Icons.refresh)),
+          IconButton(onPressed: _load, tooltip: 'Refresh menu', icon: const Icon(Icons.refresh_outlined)),
         ],
       ),
       floatingActionButton: FloatingActionButton.extended(
@@ -219,6 +245,7 @@ class _VendorMenuManagementScreenState extends State<VendorMenuManagementScreen>
               : RefreshIndicator(
                   onRefresh: _load,
                   child: ListView(
+                    physics: const AlwaysScrollableScrollPhysics(),
                     padding: const EdgeInsets.fromLTRB(16, 16, 16, 96),
                     children: [
                       Card(
@@ -256,13 +283,15 @@ class _VendorMenuManagementScreenState extends State<VendorMenuManagementScreen>
                           final itemName = '${item['name'] ?? item['food_name'] ?? 'Menu item'}';
                           final category = '${item['category'] ?? 'General'}';
                           final price = double.tryParse('${item['price'] ?? 0}') ?? 0;
+                          final stock = item['current_stock'];
+                          final stockText = stock == null ? 'Untracked' : 'Stock: $stock';
                           return Card(
                             margin: const EdgeInsets.only(bottom: 10),
                             child: ListTile(
                               contentPadding: const EdgeInsets.fromLTRB(16, 8, 8, 8),
                               leading: CircleAvatar(child: Icon(isAvailable ? Icons.restaurant : Icons.visibility_off_outlined)),
                               title: Text(itemName, style: const TextStyle(fontWeight: FontWeight.w800)),
-                              subtitle: Text('$category  •  GH₵ ${price.toStringAsFixed(2)}\n${item['description'] ?? ''}'),
+                              subtitle: Text('$category  •  GH₵ ${price.toStringAsFixed(2)}  •  $stockText\n${item['description'] ?? ''}'),
                               isThreeLine: true,
                               trailing: Wrap(
                                 spacing: 2,
