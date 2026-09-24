@@ -41,6 +41,7 @@ $customerRoutes = function () {
         Route::get('/order-history', [OrderController::class, 'getPersonalOrderHistory']);
         Route::post('/orders', [OrderController::class, 'storeAuthenticatedStudentOrder'])
             ->middleware(['throttle:payments', 'idempotency:required']);
+        Route::post('/cart-checkout/preview', [ProductionCartCheckoutController::class, 'preview']);
         Route::post('/cart-checkout', [ProductionCartCheckoutController::class, 'store'])
             ->middleware(['throttle:payments', 'idempotency:required']);
         Route::post('/orders/{id}/cancel', [OrderController::class, 'cancel'])
