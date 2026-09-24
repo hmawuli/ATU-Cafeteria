@@ -952,6 +952,7 @@ class CafeteriaProvider extends ChangeNotifier {
     try {
       if (_authToken != null) await _authRequest('POST', 'logout', {});
     } catch (_) {}
+    await PushNotificationService.revokeRegisteredDevice();
     _authToken = null;
     _currentUser = null;
     _requiresTwoFactor = false;
