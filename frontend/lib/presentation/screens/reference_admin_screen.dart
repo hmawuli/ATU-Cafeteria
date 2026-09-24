@@ -758,6 +758,98 @@ class _ReferenceAdminScreenState extends State<ReferenceAdminScreen> {
     return stats;
   }
 
+  Widget _settlementRow(
+    BuildContext context,
+    AdminStateProvider admin,
+    dynamic raw,
+  ) {
+    final settlement = raw is Map
+        ? Map<String, dynamic>.from(raw)
+        : <String, dynamic>{};
+    final id = int.tryParse(settlement['id']?.toString() ?? '') ?? 0;
+    final status = (settlement['status']?.toString() ?? 'UNKNOWN').toUpperCase();
+    final amount = double.tryParse(settlement['net_amount']?.toString() ?? '') ?? 0;
+    final vendor = settlement['vendor'];
+    final vendorName = vendor is Map
+        ? (vendor['full_name'] ?? vendor['name'] ?? 'Vendor').toString()
+        : 'Vendor #' + (settlement['vendor_id']?.toString() ?? '—');
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 8),
+      child: Row(
+        children: [
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(vendorName, style: const TextStyle(fontWeight: FontWeight.w800)),
+                Text(
+                  'Settlement #$id  •  GH₵ ' + amount.toStringAsFixed(2),
+                  style: const TextStyle(fontSize: 11, color: AppTheme.textMuted),
+                ),
+              ],
+            ),
+          ),
+          StatusPill(status),
+          const SizedBox(width: 8),
+          if ((status == 'PENDING' || status == 'FAILED') && id > 0)
+            TextButton(
+              onPressed: admin.busy
+                  ? null
+                  : () async {
+                      final ok = await admin.payoutSettlement(id);
+                      if (!context.mounted) return;
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(content: Text(admin.actionMessage ?? (ok ? 'Payout queued.' : 'Payout failed.'))),
+                      );
+                    },
+              child: const Text('Pay'),
+            ),
+          if (status == 'PROCESSING' && settlement['transfer_code'] != null && id > 0)
+            TextButton(
+              onPressed: admin.busy ? null : () => _authorizeSettlement(context, admin, id),
+              child: const Text('Authorize'),
+            ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _authorizeSettlement(
+    BuildContext context,
+    AdminStateProvider admin,
+    int id,
+  ) async {
+    final otp = TextEditingController();
+    final value = await showDialog<String>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Authorize Vendor Payout'),
+        content: TextField(
+          controller: otp,
+          keyboardType: TextInputType.number,
+          obscureText: true,
+          decoration: const InputDecoration(labelText: 'Paystack transfer OTP'),
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(dialogContext), child: const Text('Cancel')),
+          FilledButton(
+            onPressed: () => Navigator.pop(dialogContext, otp.text.trim()),
+            child: const Text('Authorize'),
+          ),
+        ],
+      ),
+    );
+    otp.dispose();
+
+    if (value == null || value.isEmpty || !context.mounted) return;
+    final ok = await admin.finalizeSettlementPayout(id, value);
+    if (!context.mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(admin.actionMessage ?? (ok ? 'Payout authorization submitted.' : 'Authorization failed.'))),
+    );
+  }
+
   Widget _finance(AdminStateProvider admin) {
     final data = admin.financeData;
     double amount(String key) {
@@ -857,6 +949,23 @@ class _ReferenceAdminScreenState extends State<ReferenceAdminScreen> {
                 _financeRow(
                     'Payouts awaiting processing', payouts, Icons.schedule),
               ])),
+          const SizedBox(height: 14),
+          ReferenceCard(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  'Vendor Settlements',
+                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.w900, color: AppTheme.textDark),
+                ),
+                const SizedBox(height: 8),
+                if (admin.settlements.isEmpty)
+                  const Text('No settlement records yet.', style: TextStyle(color: AppTheme.textMuted))
+                else
+                  ...admin.settlements.take(10).map((settlement) => _settlementRow(context, admin, settlement)),
+              ],
+            ),
+          ),
           const SizedBox(height: 14),
           const ReferenceCard(
               child: Row(children: [
