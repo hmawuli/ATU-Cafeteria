@@ -17,6 +17,8 @@ dependencies:
   qr_flutter: ^4.1.0
   flutter_secure_storage: ^9.2.2
   url_launcher: ^6.3.1
+  firebase_core: ^4.15.0
+  firebase_messaging: ^16.7.0
 
 # Keep the Flutter client lean on low-memory development machines.
 # Removed heavy/unused UI packages. The client uses native Flutter widgets and SQLite.
