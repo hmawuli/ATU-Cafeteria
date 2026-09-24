@@ -51,3 +51,6 @@ On iOS, enable Push Notifications and Background Modes > Remote notifications fo
 - Logout revokes that installation for the current customer.
 - Laravel sends real FCM pushes when a customer order becomes READY or COMPLETED.
 - The existing database notification center remains available when push delivery is unavailable.
+## Release API endpoint
+
+The production Android build requires `ATU_API_BASE_URL` as an HTTPS URL. Supply it alongside the Firebase values in the production release workflow; debug builds may continue using local HTTP endpoints.
