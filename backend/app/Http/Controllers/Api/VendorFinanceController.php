@@ -108,6 +108,7 @@ class VendorFinanceController extends Controller
                 'status' => strtoupper((string) $order->status),
                 'payment_method' => strtoupper((string) ($order->payment_method ?: 'UNKNOWN')),
                 'payment_status' => strtoupper((string) ($order->payment_status ?: 'UNKNOWN')),
+                'sales_channel' => strtoupper((string) ($order->sales_channel ?: 'APP')),
                 'item' => $order->food_name,
                 'quantity' => (int) ($order->quantity ?? 0),
                 'gross_sales' => round($gross, 2),
