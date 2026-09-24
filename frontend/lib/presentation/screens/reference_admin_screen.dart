@@ -771,7 +771,7 @@ class _ReferenceAdminScreenState extends State<ReferenceAdminScreen> {
     final amount = double.tryParse(settlement['net_amount']?.toString() ?? '') ?? 0;
     final vendor = settlement['vendor'];
     final vendorName = vendor is Map
-        ? (vendor['full_name'] ?? vendor['name'] ?? 'Vendor').toString()
+        ? (vendor['fullName'] ?? vendor['full_name'] ?? vendor['name'] ?? 'Vendor').toString()
         : 'Vendor #' + (settlement['vendor_id']?.toString() ?? '—');
 
     return Padding(
