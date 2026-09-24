@@ -251,8 +251,32 @@ class PaystackPaymentController extends Controller
             };
             if ($refund->status === 'SUCCESS') {
                 $refund->processed_at = now();
-                $payment->status = 'REFUNDED';
-                $payment->refunded_at = now();
+
+                if ($refund->payment_id && $refund->order_id) {
+                    $allocation = \App\Models\PaymentAllocation::where('payment_id', $refund->payment_id)
+                        ->where('order_id', $refund->order_id)
+                        ->lockForUpdate()
+                        ->first();
+
+                    if ($allocation) {
+                        $allocation->refunded_amount = round(
+                            min(
+                                (float) $allocation->amount,
+                                (float) $allocation->refunded_amount + (float) $refund->amount
+                            ),
+                            2
+                        );
+                        $allocation->save();
+                    }
+                }
+
+                $payment->load('allocations');
+                $allocated = (float) $payment->allocations->sum(fn ($row) => (float) $row->amount);
+                $refunded = (float) $payment->allocations->sum(fn ($row) => (float) $row->refunded_amount);
+                $payment->status = $allocated > 0 && $refunded + 0.01 >= $allocated
+                    ? 'REFUNDED'
+                    : 'SUCCESS';
+                $payment->refunded_at = $payment->status === 'REFUNDED' ? now() : $payment->refunded_at;
             } elseif ($refund->status === 'FAILED') {
                 $payment->status = 'SUCCESS';
             } else {
