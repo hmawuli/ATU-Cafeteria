@@ -487,7 +487,9 @@ class ProductionCartCheckoutController extends Controller
                 }
 
                 $user->loyalty_points = max(0, (int) ($user->loyalty_points ?? 0) - $points);
-                $user->total_spent = round((float) ($user->total_spent ?? 0) + $grandTotal, 2);
+                // Lifetime spend is finalized only when each order reaches
+                // COMPLETED, preventing cancelled/failed orders from being
+                // counted and avoiding double-counting split checkouts.
                 $user->save();
 
                 $session->status = 'COMPLETED';
