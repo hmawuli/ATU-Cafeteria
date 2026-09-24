@@ -6,6 +6,8 @@ use App\Http\Controllers\Controller;
 use App\Models\DemandForecast;
 use App\Models\FoodItem;
 use App\Models\FoodWasteRecord;
+use App\Models\MenuItem;
+use App\Models\OrderItem;
 use App\Models\Order;
 use App\Models\SecurityAlert;
 use Illuminate\Http\Request;
@@ -64,26 +66,153 @@ class SmartCafeteriaController extends Controller
     public function recommendations(Request $request)
     {
         $user = $request->user();
-        $ordered = Order::where('user_id', $user->id)->select('food_item_id')->whereNotNull('food_item_id')->groupBy('food_item_id')->orderByRaw('COUNT(*) DESC')->pluck('food_item_id');
-        $items = FoodItem::where('is_available', true)->when($ordered->isNotEmpty(), fn ($q) => $q->orderByRaw('CASE WHEN id IN ('.implode(',', $ordered->map('intval')->all()).') THEN 0 ELSE 1 END'))
-            ->orderByDesc('id')->limit(6)->get();
 
-        return response()->json(['success' => true, 'data' => $items, 'meta' => ['strategy' => 'personal_history_then_availability']]);
+        $history = OrderItem::with('order:id,customer_id,user_id,status')
+            ->whereHas('order', function ($query) use ($user) {
+                $query->where(function ($owner) use ($user) {
+                    $owner->where('customer_id', $user->id)
+                        ->orWhere('user_id', $user->id)
+                        ->orWhere('student_id', $user->id);
+                })->whereIn(DB::raw('upper(status)'), ['COMPLETED', 'DELIVERED']);
+            })
+            ->latest()
+            ->limit(300)
+            ->get();
+
+        $foodScores = [];
+        $nameHints = [];
+
+        foreach ($history as $line) {
+            if ($line->food_item_id) {
+                $foodScores[(int) $line->food_item_id] = ($foodScores[(int) $line->food_item_id] ?? 0) + (int) $line->quantity;
+            }
+
+            $name = strtolower(trim((string) ($line->name_snapshot ?: $line->name)));
+            if ($name !== '') {
+                $nameHints[$name] = ($nameHints[$name] ?? 0) + (int) $line->quantity;
+            }
+        }
+
+        $items = FoodItem::where('is_available', true)
+            ->limit(100)
+            ->get();
+
+        $ranked = $items->map(function (FoodItem $item) use ($foodScores, $nameHints) {
+            $score = (float) ($foodScores[(int) $item->id] ?? 0);
+            $itemName = strtolower(trim((string) $item->name));
+            foreach ($nameHints as $hint => $count) {
+                if ($itemName === $hint || ($itemName !== '' && str_contains($itemName, $hint)) || ($hint !== '' && str_contains($hint, $itemName))) {
+                    $score += $count * 0.75;
+                }
+            }
+
+            return [
+                'item' => $item,
+                'score' => $score,
+            ];
+        })
+            ->sortByDesc(fn ($row) => $row['score'])
+            ->pluck('item')
+            ->take(6)
+            ->values();
+
+        return response()->json([
+            'success' => true,
+            'data' => $ranked,
+            'meta' => [
+                'strategy' => 'completed_order_items_history_then_availability',
+                'history_lines_analyzed' => $history->count(),
+            ],
+        ]);
     }
 
     public function demandForecast(Request $request)
     {
         $vendorId = $request->user()->id;
         $days = max(7, min(30, (int) $request->input('days', 14)));
-        $items = FoodItem::where('vendor_id', $vendorId)->get();
+        $since = now()->subDays($days);
+
+        $orderLines = OrderItem::whereHas('order', function ($query) use ($vendorId, $since) {
+            $query->withoutGlobalScopes()
+                ->where('vendor_id', $vendorId)
+                ->where('created_at', '>=', $since)
+                ->whereNotIn(DB::raw('upper(status)'), ['CANCELLED', 'DECLINED']);
+        })->get(['food_item_id', 'menu_item_id', 'quantity']);
+
+        $foodTotals = [];
+        $menuTotals = [];
+        foreach ($orderLines as $line) {
+            if ($line->food_item_id) {
+                $foodTotals[(int) $line->food_item_id] = ($foodTotals[(int) $line->food_item_id] ?? 0) + (int) $line->quantity;
+            }
+            if ($line->menu_item_id) {
+                $menuTotals[(int) $line->menu_item_id] = ($menuTotals[(int) $line->menu_item_id] ?? 0) + (int) $line->quantity;
+            }
+        }
+
         $result = [];
-        foreach ($items as $item) {
-            $total = (int) Order::where('vendor_id', $vendorId)->where('food_item_id', $item->id)->where('created_at', '>=', now()->subDays($days))->sum('quantity');
+        $factor = $request->boolean('weekend_adjustment') ? 1.05 : 1.0;
+
+        foreach (FoodItem::where('vendor_id', $vendorId)->get() as $item) {
+            $total = (int) ($foodTotals[(int) $item->id] ?? 0);
             $avg = $total / $days;
-            $predicted = max(0, (int) ceil($avg * ($request->boolean('weekend_adjustment') ? 1.05 : 1)));
-            $confidence = $total >= 30 ? 90 : ($total >= 10 ? 70 : 45);
-            $forecast = DemandForecast::updateOrCreate(['vendor_id' => $vendorId, 'food_item_id' => $item->id, 'forecast_date' => now()->addDay()->toDateString()], ['predicted_quantity' => $predicted, 'method' => 'moving_average', 'confidence' => $confidence]);
-            $result[] = ['food_item_id' => $item->id, 'food_name' => $item->name, 'predicted_quantity' => $predicted, 'confidence' => $confidence, 'forecast_date' => $forecast->forecast_date->toDateString()];
+            $predicted = max(0, (int) ceil($avg * $factor));
+            $confidence = $total >= 30 ? 90 : ($total >= 10 ? 70 : ($total > 0 ? 50 : 0));
+
+            $forecast = DemandForecast::updateOrCreate(
+                [
+                    'vendor_id' => $vendorId,
+                    'food_item_id' => $item->id,
+                    'menu_item_id' => null,
+                    'forecast_date' => now()->addDay()->toDateString(),
+                ],
+                [
+                    'predicted_quantity' => $predicted,
+                    'method' => 'order_items_moving_average',
+                    'confidence' => $confidence,
+                ]
+            );
+
+            $result[] = [
+                'catalogue_type' => 'FOOD_ITEM',
+                'food_item_id' => $item->id,
+                'menu_item_id' => null,
+                'food_name' => $item->name,
+                'predicted_quantity' => $predicted,
+                'confidence' => $confidence,
+                'forecast_date' => $forecast->forecast_date->toDateString(),
+            ];
+        }
+
+        foreach (MenuItem::where('vendor_id', $vendorId)->get() as $item) {
+            $total = (int) ($menuTotals[(int) $item->id] ?? 0);
+            $avg = $total / $days;
+            $predicted = max(0, (int) ceil($avg * $factor));
+            $confidence = $total >= 30 ? 90 : ($total >= 10 ? 70 : ($total > 0 ? 50 : 0));
+
+            $forecast = DemandForecast::updateOrCreate(
+                [
+                    'vendor_id' => $vendorId,
+                    'food_item_id' => null,
+                    'menu_item_id' => $item->id,
+                    'forecast_date' => now()->addDay()->toDateString(),
+                ],
+                [
+                    'predicted_quantity' => $predicted,
+                    'method' => 'order_items_moving_average',
+                    'confidence' => $confidence,
+                ]
+            );
+
+            $result[] = [
+                'catalogue_type' => 'MENU_ITEM',
+                'food_item_id' => null,
+                'menu_item_id' => $item->id,
+                'food_name' => $item->name ?: $item->food_name,
+                'predicted_quantity' => $predicted,
+                'confidence' => $confidence,
+                'forecast_date' => $forecast->forecast_date->toDateString(),
+            ];
         }
 
         return response()->json(['success' => true, 'data' => $result]);
