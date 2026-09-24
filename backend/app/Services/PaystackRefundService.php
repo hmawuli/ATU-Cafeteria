@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Models\Payment;
+use App\Models\PaymentAllocation;
 use App\Models\Refund;
 use Illuminate\Support\Facades\Http;
 use RuntimeException;
@@ -52,13 +53,38 @@ class PaystackRefundService
         $refund->update([
             'status' => $localStatus,
             'gateway_reference' => (string) (data_get($data, 'id') ?? data_get($data, 'refund_reference') ?? ''),
+            'processed_at' => $localStatus === 'SUCCESS' ? now() : $refund->processed_at,
         ]);
 
+        if ($localStatus === 'SUCCESS' && $refund->payment_id && $refund->order_id) {
+            $allocation = PaymentAllocation::where('payment_id', $refund->payment_id)
+                ->where('order_id', $refund->order_id)
+                ->lockForUpdate()
+                ->first();
+
+            if ($allocation) {
+                $allocation->refunded_amount = round(
+                    min((float) $allocation->amount, (float) $allocation->refunded_amount + (float) $refund->amount),
+                    2
+                );
+                $allocation->save();
+            }
+        }
+
+        if ($localStatus === 'SUCCESS') {
+            $payment->load('allocations');
+            $allocated = (float) $payment->allocations->sum(fn ($row) => (float) $row->amount);
+            $refunded = (float) $payment->allocations->sum(fn ($row) => (float) $row->refunded_amount);
+            $paymentStatus = $allocated > 0 && $refunded + 0.01 >= $allocated
+                ? 'REFUNDED'
+                : 'SUCCESS';
+        } else {
+            $paymentStatus = $localStatus === 'FAILED' ? 'SUCCESS' : 'REFUND_PENDING';
+        }
+
         $payment->update([
-            'status' => $localStatus === 'FAILED'
-                ? 'SUCCESS'
-                : ($localStatus === 'SUCCESS' ? 'REFUNDED' : 'REFUND_PENDING'),
-            'refunded_at' => $localStatus === 'SUCCESS' ? now() : $payment->refunded_at,
+            'status' => $paymentStatus,
+            'refunded_at' => $paymentStatus === 'REFUNDED' ? now() : $payment->refunded_at,
         ]);
 
         return $refund->fresh();
