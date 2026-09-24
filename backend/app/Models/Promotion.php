@@ -10,11 +10,12 @@ class Promotion extends Model
     use HasFactory;
 
     protected $fillable = [
-        'code','name','type','value','minimum_order_amount','maximum_discount_amount',
+        'vendor_id','code','name','type','value','minimum_order_amount','maximum_discount_amount',
         'usage_limit','per_customer_limit','starts_at','ends_at','is_active',
     ];
 
     protected $casts = [
+        'vendor_id' => 'integer',
         'value' => 'decimal:2',
         'minimum_order_amount' => 'decimal:2',
         'maximum_discount_amount' => 'decimal:2',
@@ -24,6 +25,11 @@ class Promotion extends Model
         'ends_at' => 'datetime',
         'is_active' => 'boolean',
     ];
+
+    public function vendor()
+    {
+        return $this->belongsTo(User::class, 'vendor_id');
+    }
 
     public function redemptions() { return $this->hasMany(PromotionRedemption::class); }
 
