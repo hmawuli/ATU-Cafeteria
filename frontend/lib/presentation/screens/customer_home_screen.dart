@@ -1,4 +1,3 @@
-import 'package:flutter/material.dart';
 import 'customer_experience_screen.dart';
 
 /// Canonical customer-facing home for the restaurant application.

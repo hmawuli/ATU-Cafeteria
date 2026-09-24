@@ -20,7 +20,7 @@ class _CustomerSupportScreenState extends State<CustomerSupportScreen> {
       final data = await _api.get('/customer/support/tickets');
       final raw = data is Map ? data['tickets'] : data;
       final list = raw is Map && raw['data'] is List ? raw['data'] : raw;
-      _tickets = list is List ? list.whereType<Map>().map((e) => Map<String, dynamic>.from(e)).toList() : [];
+      _tickets = list is List ? list.whereType<Map>().map(Map<String, dynamic>.from).toList() : [];
       if (mounted) setState(() {});
     } catch (e) {
       if (mounted) _message(e.toString());
@@ -44,7 +44,7 @@ class _CustomerSupportScreenState extends State<CustomerSupportScreen> {
           title: const Text('Contact support'),
           content: SingleChildScrollView(child: Column(children: [
             DropdownButtonFormField<String>(
-              value: category,
+              initialValue: category,
               items: const [
                 DropdownMenuItem(value: 'ORDER', child: Text('Order')),
                 DropdownMenuItem(value: 'PAYMENT', child: Text('Payment')),
@@ -125,7 +125,7 @@ class _CustomerSupportScreenState extends State<CustomerSupportScreen> {
                           child: ListTile(
                             leading: const CircleAvatar(child: Icon(Icons.headset_mic_outlined)),
                             title: Text(subject, style: const TextStyle(fontWeight: FontWeight.w800)),
-                            subtitle: Text(category + ' • ' + priority + '\n' + description),
+                            subtitle: Text('$category • $priority\n$description'),
                             isThreeLine: true,
                             trailing: Chip(label: Text(status)),
                           ),

@@ -122,7 +122,7 @@ class _VendorPromotionsScreenState extends State<VendorPromotionsScreen> {
                     ),
                     const SizedBox(height: 6),
                     _dateField(
-                      label: startsAt == null ? 'Start date & time (optional)' : 'Starts: ' + _displayDate(startsAt!),
+                      label: startsAt == null ? 'Start date & time (optional)' : 'Starts: ${_displayDate(startsAt!)}',
                       onPressed: () async {
                         final picked = await _pickDateTime(startsAt);
                         if (picked != null) setDialogState(() => startsAt = picked);
@@ -131,7 +131,7 @@ class _VendorPromotionsScreenState extends State<VendorPromotionsScreen> {
                     ),
                     const SizedBox(height: 6),
                     _dateField(
-                      label: endsAt == null ? 'End date & time (optional)' : 'Ends: ' + _displayDate(endsAt!),
+                      label: endsAt == null ? 'End date & time (optional)' : 'Ends: ${_displayDate(endsAt!)}',
                       onPressed: () async {
                         final picked = await _pickDateTime(endsAt ?? startsAt);
                         if (picked != null) setDialogState(() => endsAt = picked);
@@ -222,7 +222,7 @@ class _VendorPromotionsScreenState extends State<VendorPromotionsScreen> {
     final mm = date.month.toString().padLeft(2, '0');
     final hh = date.hour.toString().padLeft(2, '0');
     final min = date.minute.toString().padLeft(2, '0');
-    return dd + '/' + mm + '/' + date.year.toString() + ' ' + hh + ':' + min;
+    return '$dd/$mm/${date.year} $hh:$min';
   }
 
   Widget _dateField({
@@ -263,19 +263,19 @@ class _VendorPromotionsScreenState extends State<VendorPromotionsScreen> {
 
   String _constraints(Map<String, dynamic> promotion) {
     final parts = <String>[];
-    if (promotion['minimum_order_amount'] != null) parts.add('Min GH₵ ' + promotion['minimum_order_amount'].toString());
-    if (promotion['maximum_discount_amount'] != null) parts.add('Max GH₵ ' + promotion['maximum_discount_amount'].toString());
-    if (promotion['usage_limit'] != null) parts.add('Total ' + promotion['usage_limit'].toString());
-    if (promotion['per_customer_limit'] != null) parts.add('Customer ' + promotion['per_customer_limit'].toString());
-    if (promotion['starts_at'] != null) parts.add('From ' + _formatIsoDate(promotion['starts_at']));
-    if (promotion['ends_at'] != null) parts.add('To ' + _formatIsoDate(promotion['ends_at']));
+    if (promotion['minimum_order_amount'] != null) parts.add('Min GH₵ ${promotion['minimum_order_amount']}');
+    if (promotion['maximum_discount_amount'] != null) parts.add('Max GH₵ ${promotion['maximum_discount_amount']}');
+    if (promotion['usage_limit'] != null) parts.add('Total ${promotion['usage_limit']}');
+    if (promotion['per_customer_limit'] != null) parts.add('Customer ${promotion['per_customer_limit']}');
+    if (promotion['starts_at'] != null) parts.add('From ${_formatIsoDate(promotion['starts_at'])}');
+    if (promotion['ends_at'] != null) parts.add('To ${_formatIsoDate(promotion['ends_at'])}');
     return parts.isEmpty ? 'No extra restrictions' : parts.join(' • ');
   }
 
   String _formatIsoDate(dynamic raw) {
     final parsed = DateTime.tryParse(raw?.toString() ?? '')?.toLocal();
     if (parsed == null) return raw?.toString() ?? '';
-    return parsed.day.toString().padLeft(2, '0') + '/' + parsed.month.toString().padLeft(2, '0') + '/' + parsed.year.toString();
+    return '${parsed.day.toString().padLeft(2, '0')}/${parsed.month.toString().padLeft(2, '0')}/${parsed.year}';
   }
 
   @override

@@ -19,7 +19,7 @@ class _CustomerAddressesScreenState extends State<CustomerAddressesScreen> {
     try {
       final data = await _api.get('/customer/addresses');
       final raw = data is Map ? data['addresses'] : data;
-      _items = raw is List ? raw.whereType<Map>().map((e) => Map<String, dynamic>.from(e)).toList() : [];
+      _items = raw is List ? raw.whereType<Map>().map(Map<String, dynamic>.from).toList() : [];
       if (mounted) setState(() {});
     } catch (e) {
       if (mounted) _message(e.toString());
@@ -86,12 +86,12 @@ class _CustomerAddressesScreenState extends State<CustomerAddressesScreen> {
   }
 
   Future<void> _delete(int id) async {
-    try { await _api.delete('/customer/addresses/' + id.toString()); await _load(); }
+    try { await _api.delete('/customer/addresses/$id'); await _load(); }
     catch (e) { if (mounted) _message(e.toString()); }
   }
 
   Future<void> _default(int id) async {
-    try { await _api.post('/customer/addresses/' + id.toString() + '/default'); await _load(); }
+    try { await _api.post('/customer/addresses/$id/default'); await _load(); }
     catch (e) { if (mounted) _message(e.toString()); }
   }
 
@@ -127,7 +127,7 @@ class _CustomerAddressesScreenState extends State<CustomerAddressesScreen> {
                         final id = int.tryParse((a['id'] ?? '').toString());
                         final isDefault = a['is_default'] == true;
                         final label = (a['label'] ?? 'Address').toString();
-                        final title = isDefault ? label + ' • Default' : label;
+                        final title = isDefault ? '$label • Default' : label;
                         final parts = [a['address_line1'], a['city'], a['landmark']]
                             .where((e) => e != null && e.toString().trim().isNotEmpty)
                             .map((e) => e.toString())

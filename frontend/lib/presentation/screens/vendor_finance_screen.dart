@@ -29,7 +29,7 @@ class _VendorFinanceScreenState extends State<VendorFinanceScreen> {
       _error = null;
     });
     try {
-      final response = await context.read<ApiClient>().get('/vendor/finance?days=${_days}');
+      final response = await context.read<ApiClient>().get('/vendor/finance?days=$_days');
       if (response is! Map) {
         throw const ApiException(500, 'Invalid finance response.');
       }
@@ -141,7 +141,7 @@ class _VendorFinanceScreenState extends State<VendorFinanceScreen> {
             ],
           );
 
-          final title = const Column(
+          const title = Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text('Finance', style: TextStyle(fontSize: 24, fontWeight: FontWeight.w900, color: AppTheme.textDark)),
@@ -198,7 +198,7 @@ class _VendorFinanceScreenState extends State<VendorFinanceScreen> {
                 const SizedBox(height: 3),
                 Text(_ghs(_summary['net_food_sales']), style: const TextStyle(color: Colors.white, fontSize: 27, fontWeight: FontWeight.w900)),
                 const SizedBox(height: 2),
-                Text('Net food sales • Last ${_days} days', style: const TextStyle(color: Colors.white70, fontSize: 12)),
+                Text('Net food sales • Last $_days days', style: const TextStyle(color: Colors.white70, fontSize: 12)),
               ],
             ),
           ),
@@ -331,7 +331,7 @@ class _VendorFinanceScreenState extends State<VendorFinanceScreen> {
         children: [
           const Text('Sales Trend', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w900, color: AppTheme.textDark)),
           const SizedBox(height: 4),
-          Text('Net food sales across the selected ${_days}-day period.', style: const TextStyle(color: AppTheme.textMuted, fontSize: 11)),
+          Text('Net food sales across the selected $_days-day period.', style: const TextStyle(color: AppTheme.textMuted, fontSize: 11)),
           const SizedBox(height: 16),
           if (max <= 0)
             const Padding(
@@ -443,7 +443,7 @@ class _VendorFinanceScreenState extends State<VendorFinanceScreen> {
                     padding: const EdgeInsets.all(13),
                     child: Row(
                       children: [
-                        Icon(paid ? Icons.verified_rounded : Icons.schedule_rounded, color: paid ? Colors.green : AppTheme.accentDark),
+                        Icon(paid ? Icons.verified_rounded : Icons.schedule_rounded, color: paid ? Colors.green : AppTheme.primaryDark),
                         const SizedBox(width: 10),
                         Expanded(
                           child: Column(

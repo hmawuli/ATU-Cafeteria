@@ -1810,7 +1810,7 @@ class CafeteriaProvider extends ChangeNotifier {
     } catch (e) {
       _isStoreClosed = previous;
       notifyListeners();
-      debugPrint('Vendor store status update failed: ${e}');
+      debugPrint('Vendor store status update failed: $e');
     }
   }
 

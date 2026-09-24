@@ -61,7 +61,7 @@ class _VendorPayoutAccountScreenState extends State<VendorPayoutAccountScreen> {
     }
 
     try {
-      final response = await api.get('/vendor/payout-banks?type=' + _type);
+      final response = await api.get('/vendor/payout-banks?type=$_type');
       if (response is Map && response['channels'] is List) {
         channels = response['channels']
             .whereType<Map>()
@@ -88,7 +88,7 @@ class _VendorPayoutAccountScreenState extends State<VendorPayoutAccountScreen> {
       _bankName.clear();
     });
     try {
-      final response = await context.read<ApiClient>().get('/vendor/payout-banks?type=' + value);
+      final response = await context.read<ApiClient>().get('/vendor/payout-banks?type=$value');
       final channels = response is Map && response['channels'] is List
           ? response['channels'].whereType<Map>().map(Map<String, dynamic>.from).toList()
           : <Map<String, dynamic>>[];
@@ -157,7 +157,7 @@ class _VendorPayoutAccountScreenState extends State<VendorPayoutAccountScreen> {
                     StatusPill(_account!['status']?.toString() ?? 'PENDING'),
                   ]),
                   const SizedBox(height: 10),
-                  Text((_account!['type']?.toString() ?? 'BANK') + ' • ' + (_account!['bank_name']?.toString() ?? _account!['bank_code']?.toString() ?? 'Channel')),
+                  Text('${_account!['type']?.toString() ?? 'BANK'} • ${_account!['bank_name']?.toString() ?? _account!['bank_code']?.toString() ?? 'Channel'}'),
                   const SizedBox(height: 4),
                   Text(_account!['account_number']?.toString() ?? '••••', style: const TextStyle(fontWeight: FontWeight.w700)),
                 ],

@@ -100,8 +100,7 @@ class PushNotificationService {
         _listenerAttached = true;
         FirebaseMessaging.onMessage.listen((message) {
           debugPrint(
-            'ATU Cafeteria push: ' +
-                (message.notification?.title ?? 'Notification'),
+            'ATU Cafeteria push: ${message.notification?.title ?? 'Notification'}',
           );
         });
       }
@@ -126,19 +125,21 @@ class PushNotificationService {
               api.close();
             }
           } catch (e) {
-            debugPrint('FCM token refresh sync skipped: ' + e.toString());
+            debugPrint('FCM token refresh sync skipped: $e');
           }
         });
       }
     } catch (e) {
-      debugPrint('FCM registration skipped: ' + e.toString());
+      debugPrint('FCM registration skipped: $e');
     }
   }
 
   static Future<void> revokeRegisteredDevice() async {
     if (kIsWeb ||
         (defaultTargetPlatform != TargetPlatform.android &&
-            defaultTargetPlatform != TargetPlatform.iOS)) return;
+            defaultTargetPlatform != TargetPlatform.iOS)) {
+      return;
+    }
 
     try {
       final existing = await _storage.read(key: _deviceIdKey);
@@ -154,14 +155,14 @@ class PushNotificationService {
           if (entry['device_id']?.toString() != existing) continue;
           final id = entry['id']?.toString();
           if (id == null || id.isEmpty) continue;
-          await api.delete('/customer/devices/' + id);
+          await api.delete('/customer/devices/$id');
           break;
         }
       } finally {
         api.close();
       }
     } catch (e) {
-      debugPrint('FCM device revoke skipped: ' + e.toString());
+      debugPrint('FCM device revoke skipped: $e');
     }
   }
 

@@ -42,17 +42,17 @@ class _RestaurantCustomerHomeScreenState extends State<RestaurantCustomerHomeScr
         final vendors = data['vendors'];
         final promotions = data['promotions'];
         if (vendors is List) {
-          _discoveryVendors = vendors.whereType<Map>().map((e) => Map<String, dynamic>.from(e)).toList();
+          _discoveryVendors = vendors.whereType<Map>().map(Map<String, dynamic>.from).toList();
         }
         if (promotions is List) {
-          _promotions = promotions.whereType<Map>().map((e) => Map<String, dynamic>.from(e)).toList();
+          _promotions = promotions.whereType<Map>().map(Map<String, dynamic>.from).toList();
         }
       }
 
       final recommendations = await _api.get('/customer/recommendations');
       final raw = recommendations is Map ? recommendations['data'] : recommendations;
       if (raw is List) {
-        _smartPicks = raw.whereType<Map>().map((e) => Map<String, dynamic>.from(e)).toList();
+        _smartPicks = raw.whereType<Map>().map(Map<String, dynamic>.from).toList();
       }
       if (mounted) setState(() {});
     } catch (_) {
@@ -629,7 +629,7 @@ class _RestaurantCustomerHomeScreenState extends State<RestaurantCustomerHomeScr
                         ),
                         if (_vendorReviewCount(vendor.id) > 0)
                           Text(
-                            ' (' + _vendorReviewCount(vendor.id).toString() + ')',
+                            ' (${_vendorReviewCount(vendor.id)})',
                             style: const TextStyle(fontSize: 9, color: muted),
                           ),
                         const Spacer(),
@@ -1010,7 +1010,7 @@ class _RestaurantCustomerHomeScreenState extends State<RestaurantCustomerHomeScr
                                     context.read<CartProvider>().add(item!);
                                     ScaffoldMessenger.of(context).showSnackBar(
                                       SnackBar(
-                                        content: Text(item.name + ' added to your cart.'),
+                                        content: Text('${item.name} added to your cart.'),
                                         action: SnackBarAction(
                                           label: 'VIEW CART',
                                           onPressed: () => Navigator.pushNamed(context, '/cart'),

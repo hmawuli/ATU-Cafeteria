@@ -19,7 +19,7 @@ class _CustomerDevicesScreenState extends State<CustomerDevicesScreen> {
     try {
       final data = await _api.get('/customer/devices');
       final raw = data is Map ? data['devices'] : data;
-      _items = raw is List ? raw.whereType<Map>().map((e) => Map<String, dynamic>.from(e)).toList() : [];
+      _items = raw is List ? raw.whereType<Map>().map(Map<String, dynamic>.from).toList() : [];
       if (mounted) setState(() {});
     } catch (e) {
       if (mounted) _message(e.toString());
@@ -33,7 +33,7 @@ class _CustomerDevicesScreenState extends State<CustomerDevicesScreen> {
   }
 
   Future<void> _revoke(int id) async {
-    try { await _api.delete('/customer/devices/' + id.toString()); await _load(); }
+    try { await _api.delete('/customer/devices/$id'); await _load(); }
     catch (e) { if (mounted) _message(e.toString()); }
   }
 
@@ -68,8 +68,8 @@ class _CustomerDevicesScreenState extends State<CustomerDevicesScreen> {
                         return Card(
                           child: ListTile(
                             leading: const CircleAvatar(child: Icon(Icons.phone_android_rounded)),
-                            title: Text(platform + ' • ' + version, style: const TextStyle(fontWeight: FontWeight.w800)),
-                            subtitle: Text('Last active: ' + active),
+                            title: Text('$platform • $version', style: const TextStyle(fontWeight: FontWeight.w800)),
+                            subtitle: Text('Last active: $active'),
                             trailing: id == null ? null : IconButton(
                               tooltip: 'Revoke',
                               onPressed: () => _revoke(id),

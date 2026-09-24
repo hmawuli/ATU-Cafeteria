@@ -650,7 +650,7 @@ class _ReferenceVendorScreenState extends State<ReferenceVendorScreen> {
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                Text('Total: GH₵ ' + cart.subtotal.toStringAsFixed(2), style: const TextStyle(fontWeight: FontWeight.w900)),
+                Text('Total: GH₵ ${cart.subtotal.toStringAsFixed(2)}', style: const TextStyle(fontWeight: FontWeight.w900)),
                 const SizedBox(height: 14),
                 TextField(
                   controller: customerName,
@@ -757,16 +757,16 @@ class _ReferenceVendorScreenState extends State<ReferenceVendorScreen> {
                 Text(number, style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w900, color: AppTheme.primary)),
                 const SizedBox(height: 4),
                 Text(customer, style: const TextStyle(fontWeight: FontWeight.w700)),
-                Text('Payment: ' + payment, style: const TextStyle(color: AppTheme.textMuted)),
+                Text('Payment: $payment', style: const TextStyle(color: AppTheme.textMuted)),
                 const Divider(height: 24),
                 ...lines.map((line) => Padding(
                   padding: const EdgeInsets.only(bottom: 8),
                   child: Row(
                     children: [
                       Expanded(child: Text(line['name']?.toString() ?? 'Meal')),
-                      Text('x' + (line['quantity'] ?? 1).toString()),
+                      Text('x${(line['quantity'] ?? 1)}'),
                       const SizedBox(width: 12),
-                      Text('GH₵ ' + ((line['total'] as num?)?.toDouble() ?? 0).toStringAsFixed(2), style: const TextStyle(fontWeight: FontWeight.w800)),
+                      Text('GH₵ ${((line['total'] as num?)?.toDouble() ?? 0).toStringAsFixed(2)}', style: const TextStyle(fontWeight: FontWeight.w800)),
                     ],
                   ),
                 )),
@@ -774,7 +774,7 @@ class _ReferenceVendorScreenState extends State<ReferenceVendorScreen> {
                 Row(
                   children: [
                     const Expanded(child: Text('TOTAL', style: TextStyle(fontWeight: FontWeight.w900))),
-                    Text('GH₵ ' + total.toStringAsFixed(2), style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w900, color: AppTheme.primary)),
+                    Text('GH₵ ${total.toStringAsFixed(2)}', style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w900, color: AppTheme.primary)),
                   ],
                 ),
                 const SizedBox(height: 10),

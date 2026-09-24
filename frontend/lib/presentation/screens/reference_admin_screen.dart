@@ -772,7 +772,7 @@ class _ReferenceAdminScreenState extends State<ReferenceAdminScreen> {
     final vendor = settlement['vendor'];
     final vendorName = vendor is Map
         ? (vendor['fullName'] ?? vendor['full_name'] ?? vendor['name'] ?? 'Vendor').toString()
-        : 'Vendor #' + (settlement['vendor_id']?.toString() ?? '—');
+        : 'Vendor #${settlement['vendor_id']?.toString() ?? '—'}';
 
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 8),
@@ -784,7 +784,7 @@ class _ReferenceAdminScreenState extends State<ReferenceAdminScreen> {
               children: [
                 Text(vendorName, style: const TextStyle(fontWeight: FontWeight.w800)),
                 Text(
-                  'Settlement #$id  •  GH₵ ' + amount.toStringAsFixed(2),
+                  'Settlement #$id  •  GH₵ ${amount.toStringAsFixed(2)}',
                   style: const TextStyle(fontSize: 11, color: AppTheme.textMuted),
                 ),
               ],
