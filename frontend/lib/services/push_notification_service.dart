@@ -1,5 +1,4 @@
 import 'dart:convert';
-import 'dart:io';
 import 'dart:math';
 
 import 'package:firebase_core/firebase_core.dart';
@@ -45,7 +44,9 @@ class PushNotificationService {
   static bool _tokenRefreshAttached = false;
 
   static Future<void> syncRegisteredDevice() async {
-    if (kIsWeb || (!Platform.isAndroid && !Platform.isIOS) || !isConfigured) {
+    if (kIsWeb || !isConfigured ||
+        (defaultTargetPlatform != TargetPlatform.android &&
+            defaultTargetPlatform != TargetPlatform.iOS)) {
       return;
     }
 
@@ -78,7 +79,7 @@ class PushNotificationService {
       if (token == null || token.isEmpty) return;
 
       final deviceId = await _deviceId();
-      final platform = Platform.isIOS ? 'ios' : 'android';
+      final platform = defaultTargetPlatform == TargetPlatform.iOS ? 'ios' : 'android';
 
       final api = ApiClient();
       try {
@@ -116,7 +117,7 @@ class PushNotificationService {
                 '/customer/devices',
                 body: {
                   'device_id': deviceId,
-                  'platform': Platform.isIOS ? 'ios' : 'android',
+                  'platform': defaultTargetPlatform == TargetPlatform.iOS ? 'ios' : 'android',
                   'push_token': token,
                   'app_version': _appVersion,
                 },
@@ -135,7 +136,9 @@ class PushNotificationService {
   }
 
   static Future<void> revokeRegisteredDevice() async {
-    if (kIsWeb || (!Platform.isAndroid && !Platform.isIOS)) return;
+    if (kIsWeb ||
+        (defaultTargetPlatform != TargetPlatform.android &&
+            defaultTargetPlatform != TargetPlatform.iOS)) return;
 
     try {
       final existing = await _storage.read(key: _deviceIdKey);
