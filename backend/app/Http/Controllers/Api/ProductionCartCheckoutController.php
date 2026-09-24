@@ -247,14 +247,14 @@ class ProductionCartCheckoutController extends Controller
 
                 foreach ($groups as $vendorId => $vendorLines) {
                     $vendorSubtotal = round(array_sum(array_column($vendorLines, 'line_total')), 2);
-                    $vendorDiscount = $remainingSubtotal > 0
-                        ? round($discount * ($vendorSubtotal / $remainingSubtotal), 2)
-                        : 0.0;
+                    $isLastVendor = $vendorId === array_key_last($groups);
+                    $vendorDiscount = $isLastVendor
+                        ? $remainingDiscount
+                        : ($remainingSubtotal > 0
+                            ? round($discount * ($vendorSubtotal / $remainingSubtotal), 2)
+                            : 0.0);
 
-                    if (count($groups) === 1) {
-                        $vendorDiscount = $discount;
-                    }
-
+                    $vendorDiscount = min($vendorDiscount, $vendorSubtotal);
                     $vendorGrandTotal = max(0, round($vendorSubtotal - $vendorDiscount, 2));
                     $remainingDiscount = max(0, round($remainingDiscount - $vendorDiscount, 2));
                     $remainingSubtotal = max(0, round($remainingSubtotal - $vendorSubtotal, 2));
@@ -322,16 +322,15 @@ class ProductionCartCheckoutController extends Controller
                             'line_total' => max(0, round($line['line_total'] - $lineDiscount, 2)),
                 ]);
 
-                        if ($promotion) {
-                            PromotionRedemption::firstOrCreate(
-                                [
-                                    'promotion_id' => $promotion->id,
-                                    'customer_id' => $user->id,
-                                    'order_id' => $order->id,
-                                ],
-                                ['discount_amount' => $lineDiscount]
-                            );
-                        }
+                    }
+
+                    if ($promotion) {
+                        PromotionRedemption::create([
+                            'promotion_id' => $promotion->id,
+                            'customer_id' => $user->id,
+                            'order_id' => $order->id,
+                            'discount_amount' => $vendorDiscount,
+                        ]);
                     }
 
                     if ($paymentMethod === 'WALLET') {
