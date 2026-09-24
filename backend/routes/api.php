@@ -30,6 +30,7 @@ use App\Http\Controllers\Api\StudentBudgetController;
 use App\Http\Controllers\Api\SwaggerController;
 use App\Http\Controllers\Api\VendorAuthController;
 use App\Http\Controllers\Api\VendorFinanceController;
+use App\Http\Controllers\Api\VendorPromotionController;
 use App\Http\Controllers\Api\VendorController;
 use App\Http\Controllers\Api\VendorMenuItemController;
 use App\Http\Controllers\Api\VendorMetricsController;
@@ -166,6 +167,10 @@ Route::middleware(['auth:sanctum', InactivityTimeout::class])->group(function ()
         Route::get('/vendor/metrics', [VendorMetricsController::class, 'index']);
         Route::get('/vendor/performance', [VendorPerformanceController::class, 'index']);
         Route::get('/vendor/finance', [VendorFinanceController::class, 'index']);
+        Route::get('/vendor/promotions', [VendorPromotionController::class, 'index']);
+        Route::post('/vendor/promotions', [VendorPromotionController::class, 'store'])->middleware('idempotency:required');
+        Route::patch('/vendor/promotions/{promotion}', [VendorPromotionController::class, 'update']);
+        Route::delete('/vendor/promotions/{promotion}', [VendorPromotionController::class, 'destroy'])->middleware('idempotency:required');
         Route::get('/vendor/inventory/movements', [InventoryController::class, 'index'])->middleware('permission:inventory.view');
         Route::post('/vendor/inventory/adjust', [InventoryController::class, 'adjust'])->middleware(['permission:inventory.manage', 'idempotency:required']);
     });
