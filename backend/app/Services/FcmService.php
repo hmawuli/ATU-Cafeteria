@@ -1,34 +1,39 @@
 <?php
 
-namespace App\Services;
+namespace AppServices;
 
-use Illuminate\Support\Facades\Http;
-use Illuminate\Support\Facades\Log;
+use IlluminateSupportFacadesHttp;
+use IlluminateSupportFacadesLog;
 
 class FcmService
 {
     /**
      * Send a Firebase Cloud Messaging HTTP v1 notification.
      *
-     * FCM_ACCESS_TOKEN should be supplied by the production secret manager and
-     * rotated according to the Firebase credential lifecycle. The service
-     * deliberately returns false when no real delivery credential exists.
+     * Returns false when delivery is unavailable. The richer result method
+     * distinguishes configuration/network failures from permanently invalid
+     * registration tokens so callers can safely retire dead devices.
      */
     public static function sendPush($recipientToken, string $title, string $body, array $data = []): bool
     {
+        return self::sendPushResult($recipientToken, $title, $body, $data)['sent'];
+    }
+
+    public static function sendPushResult($recipientToken, string $title, string $body, array $data = []): array
+    {
         if (empty($recipientToken)) {
-            return false;
+            return ['sent' => false, 'invalid_token' => true];
         }
 
-        $projectId = trim((string) env('FCM_PROJECT_ID', ''));
-        $accessToken = trim((string) env('FCM_ACCESS_TOKEN', ''));
+        $projectId = trim((string) config('services.fcm.project_id', ''));
+        $accessToken = trim((string) config('services.fcm.access_token', ''));
 
         if ($projectId === '' || $accessToken === '') {
             Log::warning('FCM is not configured; push delivery skipped.', [
                 'project_id_present' => $projectId !== '',
             ]);
 
-            return false;
+            return ['sent' => false, 'invalid_token' => false];
         }
 
         try {
@@ -49,19 +54,25 @@ class FcmService
                     ]
                 );
 
-            if (! $response->successful()) {
-                Log::error('FCM delivery failed.', [
-                    'status' => $response->status(),
-                    'response' => $response->json(),
-                ]);
-
-                return false;
+            if ($response->successful()) {
+                return ['sent' => true, 'invalid_token' => false];
             }
 
-            return true;
-        } catch (\Throwable $e) {
+            $errorCode = (string) data_get($response->json(), 'error.details.0.errorCode', '');
+            $invalidToken = $errorCode === 'UNREGISTERED'
+                || ($response->status() === 404 && str_contains(strtoupper((string) $response->json('error.message', '')), 'REGISTRATION TOKEN'));
+
+            Log::error('FCM delivery failed.', [
+                'status' => $response->status(),
+                'error_code' => $errorCode ?: null,
+                'response' => $response->json(),
+            ]);
+
+            return ['sent' => false, 'invalid_token' => $invalidToken];
+        } catch (Throwable $e) {
             Log::error('FCM delivery exception.', ['message' => $e->getMessage()]);
-            return false;
+
+            return ['sent' => false, 'invalid_token' => false];
         }
     }
 }
