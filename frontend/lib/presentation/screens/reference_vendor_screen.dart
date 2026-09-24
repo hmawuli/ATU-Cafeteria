@@ -1,11 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import '../../core/network/api_client.dart';
 import '../../core/theme/app_theme.dart';
 import '../../domain/models/models.dart';
 import '../providers/cafeteria_provider.dart';
 import '../providers/cart_provider.dart';
 import '../widgets/reference_design.dart';
 import 'vendor_finance_screen.dart';
+import 'vendor_promotions_screen.dart';
 
 class ReferenceVendorScreen extends StatefulWidget {
   const ReferenceVendorScreen({super.key});
@@ -18,6 +20,21 @@ class _ReferenceVendorScreenState extends State<ReferenceVendorScreen> {
   String _kioskQuery = '';
   String _kioskCategory = 'All';
   bool _metricsRequested = false;
+  Map<String, dynamic>? _inventorySummary;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadInventorySummary();
+  }
+
+  Future<void> _loadInventorySummary() async {
+    try {
+      final response = await context.read<ApiClient>().get('/vendor/inventory/summary');
+      if (!mounted || response is! Map || response['summary'] is! Map) return;
+      setState(() => _inventorySummary = Map<String, dynamic>.from(response['summary']));
+    } catch (_) {}
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -51,6 +68,9 @@ class _ReferenceVendorScreenState extends State<ReferenceVendorScreen> {
                       NavigationDestination(
                           icon: Icon(Icons.account_balance_wallet_outlined),
                           label: 'Finance'),
+                      NavigationDestination(
+                          icon: Icon(Icons.local_offer_outlined),
+                          label: 'Promotions'),
                     ],
                   ),
                 ],
@@ -114,7 +134,8 @@ class _ReferenceVendorScreenState extends State<ReferenceVendorScreen> {
     'Orders',
     'Kiosk',
     'Performance',
-    'Finance'
+    'Finance',
+    'Promotions'
   ];
   int get _index => _pages.indexOf(page).clamp(0, _pages.length - 1);
 
@@ -151,6 +172,8 @@ class _ReferenceVendorScreenState extends State<ReferenceVendorScreen> {
         return _performance(provider);
       case 'Finance':
         return const VendorFinanceScreen();
+      case 'Promotions':
+        return const VendorPromotionsScreen();
       default:
         return _dashboard(provider);
     }
@@ -172,6 +195,23 @@ class _ReferenceVendorScreenState extends State<ReferenceVendorScreen> {
                 color: AppTheme.textDark)),
         const Text('Manage your campus store and customer orders.'),
         const SizedBox(height: 18),
+        if (_inventorySummary != null) ...[
+          ReferenceCard(
+            child: Row(
+              children: [
+                const Icon(Icons.inventory_2_outlined, color: AppTheme.primary),
+                const SizedBox(width: 12),
+                const Expanded(
+                  child: Text('Inventory health', style: TextStyle(fontWeight: FontWeight.w900, color: AppTheme.textDark)),
+                ),
+                Text('Low ${_inventorySummary!['low_stock'] ?? 0}  •  Out ${_inventorySummary!['out_of_stock'] ?? 0}', style: const TextStyle(fontWeight: FontWeight.w800, color: AppTheme.textMuted)),
+                const SizedBox(width: 8),
+                IconButton(tooltip: 'Refresh inventory', onPressed: _loadInventorySummary, icon: const Icon(Icons.refresh, size: 18)),
+              ],
+            ),
+          ),
+          const SizedBox(height: 12),
+        ],
         Wrap(spacing: 12, runSpacing: 12, children: [
           MetricTile(
               label: 'Total Orders',
