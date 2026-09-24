@@ -13,6 +13,11 @@ use App\Models\DeliveredOrderReview;
 use App\Models\FoodItem;
 use App\Models\MenuItem;
 use App\Models\Order;
+use App\Models\OrderItem;
+use App\Models\Payment;
+use App\Models\PaymentAllocation;
+use App\Models\PromotionRedemption;
+use App\Models\InventoryMovement;
 use App\Models\User;
 use App\Models\WalletTransaction;
 use App\Notifications\NewIncomingOrderNotification;
@@ -1361,35 +1366,146 @@ class OrderController extends Controller
 
         try {
             $updatedOrder = DB::transaction(function () use ($request, $order, $user, $role) {
-                $lockedOrder = Order::withoutGlobalScopes()->whereKey($order->id)->lockForUpdate()->firstOrFail();
+                $lockedOrder = Order::withoutGlobalScopes()
+                    ->whereKey($order->id)
+                    ->lockForUpdate()
+                    ->firstOrFail();
+
                 if (! in_array(strtoupper((string) $lockedOrder->status), ['PENDING', 'ORDER_PLACED'], true)) {
                     throw new \RuntimeException('This order can no longer be cancelled.');
                 }
 
                 $customerId = (int) ($lockedOrder->customer_id ?: $lockedOrder->user_id ?: $lockedOrder->student_id);
+                if ($customerId <= 0) {
+                    throw new \RuntimeException('The order has no refundable customer account.');
+                }
+
                 $customer = User::whereKey($customerId)->lockForUpdate()->firstOrFail();
                 $refundAmount = round((float) ($lockedOrder->grand_total ?: $lockedOrder->total_price), 2);
 
-                if ($lockedOrder->menu_item_id) {
-                    $menuItem = MenuItem::whereKey($lockedOrder->menu_item_id)->lockForUpdate()->first();
+                // Restore every order line for aggregate/multi-line orders.
+                $orderItems = OrderItem::where('order_id', $lockedOrder->id)
+                    ->lockForUpdate()
+                    ->get();
+
+                if ($orderItems->isNotEmpty()) {
+                    foreach ($orderItems as $orderItem) {
+                        $quantity = max(0, (int) $orderItem->quantity);
+
+                        if ($orderItem->menu_item_id) {
+                            $menuItem = MenuItem::whereKey($orderItem->menu_item_id)
+                                ->lockForUpdate()
+                                ->first();
+
+                            if ($menuItem && $menuItem->current_stock !== null && $quantity > 0) {
+                                $menuItem->current_stock = (int) $menuItem->current_stock + $quantity;
+                                $menuItem->is_available = true;
+                                $menuItem->save();
+                            }
+                        } elseif ($orderItem->food_item_id) {
+                            $foodItem = FoodItem::whereKey($orderItem->food_item_id)
+                                ->lockForUpdate()
+                                ->first();
+
+                            if ($foodItem && $foodItem->current_stock !== null && $quantity > 0) {
+                                $foodItem->current_stock = (int) $foodItem->current_stock + $quantity;
+                                $foodItem->is_available = true;
+                                $foodItem->save();
+
+                                InventoryMovement::create([
+                                    'vendor_id' => $foodItem->vendor_id,
+                                    'food_item_id' => $foodItem->id,
+                                    'menu_item_id' => null,
+                                    'order_id' => $lockedOrder->id,
+                                    'type' => 'RESTOCK',
+                                    'quantity' => $quantity,
+                                    'balance_after' => $foodItem->current_stock,
+                                    'reference' => 'CANCEL-'.$lockedOrder->order_number,
+                                    'reason' => 'Stock restored after order cancellation.',
+                                    'performed_by' => $user->id,
+                                ]);
+                            }
+                        }
+                    }
+                } elseif ($lockedOrder->menu_item_id) {
+                    // Legacy single-line menu order fallback.
+                    $menuItem = MenuItem::whereKey($lockedOrder->menu_item_id)
+                        ->lockForUpdate()
+                        ->first();
+
                     if ($menuItem && $menuItem->current_stock !== null) {
                         $menuItem->current_stock = (int) $menuItem->current_stock + (int) ($lockedOrder->quantity ?? 0);
                         $menuItem->is_available = true;
                         $menuItem->save();
+                    }
+                } elseif ($lockedOrder->food_item_id) {
+                    // Legacy single-line FoodItem order fallback.
+                    $foodItem = FoodItem::whereKey($lockedOrder->food_item_id)
+                        ->lockForUpdate()
+                        ->first();
+
+                    if ($foodItem && $foodItem->current_stock !== null) {
+                        $quantity = max(0, (int) ($lockedOrder->quantity ?? 0));
+                        $foodItem->current_stock = (int) $foodItem->current_stock + $quantity;
+                        $foodItem->is_available = true;
+                        $foodItem->save();
+
+                        if ($quantity > 0) {
+                            InventoryMovement::create([
+                                'vendor_id' => $foodItem->vendor_id,
+                                'food_item_id' => $foodItem->id,
+                                'menu_item_id' => null,
+                                'order_id' => $lockedOrder->id,
+                                'type' => 'RESTOCK',
+                                'quantity' => $quantity,
+                                'balance_after' => $foodItem->current_stock,
+                                'reference' => 'CANCEL-'.$lockedOrder->order_number,
+                                'reason' => 'Stock restored after order cancellation.',
+                                'performed_by' => $user->id,
+                            ]);
+                        }
                     }
                 }
 
                 $lockedOrder->status = 'CANCELLED';
                 $lockedOrder->order_status = 'CANCELLED';
                 $lockedOrder->cancelled_at = now();
-                $lockedOrder->cancellation_reason = trim((string) $request->input('reason', 'Customer requested cancellation.'));
+                $lockedOrder->cancellation_reason = trim((string) $request->input(
+                    'reason',
+                    'Customer requested cancellation.'
+                ));
                 $lockedOrder->save();
 
-                $payment = \App\Models\Payment::where('id', $lockedOrder->payment_id)
-                    ->lockForUpdate()->first();
+                $payment = Payment::whereKey($lockedOrder->payment_id)
+                    ->lockForUpdate()
+                    ->first();
+
+                $allocation = $payment
+                    ? PaymentAllocation::where('payment_id', $payment->id)
+                        ->where('order_id', $lockedOrder->id)
+                        ->lockForUpdate()
+                        ->first()
+                    : null;
+
+                $pointsToRestore = max(0, (int) ($lockedOrder->points_redeemed ?? 0));
+                if ($pointsToRestore > 0) {
+                    $customer->loyalty_points = (int) ($customer->loyalty_points ?? 0) + $pointsToRestore;
+                }
 
                 $walletPayment = strtoupper((string) ($lockedOrder->payment_method ?? '')) === 'WALLET';
+
                 if ($walletPayment) {
+                    $refundAmount = $allocation
+                        ? max(0, round(
+                            (float) $allocation->amount - (float) $allocation->refunded_amount,
+                            2
+                        ))
+                        : $refundAmount;
+
+                    if ($refundAmount <= 0) {
+                        throw new \RuntimeException('This order has already been refunded.');
+                    }
+
                     $before = round((float) $customer->balance, 2);
                     $customer->balance = round($before + $refundAmount, 2);
                     $customer->save();
@@ -1405,7 +1521,7 @@ class OrderController extends Controller
                         'processed_at' => now(),
                     ]);
 
-                    \App\Models\WalletTransaction::create([
+                    WalletTransaction::create([
                         'user_id' => $customer->id,
                         'order_id' => $lockedOrder->id,
                         'payment_id' => $payment?->id,
@@ -1420,8 +1536,38 @@ class OrderController extends Controller
                         'details' => 'Wallet refund for cancelled order '.$lockedOrder->order_number,
                     ]);
 
+                    if ($allocation) {
+                        $allocation->refunded_amount = round(
+                            min(
+                                (float) $allocation->amount,
+                                (float) $allocation->refunded_amount + $refundAmount
+                            ),
+                            2
+                        );
+                        $allocation->save();
+                    }
+
                     if ($payment) {
-                        $payment->update(['status' => 'REFUNDED', 'refunded_at' => now()]);
+                        $payment->load('allocations');
+                        $allocated = (float) $payment->allocations->sum(
+                            fn ($row) => (float) $row->amount
+                        );
+                        $refunded = (float) $payment->allocations->sum(
+                            fn ($row) => (float) $row->refunded_amount
+                        );
+
+                        if ($allocated > 0) {
+                            $payment->status = $refunded + 0.01 >= $allocated
+                                ? 'REFUNDED'
+                                : 'SUCCESS';
+                            if ($payment->status === 'REFUNDED') {
+                                $payment->refunded_at = now();
+                            }
+                        } else {
+                            $payment->status = 'REFUNDED';
+                            $payment->refunded_at = now();
+                        }
+                        $payment->save();
                     }
                 } else {
                     if ($payment) {
@@ -1439,6 +1585,26 @@ class OrderController extends Controller
                     ]);
                 }
 
+                $customer->save();
+
+                // A promotion belongs to the whole checkout session. Release it
+                // only when every order in that session has been cancelled.
+                $sessionId = $lockedOrder->checkout_session_id;
+                if ($walletPayment) {
+                    if ($sessionId) {
+                        $hasOpenSibling = Order::withoutGlobalScopes()
+                            ->where('checkout_session_id', $sessionId)
+                            ->whereNotIn('status', ['CANCELLED', 'DECLINED'])
+                            ->exists();
+
+                        if (! $hasOpenSibling) {
+                            PromotionRedemption::where('checkout_session_id', $sessionId)->delete();
+                        }
+                    } else {
+                        PromotionRedemption::where('order_id', $lockedOrder->id)->delete();
+                    }
+                }
+
                 AuditLog::create([
                     'user_id' => $user->id,
                     'timestamp' => now()->getTimestampMs(),
@@ -1451,7 +1617,7 @@ class OrderController extends Controller
 
             $gatewayRefund = null;
             if (strtoupper((string) $updatedOrder->payment_method) !== 'WALLET' && $updatedOrder->payment_id) {
-                $payment = \App\Models\Payment::find($updatedOrder->payment_id);
+                $payment = Payment::find($updatedOrder->payment_id);
                 $refund = \App\Models\Refund::where('order_id', $updatedOrder->id)
                     ->where('status', 'PENDING')
                     ->latest()
@@ -1470,7 +1636,9 @@ class OrderController extends Controller
                 $customerId = (int) ($updatedOrder->customer_id ?: $updatedOrder->user_id);
                 $customer = User::find($customerId);
                 if ($customer && $role !== 'STUDENT') {
-                    $customer->notify(new OrderStatusChangedNotification($updatedOrder, 'PENDING', 'CANCELLED'));
+                    $customer->notify(
+                        new OrderStatusChangedNotification($updatedOrder, 'PENDING', 'CANCELLED')
+                    );
                 }
             } catch (\Throwable $e) {
                 report($e);
@@ -1489,7 +1657,10 @@ class OrderController extends Controller
             return response()->json(['success' => false, 'message' => $e->getMessage()], 409);
         } catch (\Throwable $e) {
             report($e);
-            return response()->json(['success' => false, 'message' => 'We could not cancel this order. Please try again.'], 500);
+            return response()->json([
+                'success' => false,
+                'message' => 'We could not cancel this order. Please try again.',
+            ], 500);
         }
     }
     /**
