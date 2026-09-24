@@ -36,7 +36,7 @@ class _SmartInsightsScreenState extends State<SmartInsightsScreen> {
         adminData = Map<String, dynamic>.from(r['data'] ?? {});
       }
       if (role == 'STUDENT') {
-        final r = await _api.request('GET', 'student/recommendations');
+        final r = await _api.request('GET', 'customer/recommendations');
         recommendations = List<dynamic>.from(r['data'] ?? []);
       }
       if (role == 'VENDOR') {
