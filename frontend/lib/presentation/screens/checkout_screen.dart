@@ -18,6 +18,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
   String _fulfilment = 'Pickup now';
   DateTime? _scheduledPickup;
   final TextEditingController _pointsController = TextEditingController();
+  final TextEditingController _promotionController = TextEditingController();
   final TextEditingController _noteController = TextEditingController();
   bool _submitting = false;
   bool _cartReady = false;
@@ -39,6 +40,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
   void dispose() {
     _noteController.dispose();
     _pointsController.dispose();
+    _promotionController.dispose();
     super.dispose();
   }
 
@@ -114,6 +116,31 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                                                 Icon(Icons.payments_outlined)),
                                       ])),
                                 ]))),
+                    const SizedBox(height: 18),
+                    Card(
+                        child: Padding(
+                            padding: const EdgeInsets.all(16),
+                            child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  const Text('Have a promotion code?',
+                                      style: TextStyle(fontWeight: FontWeight.w800)),
+                                  const SizedBox(height: 8),
+                                  TextField(
+                                      controller: _promotionController,
+                                      textCapitalization: TextCapitalization.characters,
+                                      decoration: const InputDecoration(
+                                        labelText: 'Promotion code',
+                                        hintText: 'e.g. WELCOME10',
+                                        prefixIcon: Icon(Icons.local_offer_outlined),
+                                      )),
+                                  const SizedBox(height: 6),
+                                  const Text(
+                                    'Promotion codes are checked securely against current offers and usage limits.',
+                                    style: TextStyle(fontSize: 11, color: Colors.black54),
+                                  ),
+                                ],
+                            ))),
                     const SizedBox(height: 18),
                     Card(
                         child: Padding(
@@ -357,6 +384,8 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
         'payment_method': 'momo',
         'payment_reference': reference,
         if (points > 0) 'points_to_redeem': points,
+        if (_promotionController.text.trim().isNotEmpty)
+          'promotion_code': _promotionController.text.trim().toUpperCase(),
         'estimated_pickup_time':
             _fulfilment == 'Schedule pickup' && _scheduledPickup != null
                 ? _scheduledPickup!.toIso8601String()
