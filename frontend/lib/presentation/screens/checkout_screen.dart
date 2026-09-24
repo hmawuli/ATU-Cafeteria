@@ -404,61 +404,73 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
       });
       if (!context.mounted) return;
       final pageContext = context;
-      final orderId = result is Map
-          ? (result['order'] is Map
-              ? (result['order']['id'] ?? result['id'])
-              : (result['id'] ??
-                  ((result['orders'] is List &&
-                          result['orders'].isNotEmpty &&
-                          result['orders'].first is Map)
-                      ? result['orders'].first['id']
-                      : null)))
-          : null;
+      final orders = result is Map && result['orders'] is List
+          ? (result['orders'] as List).whereType<Map>().toList()
+          : <Map>[];
+      final firstOrderId = orders.isNotEmpty ? orders.first['id'] : null;
       cart.clear();
       await auth.refreshAllData();
       if (!pageContext.mounted) return;
-      final pickupPin = result is Map ? result['pickup_pin']?.toString() : null;
+
       await showDialog<void>(
-          context: pageContext,
-          builder: (ctx) => AlertDialog(
-                icon: const Icon(Icons.verified_outlined, size: 48),
-                title: const Text('Payment confirmed'),
-                content: SingleChildScrollView(
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
+        context: pageContext,
+        builder: (ctx) => AlertDialog(
+          icon: const Icon(Icons.verified_outlined, size: 48),
+          title: const Text('Payment confirmed'),
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  orders.length > 1
+                      ? 'Checkout completed. Each vendor has a separate collection pass.'
+                      : 'Order placed successfully. Show your collection pass at the vendor counter.',
+                ),
+                const SizedBox(height: 14),
+                ...orders.map((order) {
+                  final id = order['id'];
+                  final pin = order['pickup_pin']?.toString();
+                  final number = order['order_number']?.toString() ?? 'ATU-—';
+                  return Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
-                      Text(pickupPin == null
-                          ? 'Your order has been placed successfully.'
-                          : 'Order placed successfully. Show your collection pass at the vendor counter.'),
-                      if (orderId != null && pickupPin != null) ...[
-                        const SizedBox(height: 16),
+                      Text(number, style: const TextStyle(fontWeight: FontWeight.w900)),
+                      if (id != null && pin != null) ...[
+                        const SizedBox(height: 8),
                         OrderQrCard(
-                          orderId: orderId is int
-                              ? orderId
-                              : int.tryParse(orderId.toString()) ?? 0,
-                          pickupCode: pickupPin,
+                          orderId: id is int ? id : int.tryParse(id.toString()) ?? 0,
+                          pickupCode: pin,
                         ),
                       ],
+                      if (order != orders.last) const Divider(height: 24),
                     ],
-                  ),
-                ),
-                actions: [
-                  FilledButton(
-                      onPressed: () {
-                        Navigator.pop(ctx);
-                        if (orderId != null) {
-                          Navigator.pushReplacementNamed(
-                              context, '/order-tracking',
-                              arguments: orderId is int
-                                  ? orderId
-                                  : int.tryParse(orderId.toString()));
-                        } else {
-                          Navigator.pushReplacementNamed(context, '/customer');
-                        }
-                      },
-                      child: const Text('View order'))
-                ],
-              ));
+                  );
+                }),
+              ],
+            ),
+          ),
+          actions: [
+            FilledButton(
+              onPressed: () {
+                Navigator.pop(ctx);
+                final id = firstOrderId is int
+                    ? firstOrderId
+                    : int.tryParse(firstOrderId?.toString() ?? '');
+                if (id != null) {
+                  Navigator.pushReplacementNamed(
+                    context,
+                    '/order-tracking',
+                    arguments: id,
+                  );
+                } else {
+                  Navigator.pushReplacementNamed(context, '/customer');
+                }
+              },
+              child: const Text('View order'),
+            ),
+          ],
+        ),
+      );
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(
@@ -566,7 +578,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
     if (ok != true || !mounted) return;
     setState(() => _submitting = true);
     try {
-      final result = await _api.post('/student/cart-checkout', body: {
+      final result = await _api.post('/customer/cart-checkout', idempotencyKey: ApiClient.newIdempotencyKey(), body: {
         'items': cart.toCheckoutPayload(),
         if (points > 0) 'points_to_redeem': points,
         if (_noteController.text.trim().isNotEmpty)
@@ -578,16 +590,10 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                 : 'Calculating...',
       });
       if (!context.mounted) return;
-      final orderId = result is Map
-          ? (result['order'] is Map
-              ? (result['order']['id'] ?? result['id'])
-              : (result['id'] ??
-                  ((result['orders'] is List &&
-                          result['orders'].isNotEmpty &&
-                          result['orders'].first is Map)
-                      ? result['orders'].first['id']
-                      : null)))
-          : null;
+      final orders = result is Map && result['orders'] is List
+          ? (result['orders'] as List).whereType<Map>().toList()
+          : <Map>[];
+      final orderId = orders.isNotEmpty ? orders.first['id'] : null;
       cart.clear();
       await auth.refreshAllData();
       final message = result is Map && result['message'] != null
