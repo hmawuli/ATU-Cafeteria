@@ -57,6 +57,10 @@ class _VendorPromotionsScreenState extends State<VendorPromotionsScreen> {
     final code = TextEditingController();
     final name = TextEditingController();
     final value = TextEditingController();
+    final minimumOrder = TextEditingController();
+    final maximumDiscount = TextEditingController();
+    final usageLimit = TextEditingController();
+    final customerLimit = TextEditingController();
     String type = 'PERCENTAGE';
 
     final ok = await showDialog<bool>(
@@ -82,7 +86,38 @@ class _VendorPromotionsScreenState extends State<VendorPromotionsScreen> {
                       onChanged: (v) => setDialogState(() => type = v ?? type),
                       decoration: const InputDecoration(labelText: 'Type'),
                     ),
-                    TextFormField(controller: value, keyboardType: const TextInputType.numberWithOptions(decimal: true), decoration: const InputDecoration(labelText: 'Value'), validator: (v) => double.tryParse(v ?? '') == null || double.parse(v!) <= 0 ? 'Enter a value greater than 0' : null),
+                    TextFormField(
+                      controller: value,
+                      keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                      decoration: InputDecoration(labelText: type == 'PERCENTAGE' ? 'Discount percentage' : 'Discount amount (GH₵)'),
+                      validator: (v) {
+                        final parsed = double.tryParse(v?.trim() ?? '');
+                        if (parsed == null || parsed <= 0) return 'Enter a value greater than 0';
+                        if (type == 'PERCENTAGE' && parsed > 100) return 'Percentage cannot exceed 100';
+                        return null;
+                      },
+                    ),
+                    TextFormField(
+                      controller: minimumOrder,
+                      keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                      decoration: const InputDecoration(labelText: 'Minimum order amount (optional)', prefixText: 'GH₵ '),
+                    ),
+                    if (type == 'PERCENTAGE')
+                      TextFormField(
+                        controller: maximumDiscount,
+                        keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                        decoration: const InputDecoration(labelText: 'Maximum discount amount (optional)', prefixText: 'GH₵ '),
+                      ),
+                    TextFormField(
+                      controller: usageLimit,
+                      keyboardType: TextInputType.number,
+                      decoration: const InputDecoration(labelText: 'Total usage limit (optional)'),
+                    ),
+                    TextFormField(
+                      controller: customerLimit,
+                      keyboardType: TextInputType.number,
+                      decoration: const InputDecoration(labelText: 'Per-customer limit (optional)'),
+                    ),
                   ],
                 ),
               ),
@@ -102,6 +137,10 @@ class _VendorPromotionsScreenState extends State<VendorPromotionsScreen> {
                       'name': name.text.trim(),
                       'type': type,
                       'value': double.parse(value.text.trim()),
+                      'minimum_order_amount': _nullableDouble(minimumOrder.text),
+                      'maximum_discount_amount': type == 'PERCENTAGE' ? _nullableDouble(maximumDiscount.text) : null,
+                      'usage_limit': _nullableInt(usageLimit.text),
+                      'per_customer_limit': _nullableInt(customerLimit.text),
                       'is_active': true,
                     },
                   );
@@ -121,6 +160,10 @@ class _VendorPromotionsScreenState extends State<VendorPromotionsScreen> {
     code.dispose();
     name.dispose();
     value.dispose();
+    minimumOrder.dispose();
+    maximumDiscount.dispose();
+    usageLimit.dispose();
+    customerLimit.dispose();
     if (ok == true) _load();
   }
 
