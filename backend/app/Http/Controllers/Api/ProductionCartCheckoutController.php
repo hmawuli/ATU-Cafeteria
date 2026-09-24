@@ -135,6 +135,12 @@ class ProductionCartCheckoutController extends Controller
                         throw new \RuntimeException('This promotion is not active or has expired.');
                     }
 
+                    $cartVendorIds = array_values(array_unique($vendorIds));
+                    if ($promotion->vendor_id !== null &&
+                        (count($cartVendorIds) !== 1 || (int) $promotion->vendor_id !== (int) $cartVendorIds[0])) {
+                        throw new \RuntimeException('This promotion applies only to that vendor’s menu.');
+                    }
+
                     if ($subtotal < (float) $promotion->minimum_order_amount) {
                         throw new \RuntimeException(
                             'This promotion requires a minimum order of GH₵ '.
