@@ -94,6 +94,8 @@ class _VendorFinanceScreenState extends State<VendorFinanceScreen> {
             const SizedBox(height: 14),
             _breakdown(),
             const SizedBox(height: 14),
+            _salesChannels(),
+            const SizedBox(height: 14),
             _trendCard(),
             const SizedBox(height: 14),
             _transactionsCard(),
@@ -218,6 +220,67 @@ class _VendorFinanceScreenState extends State<VendorFinanceScreen> {
           MetricTile(label: 'Settled', value: _ghs(_summary['settled_amount']), icon: Icons.account_balance_outlined),
         ],
       );
+
+  Widget _salesChannels() {
+    final raw = _summary['sales_channels'];
+    final channels = raw is List
+        ? raw.whereType<Map>().map(Map<String, dynamic>.from).toList()
+        : const <Map<String, dynamic>>[];
+
+    return ReferenceCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            'Sales Channels',
+            style: TextStyle(fontSize: 18, fontWeight: FontWeight.w900, color: AppTheme.textDark),
+          ),
+          const SizedBox(height: 4),
+          const Text(
+            'Where completed revenue was recorded.',
+            style: TextStyle(color: AppTheme.textMuted, fontSize: 11),
+          ),
+          const SizedBox(height: 12),
+          if (channels.isEmpty)
+            const Text('No channel sales recorded for this period.')
+          else
+            ...channels.map(
+              (channel) => Padding(
+                padding: const EdgeInsets.symmetric(vertical: 6),
+                child: Row(
+                  children: [
+                    Icon(
+                      channel['sales_channel']?.toString().toUpperCase() == 'KIOSK'
+                          ? Icons.point_of_sale_rounded
+                          : Icons.phone_android_rounded,
+                      color: AppTheme.primary,
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Text(
+                        channel['sales_channel']?.toString().toUpperCase() == 'KIOSK'
+                            ? 'Kiosk / Walk-in'
+                            : 'Customer App',
+                        style: const TextStyle(fontWeight: FontWeight.w700),
+                      ),
+                    ),
+                    Text(
+                      '${channel['orders'] ?? 0} orders',
+                      style: const TextStyle(color: AppTheme.textMuted, fontSize: 11),
+                    ),
+                    const SizedBox(width: 14),
+                    Text(
+                      _ghs(channel['net_sales']),
+                      style: const TextStyle(fontWeight: FontWeight.w900),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
 
   Widget _breakdown() => ReferenceCard(
         child: Column(
