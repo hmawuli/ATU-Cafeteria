@@ -950,12 +950,23 @@ class _ReferenceAdminScreenState extends State<ReferenceAdminScreen> {
                     'Payouts awaiting processing', payouts, Icons.schedule),
               ])),
           const SizedBox(height: 14),
-          ReferenceCard(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Text(
-                  'Vendor Settlements',
+          if (admin.settlementsError != null)
+            ReferenceCard(
+              child: Row(
+                children: [
+                  const Icon(Icons.lock_outline, color: AppTheme.textMuted),
+                  const SizedBox(width: 10),
+                  Expanded(child: Text(admin.settlementsError!, style: const TextStyle(color: AppTheme.textMuted))),
+                ],
+              ),
+            )
+          else
+            ReferenceCard(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    'Vendor Settlements',
                   style: TextStyle(fontSize: 18, fontWeight: FontWeight.w900, color: AppTheme.textDark),
                 ),
                 const SizedBox(height: 8),
@@ -963,9 +974,9 @@ class _ReferenceAdminScreenState extends State<ReferenceAdminScreen> {
                   const Text('No settlement records yet.', style: TextStyle(color: AppTheme.textMuted))
                 else
                   ...admin.settlements.take(10).map((settlement) => _settlementRow(context, admin, settlement)),
-              ],
+                ],
+              ),
             ),
-          ),
           const SizedBox(height: 14),
           const ReferenceCard(
               child: Row(children: [
