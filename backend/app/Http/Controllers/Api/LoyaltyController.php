@@ -34,8 +34,8 @@ class LoyaltyController extends Controller
         $points = (int) ($user->loyalty_points ?? 0);
         $totalSpent = (float) ($user->total_spent ?? 0.00);
 
-        // Calculate cashback conversion: 10 points = GH₵ 1.00 (i.e. 1 point = GH₵ 0.10)
-        $cashbackRate = 0.10;
+        // Calculate cashback conversion: 10 points = GH₵ 4.00 (i.e. 1 point = GH₵ 0.40)
+        $cashbackRate = 0.40;
         $equivalentCashbackVal = round($points * $cashbackRate, 2);
 
         // Tier thresholds
@@ -120,7 +120,7 @@ class LoyaltyController extends Controller
             'next_tier' => $nextTier,
             'points_needed_for_next_tier' => max(0, $pointsNeededForNext),
             'total_spent_all_time' => $totalSpent,
-            'conversion_rule' => '10 Loyalty Points = GH₵ 1.00 Discount',
+            'conversion_rule' => '10 Loyalty Points = GH₵ 4.00 Discount',
             'earning_rule' => 'Earn 1 Loyalty Point for every GH₵ 1.00 spent on completed orders',
             'history' => $history,
             'generated_at' => date('c'),
@@ -151,8 +151,8 @@ class LoyaltyController extends Controller
             ], 400);
         }
 
-        // 10 points = 1.00 GHS
-        $discount = round($pointsToRedeem * 0.10, 2);
+        // 10 points = 4.00 GHS
+        $discount = round($pointsToRedeem * 0.40, 2);
 
         return response()->json([
             'success' => true,

@@ -524,7 +524,7 @@ class GroupOrderController extends Controller
                 ], 400);
             }
 
-            $loyaltyDiscount = round($pointsToRedeem * 0.10, 2);
+            $loyaltyDiscount = round($pointsToRedeem * 0.40, 2);
         }
 
         $finalCheckoutCost = max(0.00, round($totalCheckoutCost - $loyaltyDiscount, 2));

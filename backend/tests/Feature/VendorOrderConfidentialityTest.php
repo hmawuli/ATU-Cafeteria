@@ -99,6 +99,11 @@ class VendorOrderConfidentialityTest extends TestCase
 
     public function test_vendor_pickup_completion_never_exposes_pickup_pin(): void
     {
+        // Follow the production order lifecycle:
+        // ORDER_PLACED -> PREPARING -> READY.
+        $this->order->status = 'PREPARING';
+        $this->order->save();
+
         $this->order->status = 'READY';
         $this->order->save();
 

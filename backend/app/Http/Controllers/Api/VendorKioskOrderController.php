@@ -143,20 +143,18 @@ class VendorKioskOrderController extends Controller
                         $item->is_available = $item->current_stock > 0;
                         $item->save();
 
-                        if (! $line['is_menu']) {
-                            InventoryMovement::create([
-                                'vendor_id' => $item->vendor_id,
-                                'food_item_id' => $item->id,
-                                'menu_item_id' => null,
-                                'order_id' => $order->id,
-                                'type' => 'SALE',
-                                'quantity' => -$line['quantity'],
-                                'balance_after' => $item->current_stock,
-                                'reference' => 'KSK-'.$order->order_number,
-                                'reason' => 'Stock consumed by walk-in kiosk sale.',
-                                'performed_by' => $lockedVendor->id,
-                            ]);
-                        }
+                        InventoryMovement::create([
+                            'vendor_id' => $item->vendor_id,
+                            'food_item_id' => $line['is_menu'] ? null : $item->id,
+                            'menu_item_id' => $line['is_menu'] ? $item->id : null,
+                            'order_id' => $order->id,
+                            'type' => 'SALE',
+                            'quantity' => -$line['quantity'],
+                            'balance_after' => $item->current_stock,
+                            'reference' => 'KSK-'.$order->order_number,
+                            'reason' => 'Stock consumed by walk-in kiosk sale.',
+                            'performed_by' => $lockedVendor->id,
+                        ]);
                     }
 
                     OrderItem::create([

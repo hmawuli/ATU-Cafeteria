@@ -77,20 +77,6 @@ class _VendorInventoryScreenState extends State<VendorInventoryScreen> {
     }).toList();
   }
 
-  Color _statusColor(BuildContext context, String status) {
-    switch (status.toUpperCase()) {
-      case 'OUT_OF_STOCK':
-        return Theme.of(context).colorScheme.error;
-      case 'LOW_STOCK':
-        return Colors.orange.shade800;
-      case 'HEALTHY':
-      case 'AVAILABLE':
-        return Colors.green.shade700;
-      default:
-        return Theme.of(context).colorScheme.outline;
-    }
-  }
-
   Future<void> _adjustStock(Map<String, dynamic> item) async {
     final id = item['menu_item_id'] ?? item['id'];
     if (id == null) return;

@@ -165,9 +165,17 @@ Route::middleware(['auth:sanctum', InactivityTimeout::class])->group(function ()
     });
 
     Route::middleware('role:VENDOR,ADMIN')->group(function () {
+        // Production vendor order API.
         Route::get('/vendor/orders', [OrderController::class, 'getVendorOrders']);
+
+        // Backward-compatible vendor order endpoint used by existing clients.
+        Route::get('/vendor/my-orders', [OrderController::class, 'getVendorOrders']);
         Route::get('/vendor/orders/{id}', [OrderController::class, 'getVendorOrder']);
         Route::patch('/vendor/orders/{id}/status', [OrderController::class, 'updateStatus']);
+
+        // Backward-compatible order workflow endpoints.
+        Route::put('/orders/{id}/status', [OrderController::class, 'updateStatus']);
+        Route::post('/orders/{id}/verify-pickup', [OrderController::class, 'verifyAndCompletePickup']);
         Route::post('/vendor/menu-items', [VendorMenuItemController::class, 'store']);
         Route::put('/vendor/menu-items/{id}', [VendorMenuItemController::class, 'update']);
         Route::delete('/vendor/menu-items/{id}', [VendorMenuItemController::class, 'destroy']);
@@ -190,6 +198,13 @@ Route::middleware(['auth:sanctum', InactivityTimeout::class])->group(function ()
         Route::get('/vendor/inventory/movements', [InventoryController::class, 'index'])->middleware('permission:inventory.view');
         Route::post('/vendor/inventory/adjust', [InventoryController::class, 'adjust'])->middleware(['permission:inventory.manage', 'idempotency:required']);
     });
+
+    // Backward-compatible student order placement endpoint.
+    // Reuses the production authenticated checkout implementation.
+    Route::post('/v1/student/orders', [OrderController::class, 'storeAuthenticatedStudentOrder']);
+
+    // Backward-compatible student order history endpoint.
+    Route::get('/orders/customer/{studentId}', [OrderController::class, 'getLegacyCustomerOrderHistory']);
 
     Route::middleware('role:STUDENT')->group(function () {
         Route::get('/wallet', [WalletController::class, 'index']);
