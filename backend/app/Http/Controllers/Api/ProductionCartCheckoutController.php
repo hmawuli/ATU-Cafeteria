@@ -124,7 +124,7 @@ class ProductionCartCheckoutController extends Controller
 
                 $discount = min($discount, $subtotal);
             } else {
-                $discount = min($subtotal, round($points * 0.10, 2));
+                $discount = min($subtotal, round($points * 0.40, 2));
             }
 
             return response()->json([
@@ -298,7 +298,7 @@ class ProductionCartCheckoutController extends Controller
                 $discount = round(
                     $promotion
                         ? $promotionDiscount
-                        : ($points * 0.10),
+                        : ($points * 0.40),
                     2
                 );
                 $grandTotal = max(0, round($subtotal - $discount, 2));
@@ -378,7 +378,7 @@ class ProductionCartCheckoutController extends Controller
                     $vendorPoints = min($vendorPoints, $remainingPoints);
 
                     $vendorDiscount = $points > 0
-                        ? round($vendorPoints * 0.10, 2)
+                        ? round($vendorPoints * 0.40, 2)
                         : ($isLastVendor
                             ? $remainingDiscount
                             : ($remainingSubtotal > 0

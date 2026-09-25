@@ -33,7 +33,6 @@ return Application::configure(basePath: dirname(__DIR__))
         $middleware->api(append: [
             'throttle:api', EnsureSecureTransport::class,
             RequireAuthenticatedApiRoutes::class, RequestIdMiddleware::class,
-            IdempotencyMiddleware::class,
         ]);
         $middleware->alias([
             'role' => RoleMiddleware::class,

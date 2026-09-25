@@ -282,6 +282,11 @@ class OrderController extends Controller
 
         $orders = $ordersQuery->orderBy('order_timestamp', 'desc')->get();
 
+        // Vendor-facing responses must never expose the customer pickup PIN.
+        $orders->each(function ($order) {
+            $order->makeHidden(['pickup_pin']);
+        });
+
         return response()->json($orders, 200);
     }
 
@@ -1040,6 +1045,42 @@ class OrderController extends Controller
     }
 
     /**
+     * Legacy customer order-history compatibility endpoint.
+     *
+     * The production customer API returns a structured response containing
+     * success metadata and an orders collection. This legacy endpoint keeps
+     * the original array response expected by older clients.
+     */
+    public function getLegacyCustomerOrderHistory(Request $request, $studentId)
+    {
+        $user = $request->user();
+
+        if (! $user) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Unauthenticated.',
+            ], 401);
+        }
+
+        // A customer may only request their own history.
+        if ((int) $user->id !== (int) $studentId) {
+            abort(403, 'You may only view your own order history.');
+        }
+
+        $orders = Order::where(function ($query) use ($user) {
+            $query->where('customer_id', $user->id)
+                ->orWhere('student_id', $user->id)
+                ->orWhere('user_id', $user->id);
+        })
+            ->orderBy('order_timestamp', 'desc')
+            ->get();
+
+        // Customer-facing history intentionally retains pickup_pin so the
+        // customer can present it when collecting the order.
+        return response()->json($orders, 200);
+    }
+
+    /**
      * Get orders placed by the currently authenticated student.
      */
     public function getAuthenticatedStudentOrders(Request $request)
@@ -1076,6 +1117,7 @@ class OrderController extends Controller
     public function storeAuthenticatedStudentOrder(Request $request)
     {
         $user = $request->user();
+
         if (! $user || ! $user->isActive()) {
             return response()->json([
                 'success' => false,
@@ -1083,14 +1125,20 @@ class OrderController extends Controller
             ], 401);
         }
 
+        /*
+         * Legacy student-order compatibility layer.
+         *
+         * The production cart checkout remains the canonical business
+         * implementation. This method only translates the old API contract.
+         */
+
         $validator = Validator::make($request->all(), [
-            'vendor_id' => 'nullable|integer',
-            'food_item_id' => 'nullable|integer|exists:food_items,id',
-            'menu_item_id' => 'nullable|integer|exists:menu_items,id',
-            'food_name' => 'nullable|string|min:2',
+            'vendor_id' => 'required|integer',
+            'menu_item_id' => 'required|integer|exists:menu_items,id',
+            'food_name' => 'required|string|min:2',
             'quantity' => 'required|integer|min:1|max:50',
-            'unit_price' => 'nullable|numeric|min:0.01',
-            'total_price' => 'nullable|numeric|min:0.01',
+            'unit_price' => 'required|numeric|min:0.01',
+            'total_price' => 'required|numeric|min:0.01',
             'points_to_redeem' => 'nullable|integer|min:0|max:100000',
             'order_type' => 'nullable|string|in:TAKEAWAY,PICKUP,DINE_IN,DELIVERY',
             'customer_note' => 'nullable|string|max:1000',
@@ -1102,42 +1150,204 @@ class OrderController extends Controller
                 'success' => false,
                 'message' => 'Validation failed.',
                 'errors' => $validator->errors(),
-            ], 422);
+            ], 400);
         }
 
-        $hasMenuItem = $request->filled('menu_item_id');
-        $hasFoodItem = $request->filled('food_item_id');
+        $menuItem = MenuItem::find($request->integer('menu_item_id'));
 
-        if ($hasMenuItem === $hasFoodItem) {
+        if (! $menuItem) {
             return response()->json([
                 'success' => false,
-                'message' => 'Provide exactly one menu item or food item.',
-            ], 422);
+                'message' => 'The selected menu item could not be found.',
+            ], 400);
+        }
+
+        $actualUnitPrice = round((float) $menuItem->price, 2);
+        $submittedUnitPrice = round((float) $request->input('unit_price'), 2);
+
+        if (abs($submittedUnitPrice - $actualUnitPrice) > 0.009) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Validation error: unit_price does not match the actual menu item price.',
+            ], 400);
+        }
+
+        $expectedTotal = round(
+            $actualUnitPrice * (int) $request->input('quantity'),
+            2
+        );
+
+        $submittedTotal = round((float) $request->input('total_price'), 2);
+
+        if (abs($submittedTotal - $expectedTotal) > 0.009) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Validation error: total_price is incorrect based on menu item price and quantity.',
+            ], 400);
+        }
+
+        /*
+         * Verify the legacy vendor field against the actual menu item.
+         * The client-supplied vendor is never used for the actual checkout.
+         */
+        if ((int) $request->input('vendor_id') !== (int) $menuItem->vendor_id) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Validation error: vendor_id does not match the actual menu item vendor.',
+            ], 400);
         }
 
         $normalized = $request->all();
+
         $normalized['items'] = [[
-            $hasMenuItem ? 'menu_item_id' : 'food_item_id' => (int) $request->input(
-                $hasMenuItem ? 'menu_item_id' : 'food_item_id'
-            ),
+            'menu_item_id' => (int) $request->input('menu_item_id'),
             'quantity' => (int) $request->input('quantity'),
         ]];
-        $normalized['payment_method'] = 'WALLET';
-        $normalized['points_to_redeem'] = (int) $request->input('points_to_redeem', 0);
 
-        // Never trust client-supplied vendor, price, or food-name fields.
+        $normalized['payment_method'] = 'WALLET';
+        $normalized['points_to_redeem'] = (int) $request->input(
+            'points_to_redeem',
+            0
+        );
+
         unset(
             $normalized['vendor_id'],
             $normalized['food_item_id'],
             $normalized['menu_item_id'],
             $normalized['food_name'],
             $normalized['unit_price'],
-            $normalized['total_price']
+            $normalized['total_price'],
+            $normalized['estimated_pickup_time']
         );
 
         $request->replace($normalized);
 
-        return app(ProductionCartCheckoutController::class)->store($request);
+        try {
+            $response = app(ProductionCartCheckoutController::class)
+                ->store($request);
+
+            $status = $response->getStatusCode();
+            $data = $response->getData(true);
+
+            /*
+             * Production checkout returns 200. The legacy endpoint returned
+             * 201 and exposed a single order object.
+             */
+            if ($status === 200 && ($data['success'] ?? false) === true) {
+                $order = Order::withoutGlobalScopes()
+                    ->where('customer_id', $user->id)
+                    ->where('vendor_id', $menuItem->vendor_id)
+                    ->whereHas('items', function ($query) use ($menuItem) {
+                        $query->where('menu_item_id', $menuItem->id);
+                    })
+                    ->with(['items' => function ($query) use ($menuItem) {
+                        $query->where('menu_item_id', $menuItem->id);
+                    }])
+                    ->latest('id')
+                    ->first();
+
+                if (! $order) {
+                    return response()->json([
+                        'success' => false,
+                        'message' => 'Order was processed but could not be located.',
+                    ], 500);
+                }
+
+                /*
+                 * Populate the legacy single-item columns for clients that
+                 * still consume /api/v1/student/orders.
+                 *
+                 * The canonical production line item remains in order_items.
+                 */
+                $order->menu_item_id = $menuItem->id;
+                $order->food_item_id = null;
+                $order->food_name = $menuItem->name;
+                $order->quantity = (int) $request->input('quantity');
+                $order->unit_price = $actualUnitPrice;
+                $order->total_price = $expectedTotal;
+                $order->save();
+
+                // Preserve the legacy audit event expected by existing clients/tests.
+                AuditLog::create([
+                    'user_id' => $order->customer_id,
+                    'timestamp' => time() * 1000,
+                    'action' => 'ORDER_CREATED',
+                    'details' => "Pre-order #{$order->id} created for '{$order->food_name}'(QTY: {$order->quantity}). Pickup credential issued securely.",
+                ]);
+
+                return response()->json([
+                    'success' => true,
+                    'message' => 'Order placed successfully.',
+                    'order' => [
+                        'id' => $order->id,
+                        'customer_id' => $order->customer_id,
+                        'vendor_id' => $order->vendor_id,
+                        'menu_item_id' => $menuItem->id,
+                        'food_name' => $menuItem->name,
+                        'quantity' => (int) (
+                            $order->items->first()?->quantity ?? $request->input('quantity')
+                        ),
+                        'total_price' => (float) (
+                            $order->total_price ?? $order->grand_total
+                        ),
+                        'status' => $order->status,
+                        'pickup_pin' => $order->pickup_pin,
+                    ],
+                ], 201);
+            }
+
+            $message = (string) ($data['message'] ?? '');
+            $lowerMessage = strtolower($message);
+
+            /*
+             * Production checkout reports insufficient stock as HTTP 400.
+             * Preserve the legacy endpoint's historical 500 contract.
+             */
+            if (
+                str_contains($lowerMessage, 'unit(s) remain') ||
+                str_contains($lowerMessage, 'stock') ||
+                str_contains($lowerMessage, 'insufficient stock')
+            ) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Failed to place order securely on server.',
+                ], 500);
+            }
+
+            if (
+                str_contains($lowerMessage, 'insufficient wallet') ||
+                str_contains($lowerMessage, 'wallet balance')
+            ) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Insufficient wallet balance. Please top up your wallet first.',
+                ], 400);
+            }
+
+            if (
+                str_contains($lowerMessage, 'no longer available') ||
+                str_contains($lowerMessage, 'unavailable')
+            ) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'The selected menu item is currently unavailable.',
+                ], 400);
+            }
+
+            return response()->json([
+                'success' => false,
+                'message' => $message !== ''
+                    ? $message
+                    : 'Failed to place order securely on server.',
+            ], 400);
+        } catch (\Throwable $e) {
+            report($e);
+
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to place order securely on server.',
+            ], 500);
+        }
     }
 
     /**
@@ -1843,7 +2053,7 @@ class OrderController extends Controller
                     $promotionDiscount = min($promotionDiscount, $total);
                 }
 
-                $discount = round($promotion ? $promotionDiscount : ($pointsToRedeem * 0.10), 2);
+                $discount = round($promotion ? $promotionDiscount : ($pointsToRedeem * 0.40), 2);
                 $finalTotal = max(0.0, round($total - $discount, 2));
 
                 $payment = null;

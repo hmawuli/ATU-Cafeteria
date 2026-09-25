@@ -11,12 +11,20 @@ use App\Models\Promotion;
 use App\Models\PromotionRedemption;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Cache;
 use Laravel\Sanctum\Sanctum;
 use Tests\TestCase;
 
 class ProductionCheckoutTest extends TestCase
 {
     use RefreshDatabase;
+
+    protected function setUp(): void
+    {
+        parent::setUp();
+
+        Cache::flush();
+    }
 
     public function test_cart_checkout_creates_one_vendor_order_with_multiple_line_items(): void
     {
