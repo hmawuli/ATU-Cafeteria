@@ -42,6 +42,7 @@ ATU-Cafeteria/
 
 | Purpose | Document |
 |---|---|
+| How data flows between pages & the API (conventions) | `docs/DATA_FLOW.md` |
 | Local PostgreSQL setup & credentials | `docs/LOCAL_POSTGRES.md` |
 | API conventions (envelope, errors, idempotency, rate limits) | `docs/API_STANDARDS.md` |
 | Interactive API docs (served live) | `/api/docs` on the running backend |

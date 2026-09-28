@@ -77,6 +77,11 @@ and this project follows the versioning policy described in
   from `backend/.env`), `make db-create` / `make db-ping`, and
   `docs/LOCAL_POSTGRES.md` documenting the credentials, install, migrate/seed
   and verification flow for storing data locally in PostgreSQL.
+- **Cross-page data flow unified**: the vendor order workflow screen no longer
+  does raw HTTP — it now goes through `CafeteriaProvider` (`refreshVendorOrders`
+  / `completePickup`), so status/pickup changes propagate to every page
+  watching the same state; no screen in the app bypasses the providers.
+  `docs/DATA_FLOW.md` documents the flow and the conventions.
 
 ### Changed
 - Local backend port standardised on Laravel default `8000` (loopback,

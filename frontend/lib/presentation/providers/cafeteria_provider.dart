@@ -727,13 +727,10 @@ class CafeteriaProvider extends ChangeNotifier {
   Future<void> _refreshVendorOrdersSilently() async {
     if (_authToken == null || _currentUser?.id == null) return;
     try {
-      final url = Uri.parse('$_laravelBaseUrl/api/vendor/my-orders');
-      final response = await http.get(url, headers: {
-        'Accept': 'application/json',
-        'Authorization': 'Bearer $_authToken',
-      }).timeout(const Duration(seconds: 8));
-      if (response.statusCode != 200) return;
-      final value = jsonDecode(response.body);
+      final value = await _api
+          .request('GET', 'vendor/my-orders', token: _authToken)
+          .timeout(const Duration(seconds: 8));
+
       if (value is List) {
         _vendorOrders = value
             .whereType<Map>()
@@ -744,6 +741,34 @@ class CafeteriaProvider extends ChangeNotifier {
     } catch (e) {
       debugPrint('Vendor order refresh skipped: $e');
     }
+  }
+
+  /// Refresh the authenticated vendor's orders from the API and return the
+  /// parsed list, keeping the shared provider state in sync so every page
+  /// watching [vendorOrders] reflects the same data.
+  Future<List<Order>> refreshVendorOrders() async {
+    await _refreshVendorOrdersSilently();
+    return _vendorOrders;
+  }
+
+  /// Verify a student's pickup PIN server-side and complete the order.
+  /// Returns a success message, or throws [ApiException] on failure. Orders are
+  /// refreshed afterwards so all pages see the completed state immediately.
+  Future<String> completePickup(int orderId, String pin) async {
+    final decoded = await _api
+        .request(
+          'POST',
+          'orders/$orderId/verify-pickup',
+          body: {'pickup_pin': pin},
+          token: _authToken,
+        )
+        .timeout(const Duration(seconds: 10));
+    await refreshVendorOrders();
+
+    return decoded is Map
+        ? decoded['message']?.toString() ??
+            'Pickup verified. Order completed.'
+        : 'Pickup verified. Order completed.';
   }
 
   void _syncPushDeviceIfCustomer() {

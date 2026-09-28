@@ -1,8 +1,6 @@
 import 'dart:async';
-import 'dart:convert';
 
 import 'package:flutter/material.dart';
-import 'package:http/http.dart' as http;
 import 'package:provider/provider.dart';
 
 import '../../core/theme/app_theme.dart';
@@ -47,35 +45,11 @@ class _VendorOrderWorkflowScreenState extends State<VendorOrderWorkflowScreen> {
     }
 
     try {
-      final response = await http.get(
-        Uri.parse('${provider.laravelBaseUrl}/api/vendor/my-orders'),
-        headers: {
-          'Accept': 'application/json',
-          'Authorization': 'Bearer $token',
-        },
-      ).timeout(const Duration(seconds: 8));
-
-      if (response.statusCode != 200) {
-        throw Exception('Server returned ${response.statusCode}.');
-      }
-
-      final decoded = response.body.isEmpty ? null : jsonDecode(response.body);
-      if (decoded is! List) {
-        throw Exception('Invalid order response.');
-      }
-
-      final orders = <Order>[];
-      for (final raw in decoded) {
-        if (raw is! Map) continue;
-        try {
-          orders.add(Order.fromJson(Map<String, dynamic>.from(raw)));
-        } catch (_) {}
-      }
-      orders.sort((a, b) => (b.id ?? 0).compareTo(a.id ?? 0));
-
+      final orders = await provider.refreshVendorOrders();
       if (!mounted) return;
       setState(() {
-        _orders = orders;
+        _orders = orders.where((o) => o.id != null).toList()
+          ..sort((a, b) => (b.id ?? 0).compareTo(a.id ?? 0));
         _loading = false;
         _error = null;
       });
@@ -161,26 +135,14 @@ class _VendorOrderWorkflowScreenState extends State<VendorOrderWorkflowScreen> {
       final token = provider.authToken;
       if (token == null || token.isEmpty) throw Exception('Session expired.');
 
-      final response = await http.post(
-        Uri.parse('${provider.laravelBaseUrl}/api/orders/${order.id}/verify-pickup'),
-        headers: {
-          'Accept': 'application/json',
-          'Content-Type': 'application/json',
-          'Authorization': 'Bearer $token',
-        },
-        body: jsonEncode({'pickup_pin': pin}),
-      ).timeout(const Duration(seconds: 8));
+      final message = await provider.completePickup(order.id!, pin);
 
-      final body = response.body.isEmpty ? null : jsonDecode(response.body);
-      final message = body is Map ? body['message']?.toString() : null;
-      if (response.statusCode != 200) {
-        throw Exception(message ?? 'Pickup verification failed.');
-      }
-
-      await _loadOrders(silent: true);
       if (mounted) {
+        final fresh = provider.vendorOrders.where((o) => o.id != null).toList()
+          ..sort((a, b) => (b.id ?? 0).compareTo(a.id ?? 0));
+        setState(() => _orders = fresh);
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(message ?? 'Pickup verified. Order completed.')),
+          SnackBar(content: Text(message)),
         );
       }
     } catch (e) {
