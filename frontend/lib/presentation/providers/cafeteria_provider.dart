@@ -5,6 +5,7 @@ import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import 'package:atu_cafeteria/domain/models/models.dart';
 import 'package:atu_cafeteria/data/local/db_helper.dart';
+import 'package:atu_cafeteria/data/remote/menu_response.dart';
 import 'package:atu_cafeteria/core/config/server_config.dart';
 import 'package:atu_cafeteria/core/storage/secure_session_store.dart';
 import 'package:atu_cafeteria/services/push_notification_service.dart';
@@ -280,24 +281,10 @@ class CafeteriaProvider extends ChangeNotifier {
 
       final decoded = jsonDecode(response.body);
 
-      // Production catalogue returns:
-      // {
-      //   "success": true,
-      //   "data": [...]
-      // }
-      //
-      // Keep support for a bare List for backward compatibility.
-      final List<dynamic> items;
-
-      if (decoded is Map && decoded['menu_items'] is List) {
-        items = decoded['menu_items'] as List<dynamic>;
-      } else if (decoded is Map && decoded['data'] is List) {
-        items = decoded['data'] as List<dynamic>;
-      } else if (decoded is List) {
-        items = decoded;
-      } else {
-        return [];
-      }
+      // Production catalogue returns {success, menu_items: [...]}, but older
+      // deployments used {success, data: [...]} or a bare JSON array.
+      final items = menuItemsFromResponse(decoded);
+      if (items == null) return [];
 
       final remoteItems = <FoodItem>[];
 
@@ -361,7 +348,7 @@ class CafeteriaProvider extends ChangeNotifier {
 
     try {
       final response = await http.get(
-        Uri.parse('$_laravelBaseUrl/api/vendor/my-menu'),
+        Uri.parse('$_laravelBaseUrl/api/vendor/menu-items'),
         headers: {
           'Accept': 'application/json',
           'Authorization': 'Bearer $_authToken',
@@ -370,9 +357,13 @@ class CafeteriaProvider extends ChangeNotifier {
 
       if (response.statusCode != 200 || response.body.isEmpty) return;
       final decoded = jsonDecode(response.body);
-      if (decoded is! List) return;
 
-      for (final raw in decoded) {
+      // Vendor menu endpoint returns {success, menu_items: [...]}; tolerate
+      // {success, data: [...]} and bare lists for older deployments.
+      final items = menuItemsFromResponse(decoded);
+      if (items == null) return;
+
+      for (final raw in items) {
         if (raw is! Map) continue;
         try {
           await _upsertLocalFoodItem(

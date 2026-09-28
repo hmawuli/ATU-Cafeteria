@@ -171,6 +171,7 @@ Route::middleware(['auth:sanctum', InactivityTimeout::class])->group(function ()
         Route::get('/vendor/menu-items', [VendorMenuItemController::class, 'index']);
         Route::get('/vendor/metrics', [VendorMetricsController::class, 'index']);
         Route::get('/vendor/performance', [VendorPerformanceController::class, 'index']);
+        Route::get('/vendor/performance-metrics', [VendorPerformanceController::class, 'getVendorPerformanceMetrics']);
         Route::get('/vendor/daily-revenue', [VendorPerformanceController::class, 'dailyRevenue']);
         Route::get('/vendor/recharts-sales', [VendorPerformanceController::class, 'exportSalesForRecharts']);
         Route::get('/vendor/finance', [VendorFinanceController::class, 'index']);

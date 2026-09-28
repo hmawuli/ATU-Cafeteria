@@ -319,10 +319,10 @@ HTML;
                     'get' => [
                         'tags' => ['Catalog'],
                         'summary' => 'List food items (deprecated)',
-                        'description' => 'Legacy endpoint returning a bare JSON array. Prefer /catalog/menu-items. List consumers must accept the bare-array shape.',
+                        'description' => 'Legacy endpoint returning the standard {success, data: [...]} envelope. Prefer /catalog/menu-items, which returns richer menu items with vendor and stock fields.',
                         'deprecated' => true,
                         'responses' => [
-                            '200' => ['description' => 'Bare JSON array of food items'],
+                            '200' => ['description' => '{success, data: [...]} list of food items'],
                         ],
                     ],
                 ],

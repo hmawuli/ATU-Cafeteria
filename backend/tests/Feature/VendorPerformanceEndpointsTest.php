@@ -145,4 +145,14 @@ class VendorPerformanceEndpointsTest extends TestCase
             ->assertJsonPath('success', true)
             ->assertJsonStructure(['data' => ['by_date']]);
     }
+
+    public function test_vendor_receives_performance_metrics(): void
+    {
+        Sanctum::actingAs($this->vendor, ['*']);
+
+        $this->getJson('/api/vendor/performance-metrics')
+            ->assertOk()
+            ->assertJsonPath('success', true)
+            ->assertJsonStructure(['performance' => []]);
+    }
 }

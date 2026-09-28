@@ -8,9 +8,8 @@ class MenuRepository {
 
   /// Fetches the full food catalogue from `GET /api/food-items`.
   ///
-  /// The endpoint returns a bare JSON array, but we tolerate the common
-  /// envelope shapes (`{"data": [...]}`, `{"food_items": [...]}`) for
-  /// robustness against older API responses.
+  /// The endpoint returns the standard `{success, data: [...]}` envelope; we
+  /// still tolerate a bare array for backwards compatibility.
   ///
   /// Failures surface as:
   ///   * [ApiException] — HTTP error from the server;

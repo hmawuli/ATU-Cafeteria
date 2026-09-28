@@ -26,7 +26,12 @@ class FoodItemController extends Controller
             return $food->vendor_id.'|'.mb_strtolower(trim($food->name));
         })->values();
 
-        return response()->json($foods, 200);
+        // Standard list envelope {success, data}. Legacy field is deprecated
+        // in favour of /catalog/menu-items.
+        return response()->json([
+            'success' => true,
+            'data' => $foods,
+        ], 200);
     }
 
     /**

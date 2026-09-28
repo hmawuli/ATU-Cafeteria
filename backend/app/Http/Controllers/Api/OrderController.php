@@ -1085,6 +1085,48 @@ class OrderController extends Controller
     }
 
     /**
+     * Poll for student orders that have just become ready for pickup.
+     *
+     * Lightweight polling endpoint the mobile app calls every ~15 seconds.
+     * Only returns the last 24 hours of READY / OUT_FOR_DELIVERY orders owned
+     * by the authenticated student, so clients can raise a local alert
+     * without waiting for a push notification.
+     */
+    public function pollReadyOrders(Request $request)
+    {
+        $user = $request->user();
+        if (! $user || strtoupper((string) $user->role) !== 'STUDENT') {
+            return response()->json(['success' => false, 'message' => 'Unauthenticated.'], 401);
+        }
+
+        $orders = Order::where(function ($query) use ($user) {
+            $query->where('customer_id', $user->id)
+                ->orWhere('student_id', $user->id)
+                ->orWhere('user_id', $user->id);
+        })
+            ->whereIn('status', ['READY', 'OUT_FOR_DELIVERY'])
+            ->where('created_at', '>=', now()->subDay())
+            ->orderByDesc('updated_at')
+            ->limit(20)
+            ->get();
+
+        $alerts = $orders->map(function (Order $order) {
+            return [
+                'order_id' => $order->id,
+                'title' => 'Order Ready for Pickup! 🍽️',
+                'body' => 'Your order #'.$order->id.' is ready for pickup'
+                    .($order->vendor ? ' at '.$order->vendor->name : '').'.',
+                'vendor_name' => $order->vendor?->name,
+            ];
+        })->values();
+
+        return response()->json([
+            'success' => true,
+            'ready_alerts' => $alerts,
+        ], 200);
+    }
+
+    /**
      * Get orders placed by the currently authenticated student.
      */
     public function getAuthenticatedStudentOrders(Request $request)

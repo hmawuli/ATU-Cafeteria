@@ -45,9 +45,10 @@ Rules:
 - **Lists** — `data` is a JSON array. Established legacy keys on specific
   endpoints (`menu_items`) are documented in the OpenAPI spec and consumers
   may read `data` as an alias where supported.
-- **Bare-list exceptions (deprecated)** — `GET /catalog/food-items` returns a
-  bare JSON array. Prefer `GET /catalog/menu-items`. Do not add new bare-list
-  endpoints.
+- **Legacy endpoints** — `GET /catalog/food-items` and `GET /api/food-items`
+  still exist but are considered legacy: they return the standard
+  `{success, data}` envelope yet are deprecated in favour of
+  `GET /catalog/menu-items`. Do not build new features on them.
 
 ### HTTP status codes used
 

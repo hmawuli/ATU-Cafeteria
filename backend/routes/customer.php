@@ -39,6 +39,7 @@ $customerRoutes = function () {
         Route::get('/recommendations', [SmartCafeteriaController::class, 'recommendations']);
 
         Route::get('/orders', [OrderController::class, 'getAuthenticatedStudentOrders']);
+        Route::get('/orders/poll-ready', [OrderController::class, 'pollReadyOrders']);
         Route::get('/purchased-vendors', [OrderController::class, 'getPurchasedVendors']);
         Route::get('/order-history', [OrderController::class, 'getPersonalOrderHistory']);
         Route::post('/orders', [OrderController::class, 'storeAuthenticatedStudentOrder'])
