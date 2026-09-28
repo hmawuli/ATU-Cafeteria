@@ -61,8 +61,8 @@ class CustomerDiscoveryController extends Controller
             ->orderByDesc('id')
             ->limit(6)
             ->get([
-                'id','code','name','type','value','minimum_order_amount',
-                'maximum_discount_amount','starts_at','ends_at',
+                'id', 'code', 'name', 'type', 'value', 'minimum_order_amount',
+                'maximum_discount_amount', 'starts_at', 'ends_at',
             ]);
 
         $featuredItems = FoodItem::where('is_available', true)

@@ -33,7 +33,18 @@ class WalletTransaction extends Model
         return $this->belongsTo(User::class, 'user_id');
     }
 
-    public function order() { return $this->belongsTo(Order::class); }
-    public function payment() { return $this->belongsTo(Payment::class); }
-    public function performedBy() { return $this->belongsTo(User::class, 'performed_by'); }
+    public function order()
+    {
+        return $this->belongsTo(Order::class);
+    }
+
+    public function payment()
+    {
+        return $this->belongsTo(Payment::class);
+    }
+
+    public function performedBy()
+    {
+        return $this->belongsTo(User::class, 'performed_by');
+    }
 }

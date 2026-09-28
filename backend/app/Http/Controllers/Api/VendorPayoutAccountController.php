@@ -32,6 +32,7 @@ class VendorPayoutAccountController extends Controller
             $channels = $paystack->listGhanaBanks($type === 'MOBILE_MONEY' ? 'mobile_money' : 'ghipss');
         } catch (\Throwable $e) {
             report($e);
+
             return response()->json(['success' => false, 'message' => 'Unable to load payout channels.'], 503);
         }
 
@@ -66,6 +67,7 @@ class VendorPayoutAccountController extends Controller
                 }
             } catch (\Throwable $e) {
                 report($e);
+
                 return response()->json(['success' => false, 'message' => 'The bank account could not be verified.'], 422);
             }
         } elseif ($accountName === '') {
@@ -99,6 +101,7 @@ class VendorPayoutAccountController extends Controller
         } catch (\Throwable $e) {
             $account->update(['status' => 'FAILED']);
             report($e);
+
             return response()->json(['success' => false, 'message' => 'The payout recipient could not be created.'], 502);
         }
 

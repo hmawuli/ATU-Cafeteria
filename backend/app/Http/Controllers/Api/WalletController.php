@@ -86,16 +86,19 @@ class WalletController extends Controller
 
             if (! $dbSender || ! $dbReceiver) {
                 DB::rollBack();
+
                 return response()->json(['success' => false, 'message' => 'Transfer account could not be found.'], 404);
             }
 
             if ((int) $dbSender->id === (int) $dbReceiver->id) {
                 DB::rollBack();
+
                 return response()->json(['success' => false, 'message' => 'Cannot transfer money to yourself.'], 400);
             }
 
             if ((float) $dbSender->balance < $amount) {
                 DB::rollBack();
+
                 return response()->json(['success' => false, 'message' => 'Insufficient wallet balance.'], 400);
             }
 
@@ -139,6 +142,7 @@ class WalletController extends Controller
         } catch (\Throwable $e) {
             DB::rollBack();
             report($e);
+
             return response()->json(['success' => false, 'message' => 'Transfer could not be completed.'], 500);
         }
     }
@@ -179,6 +183,7 @@ class WalletController extends Controller
             $dbVendor = User::lockForUpdate()->find($vendor->id);
             if (! $dbVendor || (float) $dbVendor->balance < $amount) {
                 DB::rollBack();
+
                 return response()->json(['success' => false, 'message' => 'Insufficient earnings balance for payout.'], 400);
             }
 
@@ -213,6 +218,7 @@ class WalletController extends Controller
         } catch (\Throwable $e) {
             DB::rollBack();
             report($e);
+
             return response()->json(['success' => false, 'message' => 'Payout request could not be created.'], 500);
         }
     }

@@ -6,8 +6,8 @@ use App\Events\OrderStatusCompleted;
 use App\Models\AuditLog;
 use App\Models\CustomerDevice;
 use App\Models\User;
-use App\Services\FcmService;
 use App\Notifications\OrderCompletedNotification;
+use App\Services\FcmService;
 
 class SendOrderCompletedNotification
 {
@@ -49,7 +49,7 @@ class SendOrderCompletedNotification
                 }
 
                 $title = 'Order completed';
-                $body = "Order #".($order->order_number ?: $order->id)." has been picked up. Thank you for ordering with ATU Cafeteria.";
+                $body = 'Order #'.($order->order_number ?: $order->id).' has been picked up. Thank you for ordering with ATU Cafeteria.';
                 $data = [
                     'order_id' => (string) $order->id,
                     'order_number' => (string) ($order->order_number ?: $order->id),

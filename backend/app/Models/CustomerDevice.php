@@ -10,8 +10,8 @@ class CustomerDevice extends Model
     use HasFactory;
 
     protected $fillable = [
-        'customer_id','device_id','platform','push_token','app_version',
-        'last_seen_at','revoked_at',
+        'customer_id', 'device_id', 'platform', 'push_token', 'app_version',
+        'last_seen_at', 'revoked_at',
     ];
 
     protected $casts = [
@@ -22,7 +22,10 @@ class CustomerDevice extends Model
 
     protected $hidden = ['push_token'];
 
-    public function customer() { return $this->belongsTo(User::class, 'customer_id'); }
+    public function customer()
+    {
+        return $this->belongsTo(User::class, 'customer_id');
+    }
 
     public function scopeActive($query)
     {

@@ -26,6 +26,7 @@ class StoreOrderRequest extends FormRequest
                 'customer_id' => $user->id,
                 'student_id' => $user->id,
             ]);
+
             return;
         }
 

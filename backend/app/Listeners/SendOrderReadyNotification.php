@@ -3,8 +3,8 @@
 namespace App\Listeners;
 
 use App\Events\OrderStatusReady;
-use App\Models\User;
 use App\Models\CustomerDevice;
+use App\Models\User;
 use App\Notifications\OrderReadyNotification;
 use App\Services\FcmService;
 

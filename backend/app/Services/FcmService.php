@@ -2,9 +2,6 @@
 
 namespace AppServices;
 
-use IlluminateSupportFacadesHttp;
-use IlluminateSupportFacadesLog;
-
 class FcmService
 {
     /**

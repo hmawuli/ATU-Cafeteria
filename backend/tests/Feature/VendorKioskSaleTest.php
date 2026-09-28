@@ -3,7 +3,6 @@
 namespace Tests\Feature;
 
 use App\Models\MenuItem;
-use App\Models\InventoryMovement;
 use App\Models\Order;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;

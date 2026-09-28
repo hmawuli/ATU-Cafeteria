@@ -10,8 +10,8 @@ class CustomerAddress extends Model
     use HasFactory;
 
     protected $fillable = [
-        'customer_id','label','contact_name','phone','address_line1','address_line2',
-        'city','landmark','is_default',
+        'customer_id', 'label', 'contact_name', 'phone', 'address_line1', 'address_line2',
+        'city', 'landmark', 'is_default',
     ];
 
     protected $casts = [
@@ -19,5 +19,8 @@ class CustomerAddress extends Model
         'is_default' => 'boolean',
     ];
 
-    public function customer() { return $this->belongsTo(User::class, 'customer_id'); }
+    public function customer()
+    {
+        return $this->belongsTo(User::class, 'customer_id');
+    }
 }

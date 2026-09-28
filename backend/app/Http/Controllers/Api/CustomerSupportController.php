@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Models\Order;
 use App\Models\SupportTicket;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Validator;
@@ -33,7 +34,7 @@ class CustomerSupportController extends Controller
 
         $orderId = $request->input('order_id');
         if ($orderId !== null) {
-            $ownsOrder = \App\Models\Order::query()
+            $ownsOrder = Order::query()
                 ->whereKey($orderId)
                 ->where(function ($query) use ($request) {
                     $query->where('customer_id', $request->user()->id)
@@ -67,6 +68,7 @@ class CustomerSupportController extends Controller
     public function show(Request $request, SupportTicket $ticket)
     {
         abort_unless((int) $ticket->customer_id === (int) $request->user()->id, 403);
+
         return response()->json(['success' => true, 'ticket' => $ticket]);
     }
 }

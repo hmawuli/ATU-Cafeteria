@@ -9,19 +9,23 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\StoreOrderRequest;
 use App\Http\Resources\OrderResource;
 use App\Models\AuditLog;
+use App\Models\CheckoutSession;
 use App\Models\DeliveredOrderReview;
 use App\Models\FoodItem;
+use App\Models\InventoryMovement;
 use App\Models\MenuItem;
 use App\Models\Order;
 use App\Models\OrderItem;
 use App\Models\Payment;
 use App\Models\PaymentAllocation;
+use App\Models\Promotion;
 use App\Models\PromotionRedemption;
-use App\Models\InventoryMovement;
+use App\Models\Refund;
 use App\Models\User;
 use App\Models\WalletTransaction;
 use App\Notifications\NewIncomingOrderNotification;
 use App\Notifications\OrderStatusChangedNotification;
+use App\Services\PaystackRefundService;
 use App\Services\ReceiptPdfWriter;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -1354,7 +1358,7 @@ class OrderController extends Controller
      * Cancel an order.
      * Users can only cancel orders if the current status is 'PENDING' or 'ORDER_PLACED'.
      */
-    public function cancel(Request $request, $id, \App\Services\PaystackRefundService $paystackRefunds)
+    public function cancel(Request $request, $id, PaystackRefundService $paystackRefunds)
     {
         $user = $request->user();
         if (! $user) {
@@ -1391,7 +1395,7 @@ class OrderController extends Controller
         }
 
         try {
-            $updatedOrder = DB::transaction(function () use ($request, $order, $user, $role) {
+            $updatedOrder = DB::transaction(function () use ($request, $order, $user) {
                 $lockedOrder = Order::withoutGlobalScopes()
                     ->whereKey($order->id)
                     ->lockForUpdate()
@@ -1538,7 +1542,7 @@ class OrderController extends Controller
                     $customer->balance = round($before + $refundAmount, 2);
                     $customer->save();
 
-                    $refund = \App\Models\Refund::create([
+                    $refund = Refund::create([
                         'order_id' => $lockedOrder->id,
                         'payment_id' => $payment?->id,
                         'customer_id' => $customer->id,
@@ -1602,7 +1606,7 @@ class OrderController extends Controller
                         $payment->update(['status' => 'REFUND_PENDING']);
                     }
 
-                    \App\Models\Refund::create([
+                    Refund::create([
                         'order_id' => $lockedOrder->id,
                         'payment_id' => $payment?->id,
                         'customer_id' => $customer->id,
@@ -1626,7 +1630,7 @@ class OrderController extends Controller
                         ->whereNotIn('status', ['CANCELLED', 'DECLINED'])
                         ->exists();
 
-                    \App\Models\CheckoutSession::whereKey($sessionId)->update([
+                    CheckoutSession::whereKey($sessionId)->update([
                         'status' => $hasOpenSibling ? 'PARTIALLY_CANCELLED' : 'CANCELLED',
                     ]);
 
@@ -1650,7 +1654,7 @@ class OrderController extends Controller
             $gatewayRefund = null;
             if (strtoupper((string) $updatedOrder->payment_method) !== 'WALLET' && $updatedOrder->payment_id) {
                 $payment = Payment::find($updatedOrder->payment_id);
-                $refund = \App\Models\Refund::where('order_id', $updatedOrder->id)
+                $refund = Refund::where('order_id', $updatedOrder->id)
                     ->where('status', 'PENDING')
                     ->latest()
                     ->first();
@@ -1689,12 +1693,14 @@ class OrderController extends Controller
             return response()->json(['success' => false, 'message' => $e->getMessage()], 409);
         } catch (\Throwable $e) {
             report($e);
+
             return response()->json([
                 'success' => false,
                 'message' => 'We could not cancel this order. Please try again.',
             ], 500);
         }
     }
+
     /**
      * Real-time order status tracking with SSE (Server-Sent Events) and JSON fallback.
      */
@@ -2016,7 +2022,7 @@ class OrderController extends Controller
                         throw new \RuntimeException('Use either loyalty points or a promotion code for this order, not both.');
                     }
 
-                    $promotion = \App\Models\Promotion::whereRaw('UPPER(code) = ?', [$promotionCode])
+                    $promotion = Promotion::whereRaw('UPPER(code) = ?', [$promotionCode])
                         ->lockForUpdate()
                         ->first();
 
@@ -2032,12 +2038,12 @@ class OrderController extends Controller
                     }
 
                     if ($promotion->usage_limit !== null &&
-                        \App\Models\PromotionRedemption::where('promotion_id', $promotion->id)->count() >= $promotion->usage_limit) {
+                        PromotionRedemption::where('promotion_id', $promotion->id)->count() >= $promotion->usage_limit) {
                         throw new \RuntimeException('This promotion has reached its usage limit.');
                     }
 
                     if ($promotion->per_customer_limit !== null &&
-                        \App\Models\PromotionRedemption::where('promotion_id', $promotion->id)
+                        PromotionRedemption::where('promotion_id', $promotion->id)
                             ->where('customer_id', $lockedUser->id)->count() >= $promotion->per_customer_limit) {
                         throw new \RuntimeException('You have already used this promotion the maximum number of times allowed.');
                     }
@@ -2062,7 +2068,7 @@ class OrderController extends Controller
                         throw new \RuntimeException('Insufficient wallet balance.');
                     }
 
-                    $payment = \App\Models\Payment::create([
+                    $payment = Payment::create([
                         'customer_id' => $lockedUser->id,
                         'reference' => 'WAL-CART-'.strtoupper(Str::random(14)),
                         'gateway' => 'internal-wallet',
@@ -2079,7 +2085,7 @@ class OrderController extends Controller
                         throw new \RuntimeException('A verified online payment reference is required.');
                     }
 
-                    $payment = \App\Models\Payment::where('customer_id', $lockedUser->id)
+                    $payment = Payment::where('customer_id', $lockedUser->id)
                         ->where('reference', $paymentReference)
                         ->where('purpose', 'DIRECT_ORDER_PAY')
                         ->where('status', 'SUCCESS')
@@ -2148,7 +2154,7 @@ class OrderController extends Controller
                     }
 
                     if ($promotion) {
-                        \App\Models\PromotionRedemption::create([
+                        PromotionRedemption::create([
                             'promotion_id' => $promotion->id,
                             'customer_id' => $lockedUser->id,
                             'order_id' => $order->id,
@@ -2156,7 +2162,7 @@ class OrderController extends Controller
                         ]);
                     }
 
-                    \App\Models\OrderItem::create([
+                    OrderItem::create([
                         'order_id' => $order->id,
                         'food_item_id' => $item['is_menu_item'] ? null : $catalogItem->id,
                         'name' => $itemName,
@@ -2170,7 +2176,7 @@ class OrderController extends Controller
 
                     if ($paymentMethod === 'WALLET') {
                         $lockedUser->balance = round((float) $lockedUser->balance - $lineGrandTotal, 2);
-                        \App\Models\WalletTransaction::create([
+                        WalletTransaction::create([
                             'user_id' => $lockedUser->id,
                             'order_id' => $order->id,
                             'payment_id' => $payment->id,
@@ -2224,12 +2230,14 @@ class OrderController extends Controller
             return response()->json(['success' => false, 'message' => $e->getMessage()], 400);
         } catch (\Throwable $e) {
             report($e);
+
             return response()->json([
                 'success' => false,
                 'message' => 'We could not complete your order. No payment was taken. Please try again.',
             ], 500);
         }
     }
+
     /**
      * Remove the specified order from storage (Admin only).
      */

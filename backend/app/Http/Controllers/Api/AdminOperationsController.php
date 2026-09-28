@@ -11,8 +11,8 @@ use App\Models\Promotion;
 use App\Models\Refund;
 use App\Models\SupportTicket;
 use App\Models\User;
-use App\Models\VendorSettlement;
 use App\Models\VendorPayoutAccount;
+use App\Models\VendorSettlement;
 use App\Models\WalletTransaction;
 use App\Services\PaystackPayoutService;
 use App\Services\PaystackRefundService;
@@ -57,8 +57,8 @@ class AdminOperationsController extends Controller
 
         $promotion = Promotion::create([
             ...$request->only([
-                'vendor_id','name','type','value','minimum_order_amount','maximum_discount_amount',
-                'usage_limit','per_customer_limit','starts_at','ends_at',
+                'vendor_id', 'name', 'type', 'value', 'minimum_order_amount', 'maximum_discount_amount',
+                'usage_limit', 'per_customer_limit', 'starts_at', 'ends_at',
             ]),
             'code' => strtoupper(trim($request->input('code'))),
             'is_active' => $request->boolean('is_active', true),
@@ -93,8 +93,8 @@ class AdminOperationsController extends Controller
         }
 
         $promotion->fill($request->only([
-            'name','type','value','minimum_order_amount','maximum_discount_amount',
-            'usage_limit','per_customer_limit','starts_at','ends_at','is_active',
+            'name', 'type', 'value', 'minimum_order_amount', 'maximum_discount_amount',
+            'usage_limit', 'per_customer_limit', 'starts_at', 'ends_at', 'is_active',
         ]));
         $promotion->save();
 
@@ -103,7 +103,8 @@ class AdminOperationsController extends Controller
 
     public function refunds(Request $request)
     {
-        $query = Refund::with(['order','customer','payment'])->latest();
+        $query = Refund::with(['order', 'customer', 'payment'])->latest();
+
         return response()->json(['success' => true, 'refunds' => $query->paginate(50)]);
     }
 
@@ -130,7 +131,7 @@ class AdminOperationsController extends Controller
                 : null;
 
             $alreadyRefunded = (float) Refund::where('order_id', $lockedOrder->id)
-                ->whereIn('status', ['SUCCESS','PROCESSING','PENDING'])
+                ->whereIn('status', ['SUCCESS', 'PROCESSING', 'PENDING'])
                 ->sum('amount');
             $maxRefund = $allocation
                 ? (float) $allocation->amount
@@ -262,6 +263,7 @@ class AdminOperationsController extends Controller
     public function settlements(Request $request)
     {
         $query = VendorSettlement::with('vendor')->latest();
+
         return response()->json(['success' => true, 'settlements' => $query->paginate(50)]);
     }
 
@@ -295,7 +297,7 @@ class AdminOperationsController extends Controller
 
         $gross = (float) Order::withoutGlobalScopes()
             ->where('vendor_id', $vendorId)
-            ->whereIn('status', ['COMPLETED','DELIVERED'])
+            ->whereIn('status', ['COMPLETED', 'DELIVERED'])
             ->whereBetween('created_at', [$start.' 00:00:00', $end.' 23:59:59'])
             ->sum(DB::raw('COALESCE(grand_total, total_price)'));
 
@@ -338,12 +340,13 @@ class AdminOperationsController extends Controller
                 $row->transfer_code = null;
 
                 if (! $row->payout_reference || $wasFailed) {
-                    $row->payout_reference = 'atu_settle_' . \Illuminate\Support\Str::lower(
-                        str_replace('-', '', (string) \Illuminate\Support\Str::uuid())
+                    $row->payout_reference = 'atu_settle_'.Str::lower(
+                        str_replace('-', '', (string) Str::uuid())
                     );
                 }
 
                 $row->save();
+
                 return $row->fresh();
             });
         } catch (\RuntimeException $e) {
@@ -356,6 +359,7 @@ class AdminOperationsController extends Controller
         $account = VendorPayoutAccount::where('vendor_id', $locked->vendor_id)->where('status', 'ACTIVE')->first();
         if (! $account) {
             $locked->update(['status' => 'FAILED', 'failure_reason' => 'Vendor has no active payout account.']);
+
             return response()->json(['success' => false, 'message' => 'Vendor has no active payout account.'], 422);
         }
 
@@ -363,7 +367,7 @@ class AdminOperationsController extends Controller
             $data = $payouts->initiateTransfer(
                 $account,
                 (float) $locked->net_amount,
-                'ATU Cafeteria settlement ' . $locked->period_start . ' to ' . $locked->period_end,
+                'ATU Cafeteria settlement '.$locked->period_start.' to '.$locked->period_end,
                 $locked->payout_reference,
             );
             $gatewayStatus = strtolower((string) ($data['status'] ?? 'pending'));
@@ -376,6 +380,7 @@ class AdminOperationsController extends Controller
         } catch (\Throwable $e) {
             report($e);
             $locked->update(['status' => 'FAILED', 'gateway_status' => 'FAILED', 'failure_reason' => $e->getMessage()]);
+
             return response()->json(['success' => false, 'message' => 'Vendor payout could not be initiated.'], 502);
         }
 
@@ -383,7 +388,7 @@ class AdminOperationsController extends Controller
             'user_id' => request()->user()->id,
             'timestamp' => now()->getTimestampMs(),
             'action' => 'VENDOR_SETTLEMENT_PAYOUT_INITIATED',
-            'details' => 'Settlement #' . $locked->id . ' payout reference ' . $locked->payout_reference . '.',
+            'details' => 'Settlement #'.$locked->id.' payout reference '.$locked->payout_reference.'.',
         ]);
 
         return response()->json([
@@ -418,6 +423,7 @@ class AdminOperationsController extends Controller
         } catch (\Throwable $e) {
             report($e);
             $locked->update(['gateway_status' => 'FAILED', 'failure_reason' => $e->getMessage()]);
+
             return response()->json(['success' => false, 'message' => 'Transfer authorization failed.'], 502);
         }
 
@@ -430,7 +436,7 @@ class AdminOperationsController extends Controller
 
     public function supportTickets()
     {
-        return response()->json(['success' => true, 'tickets' => SupportTicket::with(['customer','order','assignedTo'])->latest()->paginate(50)]);
+        return response()->json(['success' => true, 'tickets' => SupportTicket::with(['customer', 'order', 'assignedTo'])->latest()->paginate(50)]);
     }
 
     public function updateSupportTicket(Request $request, SupportTicket $ticket)
@@ -444,8 +450,10 @@ class AdminOperationsController extends Controller
             return response()->json(['success' => false, 'message' => 'Invalid support ticket update.', 'errors' => $validator->errors()], 422);
         }
 
-        $ticket->fill($request->only(['status','priority','assigned_to']));
-        if (($request->input('status') ?? '') === 'RESOLVED') $ticket->resolved_at = now();
+        $ticket->fill($request->only(['status', 'priority', 'assigned_to']));
+        if (($request->input('status') ?? '') === 'RESOLVED') {
+            $ticket->resolved_at = now();
+        }
         $ticket->save();
 
         return response()->json(['success' => true, 'ticket' => $ticket]);

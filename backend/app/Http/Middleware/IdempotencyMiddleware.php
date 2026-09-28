@@ -11,6 +11,7 @@ use Symfony\Component\HttpFoundation\Response;
 class IdempotencyMiddleware
 {
     private const TTL_SECONDS = 86400;
+
     private const KEY_MAX_LENGTH = 128;
 
     public function handle(Request $request, Closure $next, string $mode = 'optional'): Response

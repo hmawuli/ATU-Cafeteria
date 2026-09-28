@@ -5,10 +5,11 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Models\CheckoutSession;
 use App\Models\FoodItem;
+use App\Models\InventoryMovement;
 use App\Models\MenuItem;
 use App\Models\Order;
 use App\Models\OrderItem;
-use App\Models\InventoryMovement;
+use App\Models\Payment;
 use App\Models\PaymentAllocation;
 use App\Models\Promotion;
 use App\Models\PromotionRedemption;
@@ -317,7 +318,7 @@ class ProductionCartCheckoutController extends Controller
                         throw new \RuntimeException('Insufficient wallet balance.');
                     }
 
-                    $payment = \App\Models\Payment::create([
+                    $payment = Payment::create([
                         'order_id' => null,
                         'checkout_session_id' => $session->id,
                         'customer_id' => $user->id,
@@ -336,7 +337,7 @@ class ProductionCartCheckoutController extends Controller
                         throw new \RuntimeException('A verified online payment reference is required.');
                     }
 
-                    $payment = \App\Models\Payment::where('customer_id', $user->id)
+                    $payment = Payment::where('customer_id', $user->id)
                         ->where('reference', $paymentReference)
                         ->where('purpose', 'DIRECT_ORDER_PAY')
                         ->where('status', 'SUCCESS')

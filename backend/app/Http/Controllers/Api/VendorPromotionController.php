@@ -103,9 +103,9 @@ class VendorPromotionController extends Controller
         }
 
         $promotion->fill($request->only([
-            'name','type','value','minimum_order_amount',
-            'maximum_discount_amount','usage_limit','per_customer_limit',
-            'starts_at','ends_at','is_active',
+            'name', 'type', 'value', 'minimum_order_amount',
+            'maximum_discount_amount', 'usage_limit', 'per_customer_limit',
+            'starts_at', 'ends_at', 'is_active',
         ]));
         $promotion->save();
 

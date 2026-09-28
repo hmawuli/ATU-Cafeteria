@@ -39,7 +39,9 @@ class MenuItem extends Model
         });
 
         static::updated(function (MenuItem $item) {
-            if (! $item->wasChanged('current_stock')) return;
+            if (! $item->wasChanged('current_stock')) {
+                return;
+            }
 
             $delta = (int) $item->current_stock - (int) $item->getOriginal('current_stock');
             $route = null;

@@ -10,8 +10,8 @@ class VendorSettlement extends Model
     use HasFactory;
 
     protected $fillable = [
-        'vendor_id','period_start','period_end','gross_sales','refunds','fees',
-        'net_amount','status','payout_reference','transfer_code','gateway_status','failure_reason','payout_attempted_at','settled_at',
+        'vendor_id', 'period_start', 'period_end', 'gross_sales', 'refunds', 'fees',
+        'net_amount', 'status', 'payout_reference', 'transfer_code', 'gateway_status', 'failure_reason', 'payout_attempted_at', 'settled_at',
     ];
 
     protected $casts = [
@@ -24,5 +24,8 @@ class VendorSettlement extends Model
         'payout_attempted_at' => 'datetime',
     ];
 
-    public function vendor() { return $this->belongsTo(User::class, 'vendor_id'); }
+    public function vendor()
+    {
+        return $this->belongsTo(User::class, 'vendor_id');
+    }
 }

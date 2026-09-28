@@ -33,6 +33,6 @@ class VendorPayoutAccount extends Model
 
     public function maskedAccountNumber(): string
     {
-        return '••••' . $this->account_number_last4;
+        return '••••'.$this->account_number_last4;
     }
 }

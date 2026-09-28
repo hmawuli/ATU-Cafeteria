@@ -82,8 +82,8 @@ class CustomerAddressController extends Controller
                     ->where('id', '!=', $address->id)->update(['is_default' => false]);
             }
             $address->fill($request->only([
-                'label','contact_name','phone','address_line1','address_line2',
-                'city','landmark','is_default',
+                'label', 'contact_name', 'phone', 'address_line1', 'address_line2',
+                'city', 'landmark', 'is_default',
             ]));
             $address->save();
         });
@@ -99,7 +99,9 @@ class CustomerAddressController extends Controller
 
         if ($wasDefault) {
             $replacement = CustomerAddress::where('customer_id', $request->user()->id)->latest()->first();
-            if ($replacement) $replacement->update(['is_default' => true]);
+            if ($replacement) {
+                $replacement->update(['is_default' => true]);
+            }
         }
 
         return response()->json(['success' => true, 'message' => 'Address removed.']);

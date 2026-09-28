@@ -10,8 +10,8 @@ class SupportTicket extends Model
     use HasFactory;
 
     protected $fillable = [
-        'customer_id','order_id','category','subject','description','priority',
-        'status','assigned_to','resolved_at',
+        'customer_id', 'order_id', 'category', 'subject', 'description', 'priority',
+        'status', 'assigned_to', 'resolved_at',
     ];
 
     protected $casts = [
@@ -21,7 +21,18 @@ class SupportTicket extends Model
         'resolved_at' => 'datetime',
     ];
 
-    public function customer() { return $this->belongsTo(User::class, 'customer_id'); }
-    public function order() { return $this->belongsTo(Order::class); }
-    public function assignedTo() { return $this->belongsTo(User::class, 'assigned_to'); }
+    public function customer()
+    {
+        return $this->belongsTo(User::class, 'customer_id');
+    }
+
+    public function order()
+    {
+        return $this->belongsTo(Order::class);
+    }
+
+    public function assignedTo()
+    {
+        return $this->belongsTo(User::class, 'assigned_to');
+    }
 }

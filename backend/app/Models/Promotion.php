@@ -10,8 +10,8 @@ class Promotion extends Model
     use HasFactory;
 
     protected $fillable = [
-        'vendor_id','code','name','type','value','minimum_order_amount','maximum_discount_amount',
-        'usage_limit','per_customer_limit','starts_at','ends_at','is_active',
+        'vendor_id', 'code', 'name', 'type', 'value', 'minimum_order_amount', 'maximum_discount_amount',
+        'usage_limit', 'per_customer_limit', 'starts_at', 'ends_at', 'is_active',
     ];
 
     protected $casts = [
@@ -31,11 +31,15 @@ class Promotion extends Model
         return $this->belongsTo(User::class, 'vendor_id');
     }
 
-    public function redemptions() { return $this->hasMany(PromotionRedemption::class); }
+    public function redemptions()
+    {
+        return $this->hasMany(PromotionRedemption::class);
+    }
 
     public function isCurrentlyActive(): bool
     {
         $now = now();
+
         return $this->is_active
             && (! $this->starts_at || $this->starts_at->lte($now))
             && (! $this->ends_at || $this->ends_at->gte($now));

@@ -2,9 +2,9 @@
 
 namespace Tests\Feature;
 
+use App\Models\User;
 use App\Models\VendorPayoutAccount;
 use App\Services\PaystackPayoutService;
-use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Http;
 use Laravel\Sanctum\Sanctum;
@@ -37,6 +37,7 @@ class VendorPayoutTest extends TestCase
                     'data' => ['recipient_code' => 'RCP_TEST_001'],
                 ], 201);
             }
+
             return Http::response(['status' => false], 404);
         });
 

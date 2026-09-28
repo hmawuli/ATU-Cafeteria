@@ -14,7 +14,7 @@ class InventoryController extends Controller
     public function index(Request $request)
     {
         $user = $request->user();
-        $query = InventoryMovement::with(['menuItem','performedBy'])->latest();
+        $query = InventoryMovement::with(['menuItem', 'performedBy'])->latest();
 
         if (strtoupper((string) $user->role) === 'VENDOR') {
             $query->where('vendor_id', $user->id);

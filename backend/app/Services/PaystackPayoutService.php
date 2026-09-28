@@ -26,7 +26,7 @@ class PaystackPayoutService
         }
 
         $request = Http::timeout(20)->withToken($secret)->acceptJson();
-        $url = $this->baseUrl() . $path;
+        $url = $this->baseUrl().$path;
 
         return $method === 'GET'
             ? $request->get($url, $query)
@@ -36,7 +36,9 @@ class PaystackPayoutService
     public function listGhanaBanks(?string $type = null): array
     {
         $query = ['country' => 'ghana', 'currency' => 'GHS'];
-        if ($type !== null) $query['type'] = $type;
+        if ($type !== null) {
+            $query['type'] = $type;
+        }
 
         $response = $this->request('GET', '/bank', [], $query);
         if (! $response->successful() || data_get($response->json(), 'status') !== true) {
@@ -69,7 +71,7 @@ class PaystackPayoutService
             'account_number' => $account->account_number,
             'bank_code' => $account->bank_code,
             'currency' => $account->currency ?: 'GHS',
-            'description' => 'ATU Cafeteria vendor ' . $account->vendor_id,
+            'description' => 'ATU Cafeteria vendor '.$account->vendor_id,
             'metadata' => ['vendor_id' => $account->vendor_id],
         ]);
 
@@ -87,9 +89,11 @@ class PaystackPayoutService
         }
 
         $amountPesewas = (int) round($amount * 100);
-        if ($amountPesewas < 1) throw new \RuntimeException('Settlement amount must be greater than zero.');
+        if ($amountPesewas < 1) {
+            throw new \RuntimeException('Settlement amount must be greater than zero.');
+        }
 
-        $reference = $reference ?: ('atu_settle_' . Str::lower(str_replace('-', '', (string) Str::uuid())));
+        $reference = $reference ?: ('atu_settle_'.Str::lower(str_replace('-', '', (string) Str::uuid())));
         $response = $this->request('POST', '/transfer', [
             'source' => 'balance',
             'amount' => $amountPesewas,

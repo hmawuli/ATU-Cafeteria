@@ -35,7 +35,7 @@ return new class extends Migration
                 Schema::table($tableName, function (Blueprint $table) use ($tableName) {
                     $table->unique('sku', $tableName.'_sku_unique');
                 });
-            } catch (\Throwable) {
+            } catch (Throwable) {
                 // Existing deployments may already have a SKU index.
             }
         }
@@ -44,9 +44,11 @@ return new class extends Migration
     public function down(): void
     {
         foreach (['food_items', 'menu_items'] as $tableName) {
-            if (! Schema::hasTable($tableName)) continue;
+            if (! Schema::hasTable($tableName)) {
+                continue;
+            }
             Schema::table($tableName, function (Blueprint $table) use ($tableName) {
-                foreach (['sku','preparation_minutes','dietary_tags','allergen_info','is_featured'] as $column) {
+                foreach (['sku', 'preparation_minutes', 'dietary_tags', 'allergen_info', 'is_featured'] as $column) {
                     if (Schema::hasColumn($tableName, $column)) {
                         $table->dropColumn($column);
                     }

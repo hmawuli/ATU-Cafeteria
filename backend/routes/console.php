@@ -12,8 +12,8 @@ use Illuminate\Foundation\Inspiring;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
-use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\Schedule;
+use Illuminate\Support\Facades\Storage;
 
 Artisan::command('inspire', function () {
     $this->comment(Inspiring::quote());
@@ -171,7 +171,7 @@ Artisan::command('database:backup', function () {
                 fclose($fileStream);
                 $this->info("Uploaded backup file to cloud storage: disk '{$disk}' / path: backups/{$fileName}");
             } else {
-                throw new \RuntimeException("Backup disk '{$disk}' is not configured.");
+                throw new RuntimeException("Backup disk '{$disk}' is not configured.");
             }
 
             Log::info("Database daily backup completed successfully. File: {$fileName}, Size: {$fileSizeKb} KB, Transmitted to Cloud Storage: true");
@@ -297,7 +297,6 @@ Artisan::command('vendor:calculate-weekly-metrics', function () {
 
 // Schedule the weekly performance rating calculator to run every week
 Schedule::command('vendor:calculate-weekly-metrics')->weekly();
-
 
 Artisan::command('cafeteria:cleanup-production', function () {
     $codes = DB::table('auth_verification_codes')

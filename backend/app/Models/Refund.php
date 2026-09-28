@@ -10,8 +10,8 @@ class Refund extends Model
     use HasFactory;
 
     protected $fillable = [
-        'order_id','payment_id','customer_id','requested_by','amount','reason',
-        'status','gateway_reference','processed_at',
+        'order_id', 'payment_id', 'customer_id', 'requested_by', 'amount', 'reason',
+        'status', 'gateway_reference', 'processed_at',
     ];
 
     protected $casts = [
@@ -23,8 +23,23 @@ class Refund extends Model
         'processed_at' => 'datetime',
     ];
 
-    public function order() { return $this->belongsTo(Order::class); }
-    public function payment() { return $this->belongsTo(Payment::class); }
-    public function customer() { return $this->belongsTo(User::class, 'customer_id'); }
-    public function requestedBy() { return $this->belongsTo(User::class, 'requested_by'); }
+    public function order()
+    {
+        return $this->belongsTo(Order::class);
+    }
+
+    public function payment()
+    {
+        return $this->belongsTo(Payment::class);
+    }
+
+    public function customer()
+    {
+        return $this->belongsTo(User::class, 'customer_id');
+    }
+
+    public function requestedBy()
+    {
+        return $this->belongsTo(User::class, 'requested_by');
+    }
 }

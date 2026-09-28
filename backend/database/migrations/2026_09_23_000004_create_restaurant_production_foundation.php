@@ -4,7 +4,6 @@ use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
-use Illuminate\Support\Str;
 
 return new class extends Migration
 {
@@ -12,22 +11,54 @@ return new class extends Migration
     {
         if (Schema::hasTable('orders')) {
             Schema::table('orders', function (Blueprint $table) {
-                if (! Schema::hasColumn('orders', 'order_number')) $table->string('order_number', 40)->nullable();
-                if (! Schema::hasColumn('orders', 'order_type')) $table->string('order_type', 30)->default('TAKEAWAY');
-                if (! Schema::hasColumn('orders', 'payment_method')) $table->string('payment_method', 30)->default('WALLET');
-                if (! Schema::hasColumn('orders', 'payment_status')) $table->string('payment_status', 30)->default('PAID')->index();
-                if (! Schema::hasColumn('orders', 'subtotal')) $table->decimal('subtotal', 12, 2)->default(0);
-                if (! Schema::hasColumn('orders', 'discount_amount')) $table->decimal('discount_amount', 12, 2)->default(0);
-                if (! Schema::hasColumn('orders', 'tax_amount')) $table->decimal('tax_amount', 12, 2)->default(0);
-                if (! Schema::hasColumn('orders', 'service_fee')) $table->decimal('service_fee', 12, 2)->default(0);
-                if (! Schema::hasColumn('orders', 'delivery_fee')) $table->decimal('delivery_fee', 12, 2)->default(0);
-                if (! Schema::hasColumn('orders', 'grand_total')) $table->decimal('grand_total', 12, 2)->default(0);
-                if (! Schema::hasColumn('orders', 'currency')) $table->string('currency', 3)->default('GHS');
-                if (! Schema::hasColumn('orders', 'customer_note')) $table->text('customer_note')->nullable();
-                if (! Schema::hasColumn('orders', 'cancellation_reason')) $table->string('cancellation_reason', 255)->nullable();
-                if (! Schema::hasColumn('orders', 'placed_at')) $table->timestamp('placed_at')->nullable();
-                if (! Schema::hasColumn('orders', 'confirmed_at')) $table->timestamp('confirmed_at')->nullable();
-                if (! Schema::hasColumn('orders', 'cancelled_at')) $table->timestamp('cancelled_at')->nullable();
+                if (! Schema::hasColumn('orders', 'order_number')) {
+                    $table->string('order_number', 40)->nullable();
+                }
+                if (! Schema::hasColumn('orders', 'order_type')) {
+                    $table->string('order_type', 30)->default('TAKEAWAY');
+                }
+                if (! Schema::hasColumn('orders', 'payment_method')) {
+                    $table->string('payment_method', 30)->default('WALLET');
+                }
+                if (! Schema::hasColumn('orders', 'payment_status')) {
+                    $table->string('payment_status', 30)->default('PAID')->index();
+                }
+                if (! Schema::hasColumn('orders', 'subtotal')) {
+                    $table->decimal('subtotal', 12, 2)->default(0);
+                }
+                if (! Schema::hasColumn('orders', 'discount_amount')) {
+                    $table->decimal('discount_amount', 12, 2)->default(0);
+                }
+                if (! Schema::hasColumn('orders', 'tax_amount')) {
+                    $table->decimal('tax_amount', 12, 2)->default(0);
+                }
+                if (! Schema::hasColumn('orders', 'service_fee')) {
+                    $table->decimal('service_fee', 12, 2)->default(0);
+                }
+                if (! Schema::hasColumn('orders', 'delivery_fee')) {
+                    $table->decimal('delivery_fee', 12, 2)->default(0);
+                }
+                if (! Schema::hasColumn('orders', 'grand_total')) {
+                    $table->decimal('grand_total', 12, 2)->default(0);
+                }
+                if (! Schema::hasColumn('orders', 'currency')) {
+                    $table->string('currency', 3)->default('GHS');
+                }
+                if (! Schema::hasColumn('orders', 'customer_note')) {
+                    $table->text('customer_note')->nullable();
+                }
+                if (! Schema::hasColumn('orders', 'cancellation_reason')) {
+                    $table->string('cancellation_reason', 255)->nullable();
+                }
+                if (! Schema::hasColumn('orders', 'placed_at')) {
+                    $table->timestamp('placed_at')->nullable();
+                }
+                if (! Schema::hasColumn('orders', 'confirmed_at')) {
+                    $table->timestamp('confirmed_at')->nullable();
+                }
+                if (! Schema::hasColumn('orders', 'cancelled_at')) {
+                    $table->timestamp('cancelled_at')->nullable();
+                }
             });
 
             DB::table('orders')->whereNull('order_number')->orderBy('id')->each(function ($order) {
@@ -38,18 +69,28 @@ return new class extends Migration
 
             try {
                 Schema::table('orders', fn (Blueprint $table) => $table->unique('order_number', 'orders_order_number_unique'));
-            } catch (\Throwable) {
+            } catch (Throwable) {
                 // Existing deployments may already contain this constraint.
             }
         }
 
         if (Schema::hasTable('order_items')) {
             Schema::table('order_items', function (Blueprint $table) {
-                if (! Schema::hasColumn('order_items', 'name_snapshot')) $table->string('name_snapshot')->nullable();
-                if (! Schema::hasColumn('order_items', 'sku_snapshot')) $table->string('sku_snapshot', 100)->nullable();
-                if (! Schema::hasColumn('order_items', 'discount_amount')) $table->decimal('discount_amount', 12, 2)->default(0);
-                if (! Schema::hasColumn('order_items', 'tax_amount')) $table->decimal('tax_amount', 12, 2)->default(0);
-                if (! Schema::hasColumn('order_items', 'line_total')) $table->decimal('line_total', 12, 2)->default(0);
+                if (! Schema::hasColumn('order_items', 'name_snapshot')) {
+                    $table->string('name_snapshot')->nullable();
+                }
+                if (! Schema::hasColumn('order_items', 'sku_snapshot')) {
+                    $table->string('sku_snapshot', 100)->nullable();
+                }
+                if (! Schema::hasColumn('order_items', 'discount_amount')) {
+                    $table->decimal('discount_amount', 12, 2)->default(0);
+                }
+                if (! Schema::hasColumn('order_items', 'tax_amount')) {
+                    $table->decimal('tax_amount', 12, 2)->default(0);
+                }
+                if (! Schema::hasColumn('order_items', 'line_total')) {
+                    $table->decimal('line_total', 12, 2)->default(0);
+                }
             });
             DB::table('order_items')->whereNull('name_snapshot')->update(['name_snapshot' => DB::raw('name')]);
             DB::table('order_items')->where('line_total', 0)->update(['line_total' => DB::raw('total_price')]);
@@ -79,12 +120,24 @@ return new class extends Migration
 
         if (Schema::hasTable('wallet_transactions')) {
             Schema::table('wallet_transactions', function (Blueprint $table) {
-                if (! Schema::hasColumn('wallet_transactions', 'order_id')) $table->foreignId('order_id')->nullable()->constrained('orders')->nullOnDelete();
-                if (! Schema::hasColumn('wallet_transactions', 'payment_id')) $table->foreignId('payment_id')->nullable()->constrained('payments')->nullOnDelete();
-                if (! Schema::hasColumn('wallet_transactions', 'source')) $table->string('source', 40)->default('SYSTEM');
-                if (! Schema::hasColumn('wallet_transactions', 'performed_by')) $table->foreignId('performed_by')->nullable()->constrained('users')->nullOnDelete();
-                if (! Schema::hasColumn('wallet_transactions', 'balance_before')) $table->decimal('balance_before', 12, 2)->nullable();
-                if (! Schema::hasColumn('wallet_transactions', 'balance_after')) $table->decimal('balance_after', 12, 2)->nullable();
+                if (! Schema::hasColumn('wallet_transactions', 'order_id')) {
+                    $table->foreignId('order_id')->nullable()->constrained('orders')->nullOnDelete();
+                }
+                if (! Schema::hasColumn('wallet_transactions', 'payment_id')) {
+                    $table->foreignId('payment_id')->nullable()->constrained('payments')->nullOnDelete();
+                }
+                if (! Schema::hasColumn('wallet_transactions', 'source')) {
+                    $table->string('source', 40)->default('SYSTEM');
+                }
+                if (! Schema::hasColumn('wallet_transactions', 'performed_by')) {
+                    $table->foreignId('performed_by')->nullable()->constrained('users')->nullOnDelete();
+                }
+                if (! Schema::hasColumn('wallet_transactions', 'balance_before')) {
+                    $table->decimal('balance_before', 12, 2)->nullable();
+                }
+                if (! Schema::hasColumn('wallet_transactions', 'balance_after')) {
+                    $table->decimal('balance_after', 12, 2)->nullable();
+                }
             });
         }
 
@@ -266,18 +319,24 @@ return new class extends Migration
         Schema::dropIfExists('order_status_histories');
         Schema::table('wallet_transactions', function (Blueprint $table) {
             foreach (['balance_before', 'balance_after', 'source', 'performed_by', 'payment_id', 'order_id'] as $column) {
-                if (Schema::hasColumn('wallet_transactions', $column)) $table->dropColumn($column);
+                if (Schema::hasColumn('wallet_transactions', $column)) {
+                    $table->dropColumn($column);
+                }
             }
         });
         Schema::dropIfExists('payments');
         Schema::table('order_items', function (Blueprint $table) {
             foreach (['name_snapshot', 'sku_snapshot', 'discount_amount', 'tax_amount', 'line_total'] as $column) {
-                if (Schema::hasColumn('order_items', $column)) $table->dropColumn($column);
+                if (Schema::hasColumn('order_items', $column)) {
+                    $table->dropColumn($column);
+                }
             }
         });
         Schema::table('orders', function (Blueprint $table) {
-            foreach (['order_number','order_type','payment_method','payment_status','subtotal','discount_amount','tax_amount','service_fee','delivery_fee','grand_total','currency','customer_note','cancellation_reason','placed_at','confirmed_at','cancelled_at'] as $column) {
-                if (Schema::hasColumn('orders', $column)) $table->dropColumn($column);
+            foreach (['order_number', 'order_type', 'payment_method', 'payment_status', 'subtotal', 'discount_amount', 'tax_amount', 'service_fee', 'delivery_fee', 'grand_total', 'currency', 'customer_note', 'cancellation_reason', 'placed_at', 'confirmed_at', 'cancelled_at'] as $column) {
+                if (Schema::hasColumn('orders', $column)) {
+                    $table->dropColumn($column);
+                }
             }
         });
     }

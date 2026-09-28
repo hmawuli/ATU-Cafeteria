@@ -72,8 +72,8 @@ class ProductionCheckoutTest extends TestCase
                 ['menu_item_id' => $drink->id, 'quantity' => 2],
             ],
         ])->assertOk()
-          ->assertJsonPath('final_total', 25)
-          ->assertJsonPath('subtotal', 25);
+            ->assertJsonPath('final_total', 25)
+            ->assertJsonPath('subtotal', 25);
 
         $response = $this->postJson('/api/customer/cart-checkout', [
             'items' => [
@@ -421,5 +421,4 @@ class ProductionCheckoutTest extends TestCase
 
         $this->assertSame(1, (int) $promotion->fresh()->usage_limit);
     }
-
 }

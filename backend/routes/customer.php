@@ -1,16 +1,18 @@
 <?php
 
+use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\CustomerAccountController;
 use App\Http\Controllers\Api\CustomerAddressController;
 use App\Http\Controllers\Api\CustomerAuthController;
 use App\Http\Controllers\Api\CustomerDeviceController;
 use App\Http\Controllers\Api\CustomerDiscoveryController;
-use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\CustomerSupportController;
-use App\Http\Controllers\Api\ProductionCartCheckoutController;
+use App\Http\Controllers\Api\DeliveredOrderReviewController;
 use App\Http\Controllers\Api\FavoriteMenuItemController;
 use App\Http\Controllers\Api\LoyaltyController;
 use App\Http\Controllers\Api\OrderController;
+use App\Http\Controllers\Api\ProductionCartCheckoutController;
+use App\Http\Controllers\Api\SmartCafeteriaController;
 use App\Http\Controllers\Api\StudentBudgetController;
 use App\Http\Controllers\Api\WalletController;
 use App\Http\Middleware\InactivityTimeout;
@@ -34,7 +36,7 @@ $customerRoutes = function () {
         Route::post('/pin/change', [AuthController::class, 'changePin'])->middleware('idempotency:required');
 
         Route::get('/discovery', [CustomerDiscoveryController::class, 'index']);
-        Route::get('/recommendations', [\App\Http\Controllers\Api\SmartCafeteriaController::class, 'recommendations']);
+        Route::get('/recommendations', [SmartCafeteriaController::class, 'recommendations']);
 
         Route::get('/orders', [OrderController::class, 'getAuthenticatedStudentOrders']);
         Route::get('/purchased-vendors', [OrderController::class, 'getPurchasedVendors']);
@@ -58,8 +60,8 @@ $customerRoutes = function () {
         Route::get('/loyalty/summary', [LoyaltyController::class, 'summary']);
         Route::post('/loyalty/preview-discount', [LoyaltyController::class, 'previewDiscount']);
 
-        Route::get('/reviews', [\App\Http\Controllers\Api\DeliveredOrderReviewController::class, 'index']);
-        Route::post('/reviews', [\App\Http\Controllers\Api\DeliveredOrderReviewController::class, 'store'])
+        Route::get('/reviews', [DeliveredOrderReviewController::class, 'index']);
+        Route::post('/reviews', [DeliveredOrderReviewController::class, 'store'])
             ->middleware('idempotency:required');
 
         Route::get('/wallet', [WalletController::class, 'index']);

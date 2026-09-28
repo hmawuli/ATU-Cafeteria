@@ -96,7 +96,9 @@ class Order extends Model
         });
 
         static::updated(function (Order $order) {
-            if (! $order->wasChanged('status')) return;
+            if (! $order->wasChanged('status')) {
+                return;
+            }
 
             OrderStatusHistory::create([
                 'order_id' => $order->id,
