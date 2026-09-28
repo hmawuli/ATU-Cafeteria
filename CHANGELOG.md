@@ -69,6 +69,10 @@ and this project follows the versioning policy described in
   SSE order-tracking streaming remains the documented exception.
 - **Branding**: generated Android launcher icons + brand asset; README banner
   and badges; `docs/DEPLOYMENT_CHECKLIST.md` (A–F rollout/release plan).
+- **Real-world UX**: queued orders are now surfaced — `pendingOrderCount` state
+  and a "Queued" status on offline orders; `docs/STAFF_QUICKSTART.md` for
+  vendor/admin staff; on-device `integration_test` scaffold; semantic label on
+  the home logo (accessible for screen readers).
 
 ### Changed
 - Local backend port standardised on Laravel default `8000` (loopback,

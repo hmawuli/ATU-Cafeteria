@@ -15,12 +15,14 @@ import 'package:atu_cafeteria/services/push_notification_service.dart';
 class CafeteriaProvider extends ChangeNotifier {
   final DbHelper _db = DbHelper.instance;
   final ApiClient _api;
-  final PendingOrderQueue _orderQueue =
-      PendingOrderQueue(DbPendingOrderStore(DbHelper.instance));
+  final PendingOrderQueue _orderQueue;
   Timer? _readyPollingTimer;
   final Set<int> _announcedReadyOrders = <int>{};
 
-  CafeteriaProvider({ApiClient? apiClient}) : _api = apiClient ?? ApiClient();
+  CafeteriaProvider({ApiClient? apiClient, PendingOrderQueue? orderQueue})
+      : _api = apiClient ?? ApiClient(),
+        _orderQueue =
+            orderQueue ?? PendingOrderQueue(DbPendingOrderStore(DbHelper.instance));
 
   // Convenience for builder call sites that need the shared client.
   ApiClient get apiClient => _api;
@@ -444,7 +446,20 @@ class CafeteriaProvider extends ChangeNotifier {
       }
     } catch (e) {
       debugPrint('Pending order flush skipped: $e');
+    } finally {
+      await refreshPendingOrderCount();
     }
+  }
+
+  /// Number of orders currently queued for offline delivery. Exposed so the UI
+  /// can show a "Queued" indicator instead of silently swallowing an order.
+  int _pendingOrderCount = 0;
+
+  int get pendingOrderCount => _pendingOrderCount;
+
+  Future<void> refreshPendingOrderCount() async {
+    _pendingOrderCount = await _orderQueue.pendingCount();
+    notifyListeners();
   }
 
   /// Refresh the authenticated user's profile (notably the wallet balance)
@@ -1395,6 +1410,8 @@ class CafeteriaProvider extends ChangeNotifier {
           },
           idempotencyKey: ApiClient.newIdempotencyKey(),
         );
+        await _db.updateOrderStatus(orderId, 'Queued');
+        await refreshPendingOrderCount();
       } catch (qe) {
         debugPrint('Could not queue offline order: $qe');
       }

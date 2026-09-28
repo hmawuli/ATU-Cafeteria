@@ -50,6 +50,8 @@ ATU-Cafeteria/
 | Performance baselines & budgets | `docs/PERFORMANCE_BUDGET.md` |
 | Accessibility audit & offline-order design | `docs/MOBILE_POLISH.md` |
 | Manual release test pass | `docs/UAT_CHECKLIST.md` |
+| Staff & admin operations guide | `docs/STAFF_QUICKSTART.md` |
+| Rollout/release checklist (A–F) | `docs/DEPLOYMENT_CHECKLIST.md` |
 | Release & versioning process | `RELEASING.md` |
 | Contribution guide | `CONTRIBUTING.md` |
 

@@ -85,17 +85,21 @@ class HomeHeader extends StatelessWidget {
 class _LogoTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
-    return Container(
-      width: 38,
-      height: 38,
-      decoration: BoxDecoration(
-        color: AppTheme.accent,
-        borderRadius: BorderRadius.circular(10),
-      ),
-      child: const Icon(
-        Icons.restaurant_menu_rounded,
-        color: AppTheme.primary,
-        size: 24,
+    return Semantics(
+      label: 'ATU Cafeteria logo',
+      image: true,
+      child: Container(
+        width: 38,
+        height: 38,
+        decoration: BoxDecoration(
+          color: AppTheme.accent,
+          borderRadius: BorderRadius.circular(10),
+        ),
+        child: const Icon(
+          Icons.restaurant_menu_rounded,
+          color: AppTheme.primary,
+          size: 24,
+        ),
       ),
     );
   }

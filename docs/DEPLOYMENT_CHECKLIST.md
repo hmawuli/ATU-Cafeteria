@@ -4,6 +4,10 @@ Everything required to take the repository from "development green" to
 "standing in production". Run through **A → F** once, then reuse **C–F** for
 every release.
 
+**Companions:** `docs/STAFF_QUICKSTART.md` (how venue staff and admins run it),
+`docs/UAT_CHECKLIST.md` (manual QA), `docs/PERFORMANCE_BUDGET.md` (baselines),
+`RELEASING.md` (versioning).
+
 ## A. Environment (only you can provide)
 
 - [ ] A production server (VPS or any Docker host) with 2 GB+ RAM, ports 80/443 open.
@@ -60,6 +64,20 @@ Run `docs/UAT_CHECKLIST.md` against the deployed API. At minimum:
       after reconnect with **no double charge** (`orders` has one row, idempotency key).
 - [ ] Crashlytics shows no crashes from the release build.
 - [ ] Vendor dashboard loads metrics, daily-revenue and recharts data.
+
+### Payments (sandbox first, then live)
+
+- [ ] Paystack **test mode** end-to-end: initialize → redirect → verify → wallet credit.
+- [ ] Duplicate webhook/success protection (no double credit).
+- [ ] Refund flow restores the wallet.
+- [ ] Only then flip `PAYSTACK_DEMO_MODE=false` with the production secret.
+
+### Real data & people onboarding
+
+- [ ] Create real vendor accounts via Admin → Vendors (`POST /api/admin/vendors`).
+- [ ] Load the actual menu/prices/categories; delete/ignore demo seed data.
+- [ ] Brief vendor staff using `docs/STAFF_QUICKSTART.md`.
+- [ ] Appointed admin reviews `audit_logs` daily.
 
 ## F. Release (per `RELEASING.md`)
 
