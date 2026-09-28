@@ -18,6 +18,7 @@ use App\Http\Controllers\Api\NotificationController;
 use App\Http\Controllers\Api\OrderController;
 use App\Http\Controllers\Api\PaystackPaymentController;
 use App\Http\Controllers\Api\SmartCafeteriaController;
+use App\Http\Controllers\Api\StandoutController;
 use App\Http\Controllers\Api\StudentAuthController;
 use App\Http\Controllers\Api\SwaggerController;
 use App\Http\Controllers\Api\VendorAuthController;
@@ -56,6 +57,11 @@ Route::post('/vendor/login', [VendorAuthController::class, 'login'])->middleware
 // authentication is still required for cart, checkout and account operations.
 Route::get('/catalog/food-items', [FoodItemController::class, 'index']);
 Route::get('/catalog/menu-items', [MenuItemController::class, 'index']);
+
+// Stand-out: public stall directory + "what's open now" board, and the target
+// of stall QR codes / deep links.
+Route::get('/public/stalls', [StandoutController::class, 'publicStalls']);
+Route::get('/stalls/{id}', [StandoutController::class, 'stall']);
 
 // Documentation and monitoring.
 Route::get('/docs', [SwaggerController::class, 'index']);
@@ -151,6 +157,11 @@ Route::middleware(['auth:sanctum', InactivityTimeout::class])->group(function ()
         Route::get('/reviews', [DeliveredOrderReviewController::class, 'index']);
         Route::post('/reviews', [DeliveredOrderReviewController::class, 'store']);
         Route::post('/feedback', [FeedbackController::class, 'store']);
+
+        // Stand-out: scheduled pre-ordering + digital receipts.
+        Route::put('/orders/{id}/schedule', [StandoutController::class, 'schedulePickup']);
+        Route::get('/orders/{id}/receipt', [StandoutController::class, 'receipt']);
+        Route::get('/orders/{id}/pdf', [StandoutController::class, 'pdf']);
     });
 
     Route::middleware('role:VENDOR,ADMIN')->group(function () {

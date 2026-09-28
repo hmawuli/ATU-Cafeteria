@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\StoreMenuItemRequest;
 use App\Models\AuditLog;
 use App\Models\MenuItem;
+use App\Support\MenuBadges;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Validator;
@@ -22,6 +23,16 @@ class MenuItemController extends Controller
             $query->where('vendor_id', $request->query('vendor_id'));
         }
 
+        $withBadges = function ($items) {
+            return $items->map(function (MenuItem $item) {
+                $data = $item->toArray();
+                $data['vendor_id'] = $item->vendor_id;
+                $data['badges'] = MenuBadges::for($item);
+
+                return $data;
+            });
+        };
+
         // Optional pagination: ?page=2&per_page=50. When omitted the full
         // catalogue is returned, preserving legacy client behaviour.
         $page = $request->integer('page', 0);
@@ -32,7 +43,7 @@ class MenuItemController extends Controller
 
             return response()->json([
                 'success' => true,
-                'menu_items' => $paginated->items(),
+                'menu_items' => $withBadges(collect($paginated->items()))->values(),
                 'pagination' => [
                     'current_page' => $paginated->currentPage(),
                     'per_page' => $paginated->perPage(),
@@ -46,7 +57,7 @@ class MenuItemController extends Controller
 
         return response()->json([
             'success' => true,
-            'menu_items' => $items,
+            'menu_items' => $withBadges($items)->values(),
         ], 200);
     }
 

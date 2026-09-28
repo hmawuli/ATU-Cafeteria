@@ -59,7 +59,7 @@ class Order extends Model
         'delivery_fee' => 'decimal:2', 'grand_total' => 'decimal:2',
         'placed_at' => 'datetime', 'confirmed_at' => 'datetime', 'accepted_at' => 'datetime',
         'preparing_at' => 'datetime', 'ready_at' => 'datetime', 'collected_at' => 'datetime',
-        'cancelled_at' => 'datetime',
+        'cancelled_at' => 'datetime', 'scheduled_pickup_at' => 'datetime',
     ];
 
     protected static function booted(): void

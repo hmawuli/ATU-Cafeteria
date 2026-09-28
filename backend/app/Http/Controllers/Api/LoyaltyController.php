@@ -11,6 +11,20 @@ use Illuminate\Support\Facades\DB;
 class LoyaltyController extends Controller
 {
     /**
+     * API routes reference /loyalty and /loyalty/summary; delegate both to the
+     * canonical summary implementation.
+     */
+    public function index(Request $request)
+    {
+        return $this->getLoyaltySummary($request);
+    }
+
+    public function summary(Request $request)
+    {
+        return $this->getLoyaltySummary($request);
+    }
+
+    /**
      * Retrieve the authenticated user's loyalty point status and history.
      */
     public function getLoyaltySummary(Request $request)
@@ -112,6 +126,27 @@ class LoyaltyController extends Controller
             return $b['timestamp_ms'] <=> $a['timestamp_ms'];
         });
 
+        // Stand-out loyalty: consecutive-day streak and next milestone.
+        $completedDates = $orders
+            ->filter(fn ($order) => in_array(strtoupper((string) $order->status), ['COMPLETED', 'DELIVERED'], true))
+            ->map(function ($order) {
+                if ($order->created_at) {
+                    return $order->created_at->toDateString();
+                }
+
+                return date('Y-m-d', (int) ($order->order_timestamp ?? time() * 1000) / 1000);
+            })
+            ->unique()
+            ->values();
+
+        $completedDays = array_fill_keys($completedDates->all(), true);
+        $streak = 0;
+        while (isset($completedDays[now()->subDays($streak)->toDateString()])) {
+            $streak++;
+        }
+
+        $milestoneTarget = $streak >= 7 ? 30 : 7;
+
         return response()->json([
             'success' => true,
             'loyalty_points_balance' => $points,
@@ -120,6 +155,9 @@ class LoyaltyController extends Controller
             'next_tier' => $nextTier,
             'points_needed_for_next_tier' => max(0, $pointsNeededForNext),
             'total_spent_all_time' => $totalSpent,
+            'streak_days' => $streak,
+            'milestone_target_days' => $milestoneTarget,
+            'days_to_next_milestone' => max(0, $milestoneTarget - $streak),
             'conversion_rule' => '10 Loyalty Points = GH₵ 4.00 Discount',
             'earning_rule' => 'Earn 1 Loyalty Point for every GH₵ 1.00 spent on completed orders',
             'history' => $history,

@@ -93,6 +93,15 @@ and this project follows the versioning policy described in
   delegates to them (public API unchanged, notifications forwarded), and the
   refresh pipeline now also loads the wallet ledger. Tests:
   `orders_state_test.dart`, `wallet_state_test.dart`.
+- **Stand-out features** (`docs/STANDOUT_FEATURES.md`): public "what's open
+  now" board (`GET /api/public/stalls`, `GET /stalls` HTML) with campus
+  filter; stall QR/deep-link menus (`GET /api/stalls/{id}`) with health
+  badges (VEGAN/VEGETARIAN/GLUTEN-FREE/FEATURED); scheduled pre-ordering
+  (`PUT /api/orders/{id}/schedule`); loyalty streaks in the loyalty summary;
+  digital receipts (`GET /api/orders/{id}/receipt` JSON + `…/pdf`); and a
+  multi-campus `vendors.campus` field. Also fixed pre-existing broken
+  `/api/customer/loyalty` routes (methods `index`/`summary` did not exist).
+  Tests: `StandoutFeaturesTest` (9).
 
 ### Changed
 - Local backend port standardised on Laravel default `8000` (loopback,

@@ -753,6 +753,17 @@ class CafeteriaProvider extends ChangeNotifier {
   Future<List<Order>> refreshVendorOrders() =>
       orders.refreshVendorOrders(_api, _authToken);
 
+  /// Schedule (or reschedule) a pickup for an order. Returns the server
+  /// message or throws [ApiException] on failure.
+  Future<dynamic> schedulePickup(int orderId, String pickupAt) {
+    return _api.request(
+      'PUT',
+      'orders/$orderId/schedule',
+      body: {'pickup_at': pickupAt},
+      token: _authToken,
+    );
+  }
+
   /// Verify a student's pickup PIN server-side and complete the order
   /// (delegated to [OrdersState]). Refreshes orders so all pages update.
   Future<String> completePickup(int orderId, String pin) =>
