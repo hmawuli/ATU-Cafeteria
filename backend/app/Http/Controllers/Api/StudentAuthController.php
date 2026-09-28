@@ -41,9 +41,7 @@ class StudentAuthController extends Controller
             return response()->json(['success' => false, 'message' => 'That username is already in use.'], 409);
         }
 
-        $emailExists = DB::connection()->getDriverName() === 'sqlite'
-            ? User::whereRaw("json_extract(profile_info, '$.email') = ?", [$email])->exists()
-            : User::whereRaw("JSON_UNQUOTE(JSON_EXTRACT(profile_info, '$.email')) = ?", [$email])->exists();
+        $emailExists = User::emailTaken($email);
 
         if ($emailExists) {
             return response()->json(['success' => false, 'message' => 'An account with that email already exists.'], 409);

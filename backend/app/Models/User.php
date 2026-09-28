@@ -31,6 +31,29 @@ class User extends Authenticatable
 
     protected $appends = ['email', 'account_type'];
 
+    /**
+     * Determine whether an account already exists for the given email.
+     *
+     * The email address may live either in the `username` column or inside
+     * the JSON `profile_info` payload (legacy accounts). Relying on raw JSON
+     * functions (JSON_EXTRACT / json_extract) is driver-specific, so the
+     * check is kept portable across SQLite, MySQL and PostgreSQL.
+     */
+    public static function emailTaken(string $email): bool
+    {
+        $email = strtolower(trim($email));
+
+        if (static::whereRaw('LOWER(username) = ?', [$email])->exists()) {
+            return true;
+        }
+
+        return static::where('profile_info', 'like', '%'.$email.'%')
+            ->get(['id', 'profile_info'])
+            ->contains(function (self $user) use ($email): bool {
+                return strtolower(trim((string) ($user->profile_info['email'] ?? ''))) === $email;
+            });
+    }
+
     public function getEmailAttribute($value): ?string
     {
         $profile = is_array($this->profile_info) ? $this->profile_info : [];

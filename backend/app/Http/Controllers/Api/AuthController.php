@@ -97,9 +97,7 @@ class AuthController extends Controller
         }
 
         $email = strtolower(trim($request->input('email')));
-        if (User::where('username', $email)
-            ->orWhereRaw("JSON_UNQUOTE(JSON_EXTRACT(profile_info, '$.email')) = ?", [$email])
-            ->exists()) {
+        if (User::emailTaken($email)) {
             return response()->json([
                 'success' => false,
                 'message' => 'An account with this email address already exists.',
