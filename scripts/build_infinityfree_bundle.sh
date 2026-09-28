@@ -40,7 +40,7 @@ echo "▶ Staging backend source…"
     --exclude='node_modules' -cf - . ) | tar -xf - -C "$APP_DEST"
 
 # Development-only files that must not ship to shared hosting.
-rm -rf "$APP_DEST"/{phpunit.xml,railway.json,scripts,public,storage/framework/cache/data/*} 2>/dev/null || true
+rm -rf "$APP_DEST"/{phpunit.xml,scripts,public,storage/framework/cache/data/*} 2>/dev/null || true
 rm -rf "$APP_DEST"/database/{migrations,factories,seeders} 2>/dev/null || true
 rm -f  "$APP_DEST"/*.md 2>/dev/null || true
 mkdir -p "$APP_DEST"/{storage/framework/cache/data,storage/framework/sessions,storage/framework/views,storage/logs,bootstrap/cache}

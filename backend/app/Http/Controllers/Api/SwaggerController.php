@@ -414,7 +414,7 @@ HTML;
                     'get' => [
                         'tags' => ['System Status'],
                         'summary' => 'Lightweight App Health Check',
-                        'description' => 'Used by deployment environments (such as Railway) to check container status.',
+                        'description' => 'Used by deployment environments to check container status.',
                         'responses' => [
                             '200' => [
                                 'description' => 'Container operational',
