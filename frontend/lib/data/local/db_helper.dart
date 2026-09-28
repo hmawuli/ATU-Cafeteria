@@ -21,7 +21,7 @@ class DbHelper {
 
     return await openDatabase(
       path,
-      version: 2,
+      version: 3,
       onCreate: _createDB,
       onUpgrade: _upgradeDB,
     );
@@ -34,6 +34,20 @@ class DbHelper {
           "ALTER TABLE food_items ADD COLUMN calories INTEGER NOT NULL DEFAULT 250");
       await db.execute(
           "ALTER TABLE food_items ADD COLUMN allergens TEXT NOT NULL DEFAULT 'None'");
+    }
+    if (oldVersion < 3) {
+      // Offline order queue: orders composed while offline are flushed with
+      // their idempotency key once connectivity returns.
+      await db.execute('''
+        CREATE TABLE pending_orders (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          idempotency_key TEXT NOT NULL UNIQUE,
+          payload TEXT NOT NULL,
+          created_at INTEGER NOT NULL
+        )
+      ''');
+      await db.execute(
+          'CREATE INDEX idx_pending_orders_created ON pending_orders(created_at)');
     }
   }
 
@@ -113,12 +127,24 @@ class DbHelper {
       )
     ''');
 
+    // 6. Offline Order Queue
+    await db.execute('''
+      CREATE TABLE pending_orders (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        idempotency_key TEXT NOT NULL UNIQUE,
+        payload TEXT NOT NULL,
+        created_at INTEGER NOT NULL
+      )
+    ''');
+
     // Indexes for fast lookups
     await db.execute('CREATE INDEX idx_users_username ON users(username)');
     await db.execute('CREATE INDEX idx_food_vendor ON food_items(vendorId)');
     await db.execute('CREATE INDEX idx_orders_customer ON orders(customerId)');
     await db.execute('CREATE INDEX idx_orders_vendor ON orders(vendorId)');
     await db.execute('CREATE INDEX idx_feedback_vendor ON feedback(vendorId)');
+    await db.execute(
+        'CREATE INDEX idx_pending_orders_created ON pending_orders(created_at)');
   }
 
   // ==========================================
@@ -371,6 +397,41 @@ class DbHelper {
       where: 'id = ?',
       whereArgs: [id],
     );
+  }
+
+  // ==========================================
+  // PENDING ORDER QUEUE (offline ordering)
+  // ==========================================
+  Future<int> insertPendingOrder(
+      {required String idempotencyKey,
+      required String payload,
+      required int createdAt}) async {
+    final db = await instance.database;
+    return await db.insert('pending_orders', {
+      'idempotency_key': idempotencyKey,
+      'payload': payload,
+      'created_at': createdAt,
+    });
+  }
+
+  Future<List<Map<String, dynamic>>> allPendingOrders() async {
+    final db = await instance.database;
+    return await db.query('pending_orders', orderBy: 'created_at ASC');
+  }
+
+  Future<void> deletePendingOrderByKey(String idempotencyKey) async {
+    final db = await instance.database;
+    await db.delete(
+      'pending_orders',
+      where: 'idempotency_key = ?',
+      whereArgs: [idempotencyKey],
+    );
+  }
+
+  Future<int> countPendingOrders() async {
+    final db = await instance.database;
+    final rows = await db.rawQuery('SELECT COUNT(*) AS c FROM pending_orders');
+    return (rows.first['c'] as int?) ?? 0;
   }
 
   Future close() async {

@@ -9,11 +9,14 @@ import 'package:atu_cafeteria/data/remote/menu_response.dart';
 import 'package:atu_cafeteria/core/config/server_config.dart';
 import 'package:atu_cafeteria/core/network/api_client.dart';
 import 'package:atu_cafeteria/core/storage/secure_session_store.dart';
+import 'package:atu_cafeteria/services/pending_order_queue.dart';
 import 'package:atu_cafeteria/services/push_notification_service.dart';
 
 class CafeteriaProvider extends ChangeNotifier {
   final DbHelper _db = DbHelper.instance;
   final ApiClient _api;
+  final PendingOrderQueue _orderQueue =
+      PendingOrderQueue(DbPendingOrderStore(DbHelper.instance));
   Timer? _readyPollingTimer;
   final Set<int> _announcedReadyOrders = <int>{};
 
@@ -420,10 +423,28 @@ class CafeteriaProvider extends ChangeNotifier {
     }
 
     // Every page reads `customerWalletBalance` from the authenticated user.
+    // Deliver any orders that were queued while offline.
+    await flushPendingOrders();
+
     // Re-sync that user from the API so wallet changes made on the server
     // (checkouts, top-ups, admin adjustments) are visible on all pages.
     await _syncCurrentUserFromServer();
     notifyListeners();
+  }
+
+  /// Deliver any orders composed while offline. Called during [refreshAllData]
+  /// whenever connectivity returns; orders are idempotency-protected so a
+  /// retry can never double-charge.
+  Future<void> flushPendingOrders() async {
+    if (_authToken == null || (_currentUser?.role ?? '') != 'STUDENT') return;
+    try {
+      final delivered = await _orderQueue.flush(_api, _authToken);
+      if (delivered > 0) {
+        debugPrint('Pending orders flushed: $delivered delivered.');
+      }
+    } catch (e) {
+      debugPrint('Pending order flush skipped: $e');
+    }
   }
 
   /// Refresh the authenticated user's profile (notably the wallet balance)
@@ -765,30 +786,17 @@ class CafeteriaProvider extends ChangeNotifier {
       return false;
     }
 
-    // Use package:http so authentication works on Web, Linux, Android and iOS.
     try {
-      final loginUrl = Uri.parse('$_laravelBaseUrl/api/login');
-      final response = await http
-          .post(
-            loginUrl,
-            headers: const {
-              'Content-Type': 'application/json',
-              'Accept': 'application/json',
-            },
-            body: jsonEncode({
-              'username': normalizedUsername,
-              'pin': pinCode,
-            }),
-          )
+      final response = await _api
+          .rawRequest('POST', 'login', body: {
+            'username': normalizedUsername,
+            'pin': pinCode,
+          })
           .timeout(const Duration(seconds: 10));
 
-      Map<String, dynamic> decoded = {};
-      if (response.body.isNotEmpty) {
-        final value = jsonDecode(response.body);
-        if (value is Map) {
-          decoded = Map<String, dynamic>.from(value);
-        }
-      }
+      final decoded = response.body is Map
+          ? Map<String, dynamic>.from(response.body as Map)
+          : <String, dynamic>{};
 
       if (response.statusCode == 200 && decoded['requires_2fa'] == true) {
         _requiresTwoFactor = true;
@@ -870,23 +878,15 @@ class CafeteriaProvider extends ChangeNotifier {
     _loginError = null;
     notifyListeners();
     try {
-      final url = Uri.parse('$_laravelBaseUrl/api/login/2fa');
-      final res = await http
-          .post(
-            url,
-            headers: const {
-              'Content-Type': 'application/json',
-              'Accept': 'application/json',
-            },
-            body: jsonEncode({
-              'username': username.trim(),
-              'code': code.trim(),
-            }),
-          )
+      final res = await _api
+          .rawRequest('POST', 'login/2fa', body: {
+            'username': username.trim(),
+            'code': code.trim(),
+          })
           .timeout(const Duration(seconds: 10));
 
-      final decoded = res.body.isNotEmpty
-          ? Map<String, dynamic>.from(jsonDecode(res.body) as Map)
+      final decoded = res.body is Map
+          ? Map<String, dynamic>.from(res.body as Map)
           : <String, dynamic>{};
 
       if (res.statusCode == 200) {
@@ -1382,7 +1382,22 @@ class CafeteriaProvider extends ChangeNotifier {
             "Order synced with Laravel backend successfully. Real order ID: $remoteOrderId");
       }
     } catch (e) {
-      debugPrint("Laravel sync unavailable ($e). Utilizing local fallback.");
+      debugPrint("Laravel sync unavailable ($e). Queuing for offline delivery.");
+      try {
+        await _orderQueue.enqueue(
+          payload: {
+            'vendor_id': foodItem.vendorId,
+            'menu_item_id': foodItem.id!,
+            'food_name': foodItem.name,
+            'quantity': quantity,
+            'unit_price': foodItem.price,
+            'total_price': requiredSum,
+          },
+          idempotencyKey: ApiClient.newIdempotencyKey(),
+        );
+      } catch (qe) {
+        debugPrint('Could not queue offline order: $qe');
+      }
     }
 
     _startRealTimeTrackingSimulation(remoteOrderId);
@@ -1486,29 +1501,20 @@ class CafeteriaProvider extends ChangeNotifier {
     required String purpose,
   }) async {
     try {
-      final initUrl = Uri.parse("$_laravelBaseUrl/api/paystack/initialize");
-      final client = HttpClient();
-      client.connectionTimeout = const Duration(seconds: 4);
-      final request = await client.postUrl(initUrl);
-      request.headers.add("Content-Type", "application/json");
-      request.headers.add("Accept", "application/json");
-      if (_authToken != null && _authToken!.isNotEmpty) {
-        request.headers.add("Authorization", "Bearer $_authToken");
-      }
-      request.add(utf8.encode(json.encode({
-        'amount': amount,
-        'email': email,
-        'purpose': purpose,
-      })));
-      final response = await request.close();
-      final body = await response.transform(utf8.decoder).join();
-      final decoded = json.decode(body);
-      if (response.statusCode == 200 &&
-          decoded is Map &&
-          decoded['success'] == true) {
+      final decoded = await _api.request(
+        'POST',
+        'paystack/initialize',
+        body: {
+          'amount': amount,
+          'email': email,
+          'purpose': purpose,
+        },
+        token: _authToken,
+      );
+      if (decoded is Map && decoded['success'] == true) {
         return Map<String, dynamic>.from(decoded['data'] as Map);
       }
-      debugPrint("Initialize Paystack error response: $body");
+      debugPrint("Initialize Paystack error response: $decoded");
     } catch (e) {
       debugPrint("Exception initializing Paystack payment: $e");
     }
@@ -1521,22 +1527,12 @@ class CafeteriaProvider extends ChangeNotifier {
     required String purpose,
   }) async {
     try {
-      final verifyUrl = Uri.parse(
-        "$_laravelBaseUrl/api/paystack/verify/$reference?amount=$amount&purpose=$purpose",
+      final decoded = await _api.request(
+        'GET',
+        'paystack/verify/$reference?amount=$amount&purpose=$purpose',
+        token: _authToken,
       );
-      final client = HttpClient();
-      client.connectionTimeout = const Duration(seconds: 4);
-      final request = await client.getUrl(verifyUrl);
-      request.headers.add("Accept", "application/json");
-      if (_authToken != null && _authToken!.isNotEmpty) {
-        request.headers.add("Authorization", "Bearer $_authToken");
-      }
-      final response = await request.close();
-      final body = await response.transform(utf8.decoder).join();
-      final decoded = json.decode(body);
-      if (response.statusCode == 200 &&
-          decoded is Map &&
-          decoded['success'] == true) {
+      if (decoded is Map && decoded['success'] == true) {
         if (purpose == 'WALLET_TOPUP') {
           // The server has already verified and credited the wallet (users.balance).
           // Mirror the credit locally so every page shows it even if the
@@ -1550,7 +1546,7 @@ class CafeteriaProvider extends ChangeNotifier {
         }
         return true;
       }
-      debugPrint("Verify Paystack error response: $body");
+      debugPrint("Verify Paystack error response: $decoded");
     } catch (e) {
       debugPrint("Exception verifying Paystack payment: $e");
     }

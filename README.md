@@ -1,4 +1,11 @@
-# ATU Cafeteria Management System
+# 🍽️ ATU Cafeteria Management System
+
+> Production-ready **Flutter + Laravel + PostgreSQL** platform for Accra
+> Technical University cafeteria operations.
+
+![CI](https://github.com/hmawuli/ATU-Cafeteria/actions/workflows/flutter.yml/badge.svg)
+[![OpenAPI](https://img.shields.io/badge/API-OpenAPI%203.0-6b21a8)](https://github.com/hmawuli/ATU-Cafeteria)
+[![PostgreSQL](https://img.shields.io/badge/database-PostgreSQL-336791)](https://github.com/hmawuli/ATU-Cafeteria)
 
 Production-oriented Flutter + Laravel implementation for Accra Technical University cafeteria operations.
 

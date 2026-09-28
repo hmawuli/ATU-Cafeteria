@@ -14,6 +14,20 @@ class ApiException implements Exception {
   String toString() => message;
 }
 
+/// Raw response for flows that branch on specific status codes (2FA gate) or
+/// read legacy response headers (e.g. `x-auth-token`).
+class RawHttpResponse {
+  final int statusCode;
+  final Map<String, String> headers;
+  final dynamic body;
+
+  const RawHttpResponse({
+    required this.statusCode,
+    required this.headers,
+    this.body,
+  });
+}
+
 class ApiClient {
   final http.Client _client;
   String? token;
@@ -111,6 +125,68 @@ class ApiClient {
       );
     }
     return decoded;
+  }
+
+  /// Low-level request that keeps the raw status, headers and decoded body.
+  ///
+  /// Used by authentication flows that branch on specific status codes (the
+  /// 2FA gate) or read the legacy `x-auth-token` response header. Everything
+  /// else should use [request].
+  Future<RawHttpResponse> rawRequest(
+    String method,
+    String path, {
+    Map<String, dynamic>? body,
+    String? token,
+  }) async {
+    String? storedToken;
+    try {
+      storedToken = await _storage.read(key: _tokenKey);
+    } catch (_) {
+      storedToken = null;
+    }
+    final effectiveToken = token ??
+        ((storedToken != null && storedToken.isNotEmpty)
+            ? storedToken
+            : this.token);
+
+    final uri = Uri.parse(
+        '${ServerConfig.baseUrl}/api/${path.replaceFirst(RegExp(r'^/'), '')}');
+
+    if (kReleaseMode && uri.scheme != 'https') {
+      throw const ApiException(
+        0,
+        'Production builds require a secure HTTPS API endpoint.',
+      );
+    }
+    final headers = <String, String>{
+      'Accept': 'application/json',
+      'Content-Type': 'application/json',
+    };
+    if (effectiveToken != null && effectiveToken.isNotEmpty) {
+      headers['Authorization'] = 'Bearer $effectiveToken';
+    }
+
+    final response = await _send(
+      method,
+      uri,
+      headers,
+      body == null ? null : jsonEncode(body),
+    );
+
+    dynamic decoded;
+    if (response.body.isNotEmpty) {
+      try {
+        decoded = jsonDecode(response.body);
+      } catch (_) {
+        decoded = response.body;
+      }
+    }
+
+    return RawHttpResponse(
+      statusCode: response.statusCode,
+      headers: response.headers,
+      body: decoded,
+    );
   }
 
   /// Creates a cryptographically strong-enough client request key for a

@@ -30,38 +30,22 @@ set to large in Android settings.
 - [ ] Long vendor names / currency strings truncate cleanly.
 - [ ] Empty states (no orders, no catalogue) have a friendly message + action.
 
-## 2. Offline order queueing (design)
+## 2. Offline order queueing (implemented — verify on device)
 
-Goal: a student can compose and dispatch an order while offline; it is sent
-once connectivity returns — without double-charging.
+**Implemented:** `DbHelper.pending_orders` table, the `PendingOrderQueue`
+service (`lib/services/pending_order_queue.dart`) and wiring in the provider —
+an order composed while offline is queued with its idempotency key and flushed
+through `POST /api/customer/orders` during `refreshAllData` once connectivity
+returns. Unit-tested (`test/pending_order_queue_test.dart`): success delivers,
+4xx drops, 5xx/network retries.
 
-### Server contract (already idempotent — good)
-`POST /api/customer/orders` is `idempotency:required`. Each order already
-carries an `Idempotency-Key`, so retrying an order after reconnecting cannot
-create duplicates server-side.
-
-### Client design
-1. **Queue store** — persist pending orders in SQLite (`DbHelper`), keyed by
-   their idempotency key: `{key, payload, created_at}`.
-2. **Compose** — the checkout flow writes the payload to the queue and shows
-   "Queued — we'll send it when you're online".
-3. **Flush** — on reconnect (connectivity plugin / after a failed request),
-   drain the queue oldest-first with `ApiClient.post(..., idempotencyKey: key)`.
-4. **Reconcile** — on success remove from queue; on a 4xx validation error
-   drop it and surface the message to the user; on 5xx/network keep it.
-5. **Order status** — while queued, show "Pending" in order history; the
-   server is the source of truth once accepted.
-
-### Constraints
-- Only single-vendor orders are queued (cart checkout is verified online).
-- Wallet balance is validated server-side at flush time — a queued order may
-  be rejected if the balance changed; the app must surface that.
-- Do not auto-flush payments/mutations other than orders.
-
-### Next step
-Implement after addressing the accessibility items; the quad of
-(sqflite queue table + connectivity flush + idempotent retry) is isolated and
-unit-testable without touching the vendor/admin flows.
+### Behaviour to verify on a real device
+1. **Compose** — airplaned client places an order → it is persisted locally and
+   shown as queued.
+2. **Flush** — reconnect and trigger a refresh → the order delivers over
+   `POST /api/customer/orders` with its idempotency key.
+3. **Reconcile** — verify `orders` contains exactly **one** row for that key
+   (no duplicate charge), and the queue row is removed on success.
 
 ## 3. Verifying the finish line
 

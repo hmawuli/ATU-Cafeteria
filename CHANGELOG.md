@@ -61,6 +61,14 @@ and this project follows the versioning policy described in
   OpenAPI and API_STANDARDS updated.
 - **Checked contract in CI**: `make contract` / a CI step run a route↔app
   audit so the frontend<->backend seam cannot silently drift again.
+- **Offline order queue**: `pending_orders` SQLite table + `PendingOrderQueue`
+  service (idempotency-keyed, flush reconciles 2xx/4xx/5xx) wired into the
+  provider; 5 unit tests.
+- **Typed client finished**: login/2FA and Paystack initialize/verify now run
+  through `ApiClient` (`rawRequest` keeps status/header semantics for auth);
+  SSE order-tracking streaming remains the documented exception.
+- **Branding**: generated Android launcher icons + brand asset; README banner
+  and badges; `docs/DEPLOYMENT_CHECKLIST.md` (A–F rollout/release plan).
 
 ### Changed
 - Local backend port standardised on Laravel default `8000` (loopback,
