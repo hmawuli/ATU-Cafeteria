@@ -6,10 +6,11 @@ class MenuRepository {
   final ApiClient client;
   MenuRepository(this.client);
 
-  /// Fetches the full food catalogue from `GET /api/food-items`.
+  /// Fetches the live menu from `GET /api/catalog/menu-items` (public, no auth
+  /// needed — so the signed-out home screen works).
   ///
-  /// The endpoint returns the standard `{success, data: [...]}` envelope; we
-  /// still tolerate a bare array for backwards compatibility.
+  /// The endpoint returns `{success, menu_items: [...]}`; we still tolerate
+  /// `{data: [...]}` and bare arrays for backwards compatibility.
   ///
   /// Failures surface as:
   ///   * [ApiException] — HTTP error from the server;
@@ -17,12 +18,15 @@ class MenuRepository {
   ///     the server could not be reached;
   ///   * [FormatException] — the body parsed as JSON but had no usable list.
   Future<List<FoodItem>> items() async {
-    final data = await client.request('GET', 'food-items');
+    final data = await client.request('GET', 'catalog/menu-items');
 
     final raw = data is List
         ? data
         : data is Map
-            ? (data['data'] ?? data['items'] ?? data['food_items'])
+            ? (data['menu_items'] ??
+                data['data'] ??
+                data['items'] ??
+                data['food_items'])
             : null;
 
     if (raw is! List) {
