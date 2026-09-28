@@ -56,7 +56,9 @@ class ATUCafeteriaApp extends StatelessWidget {
     return MultiProvider(
       providers: [
         Provider<ApiClient>(create: (_) => ApiClient()),
-        ChangeNotifierProvider(create: (_) => CafeteriaProvider()),
+        ChangeNotifierProvider(
+          create: (ctx) => CafeteriaProvider(apiClient: ctx.read<ApiClient>()),
+        ),
         ChangeNotifierProvider(create: (_) => CartProvider()),
         ChangeNotifierProvider(
           create: (ctx) => AdminStateProvider(ctx.read<ApiClient>()),

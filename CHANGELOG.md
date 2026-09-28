@@ -47,6 +47,22 @@ and this project follows the versioning policy described in
   checklist + offline order-queueing design).
 
 ### Changed
+- **One typed API layer in Flutter**: `CafeteriaProvider` now takes an
+  `ApiClient`; auth/account, `/me`, catalogue, vendor-menu, order-read and
+  pickup flows all go through it (token passing, idempotency keys, JSON error
+  mapping, HTTPS enforcement).
+- **API contract gaps fixed** (found by the new contract check):
+  vendor food-item create/update/delete now target `/api/vendor/menu-items`;
+  legacy order sync targets `/api/customer/orders`; audit reads use
+  `/api/admin/audit-logs`; audit/feedback remote writes removed (server owns
+  them) — every URL the app calls now has a matching backend route.
+- **Pagination**: `/api/catalog/menu-items` and `/api/wallet` accept optional
+  `page`/`per_page` (with a `pagination` meta block, full list when omitted);
+  OpenAPI and API_STANDARDS updated.
+- **Checked contract in CI**: `make contract` / a CI step run a route↔app
+  audit so the frontend<->backend seam cannot silently drift again.
+
+### Changed
 - Local backend port standardised on Laravel default `8000` (loopback,
   USB `adb reverse`, emulator and Wi-Fi modes).
 - Customer catalogue sync now uses `GET /api/catalog/menu-items` (server-side

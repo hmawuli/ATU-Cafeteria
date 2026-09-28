@@ -68,6 +68,9 @@ jobs:
       - name: Check PHP code style
         run: ./vendor/bin/pint --test
 
+      - name: Check frontend↔backend API contract
+        run: bash ../scripts/check_api_contract.sh
+
   backend-postgres:
     # PostgreSQL is the primary database (local, Docker and VPS). SQLite in
     # the `backend` job covers migrations; this job proves the whole suite on

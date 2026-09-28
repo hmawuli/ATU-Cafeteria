@@ -25,7 +25,11 @@ class ApiClient {
 
   Future<void> setToken(String value) async {
     token = value;
-    await _storage.write(key: _tokenKey, value: value);
+    try {
+      await _storage.write(key: _tokenKey, value: value);
+    } catch (_) {
+      // In-memory token still applies for this run.
+    }
   }
 
   Future<void> loadToken() async {
@@ -44,10 +48,21 @@ class ApiClient {
   /// server-side transaction. Existing callers remain fully compatible when
   /// the key is omitted.
   Future<dynamic> request(String method, String path,
-      {Map<String, dynamic>? body, String? idempotencyKey}) async {
-    final storedToken = await _storage.read(key: _tokenKey);
-    final effectiveToken =
-        (storedToken != null && storedToken.isNotEmpty) ? storedToken : token;
+      {Map<String, dynamic>? body,
+      String? idempotencyKey,
+      String? token}) async {
+    // Secure storage may be unavailable (unit tests, web builds, fresh
+    // installs); a caller-supplied [token] always takes precedence.
+    String? storedToken;
+    try {
+      storedToken = await _storage.read(key: _tokenKey);
+    } catch (_) {
+      storedToken = null;
+    }
+    final effectiveToken = token ??
+        ((storedToken != null && storedToken.isNotEmpty)
+            ? storedToken
+            : this.token);
 
     final uri = Uri.parse(
         '${ServerConfig.baseUrl}/api/${path.replaceFirst(RegExp(r'^/'), '')}');

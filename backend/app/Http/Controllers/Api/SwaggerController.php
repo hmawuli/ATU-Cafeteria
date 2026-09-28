@@ -289,6 +289,20 @@ HTML;
                                 'schema' => ['type' => 'integer'],
                                 'description' => 'Filter items by vendor',
                             ],
+                            [
+                                'name' => 'page',
+                                'in' => 'query',
+                                'required' => false,
+                                'schema' => ['type' => 'integer'],
+                                'description' => 'Page number (1-based). Omitting returns the full catalogue.',
+                            ],
+                            [
+                                'name' => 'per_page',
+                                'in' => 'query',
+                                'required' => false,
+                                'schema' => ['type' => 'integer', 'maximum' => 200],
+                                'description' => 'Items per page when paginating (default 50, max 200).',
+                            ],
                         ],
                         'responses' => [
                             '200' => [
@@ -519,6 +533,22 @@ HTML;
                         'tags' => ['Wallet'],
                         'summary' => 'Wallet balance and ledger',
                         'security' => [['bearerAuth' => []]],
+                        'parameters' => [
+                            [
+                                'name' => 'page',
+                                'in' => 'query',
+                                'required' => false,
+                                'schema' => ['type' => 'integer'],
+                                'description' => 'Page number (1-based); pagination meta returned when used.',
+                            ],
+                            [
+                                'name' => 'per_page',
+                                'in' => 'query',
+                                'required' => false,
+                                'schema' => ['type' => 'integer', 'maximum' => 100],
+                                'description' => 'Transactions per page (default 50, max 100).',
+                            ],
+                        ],
                         'responses' => [
                             '200' => [
                                 'description' => 'Balance and recent transactions',

@@ -3,11 +3,14 @@ import 'dart:convert';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
+import 'package:atu_cafeteria/core/network/api_client.dart';
 import 'package:atu_cafeteria/presentation/providers/cafeteria_provider.dart';
 
 void main() {
+  CafeteriaProvider providerWith(MockClient client) =>
+      CafeteriaProvider(apiClient: ApiClient(client: client));
 
-  group('CafeteriaProvider catalogue sync (injected client)', () {
+  group('CafeteriaProvider catalogue sync (injected ApiClient)', () {
     test('parses the production {menu_items: [...]} envelope', () async {
       final client = MockClient((request) async {
         expect(request.url.path, '/api/catalog/menu-items');
@@ -37,7 +40,7 @@ void main() {
         );
       });
 
-      final provider = CafeteriaProvider()..httpClientOverride = client;
+      final provider = providerWith(client);
       addTearDown(provider.dispose);
 
       final items = await provider.fetchRemoteFoodItems();
@@ -62,7 +65,7 @@ void main() {
         );
       });
 
-      final provider = CafeteriaProvider()..httpClientOverride = client;
+      final provider = providerWith(client);
       addTearDown(provider.dispose);
 
       final items = await provider.fetchRemoteFoodItems();
@@ -75,7 +78,7 @@ void main() {
         return http.Response('Service Unavailable', 503);
       });
 
-      final provider = CafeteriaProvider()..httpClientOverride = client;
+      final provider = providerWith(client);
       addTearDown(provider.dispose);
 
       expect(await provider.fetchRemoteFoodItems(), isEmpty);
@@ -87,7 +90,7 @@ void main() {
             headers: {'content-type': 'application/json'});
       });
 
-      final provider = CafeteriaProvider()..httpClientOverride = client;
+      final provider = providerWith(client);
       addTearDown(provider.dispose);
 
       expect(await provider.fetchRemoteFoodItems(), isEmpty);

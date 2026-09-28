@@ -87,6 +87,32 @@ refunds, settlements, vendor status toggles, promotion/inventory writes.
 - Omitting the key on a required route returns `419` with a descriptive
   message.
 
+## Pagination
+
+List endpoints accept optional `page` and `per_page` query parameters. When
+`page` is omitted the full list is returned (legacy behaviour); when provided,
+the response adds a `pagination` object while keeping the same item array key
+(e.g. `menu_items` or `transactions`):
+
+```json
+{
+  "success": true,
+  "menu_items": [ ... ],
+  "pagination": {
+    "current_page": 1,
+    "per_page": 50,
+    "last_page": 4,
+    "total": 183
+  }
+}
+```
+
+- `per_page` is clamped server-side (max 200 for catalogue, 100 for wallet).
+- Clients should page once collections can grow (catalogue, wallet ledger,
+  admin orders, audit logs).
+- The contract check (`make contract`) fails a build if the app calls a URL
+  with no backend route.
+
 ## Rate limiting
 
 | Limiter | Applied to | Limit |

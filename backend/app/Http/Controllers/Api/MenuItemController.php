@@ -21,6 +21,27 @@ class MenuItemController extends Controller
         if ($request->has('vendor_id')) {
             $query->where('vendor_id', $request->query('vendor_id'));
         }
+
+        // Optional pagination: ?page=2&per_page=50. When omitted the full
+        // catalogue is returned, preserving legacy client behaviour.
+        $page = $request->integer('page', 0);
+        $perPage = max(1, min(200, $request->integer('per_page', 50)));
+
+        if ($page > 0) {
+            $paginated = $query->paginate($perPage, ['*'], 'page', $page);
+
+            return response()->json([
+                'success' => true,
+                'menu_items' => $paginated->items(),
+                'pagination' => [
+                    'current_page' => $paginated->currentPage(),
+                    'per_page' => $paginated->perPage(),
+                    'last_page' => $paginated->lastPage(),
+                    'total' => $paginated->total(),
+                ],
+            ], 200);
+        }
+
         $items = $query->get();
 
         return response()->json([

@@ -7,24 +7,20 @@ import 'package:atu_cafeteria/domain/models/models.dart';
 import 'package:atu_cafeteria/data/local/db_helper.dart';
 import 'package:atu_cafeteria/data/remote/menu_response.dart';
 import 'package:atu_cafeteria/core/config/server_config.dart';
+import 'package:atu_cafeteria/core/network/api_client.dart';
 import 'package:atu_cafeteria/core/storage/secure_session_store.dart';
 import 'package:atu_cafeteria/services/push_notification_service.dart';
 
 class CafeteriaProvider extends ChangeNotifier {
   final DbHelper _db = DbHelper.instance;
+  final ApiClient _api;
   Timer? _readyPollingTimer;
   final Set<int> _announcedReadyOrders = <int>{};
 
-  // Injectable HTTP client so the catalogue/menu sync can be unit-tested
-  // without touching the network. Falls back to a default client.
-  http.Client? _httpClientOverride;
-  final http.Client _defaultHttpClient = http.Client();
+  CafeteriaProvider({ApiClient? apiClient}) : _api = apiClient ?? ApiClient();
 
-  @visibleForTesting
-  set httpClientOverride(http.Client? client) => _httpClientOverride = client;
-
-  Future<http.Response> _get(Uri uri, {Map<String, String>? headers}) =>
-      (_httpClientOverride ?? _defaultHttpClient).get(uri, headers: headers);
+  // Convenience for builder call sites that need the shared client.
+  ApiClient get apiClient => _api;
 
   @override
   void dispose() {
@@ -279,18 +275,9 @@ class CafeteriaProvider extends ChangeNotifier {
 
   Future<List<FoodItem>> _syncRemoteFoodItems() async {
     try {
-      final response = await _get(
-        Uri.parse('$_laravelBaseUrl/api/catalog/menu-items'),
-        headers: const {
-          'Accept': 'application/json',
-        },
-      ).timeout(const Duration(seconds: 10));
-
-      if (response.statusCode != 200 || response.body.isEmpty) {
-        return [];
-      }
-
-      final decoded = jsonDecode(response.body);
+      final decoded = await _api
+          .request('GET', 'catalog/menu-items')
+          .timeout(const Duration(seconds: 10));
 
       // Production catalogue returns {success, menu_items: [...]}, but older
       // deployments used {success, data: [...]} or a bare JSON array.
@@ -358,16 +345,9 @@ class CafeteriaProvider extends ChangeNotifier {
     }
 
     try {
-      final response = await _get(
-        Uri.parse('$_laravelBaseUrl/api/vendor/menu-items'),
-        headers: {
-          'Accept': 'application/json',
-          'Authorization': 'Bearer $_authToken',
-        },
-      ).timeout(const Duration(seconds: 10));
-
-      if (response.statusCode != 200 || response.body.isEmpty) return;
-      final decoded = jsonDecode(response.body);
+      final decoded = await _api
+          .request('GET', 'vendor/menu-items', token: _authToken)
+          .timeout(const Duration(seconds: 10));
 
       // Vendor menu endpoint returns {success, menu_items: [...]}; tolerate
       // {success, data: [...]} and bare lists for older deployments.
@@ -453,16 +433,10 @@ class CafeteriaProvider extends ChangeNotifier {
       return;
     }
     try {
-      final response = await http.get(
-        Uri.parse('$_laravelBaseUrl/api/me'),
-        headers: {
-          'Accept': 'application/json',
-          'Authorization': 'Bearer $_authToken',
-        },
-      ).timeout(const Duration(seconds: 8));
+      final decoded = await _api
+          .request('GET', 'me', token: _authToken)
+          .timeout(const Duration(seconds: 8));
 
-      if (response.statusCode != 200 || response.body.isEmpty) return;
-      final decoded = jsonDecode(response.body);
       final raw = decoded is Map ? decoded['user'] : null;
       if (raw is Map) {
         final fresh = User.fromJson(Map<String, dynamic>.from(raw));
@@ -670,14 +644,10 @@ class CafeteriaProvider extends ChangeNotifier {
   Future<void> pollReadyOrders() async {
     if (_authToken == null || _currentUser?.role != 'STUDENT') return;
     try {
-      final url = Uri.parse('$_laravelBaseUrl/api/customer/orders/poll-ready');
-      final response = await http.get(url, headers: {
-        'Accept': 'application/json',
-        'Authorization': 'Bearer $_authToken',
-      }).timeout(const Duration(seconds: 8));
+      final decoded = await _api
+          .request('GET', 'customer/orders/poll-ready', token: _authToken)
+          .timeout(const Duration(seconds: 8));
 
-      if (response.statusCode != 200 || response.body.isEmpty) return;
-      final decoded = jsonDecode(response.body);
       if (decoded is! Map) return;
       final alerts = decoded['ready_alerts'];
       if (alerts is! List) return;
@@ -751,22 +721,10 @@ class CafeteriaProvider extends ChangeNotifier {
     if (token == null || token.isEmpty) return;
     _authToken = token;
     try {
-      final url = Uri.parse('$_laravelBaseUrl/api/me');
-      final response = await http.get(
-        url,
-        headers: {
-          'Accept': 'application/json',
-          'Authorization': 'Bearer $token',
-        },
-      ).timeout(const Duration(seconds: 10));
+      final decoded = await _api
+          .request('GET', 'me', token: token)
+          .timeout(const Duration(seconds: 10));
 
-      if (response.statusCode != 200) {
-        _authToken = null;
-        await SecureSessionStore.clear();
-        return;
-      }
-
-      final decoded = jsonDecode(response.body) as Map<String, dynamic>;
       _currentUser =
           User.fromJson(Map<String, dynamic>.from(decoded['user'] ?? {}));
       _syncPushDeviceIfCustomer();
@@ -1003,58 +961,13 @@ class CafeteriaProvider extends ChangeNotifier {
 
   Future<dynamic> _authRequest(
       String method, String path, Map<String, dynamic> body) async {
-    final url = Uri.parse('$_laravelBaseUrl/api/$path');
-    final headers = <String, String>{
-      'Content-Type': 'application/json',
-      'Accept': 'application/json',
-    };
-    if (_authToken != null && _authToken!.isNotEmpty) {
-      headers['Authorization'] = 'Bearer $_authToken';
-    }
-
-    final encodedBody = jsonEncode(body);
-    late http.Response response;
-    switch (method.toUpperCase()) {
-      case 'GET':
-        response = await http.get(url, headers: headers).timeout(
-              const Duration(seconds: 10),
-            );
-        break;
-      case 'POST':
-        response =
-            await http.post(url, headers: headers, body: encodedBody).timeout(
-                  const Duration(seconds: 10),
-                );
-        break;
-      case 'PUT':
-        response =
-            await http.put(url, headers: headers, body: encodedBody).timeout(
-                  const Duration(seconds: 10),
-                );
-        break;
-      case 'PATCH':
-        response =
-            await http.patch(url, headers: headers, body: encodedBody).timeout(
-                  const Duration(seconds: 10),
-                );
-        break;
-      case 'DELETE':
-        response =
-            await http.delete(url, headers: headers, body: encodedBody).timeout(
-                  const Duration(seconds: 10),
-                );
-        break;
-      default:
-        throw ArgumentError('Unsupported HTTP method: $method');
-    }
-
-    final decoded = response.body.isNotEmpty ? jsonDecode(response.body) : {};
-    if (response.statusCode < 200 || response.statusCode >= 300) {
-      final msg =
-          decoded is Map ? decoded['message']?.toString() : 'Request failed.';
-      throw Exception(msg ?? 'Request failed.');
-    }
-    return decoded;
+    // All auth/account/2FA/password calls flow through the shared typed
+    // ApiClient (token passing, JSON errors, HTTPS enforcement in release).
+    // ApiException carries the server 'message' so existing callers keep the
+    // same user-facing error text.
+    return _api
+        .request(method, path, body: body, token: _authToken)
+        .timeout(const Duration(seconds: 10));
   }
 
   Future<bool> registerUser({
@@ -1446,38 +1359,27 @@ class CafeteriaProvider extends ChangeNotifier {
     // Try to sync with Laravel backend
     int remoteOrderId = orderId;
     try {
-      final postUrl = Uri.parse("$_laravelBaseUrl/api/orders");
-      final client = HttpClient();
-      client.connectionTimeout = const Duration(seconds: 3);
-      final request = await client.postUrl(postUrl);
-      request.headers.add("Content-Type", "application/json");
-      request.headers.add("Accept", "application/json");
-      if (_authToken != null && _authToken!.isNotEmpty) {
-        request.headers.add("Authorization", "Bearer $_authToken");
-      }
+      final decoded = await _api.request(
+        'POST',
+        'customer/orders',
+        body: {
+          'vendor_id': foodItem.vendorId,
+          'menu_item_id': foodItem.id!,
+          'food_name': foodItem.name,
+          'quantity': quantity,
+          'unit_price': foodItem.price,
+          'total_price': requiredSum,
+        },
+        token: _authToken,
+        idempotencyKey: ApiClient.newIdempotencyKey(),
+      ).timeout(const Duration(seconds: 10));
 
-      final payload = json.encode({
-        'customer_id': _currentUser!.id!,
-        'student_id': _currentUser!.id!,
-        'vendor_id': foodItem.vendorId,
-        'food_item_id': foodItem.id!,
-        'menu_item_id': foodItem.id!,
-        'food_name': foodItem.name,
-        'quantity': quantity,
-        'unit_price': foodItem.price,
-        'total_price': requiredSum,
-      });
-      request.add(utf8.encode(payload));
-
-      final response = await request.close();
-      if (response.statusCode == 201) {
-        final body = await response.transform(utf8.decoder).join();
-        final decoded = json.decode(body);
-        if (decoded['id'] != null) {
-          remoteOrderId = decoded['id'];
-          debugPrint(
-              "Order synced with Laravel backend successfully. Real order ID: $remoteOrderId");
-        }
+      final orderMap = decoded is Map ? (decoded['order'] ?? decoded) : null;
+      final remoteId = orderMap is Map ? orderMap['id'] : null;
+      if (remoteId != null) {
+        remoteOrderId = int.tryParse('$remoteId') ?? remoteOrderId;
+        debugPrint(
+            "Order synced with Laravel backend successfully. Real order ID: $remoteOrderId");
       }
     } catch (e) {
       debugPrint("Laravel sync unavailable ($e). Utilizing local fallback.");
@@ -1860,20 +1762,14 @@ class CafeteriaProvider extends ChangeNotifier {
 
     if (_authToken != null && item.id != null) {
       try {
-        final response = await http
-            .put(
-              Uri.parse('$_laravelBaseUrl/api/food-items/${item.id}'),
-              headers: {
-                'Accept': 'application/json',
-                'Content-Type': 'application/json',
-                'Authorization': 'Bearer $_authToken',
-              },
-              body: jsonEncode({'is_available': isAvailable}),
+        await _api
+            .request(
+              'PUT',
+              'vendor/menu-items/${item.id}',
+              body: {'is_available': isAvailable},
+              token: _authToken,
             )
             .timeout(const Duration(seconds: 10));
-        if (response.statusCode != 200) {
-          debugPrint('Remote availability update failed: ${response.body}');
-        }
       } catch (e) {
         debugPrint('Remote availability update failed: $e');
       }
@@ -1938,75 +1834,50 @@ class CafeteriaProvider extends ChangeNotifier {
       debugPrint('Description: $cleanDescription');
       debugPrint('========================================');
 
-      final response = await http
-          .post(
-            url,
-            headers: {
-              'Accept': 'application/json',
-              'Content-Type': 'application/json',
-              'Authorization': 'Bearer $_authToken',
-            },
-            body: jsonEncode({
-              'vendor_id': vendorId,
-              'name': cleanName,
+      final decoded = await _api
+          .request(
+            'POST',
+            'vendor/menu-items',
+            body: {
+              'food_name': cleanName,
               'price': price,
               'category': category,
               'description': cleanDescription,
-              'image_url': '',
+              'is_available': true,
               'initial_stock': 50,
               'low_stock_threshold': 10,
-            }),
+            },
+            token: _authToken,
           )
           .timeout(const Duration(seconds: 10));
 
-      debugPrint('ADD FOOD RESPONSE STATUS: ${response.statusCode}');
-      debugPrint('ADD FOOD RESPONSE BODY: ${response.body}');
+      debugPrint('ADD FOOD RESPONSE: success=${decoded['success']}');
 
-      if (response.statusCode == 201) {
-        debugPrint('Food item created successfully.');
+      debugPrint('Food item created successfully.');
 
-        await refreshAllData();
+      await refreshAllData();
 
-        return null;
-      }
+      return null;
+    } on ApiException catch (e) {
+      debugPrint('ADD FOOD ERROR: ${e.statusCode} ${e.message}');
 
-      try {
-        if (response.body.isNotEmpty) {
-          final decoded = jsonDecode(response.body);
+      if (e.errors.isNotEmpty) {
+        final messages = <String>[];
 
-          if (decoded is Map) {
-            final errors = decoded['errors'];
-
-            if (errors is Map) {
-              final messages = <String>[];
-
-              for (final value in errors.values) {
-                if (value is List) {
-                  messages.addAll(
-                    value.map((item) => item.toString()),
-                  );
-                } else {
-                  messages.add(value.toString());
-                }
-              }
-
-              if (messages.isNotEmpty) {
-                return messages.join('\n');
-              }
-            }
-
-            final message = decoded['message'];
-
-            if (message != null && message.toString().trim().isNotEmpty) {
-              return message.toString();
-            }
+        for (final value in e.errors.values) {
+          if (value is List) {
+            messages.addAll(value.map((item) => item.toString()));
+          } else {
+            messages.add(value.toString());
           }
         }
-      } catch (e) {
-        debugPrint('Could not decode Laravel error response: $e');
+
+        if (messages.isNotEmpty) {
+          return messages.join('\n');
+        }
       }
 
-      return 'Unable to add food item. Server returned ${response.statusCode}.';
+      return e.message;
     } on TimeoutException {
       debugPrint('ADD FOOD ERROR: Request timed out.');
 
@@ -2022,17 +1893,13 @@ class CafeteriaProvider extends ChangeNotifier {
     if (item.id == null) return;
     if (_authToken != null) {
       try {
-        final response = await http.delete(
-          Uri.parse('$_laravelBaseUrl/api/food-items/${item.id}'),
-          headers: {
-            'Accept': 'application/json',
-            'Authorization': 'Bearer $_authToken',
-          },
-        ).timeout(const Duration(seconds: 10));
-        if (response.statusCode != 200) {
-          debugPrint('Remote menu deletion failed: ${response.body}');
-          return;
-        }
+        await _api
+            .request(
+              'DELETE',
+              'vendor/menu-items/${item.id}',
+              token: _authToken,
+            )
+            .timeout(const Duration(seconds: 10));
       } catch (e) {
         debugPrint('Remote menu deletion failed: $e');
         return;
@@ -2048,23 +1915,15 @@ class CafeteriaProvider extends ChangeNotifier {
     // Attempt Laravel synchronization
     if (_authToken != null) {
       try {
-        final statusUrl =
-            Uri.parse("$_laravelBaseUrl/api/orders/$orderId/status");
-        final client = HttpClient();
-        client.connectionTimeout = const Duration(seconds: 3);
-        final request = await client.putUrl(statusUrl);
-        request.headers.add("Content-Type", "application/json");
-        request.headers.add("Authorization", "Bearer $_authToken");
-        request.add(utf8.encode(json.encode({
-          'status': newStatus,
-        })));
-        final response = await request.close();
-        if (response.statusCode == 200) {
-          debugPrint("Order status synced with Laravel: $newStatus");
-        } else {
-          final body = await response.transform(utf8.decoder).join();
-          debugPrint("Laravel status sync failed: $body");
-        }
+        await _api
+            .request(
+              'PUT',
+              'orders/$orderId/status',
+              body: {'status': newStatus},
+              token: _authToken,
+            )
+            .timeout(const Duration(seconds: 10));
+        debugPrint("Order status synced with Laravel: $newStatus");
       } catch (e) {
         debugPrint("Exception syncing status with Laravel: $e");
       }
@@ -2093,22 +1952,16 @@ class CafeteriaProvider extends ChangeNotifier {
       // Sync to Laravel if online
       if (_authToken != null) {
         try {
-          final url =
-              Uri.parse("$_laravelBaseUrl/api/orders/$orderId/verify-pickup");
-          final client = HttpClient();
-          client.connectionTimeout = const Duration(seconds: 3);
-          final request = await client.postUrl(url);
-          request.headers.add("Content-Type", "application/json");
-          request.headers.add("Authorization", "Bearer $_authToken");
-          request.add(utf8.encode(json.encode({
-            'vendor_id': _currentUser!.id!,
-            'pickup_pin': enteredPin,
-          })));
-          final response = await request.close();
-          if (response.statusCode == 200) {
-            debugPrint(
-                "Order pickup validation synced with Laravel for #$orderId");
-          }
+          await _api
+              .request(
+                'POST',
+                'orders/$orderId/verify-pickup',
+                body: {'pickup_pin': enteredPin},
+                token: _authToken,
+              )
+              .timeout(const Duration(seconds: 10));
+          debugPrint(
+              "Order pickup validation synced with Laravel for #$orderId");
         } catch (e) {
           debugPrint("Could not sync pickup validation with Laravel: $e");
         }
@@ -2142,25 +1995,10 @@ class CafeteriaProvider extends ChangeNotifier {
   }
 
   Future<void> insertAuditLog(AuditLog log) async {
+    // Audit rows are written by the Laravel API (server side). The client
+    // only maintains its local cache — there is deliberately no push endpoint,
+    // so a phantom remote call is not attempted here.
     await _db.insertAuditLog(log);
-    if (_authToken != null) {
-      try {
-        final url = Uri.parse("$_laravelBaseUrl/api/audit-logs");
-        final client = HttpClient();
-        client.connectionTimeout = const Duration(seconds: 3);
-        final request = await client.postUrl(url);
-        request.headers.add("Content-Type", "application/json");
-        request.headers.add("Authorization", "Bearer $_authToken");
-        request.add(utf8.encode(json.encode({
-          'user_id': log.userId,
-          'action': log.action,
-          'details': log.details,
-        })));
-        await request.close();
-      } catch (e) {
-        debugPrint("Exception syncing audit log: $e");
-      }
-    }
   }
 
   Future<void> fetchAndCacheFeedback() async {
@@ -2198,27 +2036,34 @@ class CafeteriaProvider extends ChangeNotifier {
   }
 
   Future<void> fetchAndCacheAuditLogs() async {
+    // Only administrators may read the audit trail. The server returns the
+    // paginated {success, data: {data: [...]}} envelope.
+    if (_authToken == null ||
+        (_currentUser?.role ?? '').toUpperCase() != 'ADMIN') {
+      return;
+    }
     try {
-      final url = Uri.parse("$_laravelBaseUrl/api/audit-logs");
-      final client = HttpClient();
-      client.connectionTimeout = const Duration(seconds: 4);
-      final request = await client.getUrl(url);
-      request.headers.add("Authorization", "Bearer $_authToken");
-      final response = await request.close();
-      if (response.statusCode == 200) {
-        final body = await response.transform(utf8.decoder).join();
-        final List decoded = json.decode(body);
-        for (var item in decoded) {
-          final log = AuditLog(
-            id: item['id'],
-            userId: item['user_id'],
-            action: item['action'],
-            details: item['details'],
-            timestamp:
-                item['timestamp'] ?? DateTime.now().millisecondsSinceEpoch,
-          );
-          await _db.insertAuditLog(log);
-        }
+      final decoded = await _api
+          .request('GET', 'admin/audit-logs', token: _authToken)
+          .timeout(const Duration(seconds: 8));
+
+      final wrapper = decoded is Map ? decoded['data'] : null;
+      final items = wrapper is Map
+          ? wrapper['data']
+          : (decoded is List ? decoded : null);
+      if (items is! List) return;
+
+      for (final item in items) {
+        if (item is! Map) continue;
+        final log = AuditLog(
+          id: item['id'],
+          userId: item['user_id'],
+          action: item['action'],
+          details: item['details'],
+          timestamp:
+              item['timestamp'] ?? DateTime.now().millisecondsSinceEpoch,
+        );
+        await _db.insertAuditLog(log);
       }
     } catch (e) {
       debugPrint(
@@ -2227,62 +2072,19 @@ class CafeteriaProvider extends ChangeNotifier {
   }
 
   Future<bool> deleteFeedback(int id) async {
-    // 1. Delete locally
+    // Local cache deletion only. There is no server DELETE endpoint for
+    // customer feedback — server rows remain the source of truth.
     await _db.deleteFeedback(id);
-
-    // 2. Delete remotely
-    bool remoteSuccess = false;
-    if (_authToken != null) {
-      try {
-        final url = Uri.parse("$_laravelBaseUrl/api/feedback/$id");
-        final client = HttpClient();
-        client.connectionTimeout = const Duration(seconds: 3);
-        final request = await client.deleteUrl(url);
-        request.headers.add("Authorization", "Bearer $_authToken");
-        final response = await request.close();
-        if (response.statusCode == 200) {
-          remoteSuccess = true;
-          debugPrint("Feedback deleted remotely from Laravel.");
-        } else {
-          debugPrint(
-              "Failed to delete feedback remotely. Code: ${response.statusCode}");
-        }
-      } catch (e) {
-        debugPrint("Exception deleting feedback remotely: $e");
-      }
-    }
-
     await refreshAllData();
-    return remoteSuccess || _authToken == null;
+
+    return true;
   }
 
   Future<bool> deleteAuditLog(int id) async {
-    // 1. Delete locally
+    // Local cache deletion only. Audit rows are immutable on the server.
     await _db.deleteAuditLog(id);
-
-    // 2. Delete remotely
-    bool remoteSuccess = false;
-    if (_authToken != null) {
-      try {
-        final url = Uri.parse("$_laravelBaseUrl/api/audit-logs/$id");
-        final client = HttpClient();
-        client.connectionTimeout = const Duration(seconds: 3);
-        final request = await client.deleteUrl(url);
-        request.headers.add("Authorization", "Bearer $_authToken");
-        final response = await request.close();
-        if (response.statusCode == 200) {
-          remoteSuccess = true;
-          debugPrint("Audit log deleted remotely from Laravel.");
-        } else {
-          debugPrint(
-              "Failed to delete audit log remotely. Code: ${response.statusCode}");
-        }
-      } catch (e) {
-        debugPrint("Exception deleting audit log remotely: $e");
-      }
-    }
-
     await refreshAllData();
-    return remoteSuccess || _authToken == null;
+
+    return true;
   }
 }

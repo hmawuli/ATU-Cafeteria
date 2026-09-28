@@ -89,3 +89,6 @@ smoke: ## Smoke-test the running API (/health, /api/health, catalogue)
 
 load: ## Load test (default: /api/health, 20 concurrent, 200 requests)
 	scripts/load_test.sh
+
+contract: ## Verify every frontend API call has a matching backend route
+	scripts/check_api_contract.sh

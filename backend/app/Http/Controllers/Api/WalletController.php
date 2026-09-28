@@ -13,6 +13,40 @@ use Illuminate\Support\Str;
 
 class WalletController extends Controller
 {
+    /**
+     * Wallet overview: current balance plus the recent transaction ledger.
+     *
+     * Supports optional pagination (?page=1&per_page=50). Returning every
+     * transaction unbounded grows the payload with the campus, so clients are
+     * encouraged to page once the ledger is large.
+     */
+    public function index(Request $request)
+    {
+        $user = $request->user();
+        if (! $user) {
+            return response()->json(['success' => false, 'message' => 'Unauthorized.'], 401);
+        }
+
+        $page = max(1, $request->integer('page', 1));
+        $perPage = max(1, min(100, $request->integer('per_page', 50)));
+
+        $transactions = WalletTransaction::where('user_id', $user->id)
+            ->orderByDesc('created_at')
+            ->paginate($perPage, ['*'], 'page', $page);
+
+        return response()->json([
+            'success' => true,
+            'balance' => (float) $user->balance,
+            'transactions' => $transactions->items(),
+            'pagination' => [
+                'current_page' => $transactions->currentPage(),
+                'per_page' => $transactions->perPage(),
+                'last_page' => $transactions->lastPage(),
+                'total' => $transactions->total(),
+            ],
+        ]);
+    }
+
     public function getBalance(Request $request)
     {
         $user = $request->user();
