@@ -7,7 +7,7 @@ import 'app_config.dart';
 /// Priority:
 ///   1. Manual override set from the app's "API server" settings
 ///      (persisted on the device) — e.g. a deployed Railway URL.
-///   2. [AppConfig] default (loopback `http://127.0.0.1:8001` for USB).
+///   2. [AppConfig] default (loopback `http://127.0.0.1:8000` for USB).
 ///
 /// This lets the same installed APK talk to a local backend over USB or to a
 /// deployed server without rebuilding, by entering the address once in the app.

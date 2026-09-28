@@ -6,7 +6,7 @@
 ///
 ///   1. `--dart-define=API_BASE_URL=...`   (highest priority, per-launch)
 ///   2. `staticApiHost`                    (phone → laptop LAN IP, set once)
-///   3. `http://127.0.0.1:8001`            (web / desktop / USB `adb reverse`)
+///   3. `http://127.0.0.1:8000`            (web / desktop / USB `adb reverse`)
 ///
 /// The provider builds API routes by appending /api/... to the backend root,
 /// therefore this value must be the backend root, not the /api/ path.
@@ -21,13 +21,13 @@
 /// `frontend/android/app/src/main/AndroidManifest.xml`.
 ///
 /// Emulator note: an Android emulator reaches the host machine at
-/// `http://10.0.2.2:8001` — pass that via `--dart-define` for emulators only.
+/// `http://10.0.2.2:8000` — pass that via `--dart-define` for emulators only.
 class AppConfig {
   static const String _dartDefineUrl = String.fromEnvironment('API_BASE_URL');
 
   /// Computer LAN IP used by the physical Android phone over Wi-Fi.
   ///
-  /// Leave this empty to use the loopback default (`http://127.0.0.1:8001`),
+  /// Leave this empty to use the loopback default (`http://127.0.0.1:8000`),
   /// which works out of the box for web, desktop and USB (`adb reverse`)
   /// development. For phone-over-Wi-Fi only, set this to the address
   /// reported by `hostname -I` (e.g. `192.168.1.50`) so the phone can reach
@@ -35,8 +35,8 @@ class AppConfig {
   /// priority.
   static const String staticApiHost = '';
 
-  static const String _port = '8001';
-  static const String _loopbackDefault = 'http://127.0.0.1:8001';
+  static const String _port = '8000';
+  static const String _loopbackDefault = 'http://127.0.0.1:8000';
 
   static String get apiBaseUrl {
     if (_dartDefineUrl.trim().isNotEmpty) return _dartDefineUrl.trim();

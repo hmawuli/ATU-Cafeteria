@@ -3,14 +3,14 @@
 # Start the Laravel backend reachable from a physical phone on the same
 # Wi-Fi network (binds 0.0.0.0 instead of 127.0.0.1).
 #
-# Usage:  scripts/serve_backend.sh [PORT]      (default port: 8001)
+# Usage:  scripts/serve_backend.sh [PORT]      (default port: 8000)
 #
 # After starting, run the app on a phone. The app reads the address once from
 # lib/core/config/app_config.dart -> staticApiHost (set it to the LAN IP shown
 # below). No need to retype the IP for every launch.
 set -euo pipefail
 
-PORT="${1:-8001}"
+PORT="${1:-8000}"
 BACKEND_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../backend" && pwd)"
 
 LAN_IP="$(hostname -I 2>/dev/null | awk '{print $1}')"

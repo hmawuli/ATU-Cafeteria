@@ -4,13 +4,13 @@
 # changing the IP address. Uses `adb reverse` to tunnel the phone's own
 # loopback port to this machine over USB.
 #
-# Usage:  scripts/connect_phone.sh [PORT]      (default port: 8001)
+# Usage:  scripts/connect_phone.sh [PORT]      (default port: 8000)
 #
-# After this runs, the app as configured (127.0.0.1:8001) works on the phone
+# After this runs, the app as configured (127.0.0.1:8000) works on the phone
 # exactly as it does on web/desktop — no dart-define, no LAN IP.
 set -euo pipefail
 
-PORT="${1:-8001}"
+PORT="${1:-8000}"
 
 if ! command -v adb >/dev/null 2>&1; then
   echo "✗ adb not found. Install it (e.g. 'sudo apt install adb') or use the"
