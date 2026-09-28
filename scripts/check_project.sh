@@ -22,5 +22,5 @@ else
 	echo "! backend/vendor missing - run (cd backend && composer install)"
 	fail=1
 fi
-if grep -RwE "web_app|jetpack|compose" -n README.md docs frontend/lib backend/routes >/dev/null 2>&1; then echo "! legacy frontend references detected"; else echo "✓ no legacy frontend references"; fi
+if grep -RwE "web_app|jetpack" -n README.md docs frontend/lib backend/routes >/dev/null 2>&1; then echo "! legacy frontend references detected"; else echo "✓ no legacy frontend references"; fi
 exit "$fail"

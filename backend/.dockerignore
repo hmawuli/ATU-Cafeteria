@@ -18,5 +18,3 @@ tests
 node_modules
 Dockerfile
 .dockerignore
-DEPLOYMENT_RAILWAY.md
-DEPLOYMENT_NETLIFY.md
