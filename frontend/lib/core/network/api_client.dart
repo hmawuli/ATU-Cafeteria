@@ -4,7 +4,6 @@ import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:atu_cafeteria/core/config/server_config.dart';
-import 'package:atu_cafeteria/core/network/infinityfree_challenge_solver.dart';
 
 class ApiException implements Exception {
   final int statusCode;
@@ -71,8 +70,7 @@ class ApiClient {
     }
 
     final encodedBody = body == null ? null : jsonEncode(body);
-    final response =
-        await _performWithBrowserCheck(method, uri, headers, encodedBody);
+    final response = await _send(method, uri, headers, encodedBody);
 
     dynamic decoded;
     if (response.body.isNotEmpty) {
@@ -107,26 +105,6 @@ class ApiClient {
     final random = Random.secure();
     final bytes = List<int>.generate(24, (_) => random.nextInt(256));
     return base64UrlEncode(bytes).replaceAll('=', '');
-  }
-
-  Future<http.Response> _performWithBrowserCheck(
-      String method, Uri uri, Map<String, String> headers, String? encodedBody) {
-    Future<http.Response> perform() {
-      final requestHeaders = Map<String, String>.from(headers);
-      final cached = InfinityFreeChallengeSolver.cookies;
-      if (cached != null) requestHeaders['Cookie'] = '__test=$cached';
-      return _send(method, uri, requestHeaders, encodedBody);
-    }
-
-    return perform().then((response) {
-      final contentType = response.headers['content-type'] ?? '';
-      if (!InfinityFreeChallengeSolver.isChallenge(contentType, response.body)) {
-        return response;
-      }
-      final cookie = InfinityFreeChallengeSolver.solveFromHtml(response.body);
-      if (cookie == null) return response;
-      return perform();
-    });
   }
 
   Future<http.Response> _send(

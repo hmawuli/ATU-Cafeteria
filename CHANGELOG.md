@@ -46,6 +46,9 @@ and this project follows the versioning policy described in
 - Netlify deployment artifacts (`netlify.toml`, legacy `index.html` /
   `web_app/` demo pages, `DEPLOY_TO_NETLIFY.md`).
 - Railway deployment artifacts (`railway.json`, `DEPLOYMENT_RAILWAY.md`).
+- InfinityFree deployment artifacts (deploy workflow, bundle script, guide)
+  and the Flutter client's InfinityFree browser-challenge workaround —
+  self-hosted deployment now targets PostgreSQL on Docker or a Linux VPS.
 
 ### Fixed
 - API 401 handling for mobile clients (machine-readable JSON).

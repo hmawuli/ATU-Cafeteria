@@ -33,3 +33,4 @@ Thumbs.db
 # Root generated files
 .gradle/
 build/
+dist/
