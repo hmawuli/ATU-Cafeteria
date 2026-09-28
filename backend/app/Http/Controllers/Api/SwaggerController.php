@@ -75,7 +75,7 @@ class SwaggerController extends Controller
   <div class="custom-header">
     <img src="https://img.icons8.com/color/192/hamburger.png" alt="ATU Logo" />
     <h1>ATU Cafeteria Platform</h1>
-    <span>Core REST API v1.0.0</span>
+    <span>Core REST API v1.1.0</span>
   </div>
 
   <div id="swagger-ui"></div>
@@ -113,69 +113,109 @@ HTML;
 
     /**
      * Provide the detailed OpenAPI JSON specification.
+     *
+     * The contract below mirrors the production routes. See
+     * docs/API_STANDARDS.md for the response envelope and error conventions.
      */
     public function openapiJson(): JsonResponse
     {
         $spec = [
             'openapi' => '3.0.0',
             'info' => [
-                'title' => 'Accra Technical University (ATU) Cafeteria REST API',
-                'description' => 'Comprehensive, enterprise-grade API backend supporting students, food vendors, digital wallets, escrow transactions, real-time tracking, chat conversations, and automated inventory checking.',
-                'version' => '1.0.0',
+                'title' => 'ATU Cafeteria REST API',
+                'description' => 'REST API for the ATU Cafeteria platform: Laravel Sanctum authentication, restaurant catalogue, ordering, vendor operations, digital wallet and payments.',
+                'version' => '1.1.0',
                 'contact' => [
-                    'name' => 'ATU QA Directorate & Software Engineering Team',
-                    'email' => 'emmanuel.kaku@atu.edu.gh',
+                    'name' => 'ATU Cafeteria Engineering',
+                    'email' => 'support@atu.edu.gh',
                 ],
             ],
             'servers' => [
                 [
                     'url' => '/api',
-                    'description' => 'Local/Relative API Gateway',
+                    'description' => 'Local/relative API gateway',
+                ],
+                [
+                    'url' => 'https://api.example.com/api',
+                    'description' => 'Production API',
                 ],
             ],
+            'tags' => [
+                ['name' => 'Authentication', 'description' => 'Login, registration and session restoration'],
+                ['name' => 'Catalog', 'description' => 'Public restaurant catalogue'],
+                ['name' => 'Orders', 'description' => 'Order placement and lifecycle'],
+                ['name' => 'Vendor', 'description' => 'Vendor operations: menu, status, orders, metrics, inventory'],
+                ['name' => 'Wallet', 'description' => 'Digital wallet balance and top-up'],
+                ['name' => 'System', 'description' => 'Health checks and diagnostics'],
+            ],
             'paths' => [
+                // -----------------------------------------------------------------
+                // Authentication
+                // -----------------------------------------------------------------
                 '/login' => [
                     'post' => [
                         'tags' => ['Authentication'],
-                        'summary' => 'Standard User Login',
-                        'description' => 'Authenticates general users (STUDENT, VENDOR, ADMIN) using username and cross-client compatible pre-hashed SHA-256 PIN codes.',
+                        'summary' => 'Standard user login',
+                        'description' => 'Authenticates STUDENT, VENDOR and ADMIN users and issues a Sanctum bearer token.',
                         'requestBody' => [
                             'required' => true,
                             'content' => [
                                 'application/json' => [
                                     'schema' => [
-                                        'type' => 'object',
-                                        'required' => ['username', 'password'],
-                                        'properties' => [
-                                            'username' => ['type' => 'string', 'example' => 'student'],
-                                            'password' => ['type' => 'string', 'description' => 'SHA-256 pre-hashed PIN', 'example' => '1234 (Pre-hashed as SHA-256)'],
-                                        ],
+                                        '$ref' => '#/components/schemas/LoginRequest',
                                     ],
                                 ],
                             ],
                         ],
                         'responses' => [
                             '200' => [
-                                'description' => 'Successful Login authentication',
+                                'description' => 'Authenticated, token and user returned',
                                 'content' => [
                                     'application/json' => [
-                                        'example' => [
-                                            'success' => true,
-                                            'token' => 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...',
-                                            'user' => [
-                                                'id' => 1,
-                                                'username' => 'student',
-                                                'role' => 'STUDENT',
-                                                'fullName' => 'Daniel Mensah',
-                                                'balance' => 250.00,
-                                                'loyalty_points' => 120,
-                                            ],
+                                        'schema' => [
+                                            '$ref' => '#/components/schemas/LoginResponse',
                                         ],
                                     ],
                                 ],
                             ],
                             '401' => [
-                                'description' => 'Invalid credentials or failed validation',
+                                'description' => 'Invalid credentials',
+                                'content' => ['application/json' => ['schema' => ['$ref' => '#/components/schemas/Error']]],
+                            ],
+                            '422' => [
+                                'description' => 'Validation failed',
+                                'content' => ['application/json' => ['schema' => ['$ref' => '#/components/schemas/Error']]],
+                            ],
+                        ],
+                    ],
+                ],
+                '/register' => [
+                    'post' => [
+                        'tags' => ['Authentication'],
+                        'summary' => 'Create a student account',
+                        'description' => 'Public self-registration. Only the STUDENT role may be created through this endpoint; ADMIN/VENDOR roles are provisioned by administrators.',
+                        'requestBody' => [
+                            'required' => true,
+                            'content' => [
+                                'application/json' => [
+                                    'schema' => [
+                                        '$ref' => '#/components/schemas/RegisterRequest',
+                                    ],
+                                ],
+                            ],
+                        ],
+                        'responses' => [
+                            '201' => [
+                                'description' => 'Account created',
+                                'content' => [
+                                    'application/json' => [
+                                        'schema' => ['$ref' => '#/components/schemas/User'],
+                                    ],
+                                ],
+                            ],
+                            '422' => [
+                                'description' => 'Validation error or the role is not self-registrable',
+                                'content' => ['application/json' => ['schema' => ['$ref' => '#/components/schemas/Error']]],
                             ],
                         ],
                     ],
@@ -183,251 +223,364 @@ HTML;
                 '/student/login' => [
                     'post' => [
                         'tags' => ['Authentication'],
-                        'summary' => 'Dedicated Student Sanctum Login',
-                        'description' => 'Student-specific Sanctum session authentication.',
+                        'summary' => 'Student Sanctum login',
+                        'description' => 'Student-specific authentication for the customer application.',
                         'requestBody' => [
                             'required' => true,
                             'content' => [
-                                'application/json' => [
-                                    'schema' => [
-                                        'type' => 'object',
-                                        'required' => ['username', 'password'],
-                                        'properties' => [
-                                            'username' => ['type' => 'string', 'example' => 'student'],
-                                            'password' => ['type' => 'string', 'example' => '1234 (SHA-256 pre-hashed)'],
-                                        ],
-                                    ],
-                                ],
+                                'application/json' => ['schema' => ['$ref' => '#/components/schemas/LoginRequest']],
                             ],
                         ],
                         'responses' => [
-                            '200' => ['description' => 'Successful Sanctum session init'],
+                            '200' => ['description' => 'Authenticated, token and user returned'],
+                            '401' => ['description' => 'Invalid credentials'],
                         ],
                     ],
                 ],
                 '/vendor/login' => [
                     'post' => [
                         'tags' => ['Authentication'],
-                        'summary' => 'Dedicated Vendor Sanctum Login',
-                        'description' => 'Vendor-specific Sanctum session authentication.',
+                        'summary' => 'Vendor Sanctum login',
+                        'description' => 'Vendor-specific authentication for kitchen/vendor terminals.',
                         'requestBody' => [
                             'required' => true,
                             'content' => [
-                                'application/json' => [
-                                    'schema' => [
-                                        'type' => 'object',
-                                        'required' => ['username', 'password'],
-                                        'properties' => [
-                                            'username' => ['type' => 'string', 'example' => 'maryjoint'],
-                                            'password' => ['type' => 'string', 'example' => '1111 (SHA-256 pre-hashed)'],
-                                        ],
-                                    ],
-                                ],
+                                'application/json' => ['schema' => ['$ref' => '#/components/schemas/LoginRequest']],
                             ],
                         ],
                         'responses' => [
-                            '200' => ['description' => 'Successful Sanctum session init'],
+                            '200' => ['description' => 'Authenticated, token and vendor profile returned'],
+                            '401' => ['description' => 'Invalid credentials'],
                         ],
                     ],
                 ],
-                '/menus' => [
+                '/me' => [
                     'get' => [
-                        'tags' => ['Menus & Items'],
-                        'summary' => 'Get All Menus',
-                        'description' => 'Retrieves list of active categories and current daily offerings.',
+                        'tags' => ['Authentication'],
+                        'summary' => 'Restore the authenticated session',
+                        'description' => 'Returns the current user from the bearer token. Used to restore sessions after an app restart.',
+                        'security' => [['bearerAuth' => []]],
                         'responses' => [
                             '200' => [
-                                'description' => 'Array of menus returned',
+                                'description' => 'Current user profile',
+                                'content' => ['application/json' => ['schema' => ['$ref' => '#/components/schemas/User']]],
+                            ],
+                            '401' => [
+                                'description' => 'Missing or invalid bearer token',
+                                'content' => ['application/json' => ['schema' => ['$ref' => '#/components/schemas/Error']]],
                             ],
                         ],
                     ],
                 ],
-                '/menu-items' => [
+
+                // -----------------------------------------------------------------
+                // Catalog
+                // -----------------------------------------------------------------
+                '/catalog/menu-items' => [
                     'get' => [
-                        'tags' => ['Menus & Items'],
-                        'summary' => 'List Standard Menu Items',
-                        'description' => 'Returns list of individual food choices and side elements.',
-                        'responses' => [
-                            '200' => [
-                                'description' => 'List of menu items',
-                            ],
-                        ],
-                    ],
-                ],
-                '/menu-items/search' => [
-                    'get' => [
-                        'tags' => ['Menus & Items'],
-                        'summary' => 'Search & Filter Menu Items',
-                        'description' => 'Dynamic searching by term, vendor, or category.',
+                        'tags' => ['Catalog'],
+                        'summary' => 'List restaurant menu items',
+                        'description' => 'Public catalogue of menu items with vendor, availability, price and stock fields.',
                         'parameters' => [
                             [
-                                'name' => 'term',
+                                'name' => 'vendor_id',
                                 'in' => 'query',
                                 'required' => false,
-                                'schema' => ['type' => 'string'],
-                                'example' => 'Jollof',
-                            ],
-                            [
-                                'name' => 'category',
-                                'in' => 'query',
-                                'required' => false,
-                                'schema' => ['type' => 'string'],
-                                'example' => 'Drinks',
+                                'schema' => ['type' => 'integer'],
+                                'description' => 'Filter items by vendor',
                             ],
                         ],
                         'responses' => [
-                            '200' => ['description' => 'Filtered results returned'],
+                            '200' => [
+                                'description' => 'Catalogue returned as {success, menu_items: [...]}',
+                                'content' => [
+                                    'application/json' => [
+                                        'example' => [
+                                            'success' => true,
+                                            'menu_items' => [
+                                                [
+                                                    'id' => 1,
+                                                    'vendor_id' => 20,
+                                                    'name' => 'Jollof Rice with Chicken',
+                                                    'price' => 35.0,
+                                                    'category' => 'Ghanaian Local Dishes',
+                                                    'is_available' => true,
+                                                    'current_stock' => 35,
+                                                ],
+                                            ],
+                                        ],
+                                    ],
+                                ],
+                            ],
                         ],
                     ],
                 ],
-                '/orders' => [
+                '/catalog/food-items' => [
                     'get' => [
-                        'tags' => ['Orders'],
-                        'summary' => 'Get All Orders',
-                        'description' => 'Public tracking feed of current system pre-orders (Administrator or general tracking dashboard use).',
+                        'tags' => ['Catalog'],
+                        'summary' => 'List food items (deprecated)',
+                        'description' => 'Legacy endpoint returning a bare JSON array. Prefer /catalog/menu-items. List consumers must accept the bare-array shape.',
+                        'deprecated' => true,
                         'responses' => [
-                            '200' => ['description' => 'Collection of orders'],
+                            '200' => ['description' => 'Bare JSON array of food items'],
                         ],
                     ],
+                ],
+
+                // -----------------------------------------------------------------
+                // Orders
+                // -----------------------------------------------------------------
+                '/orders' => [
                     'post' => [
                         'tags' => ['Orders'],
-                        'summary' => 'Place Standard Order',
-                        'description' => 'Triggers order placement and virtual wallet balance checking.',
+                        'summary' => 'Place an order',
+                        'description' => 'Places an order against a vendor menu item and debits the wallet. The authenticated student is the order customer.',
+                        'security' => [['bearerAuth' => []]],
                         'requestBody' => [
                             'required' => true,
                             'content' => [
                                 'application/json' => [
                                     'schema' => [
                                         'type' => 'object',
-                                        'required' => ['customer_id', 'vendor_id', 'food_item_id', 'quantity'],
+                                        'required' => ['vendor_id', 'menu_item_id', 'food_name', 'quantity', 'unit_price', 'total_price'],
                                         'properties' => [
-                                            'customer_id' => ['type' => 'integer', 'example' => 1],
-                                            'vendor_id' => ['type' => 'integer', 'example' => 10],
-                                            'food_item_id' => ['type' => 'integer', 'example' => 101],
+                                            'vendor_id' => ['type' => 'integer', 'example' => 20],
+                                            'menu_item_id' => ['type' => 'integer', 'example' => 3],
+                                            'food_item_id' => ['type' => 'integer', 'nullable' => true],
+                                            'food_name' => ['type' => 'string', 'example' => 'Jollof Rice with Chicken'],
                                             'quantity' => ['type' => 'integer', 'example' => 1],
-                                            'pickup_time' => ['type' => 'string', 'example' => 'In 15 Mins'],
+                                            'unit_price' => ['type' => 'number', 'example' => 35.0],
+                                            'total_price' => ['type' => 'number', 'example' => 35.0],
+                                            'points_to_redeem' => ['type' => 'integer', 'example' => 0],
+                                            'estimated_pickup_time' => ['type' => 'string', 'example' => 'In 15 Mins'],
                                         ],
                                     ],
                                 ],
                             ],
                         ],
                         'responses' => [
-                            '201' => ['description' => 'Order created and payment deducted from wallet.'],
-                            '400' => ['description' => 'Insufficient balance or stock limitation.'],
+                            '201' => ['description' => 'Order created'],
+                            '400' => ['description' => 'Validation, stock or balance failure'],
+                            '401' => ['description' => 'Unauthenticated'],
+                        ],
+                    ],
+                    'get' => [
+                        'tags' => ['Orders'],
+                        'summary' => 'List all orders (admin)',
+                        'description' => 'Administrative order list. Requires the orders.view permission.',
+                        'security' => [['bearerAuth' => []]],
+                        'responses' => [
+                            '200' => ['description' => 'Collection of orders'],
                         ],
                     ],
                 ],
                 '/orders/{id}' => [
                     'get' => [
                         'tags' => ['Orders'],
-                        'summary' => 'Show Order Status',
-                        'description' => 'Retrieve details of a single order.',
+                        'summary' => 'Fetch a single order',
+                        'description' => 'Returns one order scoped to the authenticated user (students see only their own orders).',
+                        'security' => [['bearerAuth' => []]],
                         'parameters' => [
-                            [
-                                'name' => 'id',
-                                'in' => 'path',
-                                'required' => true,
-                                'schema' => ['type' => 'integer'],
-                                'example' => 1001,
-                            ],
+                            ['name' => 'id', 'in' => 'path', 'required' => true, 'schema' => ['type' => 'integer'], 'example' => 1001],
                         ],
                         'responses' => [
-                            '200' => ['description' => 'Order details returned'],
+                            '200' => ['description' => 'Order details'],
+                            '404' => ['description' => 'Order not found or not owned by the caller'],
                         ],
                     ],
                 ],
-                '/wallet/balance' => [
+
+                // -----------------------------------------------------------------
+                // Vendor operations
+                // -----------------------------------------------------------------
+                '/vendor/menu-items' => [
                     'get' => [
-                        'tags' => ['Wallet & Ledger'],
-                        'summary' => 'Get Wallet Balance',
-                        'description' => 'Retrieve the virtual credit balance of the authenticated user (Requires Bearer Token).',
+                        'tags' => ['Vendor'],
+                        'summary' => 'List the vendor menu',
                         'security' => [['bearerAuth' => []]],
-                        'responses' => [
-                            '200' => [
-                                'description' => 'Current wallet balance',
-                                'content' => [
-                                    'application/json' => [
-                                        'example' => [
-                                            'success' => true,
-                                            'balance' => 250.00,
+                        'responses' => ['200' => ['description' => '{success, menu_items: [...]}']],
+                    ],
+                    'post' => [
+                        'tags' => ['Vendor'],
+                        'summary' => 'Create a stock-tracked menu item',
+                        'security' => [['bearerAuth' => []]],
+                        'requestBody' => [
+                            'required' => true,
+                            'content' => [
+                                'application/json' => [
+                                    'schema' => [
+                                        'type' => 'object',
+                                        'required' => ['food_name', 'price', 'category'],
+                                        'properties' => [
+                                            'food_name' => ['type' => 'string', 'example' => 'Tea & Bread'],
+                                            'price' => ['type' => 'number', 'example' => 12.0],
+                                            'category' => ['type' => 'string', 'example' => 'Breakfast'],
+                                            'description' => ['type' => 'string'],
+                                            'is_available' => ['type' => 'boolean', 'default' => true],
+                                            'initial_stock' => ['type' => 'integer', 'example' => 50],
+                                            'low_stock_threshold' => ['type' => 'integer', 'example' => 10],
                                         ],
                                     ],
                                 ],
                             ],
                         ],
-                    ],
-                ],
-                '/wallet/transactions' => [
-                    'get' => [
-                        'tags' => ['Wallet & Ledger'],
-                        'summary' => 'Get Wallet Transactions',
-                        'description' => 'Retrieve chronological list of ledger items (deposits, purchases, refunds) for the user (Requires Bearer Token).',
-                        'security' => [['bearerAuth' => []]],
                         'responses' => [
-                            '200' => ['description' => 'Wallet history ledger collection'],
+                            '201' => ['description' => 'Menu item created'],
+                            '403' => ['description' => 'Only vendors and admins may create menu items'],
                         ],
                     ],
                 ],
-                '/chats/conversation/{otherUserId}' => [
-                    'get' => [
-                        'tags' => ['Chat & Interaction'],
-                        'summary' => 'Get Private Conversations',
-                        'description' => 'Get chat bubbles and messages exchanged with another campus member (Requires Bearer Token).',
+                '/vendor/menu-items/{id}' => [
+                    'put' => [
+                        'tags' => ['Vendor'],
+                        'summary' => 'Update a menu item',
                         'security' => [['bearerAuth' => []]],
                         'parameters' => [
-                            [
-                                'name' => 'otherUserId',
-                                'in' => 'path',
-                                'required' => true,
-                                'schema' => ['type' => 'integer'],
-                                'example' => 10,
-                            ],
+                            ['name' => 'id', 'in' => 'path', 'required' => true, 'schema' => ['type' => 'integer']],
                         ],
-                        'responses' => [
-                            '200' => ['description' => 'Conversation timeline details'],
+                        'responses' => ['200' => ['description' => 'Menu item updated'], '403' => ['description' => 'Not owned by this vendor']],
+                    ],
+                    'delete' => [
+                        'tags' => ['Vendor'],
+                        'summary' => 'Delete a menu item',
+                        'security' => [['bearerAuth' => []]],
+                        'parameters' => [
+                            ['name' => 'id', 'in' => 'path', 'required' => true, 'schema' => ['type' => 'integer']],
                         ],
+                        'responses' => ['200' => ['description' => 'Menu item deleted']],
                     ],
                 ],
-                '/system/status' => [
-                    'get' => [
-                        'tags' => ['System Status'],
-                        'summary' => 'Get System Diagnostics',
-                        'description' => 'Checks connection health to SQLite DB, local cache buffers, and underlying container metrics.',
-                        'responses' => [
-                            '200' => [
-                                'description' => 'All dependencies healthy',
-                                'content' => [
-                                    'application/json' => [
-                                        'example' => [
-                                            'status' => 'OK',
-                                            'database' => 'connected',
-                                            'cached_items_count' => 12,
-                                            'timestamp' => '2026-07-13T09:55:18',
-                                        ],
+                '/vendor/status' => [
+                    'patch' => [
+                        'tags' => ['Vendor'],
+                        'summary' => 'Toggle vendor open/closed status',
+                        'description' => 'Idempotency-key protected (X-Idempotency-Key header).',
+                        'security' => [['bearerAuth' => []]],
+                        'requestBody' => [
+                            'required' => true,
+                            'content' => [
+                                'application/json' => [
+                                    'schema' => [
+                                        'type' => 'object',
+                                        'required' => ['is_open'],
+                                        'properties' => ['is_open' => ['type' => 'boolean', 'example' => false]],
                                     ],
                                 ],
                             ],
                         ],
+                        'responses' => ['200' => ['description' => 'Status toggled, {success, is_open} returned']],
                     ],
                 ],
+                '/vendor/orders' => [
+                    'get' => [
+                        'tags' => ['Vendor'],
+                        'summary' => 'List orders for this vendor',
+                        'security' => [['bearerAuth' => []]],
+                        'responses' => ['200' => ['description' => 'Collection of orders (pickup PIN never exposed)']],
+                    ],
+                ],
+                '/vendor/orders/{id}/status' => [
+                    'patch' => [
+                        'tags' => ['Vendor'],
+                        'summary' => 'Advance an order status',
+                        'security' => [['bearerAuth' => []]],
+                        'parameters' => [
+                            ['name' => 'id', 'in' => 'path', 'required' => true, 'schema' => ['type' => 'integer']],
+                        ],
+                        'requestBody' => [
+                            'required' => true,
+                            'content' => [
+                                'application/json' => [
+                                    'schema' => [
+                                        'type' => 'object',
+                                        'required' => ['status'],
+                                        'properties' => ['status' => ['type' => 'string', 'enum' => ['RECEIVED', 'PREPARING', 'READY', 'DELIVERED', 'CANCELLED']]],
+                                    ],
+                                ],
+                            ],
+                        ],
+                        'responses' => ['200' => ['description' => 'Order status advanced']],
+                    ],
+                ],
+                '/vendor/metrics' => [
+                    'get' => [
+                        'tags' => ['Vendor'],
+                        'summary' => 'Vendor performance metrics',
+                        'security' => [['bearerAuth' => []]],
+                        'responses' => ['200' => ['description' => 'Metrics including popular menu items']],
+                    ],
+                ],
+
+                // -----------------------------------------------------------------
+                // Wallet
+                // -----------------------------------------------------------------
+                '/wallet' => [
+                    'get' => [
+                        'tags' => ['Wallet'],
+                        'summary' => 'Wallet balance and ledger',
+                        'security' => [['bearerAuth' => []]],
+                        'responses' => [
+                            '200' => [
+                                'description' => 'Balance and recent transactions',
+                                'content' => ['application/json' => ['schema' => ['$ref' => '#/components/schemas/Wallet']]],
+                            ],
+                        ],
+                    ],
+                ],
+                '/wallet/top-up' => [
+                    'post' => [
+                        'tags' => ['Wallet'],
+                        'summary' => 'Initiate a wallet top-up',
+                        'description' => 'Invokes the configured payment provider (Paystack) verification flow and credits the wallet transactionally.',
+                        'security' => [['bearerAuth' => []]],
+                        'requestBody' => [
+                            'required' => true,
+                            'content' => [
+                                'application/json' => [
+                                    'schema' => [
+                                        'type' => 'object',
+                                        'required' => ['reference'],
+                                        'properties' => ['reference' => ['type' => 'string', 'example' => 'paystack-ref-12345']],
+                                    ],
+                                ],
+                            ],
+                        ],
+                        'responses' => ['200' => ['description' => 'Top-up processed/verified'], '400' => ['description' => 'Invalid reference or duplicate success']],
+                    ],
+                ],
+
+                // -----------------------------------------------------------------
+                // System
+                // -----------------------------------------------------------------
                 '/health' => [
                     'get' => [
-                        'tags' => ['System Status'],
-                        'summary' => 'Lightweight App Health Check',
-                        'description' => 'Used by deployment environments to check container status.',
+                        'tags' => ['System'],
+                        'summary' => 'API health check',
+                        'description' => 'Whether the API service is healthy. Used by deployment environments and container health checks.',
                         'responses' => [
                             '200' => [
-                                'description' => 'Container operational',
+                                'description' => 'Service healthy',
                                 'content' => [
                                     'application/json' => [
-                                        'example' => [
-                                            'status' => 'healthy',
-                                            'framework' => 'Laravel 11.x',
-                                        ],
+                                        'example' => ['status' => 'healthy', 'framework' => 'Laravel 11'],
                                     ],
                                 ],
                             ],
                         ],
+                    ],
+                ],
+                '/docs' => [
+                    'get' => [
+                        'tags' => ['System'],
+                        'summary' => 'Interactive API documentation (Swagger UI)',
+                        'responses' => ['200' => ['description' => 'Swagger UI HTML page']],
+                    ],
+                ],
+                '/docs/openapi.json' => [
+                    'get' => [
+                        'tags' => ['System'],
+                        'summary' => 'OpenAPI 3.0 specification',
+                        'responses' => ['200' => ['description' => 'This specification as JSON']],
                     ],
                 ],
             ],
@@ -436,8 +589,65 @@ HTML;
                     'bearerAuth' => [
                         'type' => 'http',
                         'scheme' => 'bearer',
-                        'bearerFormat' => 'JWT',
-                        'description' => 'Input your JWT Token (obtained from /login response) or Sanctum Access Token to authorize requests.',
+                        'description' => 'Sanctum bearer token issued by /login. Sent as: Authorization: Bearer <token>',
+                    ],
+                ],
+                'schemas' => [
+                    'LoginRequest' => [
+                        'type' => 'object',
+                        'required' => ['username', 'pin'],
+                        'properties' => [
+                            'username' => ['type' => 'string', 'example' => 'student'],
+                            'pin' => ['type' => 'string', 'minLength' => 4, 'description' => 'PIN; either the plain PIN or a SHA-256 pre-hashed value', 'example' => '1234'],
+                        ],
+                    ],
+                    'RegisterRequest' => [
+                        'type' => 'object',
+                        'required' => ['email', 'password', 'role', 'fullName'],
+                        'properties' => [
+                            'email' => ['type' => 'string', 'format' => 'email', 'example' => 'student@atu.edu.gh'],
+                            'password' => ['type' => 'string', 'minLength' => 8, 'example' => 'a-secure-password'],
+                            'role' => ['type' => 'string', 'enum' => ['STUDENT'], 'description' => 'Only STUDENT is self-registrable'],
+                            'fullName' => ['type' => 'string', 'example' => 'Daniel Mensah'],
+                        ],
+                    ],
+                    'LoginResponse' => [
+                        'type' => 'object',
+                        'properties' => [
+                            'success' => ['type' => 'boolean'],
+                            'token' => ['type' => 'string'],
+                            'user' => ['$ref' => '#/components/schemas/User'],
+                            'requires_2fa' => ['type' => 'boolean', 'description' => 'Present when an administrator must verify a 2FA code'],
+                        ],
+                    ],
+                    'User' => [
+                        'type' => 'object',
+                        'properties' => [
+                            'id' => ['type' => 'integer'],
+                            'username' => ['type' => 'string'],
+                            'role' => ['type' => 'string', 'enum' => ['STUDENT', 'VENDOR', 'ADMIN']],
+                            'fullName' => ['type' => 'string'],
+                            'balance' => ['type' => 'number'],
+                            'loyalty_points' => ['type' => 'integer'],
+                            'is_open' => ['type' => 'boolean', 'description' => 'Vendor open status'],
+                        ],
+                    ],
+                    'Wallet' => [
+                        'type' => 'object',
+                        'properties' => [
+                            'success' => ['type' => 'boolean'],
+                            'balance' => ['type' => 'number'],
+                            'transactions' => ['type' => 'array', 'items' => ['type' => 'object']],
+                        ],
+                    ],
+                    'Error' => [
+                        'type' => 'object',
+                        'required' => ['message'],
+                        'properties' => [
+                            'success' => ['type' => 'boolean', 'example' => false],
+                            'message' => ['type' => 'string'],
+                            'errors' => ['type' => 'object', 'description' => 'Field-level validation errors when present'],
+                        ],
                     ],
                 ],
             ],
