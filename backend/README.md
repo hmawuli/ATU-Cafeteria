@@ -37,18 +37,21 @@ There is no active Blade/PWA/browser frontend. `routes/api.php` is the applicati
 
 ## Local setup
 
+Requirements: PHP 8.2+, Composer and a running PostgreSQL server.
+
 ```bash
 cd backend
 composer install
-cp .env.example .env
-mkdir -p database
-touch database/database.sqlite
+cp .env.example .env          # set DB_DATABASE / DB_USERNAME / DB_PASSWORD
+sudo -u postgres createdb atu_cafeteria   # once, if the DB does not exist yet
 php artisan key:generate
-php artisan migrate --seed
+php artisan migrate
 php artisan serve --host=0.0.0.0 --port=8000
 ```
 
-SQLite is the recommended local database for the 4 GB development machine. Use PostgreSQL/MySQL in production according to the deployment environment.
+PostgreSQL is the primary database for both local development and production
+(`DB_CONNECTION=pgsql`). Automated tests switch to SQLite automatically via
+`phpunit.xml`, so `php artisan test` needs no extra database.
 
 ## Quality checks
 
@@ -59,4 +62,5 @@ php artisan test
 
 ## Health
 
-The API exposes `/api/health` for application monitoring and Laravel's `/up` health endpoint.
+The API exposes `/api/health` for application monitoring and `/health` for
+infrastructure checks.

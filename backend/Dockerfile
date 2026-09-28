@@ -26,10 +26,10 @@ FROM php:8.2-fpm-alpine AS runtime
 
 WORKDIR /var/www/html
 
-# PHP extensions required by the application and the MySQL production database.
+# PHP extensions required by the application and the PostgreSQL production database.
 RUN set -eux; \
     apk add --no-cache --virtual .build-deps $PHPIZE_DEPS; \
-    docker-php-ext-install pdo_mysql bcmath; \
+    docker-php-ext-install pdo_pgsql pgsql bcmath; \
     apk del .build-deps
 
 # Production-tuned PHP settings (kept revalidation ON so bind mounts and

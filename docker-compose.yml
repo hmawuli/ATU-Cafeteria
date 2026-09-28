@@ -1,6 +1,7 @@
 # ATU Cafeteria — self-hosted backend stack.
 #
-# Stands up the Laravel REST API (PHP-FPM), Nginx and MySQL with health checks:
+# Stands up the Laravel REST API (PHP-FPM), Nginx and PostgreSQL with health
+# checks:
 #
 #   cp backend/.env.example backend/.env   # then set DB_* + APP_KEY
 #   docker compose up -d --build
@@ -24,9 +25,9 @@ services:
     environment:
       APP_ENV: ${APP_ENV:-production}
       APP_DEBUG: ${APP_DEBUG:-false}
-      DB_CONNECTION: mysql
+      DB_CONNECTION: pgsql
       DB_HOST: db
-      DB_PORT: "3306"
+      DB_PORT: "5432"
       MIGRATE_ON_START: ${MIGRATE_ON_START:-true}
     volumes:
       - app_code:/var/www/html
@@ -56,28 +57,18 @@ services:
       start_period: 20s
 
   db:
-    image: mysql:8.0
+    image: postgres:16-alpine
     restart: unless-stopped
     environment:
-      MYSQL_DATABASE: ${DB_DATABASE:-atu_cafeteria}
-      MYSQL_USER: ${DB_USERNAME:-atu}
-      MYSQL_PASSWORD: ${DB_PASSWORD:-atu_secret}
-      MYSQL_ROOT_PASSWORD: ${DB_ROOT_PASSWORD:-atu_root_secret}
+      POSTGRES_DB: ${DB_DATABASE:-atu_cafeteria}
+      POSTGRES_USER: ${DB_USERNAME:-atu}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-atu_secret}
     volumes:
-      - db_data:/var/lib/mysql
+      - db_data:/var/lib/postgresql/data
     networks:
       - atu
     healthcheck:
-      test:
-        [
-          "CMD",
-          "mysqladmin",
-          "ping",
-          "-h",
-          "localhost",
-          "-uroot",
-          "-p${DB_ROOT_PASSWORD:-atu_root_secret}",
-        ]
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USERNAME:-atu} -d ${DB_DATABASE:-atu_cafeteria}"]
       interval: 5s
       timeout: 5s
       retries: 20

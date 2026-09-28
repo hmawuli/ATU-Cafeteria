@@ -17,6 +17,11 @@ enter `https://atucafeteria.free.nf` once — no rebuild needed.
 
 ## Step 1 — Control panel (hPanel) prep *(2 minutes)*
 
+> **Note:** the system's primary database is PostgreSQL (Docker / VPS
+> deployments). InfinityFree is an alternative **MySQL-only** shared-hosting
+> target, so the bundle for it is configured for MySQL — the app itself is
+> driver-portable, so nothing in the code changes.
+
 1. Log into [https://dash.infinityfree.com/accounts](https://dash.infinityfree.com/accounts).
 2. **PHP version** → in the row for `atucafeteria.free.nf`, click *Manage* → *PHP version*
    and select **PHP 8.2** (or the highest version available on your account) → *Save*.

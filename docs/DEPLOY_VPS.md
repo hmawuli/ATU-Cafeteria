@@ -1,14 +1,14 @@
 # Deploying the ATU Cafeteria API to a VPS
 
 Generic Linux server deployment (Ubuntu 22.04/24.04) using Nginx + PHP-FPM +
-MySQL. Use this when you are not using Docker (see `docker-compose.yml` and
-`docker compose up -d --build` for the containerised alternative).
+PostgreSQL. Use this when you are not using Docker (see `docker-compose.yml`
+and `docker compose up -d --build` for the containerised alternative).
 
 | Component | Stack |
 |---|---|
 | Web server | Nginx |
 | Application | Laravel 11 / PHP 8.2 (PHP-FPM) |
-| Database | MySQL 8 / MariaDB 10.11 |
+| Database | PostgreSQL 14+ |
 | TLS | Let's Encrypt (certbot) |
 | Queue/cache | Database queue, file cache (adjust per scale) |
 
@@ -22,24 +22,32 @@ MySQL. Use this when you are not using Docker (see `docker-compose.yml` and
 
 ```bash
 sudo apt update && sudo apt upgrade -y
-sudo apt install -y nginx mysql-server composer git curl zip unzip
+sudo apt install -y nginx postgresql composer git curl zip unzip
 
 # PHP 8.2 (Ubuntu 24.04 ships 8.3; any of 8.2–8.3 works with this codebase)
-sudo apt install -y php8.2-fpm php8.2-cli php8.2-mysql \
+sudo apt install -y php8.2-fpm php8.2-cli php8.2-pgsql \
   php8.2-mbstring php8.2-xml php8.2-bcmath php8.2-curl php8.2-sqlite3 \
   php8.2-intl php8.2-gd
 ```
 
-Verify: `php -v` and `mysql --version`.
+Verify: `php -v` and `psql --version`.
 
-## 3. Harden MySQL
+## 3. Create the PostgreSQL database
 
 ```bash
-sudo mysql_secure_installation
-sudo mysql -e "CREATE DATABASE atu_cafeteria CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;"
-sudo mysql -e "CREATE USER 'atu'@'localhost' IDENTIFIED BY '<strong-password>';"
-sudo mysql -e "GRANT ALL PRIVILEGES ON atu_cafeteria.* TO 'atu'@'localhost';"
-sudo mysql -e "FLUSH PRIVILEGES;"
+sudo -u postgres psql
+
+# Inside the psql shell:
+CREATE USER atu WITH PASSWORD '<strong-password>';
+CREATE DATABASE atu_cafeteria OWNER atu;
+\q
+```
+
+Or, as the `postgres` OS user:
+
+```bash
+sudo -u postgres createuser -P atu          # enter the password when prompted
+sudo -u postgres createdb -O atu atu_cafeteria
 ```
 
 ## 4. Deploy the code
@@ -68,9 +76,9 @@ APP_DEBUG=false
 APP_URL=https://api.example.com
 APP_TIMEZONE=Africa/Accra
 
-DB_CONNECTION=mysql
+DB_CONNECTION=pgsql
 DB_HOST=127.0.0.1
-DB_PORT=3306
+DB_PORT=5432
 DB_DATABASE=atu_cafeteria
 DB_USERNAME=atu
 DB_PASSWORD=<strong-password>
@@ -194,15 +202,15 @@ renewed automatically.
 
 ## Backups
 
-Daily encrypted MySQL dump:
+Daily encrypted PostgreSQL dump:
 
 ```bash
 # /etc/cron.d/atu-backup
-15 2 * * * root mysqldump --single-transaction atu_cafeteria | gzip > /var/backups/atu/atu_$(date +\%F).sql.gz
+15 2 * * * root pg_dump -U atu atu_cafeteria | gzip > /var/backups/atu/atu_$(date +\%F).sql.gz
 ```
 
-Test restoration (`gunzip < ... | mysql atu_cafeteria`) at least monthly. Keep
-`.env`, keystores and backups out of git.
+Test restoration (`gunzip < ... | psql -U atu atu_cafeteria`) at least
+monthly. Keep `.env`, keystores and backups out of git.
 
 ## Security checklist
 

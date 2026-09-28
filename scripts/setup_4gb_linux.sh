@@ -32,7 +32,26 @@ echo "==> Preparing Laravel backend"
 cd "$BACKEND"
 [ -f .env ] || cp .env.example .env
 mkdir -p database bootstrap/cache storage/framework/cache storage/framework/sessions storage/framework/views storage/logs
-touch database/database.sqlite
+
+# PostgreSQL is the primary database. Offer a helpful hint if a local server
+# is available; otherwise the user creates the database on their own machine.
+if grep -q '^DB_CONNECTION=pgsql' .env; then
+  DB_NAME="$(grep -E '^DB_DATABASE=' .env | head -1 | cut -d= -f2 | tr -d ' \"')"
+  DB_USER="$(grep -E '^DB_USERNAME=' .env | head -1 | cut -d= -f2 | tr -d ' \"')"
+  if command -v psql >/dev/null 2>&1; then
+    if ! psql -tAc "SELECT 1 FROM pg_database WHERE datname='$DB_NAME'" 2>/dev/null | grep -q 1; then
+      echo "==> Creating PostgreSQL database '$DB_NAME' (owner: ${DB_USER:-current user})"
+      createdb -O "$DB_USER" "$DB_NAME" 2>/dev/null || sudo -u postgres createdb -O "$DB_USER" "$DB_NAME" 2>/dev/null || \
+        echo "! Could not auto-create the database. Create '$DB_NAME' in PostgreSQL manually."
+    fi
+  else
+    echo "! PostgreSQL client not found. Ensure a PostgreSQL server is running and create the '$DB_NAME' database."
+  fi
+else
+  # SQLite fallback for machines without PostgreSQL.
+  touch database/database.sqlite
+fi
+
 composer install --prefer-dist --optimize-autoloader
 php artisan key:generate --force
 

@@ -9,6 +9,7 @@ Production-oriented Flutter + Laravel implementation for Accra Technical Univers
 | Mobile frontend | Flutter / Dart |
 | State management | Provider |
 | Local cache | SQLite / sqflite |
+| Primary database | PostgreSQL |
 | Backend | Laravel 11 / PHP 8.2+ |
 | API | REST / JSON |
 | Authentication | Laravel-issued bearer token |
@@ -25,7 +26,7 @@ ATU-Cafeteria/
 ├── docs/              # architecture, deployment, standards and operations docs
 ├── .githooks/         # versioned git hooks (pre-commit / pre-push)
 ├── Makefile           # developer task runner (make help)
-├── docker-compose.yml # self-hosted backend stack (Laravel + MySQL + Nginx)
+├── docker-compose.yml # self-hosted backend stack (Laravel + PostgreSQL + Nginx)
 ├── CHANGELOG.md       # release history
 └── .vscode/           # lightweight editor settings
 ```
@@ -36,7 +37,7 @@ ATU-Cafeteria/
 |---|---|
 | API conventions (envelope, errors, idempotency, rate limits) | `docs/API_STANDARDS.md` |
 | Interactive API docs (served live) | `/api/docs` on the running backend |
-| Deploy to a Linux VPS (Nginx + PHP-FPM + MySQL) | `docs/DEPLOY_VPS.md` |
+| Deploy to a Linux VPS (Nginx + PHP-FPM + PostgreSQL) | `docs/DEPLOY_VPS.md` |
 | Containerised deployment | `docker-compose.yml` + `make docker-up` |
 | Release & versioning process | `RELEASING.md` |
 | Contribution guide | `CONTRIBUTING.md` |

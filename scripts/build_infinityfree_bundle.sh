@@ -7,6 +7,10 @@
 #  here (dependencies installed for PHP 8.2, .env produced, files arranged so
 #  the Laravel front controller lives in htdocs/ and the rest in laravel-app/).
 #
+#  NOTE: the system's primary database is PostgreSQL (Docker / VPS
+#  deployments). InfinityFree is an alternative MySQL-only shared-hosting
+#  target, so this bundle is built for MySQL.
+#
 #  Required environment variables:
 #    APP_KEY       Laravel application key (base64:...)
 #    DB_HOST       InfinityFree MySQL host, e.g. sql303.infinityfree.com

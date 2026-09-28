@@ -9,10 +9,15 @@ and this project follows the versioning policy described in
 ## [Unreleased]
 
 ### Added
+- **Primary database switched to PostgreSQL** (local, Docker and VPS
+  deployment). SQLite remains only for automated tests (`phpunit.xml`) and
+  the Flutter offline cache. MySQL-specific JSON lookups were replaced with
+  a DB-portable duplicate-email check, and `audit_logs.user_id` became
+  nullable so pre-auth order audits no longer violate Postgres constraints.
 - Docker self-hosting stack for the backend API (`backend/Dockerfile`,
-  `docker-compose.yml`) with MySQL, Nginx and health checks.
+  `docker-compose.yml`) with PostgreSQL, Nginx and health checks.
 - `docs/DEPLOY_VPS.md` — bare-metal Linux VPS deployment guide (Nginx +
-  PHP-FPM + MySQL, HTTPS, queue worker, backups).
+  PHP-FPM + PostgreSQL, HTTPS, queue worker, backups).
 - `docs/API_STANDARDS.md` — response envelope, idempotency, rate-limit and
   error conventions for the REST API.
 - Root `Makefile` with `make setup|serve|connect|seed-dev|test|lint|check`

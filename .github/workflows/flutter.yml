@@ -68,6 +68,72 @@ jobs:
       - name: Check PHP code style
         run: ./vendor/bin/pint --test
 
+  backend-postgres:
+    # PostgreSQL is the primary database (local, Docker and VPS). SQLite in
+    # the `backend` job covers migrations; this job proves the whole suite on
+    # the production database driver so MySQL-specific SQL cannot regress.
+    timeout-minutes: 25
+    runs-on: ubuntu-24.04
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_DB: atu_cafeteria_test
+          POSTGRES_USER: atu
+          POSTGRES_PASSWORD: atu_secret
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U atu -d atu_cafeteria_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.2'
+          extensions: mbstring, xml, ctype, iconv, json, bcmath, pgsql, pdo_pgsql
+          coverage: none
+          tools: composer:v2
+
+      - name: Install PHP dependencies
+        run: composer install --no-ansi --no-interaction --no-progress --prefer-dist
+
+      - name: Prepare test environment
+        run: |
+          cp .env.example .env
+          php artisan key:generate --force
+
+      - name: Run database migrations (PostgreSQL)
+        env:
+          DB_CONNECTION: pgsql
+          DB_HOST: 127.0.0.1
+          DB_PORT: "5432"
+          DB_DATABASE: atu_cafeteria_test
+          DB_USERNAME: atu
+          DB_PASSWORD: atu_secret
+        run: php artisan migrate --force
+
+      - name: Run Laravel tests (PostgreSQL)
+        env:
+          DB_CONNECTION: pgsql
+          DB_HOST: 127.0.0.1
+          DB_PORT: "5432"
+          DB_DATABASE: atu_cafeteria_test
+          DB_USERNAME: atu
+          DB_PASSWORD: atu_secret
+        run: php artisan test
+
+      - name: Check PHP code style
+        run: ./vendor/bin/pint --test
+
   frontend:
     timeout-minutes: 35
     runs-on: ubuntu-24.04
