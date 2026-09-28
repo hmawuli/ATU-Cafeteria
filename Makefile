@@ -86,3 +86,6 @@ db-backup: ## Back up the PostgreSQL database (Docker stack or local)
 
 smoke: ## Smoke-test the running API (/health, /api/health, catalogue)
 	scripts/smoke_test.sh
+
+load: ## Load test (default: /api/health, 20 concurrent, 200 requests)
+	scripts/load_test.sh

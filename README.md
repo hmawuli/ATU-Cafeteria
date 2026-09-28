@@ -40,6 +40,8 @@ ATU-Cafeteria/
 | Deploy to a Linux VPS (Nginx + PHP-FPM + PostgreSQL) | `docs/DEPLOY_VPS.md` |
 | Containerised deployment (incl. queue worker + scheduler) | `docker-compose.yml` + `make docker-up` |
 | Logging, health checks, monitoring, crash reporting | `docs/OBSERVABILITY.md` |
+| Performance baselines & budgets | `docs/PERFORMANCE_BUDGET.md` |
+| Accessibility audit & offline-order design | `docs/MOBILE_POLISH.md` |
 | Manual release test pass | `docs/UAT_CHECKLIST.md` |
 | Release & versioning process | `RELEASING.md` |
 | Contribution guide | `CONTRIBUTING.md` |

@@ -15,6 +15,17 @@ class CafeteriaProvider extends ChangeNotifier {
   Timer? _readyPollingTimer;
   final Set<int> _announcedReadyOrders = <int>{};
 
+  // Injectable HTTP client so the catalogue/menu sync can be unit-tested
+  // without touching the network. Falls back to a default client.
+  http.Client? _httpClientOverride;
+  final http.Client _defaultHttpClient = http.Client();
+
+  @visibleForTesting
+  set httpClientOverride(http.Client? client) => _httpClientOverride = client;
+
+  Future<http.Response> _get(Uri uri, {Map<String, String>? headers}) =>
+      (_httpClientOverride ?? _defaultHttpClient).get(uri, headers: headers);
+
   @override
   void dispose() {
     _readyPollingTimer?.cancel();
@@ -268,7 +279,7 @@ class CafeteriaProvider extends ChangeNotifier {
 
   Future<List<FoodItem>> _syncRemoteFoodItems() async {
     try {
-      final response = await http.get(
+      final response = await _get(
         Uri.parse('$_laravelBaseUrl/api/catalog/menu-items'),
         headers: const {
           'Accept': 'application/json',
@@ -347,7 +358,7 @@ class CafeteriaProvider extends ChangeNotifier {
     }
 
     try {
-      final response = await http.get(
+      final response = await _get(
         Uri.parse('$_laravelBaseUrl/api/vendor/menu-items'),
         headers: {
           'Accept': 'application/json',
@@ -376,6 +387,12 @@ class CafeteriaProvider extends ChangeNotifier {
       debugPrint('Vendor menu sync skipped: $e');
     }
   }
+
+  /// Fetch and parse the live restaurant catalogue without the full refresh
+  /// pipeline (no local-DB writes). Useful for tests and callers that only
+  /// need the remote list.
+  @visibleForTesting
+  Future<List<FoodItem>> fetchRemoteFoodItems() => _syncRemoteFoodItems();
 
   Future<void> refreshAllData() async {
     // The Laravel database is the source of truth for the live menu.

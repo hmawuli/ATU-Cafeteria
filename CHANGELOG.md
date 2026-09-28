@@ -38,6 +38,13 @@ and this project follows the versioning policy described in
   and `docs/UAT_CHECKLIST.md` (manual release test pass).
 - Flutter Crashlytics integration (`CrashReporting`), enabled via the same
   `ATU_FIREBASE_*` dart-defines used by FCM.
+- End-to-end customer journey test (`CustomerJourneyEndToEndTest`): register →
+  login → catalogue → order → vendor READY → student poll → pickup verify,
+  over the real HTTP API on SQLite and PostgreSQL.
+- Direct `CafeteriaProvider` catalogue tests via an injectable HTTP client
+  (with a `fetchRemoteFoodItems()` seam); `make load` load-test script and
+  `docs/PERFORMANCE_BUDGET.md`; `docs/MOBILE_POLISH.md` (accessibility audit
+  checklist + offline order-queueing design).
 
 ### Changed
 - Local backend port standardised on Laravel default `8000` (loopback,
