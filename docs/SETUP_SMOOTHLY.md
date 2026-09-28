@@ -28,12 +28,16 @@ chmod +x scripts/setup_4gb_linux.sh
 ## Start Laravel
 
 ```bash
-cd backend
-php artisan migrate --seed
-php artisan serve --host=0.0.0.0 --port=8000
+make seed-dev   # migrate + seed development vendors and restaurant catalog
+make serve      # Laravel on 0.0.0.0:8000
 ```
 
-Keep this terminal open.
+Keep this terminal open. If you are not using `make`, the equivalent manual
+commands are `php artisan migrate`, the two development seeders
+(`MenuCategoryAndVendorSeeder`, `DevelopmentRestaurantCatalogSeeder`) and
+`php artisan serve --host=0.0.0.0 --port=8000`. Note that `php artisan
+migrate --seed` is intentionally empty in this project — development data is
+loaded through the explicit seeders above.
 
 ## Start Flutter
 

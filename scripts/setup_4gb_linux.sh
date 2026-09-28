@@ -36,8 +36,13 @@ touch database/database.sqlite
 composer install --prefer-dist --optimize-autoloader
 php artisan key:generate --force
 
+echo "==> Installing git hooks"
+cd "$ROOT"
+git config core.hooksPath .githooks
+
 echo
 echo "Setup complete."
-echo "Backend: cd backend && php artisan serve"
+echo "Backend: make serve   (or: cd backend && php artisan serve)"
+echo "Seed dev data: make seed-dev"
 echo "Frontend: cd frontend && flutter run"
 echo "For 4 GB RAM, use a physical Android phone instead of an emulator."

@@ -1,0 +1,19 @@
+#!/usr/bin/env bash
+# Pre-push gate — runs the full CI-style project health check.
+#
+# This mirrors the GitHub Actions workflow so pushing is safe by default.
+# Bypass temporarily with:  git push --no-verify
+set -euo pipefail
+
+ROOT="$(git rev-parse --show-toplevel)"
+cd "${ROOT}"
+
+echo "◆ Running full project health check before push..."
+if ! scripts/check_project.sh; then
+  echo
+  echo "✗ Project health check failed. Do not push broken code."
+  echo "  Fix the reported items, or bypass with: git push --no-verify"
+  exit 1
+fi
+
+echo "✓ Project health check passed."

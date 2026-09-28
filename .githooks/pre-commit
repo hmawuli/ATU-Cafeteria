@@ -1,0 +1,52 @@
+#!/usr/bin/env bash
+# Pre-commit checks — designed to finish in seconds.
+#
+#   * PHP syntax check  on staged PHP files
+#   * Pint style check  on staged PHP files
+#   * Flutter analyze   when Dart files are staged (skipped with a warning if
+#                       the Flutter SDK is missing/broken on this machine)
+#
+# Bypass temporarily with:  git commit --no-verify
+set -euo pipefail
+
+ROOT="$(git rev-parse --show-toplevel)"
+cd "$ROOT"
+
+staged() { git diff --cached --name-only --diff-filter=ACM "$@" 2>/dev/null || true; }
+
+# ---------------------------------------------------------------------------
+# PHP: syntax + Pint on staged files only
+# ---------------------------------------------------------------------------
+staged_php="$(staged -- 'backend/*.php')"
+if [ -n "${staged_php}" ]; then
+  printf '%s\n' "${staged_php[@]}" | while IFS= read -r f; do
+    php -l "${ROOT}/${f}" >/dev/null || { echo "✗ PHP syntax error in ${f}"; exit 1; }
+  done
+
+  # Map repo paths to backend-relative paths for Pint.
+  rel="$(printf '%s\n' "${staged_php[@]}" | sed 's|^backend/||' | tr '\n' ' ')"
+  if ! (cd backend && ./vendor/bin/pint --test ${rel} >/dev/null); then
+    echo "✗ Pint style check failed for staged PHP files."
+    echo "  Fix with:  cd backend && ./vendor/bin/pint"
+    exit 1
+  fi
+fi
+
+# ---------------------------------------------------------------------------
+# Dart: analyze only when Dart files are staged
+# ---------------------------------------------------------------------------
+staged_dart="$(staged -- 'frontend/*.dart')"
+if [ -n "${staged_dart}" ]; then
+  FLUTTER_BIN="$(bash "${ROOT}/scripts/flutter.sh" 2>/dev/null)" || FLUTTER_BIN=""
+  if [ -n "${FLUTTER_BIN}" ]; then
+    if ! (cd frontend && "${FLUTTER_BIN}" analyze >/dev/null 2>&1); then
+      echo "✗ flutter analyze reported issues. Fix before committing."
+      echo "  Inspect with:  cd frontend && flutter analyze"
+      exit 1
+    fi
+  else
+    echo "! Could not find a working Flutter SDK; skipped flutter analyze."
+  fi
+fi
+
+echo "✓ Pre-commit checks passed."

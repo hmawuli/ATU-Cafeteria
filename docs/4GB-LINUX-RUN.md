@@ -7,15 +7,18 @@ From the project root:
 ```bash
 chmod +x scripts/setup_4gb_linux.sh
 ./scripts/setup_4gb_linux.sh
+make seed-dev    # migrate + seed development vendors and restaurant catalog
 ```
+
+This installs dependencies, prepares Laravel, and activates the repo git
+hooks (`.githooks/`).
 
 ## Daily run
 
 Terminal 1:
 
 ```bash
-cd backend
-php artisan serve
+make serve         # Laravel on 0.0.0.0:8000 (or: cd backend && php artisan serve)
 ```
 
 Terminal 2:

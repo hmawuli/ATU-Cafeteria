@@ -34,11 +34,37 @@ The Laravel API is the production source of truth. Flutter SQLite is used for lo
 
 ## Quick start
 
+Two supported paths — the `Makefile` (recommended) or the raw setup script.
+
+**Option A — `make` (recommended):**
+
+```bash
+make setup          # git hooks + PHP/Flutter dependencies + .env files
+make seed-dev       # migrate + seed development vendors and restaurant catalog
+make serve          # Laravel on 0.0.0.0:8000 (reachable by a phone)
+```
+
+Then run the Flutter app from `frontend/` (`flutter run`).
+
+**Option B — setup script:**
+
 ```bash
 ./scripts/setup_4gb_linux.sh
 ```
 
-Then start Laravel and Flutter using `docs/PRODUCTION_RUNBOOK.md`.
+Then start Laravel (`make serve` or `scripts/serve_backend.sh`) and seed the
+development catalog (`make seed-dev`). See `docs/PRODUCTION_RUNBOOK.md` for
+the detailed runbook and `docs/SETUP_SMOOTHLY.md` for the 4 GB RAM workflow.
+
+### Developer workflow
+
+- `make help` lists every task; `make test`, `make lint`, `make analyze`,
+  `make format` and `make check` cover the quality gates.
+- `make setup` installs versioned git hooks (`.githooks/`): a fast
+  pre-commit check on staged files and a full pre-push health gate.
+  See `CONTRIBUTING.md`.
+- Development data is seeded on demand via `make seed-dev` — it is never part
+  of `DatabaseSeeder` and refuses to run against a production environment.
 
 ## API endpoint configuration
 
@@ -58,30 +84,35 @@ flutter run --dart-define=API_BASE_URL=https://your-api.example.com/api/
    scripts/connect_phone.sh
    flutter run
    ```
-   The app's default `http://127.0.0.1:8001` then reaches your computer over USB.
+   The app's default `http://127.0.0.1:8000` then reaches your computer over USB.
 
 2. **Same Wi-Fi** — set the address once in `lib/core/config/app_config.dart` and start the backend with `scripts/serve_backend.sh`.
 
 3. **Android emulator** — pass the emulator loopback alias at run time:
    ```bash
-   flutter run --dart-define=API_BASE_URL=http://10.0.2.2:8001
+   flutter run --dart-define=API_BASE_URL=http://10.0.2.2:8000
    ```
 
-Precedence: `--dart-define` → `staticApiHost` → `127.0.0.1:8001`.
+Precedence: `--dart-define` → `staticApiHost` → `127.0.0.1:8000`.
 Android development builds also need cleartext HTTP when using a local HTTP API.
 
 ## Quality gates
 
-Before committing:
+Before committing or pushing:
 
 ```bash
-cd backend && php artisan test
-cd backend && ./vendor/bin/pint --test
-cd frontend && flutter analyze
-cd frontend && flutter test
-cd frontend && flutter build apk --release
-cd frontend && flutter build appbundle --release
+make lint        # Pint style + Flutter analyze
+make test        # backend + frontend test suites
+make check       # full CI-style health gate (includes lint + tests)
 ```
+
+The raw commands (`cd backend && php artisan test`, `flutter analyze`,
+`flutter test`, `./vendor/bin/pint --test`) are equivalent to the `make`
+targets above. Android release builds (`apk` / `appbundle --release`) are
+built in CI by GitHub Actions — see `.github/workflows/flutter.yml`.
+
+Versioned pre-commit/pre-push hooks (`.githooks/`) run the fast checks on
+commit and the full gate on push; `make setup` installs them.
 
 ## Production standard
 
