@@ -1,0 +1,22 @@
+# Build context exclusions for the backend Docker image.
+.git
+.gitignore
+.env
+.env.*
+!env.example
+vendor
+storage/framework/cache/data/*
+storage/framework/sessions/*
+storage/framework/views/*
+storage/logs/*
+public/storage
+database/*.sqlite
+database/*.sqlite-*
+tests
+*.result.cache
+.swagger-codegen
+node_modules
+Dockerfile
+.dockerignore
+DEPLOYMENT_RAILWAY.md
+DEPLOYMENT_NETLIFY.md

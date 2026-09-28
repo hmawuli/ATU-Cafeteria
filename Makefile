@@ -63,3 +63,20 @@ format: ## Apply formatters (Pint for backend; Dart format for frontend)
 
 check: ## Full project health check (runs the CI-style gate locally)
 	scripts/check_project.sh
+
+# --- Docker (self-hosted backend stack) ---
+
+docker-build: ## Build the backend Docker image
+	docker compose build
+
+docker-up: ## Stand up the full stack (Laravel + MySQL + Nginx) in Docker
+	docker compose up -d --build
+
+docker-down: ## Stop the Docker stack (volumes persist unless you pass -v)
+	docker compose down
+
+docker-logs: ## Tail the Docker stack logs
+	docker compose logs -f
+
+docker-migrate: ## Run migrations against the Docker database
+	docker compose run --rm app php artisan migrate --force --no-interaction

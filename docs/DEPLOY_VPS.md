@@ -1,0 +1,213 @@
+# Deploying the ATU Cafeteria API to a VPS
+
+Generic Linux server deployment (Ubuntu 22.04/24.04) using Nginx + PHP-FPM +
+MySQL. Use this when you are not using Docker (see `docker-compose.yml` and
+`docker compose up -d --build` for the containerised alternative).
+
+| Component | Stack |
+|---|---|
+| Web server | Nginx |
+| Application | Laravel 11 / PHP 8.2 (PHP-FPM) |
+| Database | MySQL 8 / MariaDB 10.11 |
+| TLS | Let's Encrypt (certbot) |
+| Queue/cache | Database queue, file cache (adjust per scale) |
+
+## 1. Provision the server
+
+- Ubuntu 22.04/24.04 LTS, at least 1 vCPU / 1 GB RAM (2 GB recommended).
+- Open ports: `22` (SSH), `80`, `443`.
+- Point a DNS `A` record (`api.example.com`) at the server IP.
+
+## 2. Install base packages
+
+```bash
+sudo apt update && sudo apt upgrade -y
+sudo apt install -y nginx mysql-server composer git curl zip unzip
+
+# PHP 8.2 (Ubuntu 24.04 ships 8.3; any of 8.2–8.3 works with this codebase)
+sudo apt install -y php8.2-fpm php8.2-cli php8.2-mysql \
+  php8.2-mbstring php8.2-xml php8.2-bcmath php8.2-curl php8.2-sqlite3 \
+  php8.2-intl php8.2-gd
+```
+
+Verify: `php -v` and `mysql --version`.
+
+## 3. Harden MySQL
+
+```bash
+sudo mysql_secure_installation
+sudo mysql -e "CREATE DATABASE atu_cafeteria CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;"
+sudo mysql -e "CREATE USER 'atu'@'localhost' IDENTIFIED BY '<strong-password>';"
+sudo mysql -e "GRANT ALL PRIVILEGES ON atu_cafeteria.* TO 'atu'@'localhost';"
+sudo mysql -e "FLUSH PRIVILEGES;"
+```
+
+## 4. Deploy the code
+
+```bash
+sudo mkdir -p /var/www/atu-cafeteria
+sudo chown -R "$USER":"$USER" /var/www/atu-cafeteria
+cd /var/www/atu-cafeteria
+git clone <your-repository-url> .   # or a release tag/branch
+cd backend
+composer install --no-dev --no-interaction --prefer-dist --optimize-autoloader
+```
+
+## 5. Configure the environment
+
+```bash
+cp .env.example .env
+php artisan key:generate
+```
+
+Then edit `.env`:
+
+```env
+APP_ENV=production
+APP_DEBUG=false
+APP_URL=https://api.example.com
+APP_TIMEZONE=Africa/Accra
+
+DB_CONNECTION=mysql
+DB_HOST=127.0.0.1
+DB_PORT=3306
+DB_DATABASE=atu_cafeteria
+DB_USERNAME=atu
+DB_PASSWORD=<strong-password>
+
+QUEUE_CONNECTION=database        # production queue (see step 8)
+SESSION_DRIVER=file
+CACHE_STORE=file
+
+PAYSTACK_SECRET_KEY=<production secret>
+PAYSTACK_DEMO_MODE=false
+CORS_ALLOWED_ORIGINS=https://your-frontend.com
+```
+
+Never commit this file. Keep secrets only in the server's `.env`.
+
+## 6. Migrate and prepare Laravel
+
+```bash
+cd /var/www/atu-cafeteria/backend
+php artisan migrate --force
+php artisan config:cache
+php artisan route:cache
+php artisan view:cache
+php artisan storage:link
+
+sudo chown -R www-data:www-data storage bootstrap/cache
+```
+
+> DatabaseSeeder is intentionally empty. Load development data only with the
+> guarded seeders (`MenuCategoryAndVendorSeeder`,
+> `DevelopmentRestaurantCatalogSeeder`) — never in production.
+
+## 7. Configure Nginx
+
+Create `/etc/nginx/sites-available/atu-cafeteria`:
+
+```nginx
+server {
+    listen 80;
+    server_name api.example.com;
+    root /var/www/atu-cafeteria/backend/public;
+    index index.php;
+
+    charset utf-8;
+    client_max_body_size 20M;
+
+    location / {
+        try_files $uri $uri/ /index.php?$query_string;
+    }
+
+    location ~ \.php$ {
+        include snippets/fastcgi-php.conf;
+        fastcgi_pass unix:/run/php/php8.2-fpm.sock;
+    }
+
+    location ~ /\.(?!well-known).* { deny all; }
+    location ~ /\.ht { deny all; }
+}
+```
+
+Enable and test:
+
+```bash
+sudo ln -s /etc/nginx/sites-available/atu-cafeteria /etc/nginx/sites-enabled/
+sudo nginx -t && sudo systemctl reload nginx
+```
+
+## 8. Production queue and scheduler
+
+```bash
+php artisan queue:table
+php artisan migrate --force
+```
+
+Add a systemd unit `/etc/systemd/system/atu-queue.service`:
+
+```ini
+[Unit]
+Description=ATU Cafeteria queue worker
+After=network.target
+
+[Service]
+User=www-data
+Group=www-data
+WorkingDirectory=/var/www/atu-cafeteria/backend
+ExecStart=/usr/bin/php artisan queue:work --sleep=3 --tries=3
+Restart=always
+
+[Install]
+WantedBy=multi-user.target
+```
+
+And a cron entry (every minute) for Laravel's scheduler:
+
+```cron
+* * * * * cd /var/www/atu-cafeteria/backend && php artisan schedule:run >> /dev/null 2>&1
+```
+
+```bash
+sudo systemctl enable --now atu-queue
+```
+
+## 9. HTTPS with Let's Encrypt
+
+```bash
+sudo apt install -y certbot python3-certbot-nginx
+sudo certbot --nginx -d api.example.com
+```
+
+Certbot updates the server block to listen on 443 and keeps certificates
+renewed automatically.
+
+## 10. Verify
+
+- `https://api.example.com/health` → `{"app":"ATU Cafeteria API","status":"Healthy","framework":"Laravel 11"}`.
+- `https://api.example.com/api/health` → API health JSON.
+- `https://api.example.com/api/docs` → interactive OpenAPI docs.
+- Point the Flutter app at the API with
+  `flutter run --dart-define=API_BASE_URL=https://api.example.com/api/` and
+  exercise login, catalog, ordering and wallet flows.
+
+## Backups
+
+Daily encrypted MySQL dump:
+
+```bash
+# /etc/cron.d/atu-backup
+15 2 * * * root mysqldump --single-transaction atu_cafeteria | gzip > /var/backups/atu/atu_$(date +\%F).sql.gz
+```
+
+Test restoration (`gunzip < ... | mysql atu_cafeteria`) at least monthly. Keep
+`.env`, keystores and backups out of git.
+
+## Security checklist
+
+- `APP_DEBUG=false`, `APP_ENV=production`, HTTPS enforced.
+- Paystack secrets server-side only, `PAYSTACK_DEMO_MODE=false`.
+- `storage/` and `bootstrap/cache` owned by `www-data`.
+- Fail2ban or UFW restricting SSH; disable password auth with key-only SSH.
+- Dependency audits in CI (`composer audit`) plus scheduled OS updates.
