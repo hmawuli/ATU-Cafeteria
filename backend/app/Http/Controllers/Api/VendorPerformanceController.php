@@ -133,6 +133,66 @@ class VendorPerformanceController extends Controller
     }
 
     /**
+     * Per-day revenue and completed-order counts for the authenticated vendor.
+     *
+     * Returns the last `days` (default 30, max 90) calendar days — including
+     * today even when it has no completed orders yet — so dashboards can always
+     * render the current day.
+     *
+     * @return JsonResponse
+     */
+    public function dailyRevenue(Request $request)
+    {
+        $user = $request->user();
+        $role = strtoupper((string) $user?->role);
+
+        if (! in_array($role, ['VENDOR', 'ADMIN'], true)) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Unauthorized. This resource requires VENDOR or ADMIN privileges.',
+            ], 403);
+        }
+
+        $vendorId = $role === 'VENDOR' ? $user->id : $request->input('vendor_id');
+        $days = max(1, min(90, (int) $request->integer('days', 30)));
+        $start = now()->subDays($days - 1)->startOfDay();
+
+        $query = DB::table('orders')
+            ->selectRaw('DATE(created_at) as order_date')
+            ->selectRaw('COUNT(id) as orders_count')
+            ->selectRaw('SUM(total_price) as revenue')
+            ->where('created_at', '>=', $start)
+            ->where('status', 'COMPLETED');
+
+        if ($vendorId) {
+            $query->where('vendor_id', (int) $vendorId);
+        }
+
+        $rows = $query
+            ->groupBy(DB::raw('DATE(created_at)'))
+            ->orderBy('order_date')
+            ->get()
+            ->keyBy('order_date');
+
+        $data = [];
+        for ($i = $days - 1; $i >= 0; $i--) {
+            $date = now()->subDays($i)->toDateString();
+            $row = $rows->get($date);
+            $data[] = [
+                'date' => $date,
+                'revenue' => round((float) ($row->revenue ?? 0), 2),
+                'orders_count' => (int) ($row->orders_count ?? 0),
+            ];
+        }
+
+        return response()->json([
+            'success' => true,
+            'data' => $data,
+            'generated_at' => now()->toIso8601String(),
+        ], 200);
+    }
+
+    /**
      * Calculate average order completion time and total sales for each vendor to support performance management.
      *
      * @return JsonResponse
