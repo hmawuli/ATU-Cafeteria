@@ -42,6 +42,7 @@ ATU-Cafeteria/
 
 | Purpose | Document |
 |---|---|
+| Local PostgreSQL setup & credentials | `docs/LOCAL_POSTGRES.md` |
 | API conventions (envelope, errors, idempotency, rate limits) | `docs/API_STANDARDS.md` |
 | Interactive API docs (served live) | `/api/docs` on the running backend |
 | Deploy to a Linux VPS (Nginx + PHP-FPM + PostgreSQL) | `docs/DEPLOY_VPS.md` |

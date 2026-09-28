@@ -84,6 +84,12 @@ docker-migrate: ## Run migrations against the Docker database
 db-backup: ## Back up the PostgreSQL database (Docker stack or local)
 	scripts/db_backup.sh
 
+db-create: ## Ensure the local PostgreSQL database exists (reads backend/.env)
+	scripts/ensure_db.sh
+
+db-ping: ## Verify the connection to the local PostgreSQL database
+	scripts/ensure_db.sh --ping
+
 smoke: ## Smoke-test the running API (/health, /api/health, catalogue)
 	scripts/smoke_test.sh
 

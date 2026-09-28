@@ -73,6 +73,10 @@ and this project follows the versioning policy described in
   and a "Queued" status on offline orders; `docs/STAFF_QUICKSTART.md` for
   vendor/admin staff; on-device `integration_test` scaffold; semantic label on
   the home logo (accessible for screen readers).
+- **Local PostgreSQL made first-class**: `scripts/ensure_db.sh` (create/ping
+  from `backend/.env`), `make db-create` / `make db-ping`, and
+  `docs/LOCAL_POSTGRES.md` documenting the credentials, install, migrate/seed
+  and verification flow for storing data locally in PostgreSQL.
 
 ### Changed
 - Local backend port standardised on Laravel default `8000` (loopback,
