@@ -80,3 +80,9 @@ docker-logs: ## Tail the Docker stack logs
 
 docker-migrate: ## Run migrations against the Docker database
 	docker compose run --rm app php artisan migrate --force --no-interaction
+
+db-backup: ## Back up the PostgreSQL database (Docker stack or local)
+	scripts/db_backup.sh
+
+smoke: ## Smoke-test the running API (/health, /api/health, catalogue)
+	scripts/smoke_test.sh

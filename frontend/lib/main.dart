@@ -38,11 +38,13 @@ import 'package:atu_cafeteria/presentation/screens/reference_admin_screen.dart';
 import 'package:atu_cafeteria/presentation/screens/notifications_screen.dart';
 import 'package:atu_cafeteria/presentation/screens/splash_screen.dart';
 import 'package:atu_cafeteria/core/config/server_config.dart';
+import 'package:atu_cafeteria/services/crash_reporting.dart';
 import 'package:atu_cafeteria/domain/models/models.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await ServerConfig.init();
+  await CrashReporting.init();
   runApp(const ATUCafeteriaApp());
 }
 

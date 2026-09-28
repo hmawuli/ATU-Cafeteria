@@ -37,6 +37,51 @@ services:
       db:
         condition: service_healthy
 
+  worker:
+    build:
+      context: ./backend
+    image: atu-cafeteria-backend:latest
+    restart: unless-stopped
+    command: ["php", "artisan", "queue:work", "--sleep=3", "--tries=3", "--max-time=3600"]
+    env_file: ./backend/.env
+    environment:
+      APP_ENV: ${APP_ENV:-production}
+      APP_DEBUG: ${APP_DEBUG:-false}
+      DB_CONNECTION: pgsql
+      DB_HOST: db
+      DB_PORT: "5432"
+      MIGRATE_ON_START: "false"
+      QUEUE_CONNECTION: database
+    volumes:
+      - app_code:/var/www/html
+    networks:
+      - atu
+    depends_on:
+      db:
+        condition: service_healthy
+
+  scheduler:
+    build:
+      context: ./backend
+    image: atu-cafeteria-backend:latest
+    restart: unless-stopped
+    command: ["php", "artisan", "schedule:work"]
+    env_file: ./backend/.env
+    environment:
+      APP_ENV: ${APP_ENV:-production}
+      APP_DEBUG: ${APP_DEBUG:-false}
+      DB_CONNECTION: pgsql
+      DB_HOST: db
+      DB_PORT: "5432"
+      MIGRATE_ON_START: "false"
+    volumes:
+      - app_code:/var/www/html
+    networks:
+      - atu
+    depends_on:
+      db:
+        condition: service_healthy
+
   nginx:
     image: nginx:1.27-alpine
     restart: unless-stopped

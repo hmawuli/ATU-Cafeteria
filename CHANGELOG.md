@@ -31,6 +31,13 @@ and this project follows the versioning policy described in
   orders, vendor, wallet, system).
 - Contribution and release documentation (`CONTRIBUTING.md`,
   `RELEASING.md`), issue/PR templates and `CODEOWNERS`.
+- Docker stack now runs the queue worker and Laravel scheduler
+  (`docker compose up`); `make db-backup` and `make smoke` operational
+  helpers.
+- `docs/OBSERVABILITY.md` (health checks, logging, monitoring, Crashlytics)
+  and `docs/UAT_CHECKLIST.md` (manual release test pass).
+- Flutter Crashlytics integration (`CrashReporting`), enabled via the same
+  `ATU_FIREBASE_*` dart-defines used by FCM.
 
 ### Changed
 - Local backend port standardised on Laravel default `8000` (loopback,

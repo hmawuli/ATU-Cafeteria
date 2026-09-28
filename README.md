@@ -38,7 +38,9 @@ ATU-Cafeteria/
 | API conventions (envelope, errors, idempotency, rate limits) | `docs/API_STANDARDS.md` |
 | Interactive API docs (served live) | `/api/docs` on the running backend |
 | Deploy to a Linux VPS (Nginx + PHP-FPM + PostgreSQL) | `docs/DEPLOY_VPS.md` |
-| Containerised deployment | `docker-compose.yml` + `make docker-up` |
+| Containerised deployment (incl. queue worker + scheduler) | `docker-compose.yml` + `make docker-up` |
+| Logging, health checks, monitoring, crash reporting | `docs/OBSERVABILITY.md` |
+| Manual release test pass | `docs/UAT_CHECKLIST.md` |
 | Release & versioning process | `RELEASING.md` |
 | Contribution guide | `CONTRIBUTING.md` |
 
