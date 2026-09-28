@@ -10,10 +10,12 @@ use App\Http\Middleware\RequireAuthenticatedApiRoutes;
 use App\Http\Middleware\RoleMiddleware;
 use App\Http\Middleware\SecureHeadersMiddleware;
 use App\Http\Middleware\SystemErrorLoggerMiddleware;
+use Illuminate\Auth\AuthenticationException;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
 use Illuminate\Http\Middleware\HandleCors;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 
 return Application::configure(basePath: dirname(__DIR__))
@@ -46,5 +48,11 @@ return Application::configure(basePath: dirname(__DIR__))
         $middleware->append(AuditAndSanitizeOrderMiddleware::class);
     })
     ->withExceptions(function (Exceptions $exceptions) {
-        //
+        $exceptions->render(function (AuthenticationException $exception, Request $request) {
+            if ($request->is('api/*')) {
+                return response()->json([
+                    'message' => 'Unauthenticated.',
+                ], 401);
+            }
+        });
     })->create();

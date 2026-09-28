@@ -27,4 +27,12 @@ class AuthenticationTest extends TestCase
         ]);
         $response->assertStatus(422);
     }
+
+    public function test_unauthenticated_api_request_returns_json_401(): void
+    {
+        $response = $this->getJson('/api/me');
+
+        $response->assertStatus(401)
+            ->assertExactJson(['message' => 'Unauthenticated.']);
+    }
 }

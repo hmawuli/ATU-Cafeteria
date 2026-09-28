@@ -268,7 +268,7 @@ class CafeteriaProvider extends ChangeNotifier {
   Future<List<FoodItem>> _syncRemoteFoodItems() async {
     try {
       final response = await http.get(
-        Uri.parse('$_laravelBaseUrl/api/catalog/food-items'),
+        Uri.parse('$_laravelBaseUrl/api/catalog/menu-items'),
         headers: const {
           'Accept': 'application/json',
         },
@@ -279,17 +279,39 @@ class CafeteriaProvider extends ChangeNotifier {
       }
 
       final decoded = jsonDecode(response.body);
-      if (decoded is! List) return [];
+
+      // Production catalogue returns:
+      // {
+      //   "success": true,
+      //   "data": [...]
+      // }
+      //
+      // Keep support for a bare List for backward compatibility.
+      final List<dynamic> items;
+
+      if (decoded is Map && decoded['menu_items'] is List) {
+        items = decoded['menu_items'] as List<dynamic>;
+      } else if (decoded is Map && decoded['data'] is List) {
+        items = decoded['data'] as List<dynamic>;
+      } else if (decoded is List) {
+        items = decoded;
+      } else {
+        return [];
+      }
 
       final remoteItems = <FoodItem>[];
-      for (final raw in decoded) {
+
+      for (final raw in items) {
         if (raw is! Map) continue;
+
         try {
           remoteItems.add(
-            FoodItem.fromJson(Map<String, dynamic>.from(raw)),
+            FoodItem.fromJson(
+              Map<String, dynamic>.from(raw),
+            ),
           );
         } catch (e) {
-          debugPrint('Skipping malformed remote food item: $e');
+          debugPrint('Skipping malformed remote menu item: $e');
         }
       }
 
@@ -303,9 +325,20 @@ class CafeteriaProvider extends ChangeNotifier {
         }
       }
 
+      debugPrint(
+        'Production restaurant catalogue: ${remoteItems.length} menu items loaded',
+      );
+
+      for (final item in remoteItems) {
+        debugPrint(
+          'MENU: id=${item.id}, vendor=${item.vendorId}, '
+          'name=${item.name}, available=${item.isAvailable}',
+        );
+      }
+
       return remoteItems;
     } catch (e) {
-      debugPrint('Remote food catalogue sync skipped: $e');
+      debugPrint('Remote restaurant catalogue sync skipped: $e');
       return [];
     }
   }
@@ -412,15 +445,13 @@ class CafeteriaProvider extends ChangeNotifier {
       return;
     }
     try {
-      final response = await http
-          .get(
-            Uri.parse('$_laravelBaseUrl/api/me'),
-            headers: {
-              'Accept': 'application/json',
-              'Authorization': 'Bearer $_authToken',
-            },
-          )
-          .timeout(const Duration(seconds: 8));
+      final response = await http.get(
+        Uri.parse('$_laravelBaseUrl/api/me'),
+        headers: {
+          'Accept': 'application/json',
+          'Authorization': 'Bearer $_authToken',
+        },
+      ).timeout(const Duration(seconds: 8));
 
       if (response.statusCode != 200 || response.body.isEmpty) return;
       final decoded = jsonDecode(response.body);
@@ -428,7 +459,8 @@ class CafeteriaProvider extends ChangeNotifier {
       if (raw is Map) {
         final fresh = User.fromJson(Map<String, dynamic>.from(raw));
         if (_currentUser != null) {
-          _currentUser = _currentUser!.copyWith(balance: fresh.balance, isOpen: fresh.isOpen);
+          _currentUser = _currentUser!
+              .copyWith(balance: fresh.balance, isOpen: fresh.isOpen);
         }
       }
     } catch (e) {
@@ -1517,8 +1549,7 @@ class CafeteriaProvider extends ChangeNotifier {
       }
 
       // 3. Fetch today's / daily revenue for the vendor
-      final dailyUrl =
-          Uri.parse("$_laravelBaseUrl/api/vendor/daily-revenue");
+      final dailyUrl = Uri.parse("$_laravelBaseUrl/api/vendor/daily-revenue");
       final dRequest = await client.getUrl(dailyUrl);
       dRequest.headers.set(HttpHeaders.acceptHeader, 'application/json');
       dRequest.headers.set(HttpHeaders.authorizationHeader, 'Bearer $token');
@@ -1789,15 +1820,17 @@ class CafeteriaProvider extends ChangeNotifier {
     }
 
     try {
-      final response = await http.patch(
-        Uri.parse('$_laravelBaseUrl/api/vendor/status'),
-        headers: {
-          'Accept': 'application/json',
-          'Content-Type': 'application/json',
-          'Authorization': 'Bearer $_authToken',
-        },
-        body: jsonEncode({'is_open': !isClosed}),
-      ).timeout(const Duration(seconds: 8));
+      final response = await http
+          .patch(
+            Uri.parse('$_laravelBaseUrl/api/vendor/status'),
+            headers: {
+              'Accept': 'application/json',
+              'Content-Type': 'application/json',
+              'Authorization': 'Bearer $_authToken',
+            },
+            body: jsonEncode({'is_open': !isClosed}),
+          )
+          .timeout(const Duration(seconds: 8));
 
       if (response.statusCode != 200) {
         _isStoreClosed = previous;
