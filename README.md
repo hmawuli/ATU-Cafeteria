@@ -19,12 +19,27 @@ Production-oriented Flutter + Laravel implementation for Accra Technical Univers
 
 ```text
 ATU-Cafeteria/
-├── frontend/       # Flutter application — active client
-├── backend/        # Laravel REST API
-├── scripts/        # lightweight setup/utility scripts
-├── docs/           # architecture, deployment and operations documentation
-└── .vscode/        # lightweight editor settings
+├── frontend/          # Flutter application — active client
+├── backend/           # Laravel REST API (+ Docker image for self-hosting)
+├── scripts/           # setup/utility scripts
+├── docs/              # architecture, deployment, standards and operations docs
+├── .githooks/         # versioned git hooks (pre-commit / pre-push)
+├── Makefile           # developer task runner (make help)
+├── docker-compose.yml # self-hosted backend stack (Laravel + MySQL + Nginx)
+├── CHANGELOG.md       # release history
+└── .vscode/           # lightweight editor settings
 ```
+
+## Key documents
+
+| Purpose | Document |
+|---|---|
+| API conventions (envelope, errors, idempotency, rate limits) | `docs/API_STANDARDS.md` |
+| Interactive API docs (served live) | `/api/docs` on the running backend |
+| Deploy to a Linux VPS (Nginx + PHP-FPM + MySQL) | `docs/DEPLOY_VPS.md` |
+| Containerised deployment | `docker-compose.yml` + `make docker-up` |
+| Release & versioning process | `RELEASING.md` |
+| Contribution guide | `CONTRIBUTING.md` |
 
 ## Development philosophy
 

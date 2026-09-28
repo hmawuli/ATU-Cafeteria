@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: ATU Cafeteria security vulnerability
+    url: https://github.com/hmawuli/ATU-Cafeteria/security/advisories/new
+    about: Please report security issues privately — see SECURITY.md
+  - name: Project documentation
+    url: https://github.com/hmawuli/ATU-Cafeteria/tree/main/docs
+    about: Check the docs before opening an issue

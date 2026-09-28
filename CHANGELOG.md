@@ -1,0 +1,73 @@
+# Changelog
+
+All notable changes to this project are documented in this file.
+
+The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
+and this project follows the versioning policy described in
+[RELEASING.md](RELEASING.md) (app version lives in `frontend/pubspec.yaml`).
+
+## [Unreleased]
+
+### Added
+- Docker self-hosting stack for the backend API (`backend/Dockerfile`,
+  `docker-compose.yml`) with MySQL, Nginx and health checks.
+- `docs/DEPLOY_VPS.md` — bare-metal Linux VPS deployment guide (Nginx +
+  PHP-FPM + MySQL, HTTPS, queue worker, backups).
+- `docs/API_STANDARDS.md` — response envelope, idempotency, rate-limit and
+  error conventions for the REST API.
+- Root `Makefile` with `make setup|serve|connect|seed-dev|test|lint|check`
+  and `docker-*` targets.
+- Versioned git hooks (`.githooks/`) — pre-commit checks and pre-push gate.
+- `scripts/dev_seed.sh` (guarded) for loading development vendors and the
+  restaurant catalog.
+- Development restaurant catalog seeder
+  (`DevelopmentRestaurantCatalogSeeder`).
+- OpenAPI contract updated to match the production routes (auth, catalog,
+  orders, vendor, wallet, system).
+- Contribution and release documentation (`CONTRIBUTING.md`,
+  `RELEASING.md`), issue/PR templates and `CODEOWNERS`.
+
+### Changed
+- Local backend port standardised on Laravel default `8000` (loopback,
+  USB `adb reverse`, emulator and Wi-Fi modes).
+- Customer catalogue sync now uses `GET /api/catalog/menu-items` (server-side
+  menu items with vendor, stock and availability) instead of the legacy
+  `food-items` bare-array endpoint.
+- Unauthenticated requests to `/api/*` now return a JSON `401`
+  (`{"message":"Unauthenticated."}`) instead of a redirect.
+- Whole backend reformatted with Laravel Pint to satisfy the CI style gate.
+
+### Removed
+- Netlify deployment artifacts (`netlify.toml`, legacy `index.html` /
+  `web_app/` demo pages, `DEPLOY_TO_NETLIFY.md`).
+- Railway deployment artifacts (`railway.json`, `DEPLOYMENT_RAILWAY.md`).
+
+### Fixed
+- API 401 handling for mobile clients (machine-readable JSON).
+- Catalog response parsing tolerates `menu_items`, `data` and bare-list
+  envelopes.
+
+## [1.1.0] — 2026-09
+
+### Added
+- Restaurant platform customer experience: vendor catalogue, For You
+  recommendations, live deals, vendor ratings, order tracking with queue
+  position, collection passes, saved addresses, wallet and loyalty points.
+- Vendor restaurant operations: production menu management with stock,
+  inventory movements, demand forecasting, kiosk sales, promotions,
+  payouts and an integrated operations dashboard.
+- Production cart checkout: idempotent multi-vendor checkout, split-venue
+  order allocations, refunds, promotion redemption and loyalty allocation.
+- Real-time order events, QR collection passes, admin command center and
+  audit-backed financial governance.
+
+## [1.0.0] — 2026-06
+
+### Added
+- Initial production release of the ATU Cafeteria platform:
+  Flutter client with local SQLite resilience, Laravel 11 REST API with
+  Sanctum authentication, RBAC, digital wallet, Paystack payments,
+  real-time order events and admin/audit workflows.
+- GitHub Actions CI (backend tests + Pint, Flutter analyze/test/build) and
+  signed production release workflow.
+- Security, authentication, RBAC and production engineering documentation.

@@ -1,0 +1,10 @@
+# Code owners are requested for review on every pull request.
+# (@hmawuli is the project maintainer; add backend/frontend reviewers as the team grows.)
+
+* @hmawuli
+
+# Sensitive areas require an explicit review from the maintainer.
+backend/                 @hmawuli
+frontend/lib/            @hmawuli
+.github/workflows/       @hmawuli
+docs/                    @hmawuli
