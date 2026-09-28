@@ -98,3 +98,10 @@ load: ## Load test (default: /api/health, 20 concurrent, 200 requests)
 
 contract: ## Verify every frontend API call has a matching backend route
 	scripts/check_api_contract.sh
+
+# Flutter SDK dart (sibling of the resolved flutter binary).
+FLUTTER_DART := $(dir $(FLUTTER))dart
+
+api-gen: ## Regenerate the typed Dart API client from docs/openapi.json
+	$(FLUTTER_DART) run tool/generate_api_client.dart
+	$(FLUTTER_DART) format frontend/lib/generated/atu_api.dart

@@ -82,6 +82,17 @@ and this project follows the versioning policy described in
   / `completePickup`), so status/pickup changes propagate to every page
   watching the same state; no screen in the app bypasses the providers.
   `docs/DATA_FLOW.md` documents the flow and the conventions.
+- **Generated typed API client (from the OpenAPI contract)**: `docs/openapi.json`
+  is the committed contract artifact; `tool/generate_api_client.dart` +
+  `make api-gen` emit strict typed models (`ApiUser`, `ApiWallet`, …) and an
+  `AtuApi` facade over `ApiClient`. The `/me` sync now runs through the
+  generated client, so contract drift fails at build time (tests:
+  `generated_api_test.dart`).
+- **Provider split begun (Orders/Wallet first)**: `OrdersState` and
+  `WalletState` are focused ChangeNotifiers; `CafeteriaProvider` composes and
+  delegates to them (public API unchanged, notifications forwarded), and the
+  refresh pipeline now also loads the wallet ledger. Tests:
+  `orders_state_test.dart`, `wallet_state_test.dart`.
 
 ### Changed
 - Local backend port standardised on Laravel default `8000` (loopback,

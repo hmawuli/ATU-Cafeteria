@@ -6,11 +6,14 @@ import 'package:http/http.dart' as http;
 import 'package:atu_cafeteria/domain/models/models.dart';
 import 'package:atu_cafeteria/data/local/db_helper.dart';
 import 'package:atu_cafeteria/data/remote/menu_response.dart';
+import 'package:atu_cafeteria/generated/atu_api.dart';
 import 'package:atu_cafeteria/core/config/server_config.dart';
 import 'package:atu_cafeteria/core/network/api_client.dart';
 import 'package:atu_cafeteria/core/storage/secure_session_store.dart';
 import 'package:atu_cafeteria/services/pending_order_queue.dart';
 import 'package:atu_cafeteria/services/push_notification_service.dart';
+import 'orders_state.dart';
+import 'wallet_state.dart';
 
 class CafeteriaProvider extends ChangeNotifier {
   final DbHelper _db = DbHelper.instance;
@@ -26,6 +29,11 @@ class CafeteriaProvider extends ChangeNotifier {
 
   // Convenience for builder call sites that need the shared client.
   ApiClient get apiClient => _api;
+
+  // Focused state stores extracted from this provider; the provider forwards
+  // their notifications so existing screens keep watching it unchanged.
+  late final OrdersState orders = OrdersState()..addListener(notifyListeners);
+  late final WalletState wallet = WalletState()..addListener(notifyListeners);
 
   @override
   void dispose() {
@@ -107,15 +115,13 @@ class CafeteriaProvider extends ChangeNotifier {
   List<AuditLog> _auditLogs = [];
   List<AuditLog> get auditLogs => _auditLogs;
 
-  // User-specific Lists
-  List<Order> _customerOrders = [];
-  List<Order> get customerOrders => _customerOrders;
+  // User-specific Lists (orders now live in the focused [OrdersState] store).
+  List<Order> get customerOrders => orders.customerOrders;
 
   List<Map<String, dynamic>> _purchasedVendors = [];
   List<Map<String, dynamic>> get purchasedVendors => _purchasedVendors;
 
-  List<Order> _vendorOrders = [];
-  List<Order> get vendorOrders => _vendorOrders;
+  List<Order> get vendorOrders => orders.vendorOrders;
 
   List<FoodItem> _vendorFoodItems = [];
   List<FoodItem> get vendorFoodItems => _vendorFoodItems;
@@ -408,12 +414,13 @@ class CafeteriaProvider extends ChangeNotifier {
             await fetchAndCacheStudentOrders(_currentUser!.id!);
         // Prefer the live Laravel orders. SQLite remains an offline fallback
         // only when the server cannot be reached.
-        _customerOrders = remoteOrders.isNotEmpty
+        orders.setCustomerOrders(remoteOrders.isNotEmpty
             ? remoteOrders
-            : await _db.getOrdersForCustomer(_currentUser!.id!);
+            : await _db.getOrdersForCustomer(_currentUser!.id!));
         await fetchPurchasedVendors();
       } else if (_currentUser!.role == 'VENDOR') {
-        _vendorOrders = await _db.getOrdersForVendor(_currentUser!.id!);
+        orders.setVendorOrders(
+            await _db.getOrdersForVendor(_currentUser!.id!));
         final remoteVendorItems = _allFoodItems
             .where((item) => item.vendorId == _currentUser!.id!)
             .toList();
@@ -431,6 +438,16 @@ class CafeteriaProvider extends ChangeNotifier {
     // Re-sync that user from the API so wallet changes made on the server
     // (checkouts, top-ups, admin adjustments) are visible on all pages.
     await _syncCurrentUserFromServer();
+
+    // Refresh the wallet ledger (transactions + balance mirror).
+    if (_authToken != null) {
+      try {
+        await wallet.refresh(_api, _authToken);
+      } catch (e) {
+        debugPrint('Wallet ledger refresh skipped: $e');
+      }
+    }
+
     notifyListeners();
   }
 
@@ -469,18 +486,16 @@ class CafeteriaProvider extends ChangeNotifier {
       return;
     }
     try {
-      final decoded = await _api
-          .request('GET', 'me', token: _authToken)
-          .timeout(const Duration(seconds: 8));
-
-      final raw = decoded is Map ? decoded['user'] : null;
-      if (raw is Map) {
-        final fresh = User.fromJson(Map<String, dynamic>.from(raw));
-        if (_currentUser != null) {
-          _currentUser = _currentUser!
-              .copyWith(balance: fresh.balance, isOpen: fresh.isOpen);
-        }
+      // Typed contract client (generated from docs/openapi.json).
+      final fresh = await AtuApi(_api).me(token: _authToken);
+      if (_currentUser != null) {
+        _currentUser = _currentUser!.copyWith(
+          balance: fresh.balance ?? _currentUser!.balance,
+          isOpen: fresh.is_open ?? _currentUser!.isOpen,
+        );
       }
+    } on FormatException catch (e) {
+      debugPrint('Current user balance sync skipped (contract): $e');
     } catch (e) {
       debugPrint('Current user balance sync skipped: $e');
     }
@@ -727,49 +742,22 @@ class CafeteriaProvider extends ChangeNotifier {
   Future<void> _refreshVendorOrdersSilently() async {
     if (_authToken == null || _currentUser?.id == null) return;
     try {
-      final value = await _api
-          .request('GET', 'vendor/my-orders', token: _authToken)
-          .timeout(const Duration(seconds: 8));
-
-      if (value is List) {
-        _vendorOrders = value
-            .whereType<Map>()
-            .map((e) => Order.fromJson(Map<String, dynamic>.from(e)))
-            .toList();
-        notifyListeners();
-      }
+      await orders.refreshVendorOrders(_api, _authToken);
     } catch (e) {
       debugPrint('Vendor order refresh skipped: $e');
     }
   }
 
   /// Refresh the authenticated vendor's orders from the API and return the
-  /// parsed list, keeping the shared provider state in sync so every page
-  /// watching [vendorOrders] reflects the same data.
-  Future<List<Order>> refreshVendorOrders() async {
-    await _refreshVendorOrdersSilently();
-    return _vendorOrders;
-  }
+  /// parsed list (delegated to [OrdersState]).
+  Future<List<Order>> refreshVendorOrders() =>
+      orders.refreshVendorOrders(_api, _authToken);
 
-  /// Verify a student's pickup PIN server-side and complete the order.
-  /// Returns a success message, or throws [ApiException] on failure. Orders are
-  /// refreshed afterwards so all pages see the completed state immediately.
-  Future<String> completePickup(int orderId, String pin) async {
-    final decoded = await _api
-        .request(
-          'POST',
-          'orders/$orderId/verify-pickup',
-          body: {'pickup_pin': pin},
-          token: _authToken,
-        )
-        .timeout(const Duration(seconds: 10));
-    await refreshVendorOrders();
-
-    return decoded is Map
-        ? decoded['message']?.toString() ??
-            'Pickup verified. Order completed.'
-        : 'Pickup verified. Order completed.';
-  }
+  /// Verify a student's pickup PIN server-side and complete the order
+  /// (delegated to [OrdersState]). Refreshes orders so all pages update.
+  Future<String> completePickup(int orderId, String pin) =>
+      orders.completePickup(_api, _authToken,
+          orderId: orderId, pin: pin);
 
   void _syncPushDeviceIfCustomer() {
     if ((_currentUser?.role ?? '').toUpperCase() == 'STUDENT') {
@@ -1178,9 +1166,8 @@ class CafeteriaProvider extends ChangeNotifier {
     _currentUser = null;
     _loginError = null;
     _registrationSuccess = false;
-    _customerOrders = [];
+    orders.clear();
     _purchasedVendors = [];
-    _vendorOrders = [];
     _vendorFoodItems = [];
     _vendorFeedback = [];
     _realAdminUser = null;
@@ -1316,9 +1303,10 @@ class CafeteriaProvider extends ChangeNotifier {
 
     // Refresh user's lists specifically
     if (targetUser.role == 'STUDENT') {
-      _customerOrders = await _db.getOrdersForCustomer(targetUser.id!);
+      orders.setCustomerOrders(
+          await _db.getOrdersForCustomer(targetUser.id!));
     } else if (targetUser.role == 'VENDOR') {
-      _vendorOrders = await _db.getOrdersForVendor(targetUser.id!);
+      orders.setVendorOrders(await _db.getOrdersForVendor(targetUser.id!));
       _vendorFoodItems = await _db.getFoodItemsByVendor(targetUser.id!);
       _vendorFeedback = await _db.getFeedbackForVendor(targetUser.id!);
     }
@@ -1346,6 +1334,7 @@ class CafeteriaProvider extends ChangeNotifier {
       _currentUser = _currentUser!.copyWith(
         balance: _currentUser!.balance + amount,
       );
+      wallet.applyLocalCredit(amount);
       await _db.insertAuditLog(AuditLog(
         userId: _currentUser!.id!,
         action: "WALLET_CREDIT",
