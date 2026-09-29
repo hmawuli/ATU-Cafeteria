@@ -102,6 +102,9 @@ and this project follows the versioning policy described in
   multi-campus `vendors.campus` field. Also fixed pre-existing broken
   `/api/customer/loyalty` routes (methods `index`/`summary` did not exist).
   Tests: `StandoutFeaturesTest` (9).
+- **Admin bootstrap**: `php artisan admin:create <username> --pin <pin> [--super]`
+  and a production-guarded `DevelopmentAdminSeeder` (superadmin/
+  `atuAdmin123`, admin/`admin123`) included in `make seed-dev`.
 
 ### Changed
 - Local backend port standardised on Laravel default `8000` (loopback,

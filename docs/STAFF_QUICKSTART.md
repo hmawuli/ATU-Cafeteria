@@ -50,6 +50,9 @@ central Laravel API.
 - **Create a vendor**: Admin → Vendors → **Create vendor** (produces the
   username/PIN the vendor signs in with). The vendor account is a normal user
   row — never share the ADMIN account.
+- **Bootstrap admins**: run `php artisan admin:create <username> --pin <strong-pin> --super`
+  (add `--super` for SUPER_ADMIN). Promoted accounts log in from the app with
+  their username + PIN.
 - **Audit trail**: Admin → **Audit logs** lists who did what (logins,
   order mutations, refunds, admin actions). Check it daily.
 - **Wallets**: adjust balance only for legitimate corrections — every change

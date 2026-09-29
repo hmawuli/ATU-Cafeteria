@@ -26,7 +26,13 @@ php artisan db:seed --class=MenuCategoryAndVendorSeeder --force
 echo "==> Seeding development restaurant catalog..."
 php artisan db:seed --class=DevelopmentRestaurantCatalogSeeder --force
 
-echo "✓ Development vendors and restaurant catalog seeded."
+echo "==> Seeding development administrators..."
+php artisan db:seed --class=DevelopmentAdminSeeder --force
+
+echo "✓ Development vendors, restaurant catalog and administrators seeded."
 echo "  Vendor logins (PIN hash of 'vendor123'):"
 echo "    testvendor1  Campus Delight"
 echo "    testvendor2  Quick Bites"
+echo "  Admin logins (development only):"
+echo "    superadmin   SUPER_ADMIN      PIN: atuAdmin123"
+echo "    admin        CAFETERIA_ADMIN  PIN: admin123"
