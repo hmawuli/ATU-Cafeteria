@@ -28,11 +28,10 @@ final class WalletTransactionObserver
 
         $actor = Auth::user();
         $details = strtolower((string) $transaction->details);
-        $demoMode = filter_var(env('PAYSTACK_DEMO_MODE', false), FILTER_VALIDATE_BOOL);
         $isPaystackSettlement = str_contains($details, 'paystack') && str_contains($details, 'verified');
         $isAdminAdjustment = $actor && strtoupper((string) $actor->role) === 'ADMIN' && $type === 'DEPOSIT';
 
-        if ($demoMode || $isPaystackSettlement || $isAdminAdjustment) {
+        if ($isPaystackSettlement || $isAdminAdjustment) {
             return;
         }
 

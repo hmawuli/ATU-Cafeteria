@@ -1552,6 +1552,9 @@ class CafeteriaProvider extends ChangeNotifier {
           'purpose': purpose,
         },
         token: _authToken,
+        // The initialize route is idempotency-protected; retries must reuse
+        // the same key to never create duplicate payment initializations.
+        idempotencyKey: ApiClient.newIdempotencyKey(),
       );
       if (decoded is Map && decoded['success'] == true) {
         return Map<String, dynamic>.from(decoded['data'] as Map);

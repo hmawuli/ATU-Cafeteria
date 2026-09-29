@@ -111,6 +111,12 @@ and this project follows the versioning policy described in
   by default in production; fixed `backend/artisan` not propagating command
   exit codes (so CI/audit gates could never trip). Tests:
   `AdminBootstrapSecurityTest` (6).
+- **Wallet top-up fixed**: the app's Paystack initialize call now sends the
+  required `Idempotency-Key` (it previously always failed with
+  IDEMPOTENCY_KEY_REQUIRED). Demo mode is documented for local testing
+  (`PAYSTACK_DEMO_MODE=true`) and the wallet deposit guard no longer bypasses
+  verification in demo mode — successful deposits must always come from a
+  verified payment or an admin adjustment. Tests: `PaystackTopUpTest` (2).
 
 ### Changed
 - Local backend port standardised on Laravel default `8000` (loopback,
