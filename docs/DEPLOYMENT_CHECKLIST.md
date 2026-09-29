@@ -27,6 +27,7 @@ docker compose up -d --build              # app + worker + scheduler + nginx + p
 docker compose ps                         # all healthy (run twice after first boot)
 make smoke                                # /health, /api/health, catalogue
 make db-backup                            # confirm a dump is written
+php artisan security:audit --fail-on-critical   # no admins on known dev PINs / 2FA missing
 ```
 
 ### VPS (manual)

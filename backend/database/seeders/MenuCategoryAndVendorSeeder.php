@@ -5,6 +5,7 @@ namespace Database\Seeders;
 use App\Models\Vendor;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\DB;
+use RuntimeException;
 
 class MenuCategoryAndVendorSeeder extends Seeder
 {
@@ -13,6 +14,10 @@ class MenuCategoryAndVendorSeeder extends Seeder
      */
     public function run(): void
     {
+        if (app()->environment('production')) {
+            throw new RuntimeException('Development seeders must never run in production.');
+        }
+
         // 1. Seed Menu Categories
         $categories = [
             [

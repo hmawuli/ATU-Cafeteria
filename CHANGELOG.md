@@ -105,6 +105,12 @@ and this project follows the versioning policy described in
 - **Admin bootstrap**: `php artisan admin:create <username> --pin <pin> [--super]`
   and a production-guarded `DevelopmentAdminSeeder` (superadmin/
   `atuAdmin123`, admin/`admin123`) included in `make seed-dev`.
+- **Security hardening**: `php artisan security:audit [--fail-on-critical]`
+  flags admin accounts on known dev PINs / missing 2FA; dev seeders are now
+  all production-guarded; `admin:create` enforces a strong-PIN policy and 2FA
+  by default in production; fixed `backend/artisan` not propagating command
+  exit codes (so CI/audit gates could never trip). Tests:
+  `AdminBootstrapSecurityTest` (6).
 
 ### Changed
 - Local backend port standardised on Laravel default `8000` (loopback,

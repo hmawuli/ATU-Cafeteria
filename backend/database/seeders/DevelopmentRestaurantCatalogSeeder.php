@@ -7,6 +7,7 @@ use App\Models\MenuItem;
 use App\Models\Vendor;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\DB;
+use RuntimeException;
 
 class DevelopmentRestaurantCatalogSeeder extends Seeder
 {
@@ -18,6 +19,9 @@ class DevelopmentRestaurantCatalogSeeder extends Seeder
      */
     public function run(): void
     {
+        if (app()->environment('production')) {
+            throw new RuntimeException('Development seeders must never run in production.');
+        }
         DB::transaction(function (): void {
             $vendors = Vendor::query()
                 ->whereIn('store_name', [
@@ -28,7 +32,7 @@ class DevelopmentRestaurantCatalogSeeder extends Seeder
                 ->keyBy('store_name');
 
             if ($vendors->count() !== 2) {
-                throw new \RuntimeException(
+                throw new RuntimeException(
                     'Expected both development vendors: Campus Delight and Quick Bites.'
                 );
             }
