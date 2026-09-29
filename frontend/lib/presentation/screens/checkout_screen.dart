@@ -569,6 +569,18 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
     }
 
     if (!context.mounted) return;
+
+    // Wallet path: surface an underfunded wallet before any server call, so
+    // the student knows to top up instead of seeing a cryptic error.
+    final walletBalance = auth.currentUser?.balance ?? 0;
+    if (walletBalance + 1e-9 < finalTotal) {
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: Text(
+            'Wallet balance is GH₵ ${walletBalance.toStringAsFixed(2)} — you need GH₵ ${(finalTotal - walletBalance).toStringAsFixed(2)} more. Top up from the Wallet screen.'),
+      ));
+      return;
+    }
+
     final ok = await showDialog<bool>(
         context: context,
         builder: (ctx) => AlertDialog(
@@ -647,7 +659,10 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
           SnackBar(content: Text(details.isEmpty ? e.message : details)),
         );
       }
-    } catch (_) {
+    } catch (e) {
+      // Never leave the user guessing: log the real failure and still show a
+      // friendly message.
+      debugPrint('Checkout failed: $e');
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
             content: Text(
