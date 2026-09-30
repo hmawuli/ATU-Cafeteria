@@ -1567,7 +1567,10 @@ class CafeteriaProvider extends ChangeNotifier {
     } on ApiException catch (e) {
       _paystackInitError = e.message;
     } catch (e) {
-      _paystackInitError = 'Could not reach the cafeteria server.';
+      _paystackInitError =
+          'Could not reach the cafeteria server. Check the phone-to-server connection: '
+          'USB = run scripts/connect_phone.sh first; emulator = use API_BASE_URL=http://10.0.2.2:8000; '
+          'or set your computer\'s LAN IP as the server address.';
       debugPrint("Exception initializing Paystack payment: $e");
     }
     return null;
