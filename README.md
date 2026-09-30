@@ -43,6 +43,7 @@ ATU-Cafeteria/
 | Purpose | Document |
 |---|---|
 | One-page system state & owners (handover) | `docs/HANDOVER.md` |
+| Industrial-standard readiness matrix | `docs/INDUSTRIAL_READINESS.md` |
 | Stand-out features (open-now board, QR menus, scheduling, badges, streaks, receipts) | `docs/STANDOUT_FEATURES.md` |
 | How data flows between pages & the API (conventions) | `docs/DATA_FLOW.md` |
 | OpenAPI contract + generated Dart client (`make api-gen`) | `docs/openapi.json`, `frontend/lib/generated/atu_api.dart` |

@@ -6,7 +6,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project follows the versioning policy described in
 [RELEASING.md](RELEASING.md) (app version lives in `frontend/pubspec.yaml`).
 
-## [Unreleased]
+## [Unreleased] — targeting 1.2.0+3
+
+> Release alignment: app `frontend/pubspec.yaml` bumped to **1.2.0+3**; OpenAPI
+> `info.version` and the Swagger header to **1.2.0**; app-version string
+> defaults to 1.2.0. Readiness matrix added: `docs/INDUSTRIAL_READINESS.md`;
+> production env template is now PostgreSQL (`backend/.env.production.example`);
+> `backups/` and `dist/` are gitignored.
 
 ### Added
 - **Primary database switched to PostgreSQL** (local, Docker and VPS

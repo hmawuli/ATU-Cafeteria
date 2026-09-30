@@ -75,7 +75,7 @@ class SwaggerController extends Controller
   <div class="custom-header">
     <img src="https://img.icons8.com/color/192/hamburger.png" alt="ATU Logo" />
     <h1>ATU Cafeteria Platform</h1>
-    <span>Core REST API v1.1.0</span>
+    <span>Core REST API v1.2.0</span>
   </div>
 
   <div id="swagger-ui"></div>
@@ -124,7 +124,7 @@ HTML;
             'info' => [
                 'title' => 'ATU Cafeteria REST API',
                 'description' => 'REST API for the ATU Cafeteria platform: Laravel Sanctum authentication, restaurant catalogue, ordering, vendor operations, digital wallet and payments.',
-                'version' => '1.1.0',
+                'version' => '1.2.0',
                 'contact' => [
                     'name' => 'ATU Cafeteria Engineering',
                     'email' => 'support@atu.edu.gh',

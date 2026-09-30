@@ -13,7 +13,7 @@ import 'dart:io';
 const specPath = 'docs/openapi.json';
 const outPath = 'frontend/lib/generated/atu_api.dart';
 
-String _typeFor(Map<String, dynamic> schema, {bool nullable = false}) {
+String _typeFor(Map<String, dynamic> schema) {
   final t = schema['type'];
   if (t == 'integer') return 'int';
   if (t == 'number') return 'double';

@@ -19,7 +19,7 @@ class PushNotificationService {
   static const FlutterSecureStorage _storage = FlutterSecureStorage();
   static const String _deviceIdKey = 'atu_device_id';
   static const String _appVersion =
-      String.fromEnvironment('ATU_APP_VERSION', defaultValue: '1.1.0');
+      String.fromEnvironment('ATU_APP_VERSION', defaultValue: '1.2.0');
 
   static const String _apiKey =
       String.fromEnvironment('ATU_FIREBASE_API_KEY', defaultValue: '');

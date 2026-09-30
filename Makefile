@@ -108,9 +108,10 @@ deploy-local: ## Stand up the backend without Docker (migrate + seed + serve + s
 release-build: ## Build release APK with env-provided API + Firebase defines
 	scripts/build_release_apk.sh
 
-# Flutter SDK dart (sibling of the resolved flutter binary).
-FLUTTER_DART := $(dir $(FLUTTER))dart
+# Flutter SDK dart (absolute sibling of the resolved flutter binary).
+FLUTTER_BIN := $(shell command -v "$(FLUTTER)")
+FLUTTER_DART := $(dir $(FLUTTER_BIN))dart
 
 api-gen: ## Regenerate the typed Dart API client from docs/openapi.json
-	$(FLUTTER_DART) run tool/generate_api_client.dart
-	$(FLUTTER_DART) format frontend/lib/generated/atu_api.dart
+	"$(FLUTTER_DART)" run tool/generate_api_client.dart
+	"$(FLUTTER_DART)" format frontend/lib/generated/atu_api.dart
