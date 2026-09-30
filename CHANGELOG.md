@@ -117,6 +117,11 @@ and this project follows the versioning policy described in
   (`PAYSTACK_DEMO_MODE=true`) and the wallet deposit guard no longer bypasses
   verification in demo mode — successful deposits must always come from a
   verified payment or an admin adjustment. Tests: `PaystackTopUpTest` (2).
+- **Efficiency & scale**: the public catalogue response is now cached (5 min
+  TTL) and auto-invalidated on every menu-item create/update/delete/restore,
+  so the hottest endpoint stops hitting the database on every request; added
+  indexes for `order_items` (order/menu), `inventory_movements`
+  (vendor+created) and `payments` (customer). Tests: `CatalogueCacheTest` (2).
 
 ### Changed
 - Local backend port standardised on Laravel default `8000` (loopback,

@@ -2,12 +2,15 @@
 
 namespace App\Providers;
 
+use App\Http\Controllers\Api\MenuItemController;
+use App\Models\MenuItem;
 use App\Models\Order;
 use App\Models\WalletTransaction;
 use App\Observers\OrderStatusObserver;
 use App\Observers\WalletTransactionObserver;
 use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\ServiceProvider;
 
@@ -22,6 +25,15 @@ class AppServiceProvider extends ServiceProvider
     {
         Order::observe(OrderStatusObserver::class);
         WalletTransaction::observe(WalletTransactionObserver::class);
+
+        // Invalidate the public catalogue cache whenever menu items change so
+        // availability, stock and pricing are always fresh.
+        $forgetCatalogue = function () {
+            Cache::forget(MenuItemController::CATALOG_CACHE_KEY);
+        };
+        foreach (['created', 'updated', 'deleted', 'restored'] as $event) {
+            MenuItem::{$event}($forgetCatalogue);
+        }
 
         RateLimiter::for('api', function (Request $request) {
             return Limit::perMinute(60)->by($request->user()?->id ?: $request->ip());

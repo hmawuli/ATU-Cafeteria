@@ -8,42 +8,53 @@ use App\Models\AuditLog;
 use App\Models\MenuItem;
 use App\Support\MenuBadges;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Validator;
 
 class MenuItemController extends Controller
 {
     /**
+     * Cache key/tag for the default public catalogue response.
+     */
+    public const CATALOG_CACHE_KEY = 'catalog.menu_items.v1';
+
+    private const CATALOG_CACHE_TTL = 300;
+
+    /**
      * List all menu items.
      */
     public function index(Request $request)
     {
-        $query = MenuItem::with('vendor');
-        if ($request->has('vendor_id')) {
-            $query->where('vendor_id', $request->query('vendor_id'));
-        }
-
-        $withBadges = function ($items) {
-            return $items->map(function (MenuItem $item) {
-                $data = $item->toArray();
-                $data['vendor_id'] = $item->vendor_id;
-                $data['badges'] = MenuBadges::for($item);
-
-                return $data;
-            });
-        };
-
         // Optional pagination: ?page=2&per_page=50. When omitted the full
         // catalogue is returned, preserving legacy client behaviour.
         $page = $request->integer('page', 0);
         $perPage = max(1, min(200, $request->integer('per_page', 50)));
+
+        // The default catalogue is the hottest, most stable response — cache
+        // it (invalidated on every menu-item create/update/delete/restore).
+        if ($page === 0 && ! $request->has('vendor_id')) {
+            $payload = Cache::remember(self::CATALOG_CACHE_KEY, self::CATALOG_CACHE_TTL, function () {
+                return [
+                    'success' => true,
+                    'menu_items' => $this->catalogueRows(MenuItem::with('vendor')->get())->all(),
+                ];
+            });
+
+            return response()->json($payload, 200);
+        }
+
+        $query = MenuItem::with('vendor');
+        if ($request->has('vendor_id')) {
+            $query->where('vendor_id', $request->query('vendor_id'));
+        }
 
         if ($page > 0) {
             $paginated = $query->paginate($perPage, ['*'], 'page', $page);
 
             return response()->json([
                 'success' => true,
-                'menu_items' => $withBadges(collect($paginated->items()))->values(),
+                'menu_items' => $this->catalogueRows(collect($paginated->items()))->values(),
                 'pagination' => [
                     'current_page' => $paginated->currentPage(),
                     'per_page' => $paginated->perPage(),
@@ -57,8 +68,22 @@ class MenuItemController extends Controller
 
         return response()->json([
             'success' => true,
-            'menu_items' => $withBadges($items)->values(),
+            'menu_items' => $this->catalogueRows($items)->values(),
         ], 200);
+    }
+
+    /**
+     * Serialize menu items with their derived health/sustainability badges.
+     */
+    private function catalogueRows($items)
+    {
+        return $items->map(function (MenuItem $item) {
+            $data = $item->toArray();
+            $data['vendor_id'] = $item->vendor_id;
+            $data['badges'] = MenuBadges::for($item);
+
+            return $data;
+        });
     }
 
     /**
