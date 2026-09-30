@@ -5,6 +5,7 @@ import 'package:provider/provider.dart';
 import '../providers/cart_provider.dart';
 import '../providers/cafeteria_provider.dart';
 import '../widgets/order_qr_card.dart';
+import '../../core/money.dart';
 import '../../core/network/api_client.dart';
 
 class CheckoutScreen extends StatefulWidget {
@@ -573,10 +574,10 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
     // Wallet path: surface an underfunded wallet before any server call, so
     // the student knows to top up instead of seeing a cryptic error.
     final walletBalance = auth.currentUser?.balance ?? 0;
-    if (walletBalance + 1e-9 < finalTotal) {
+    if (isUnderfunded(walletBalance, finalTotal)) {
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(
         content: Text(
-            'Wallet balance is GH₵ ${walletBalance.toStringAsFixed(2)} — you need GH₵ ${(finalTotal - walletBalance).toStringAsFixed(2)} more. Top up from the Wallet screen.'),
+            'Wallet balance is GH₵ ${walletBalance.toStringAsFixed(2)} — you need GH₵ ${fundingShortage(walletBalance, finalTotal).toStringAsFixed(2)} more. Top up from the Wallet screen.'),
       ));
       return;
     }

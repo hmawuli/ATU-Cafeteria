@@ -12,6 +12,7 @@ import 'package:atu_cafeteria/core/network/api_client.dart';
 import 'package:atu_cafeteria/core/storage/secure_session_store.dart';
 import 'package:atu_cafeteria/services/pending_order_queue.dart';
 import 'package:atu_cafeteria/services/push_notification_service.dart';
+import 'catalogue_state.dart';
 import 'orders_state.dart';
 import 'wallet_state.dart';
 
@@ -34,6 +35,8 @@ class CafeteriaProvider extends ChangeNotifier {
   // their notifications so existing screens keep watching it unchanged.
   late final OrdersState orders = OrdersState()..addListener(notifyListeners);
   late final WalletState wallet = WalletState()..addListener(notifyListeners);
+  late final CatalogueState catalogue =
+      CatalogueState()..addListener(notifyListeners);
 
   @override
   void dispose() {
@@ -103,8 +106,8 @@ class CafeteriaProvider extends ChangeNotifier {
   List<User> _allVendors = [];
   List<User> get allVendors => _allVendors;
 
-  List<FoodItem> _allFoodItems = [];
-  List<FoodItem> get allFoodItems => _allFoodItems;
+  // Live catalogue (delegated to [CatalogueState] store).
+  List<FoodItem> get allFoodItems => catalogue.allFoodItems;
 
   List<Order> _allOrders = [];
   List<Order> get allOrders => _allOrders;
@@ -123,8 +126,7 @@ class CafeteriaProvider extends ChangeNotifier {
 
   List<Order> get vendorOrders => orders.vendorOrders;
 
-  List<FoodItem> _vendorFoodItems = [];
-  List<FoodItem> get vendorFoodItems => _vendorFoodItems;
+  List<FoodItem> get vendorFoodItems => catalogue.vendorFoodItems;
 
   List<Feedback> _vendorFeedback = [];
   List<Feedback> get vendorFeedback => _vendorFeedback;
@@ -401,9 +403,9 @@ class CafeteriaProvider extends ChangeNotifier {
     _allVendors = await _db.getAllVendors();
     // Prefer the live Laravel catalogue whenever it is available.
     // Fall back to SQLite only when the API cannot be reached.
-    _allFoodItems = remoteFoodItems.isNotEmpty
+    catalogue.setAllFoodItems(remoteFoodItems.isNotEmpty
         ? remoteFoodItems
-        : await _db.getAllFoodItems();
+        : await _db.getAllFoodItems());
     _allOrders = await _db.getAllOrders();
     _allFeedback = await _db.getAllFeedback();
     _auditLogs = await _db.getAllLogs();
@@ -421,12 +423,12 @@ class CafeteriaProvider extends ChangeNotifier {
       } else if (_currentUser!.role == 'VENDOR') {
         orders.setVendorOrders(
             await _db.getOrdersForVendor(_currentUser!.id!));
-        final remoteVendorItems = _allFoodItems
+        final remoteVendorItems = catalogue.allFoodItems
             .where((item) => item.vendorId == _currentUser!.id!)
             .toList();
-        _vendorFoodItems = remoteVendorItems.isNotEmpty
+        catalogue.setVendorFoodItems(remoteVendorItems.isNotEmpty
             ? remoteVendorItems
-            : await _db.getFoodItemsByVendor(_currentUser!.id!);
+            : await _db.getFoodItemsByVendor(_currentUser!.id!));
         _vendorFeedback = await _db.getFeedbackForVendor(_currentUser!.id!);
       }
     }
@@ -1178,8 +1180,8 @@ class CafeteriaProvider extends ChangeNotifier {
     _loginError = null;
     _registrationSuccess = false;
     orders.clear();
+    catalogue.clear();
     _purchasedVendors = [];
-    _vendorFoodItems = [];
     _vendorFeedback = [];
     _realAdminUser = null;
     _isAdminActing = false;
@@ -1318,7 +1320,8 @@ class CafeteriaProvider extends ChangeNotifier {
           await _db.getOrdersForCustomer(targetUser.id!));
     } else if (targetUser.role == 'VENDOR') {
       orders.setVendorOrders(await _db.getOrdersForVendor(targetUser.id!));
-      _vendorFoodItems = await _db.getFoodItemsByVendor(targetUser.id!);
+      catalogue.setVendorFoodItems(
+          await _db.getFoodItemsByVendor(targetUser.id!));
       _vendorFeedback = await _db.getFeedbackForVendor(targetUser.id!);
     }
     notifyListeners();

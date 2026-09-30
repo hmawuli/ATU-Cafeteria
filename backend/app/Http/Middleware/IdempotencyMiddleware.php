@@ -10,9 +10,20 @@ use Symfony\Component\HttpFoundation\Response;
 
 class IdempotencyMiddleware
 {
+    /**
+     * Successful idempotent responses are kept for this many seconds, after
+     * which replaying the same key re-executes a fresh request. Only 2xx
+     * responses are cached, so storage stays bounded by the write rate × TTL.
+     * Override with IDEMPOTENCY_TTL_SECONDS.
+     */
     private const TTL_SECONDS = 86400;
 
     private const KEY_MAX_LENGTH = 128;
+
+    private static function ttl(): int
+    {
+        return max(60, (int) env('IDEMPOTENCY_TTL_SECONDS', self::TTL_SECONDS));
+    }
 
     public function handle(Request $request, Closure $next, string $mode = 'optional'): Response
     {
@@ -101,7 +112,7 @@ class IdempotencyMiddleware
                             'Content-Type' => $response->headers->get('Content-Type', 'application/json'),
                         ],
                         'body' => $response->getContent(),
-                    ], self::TTL_SECONDS);
+                    ], static::ttl());
                 }
 
                 return $response;
