@@ -43,6 +43,9 @@ curl -fsS -o /dev/null --max-time 5 "${BASE_URL}/health" || fail "API did not be
 log "Migrations (explicit, entrypoint also guards on boot)…"
 docker compose exec -T app php artisan migrate --force --no-interaction
 
+log "Configuration check…"
+docker compose exec -T app php artisan config:check --fail-on-prod
+
 log "Smoke test…"
 scripts/smoke_test.sh "${BASE_URL}"
 

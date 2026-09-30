@@ -136,6 +136,11 @@ and this project follows the versioning policy described in
 - **No-Docker deploy**: `make deploy-local` stands the backend up directly
   (ensure DB → migrate → guard-seeded → serve → smoke) on hosts without a
   Docker daemon — verified live on this machine.
+- **Turnkey host/credentials prep**: `scripts/prepare_host.sh` provisions a
+  Ubuntu host with Docker + the Compose plugin in one command (run on the
+  server itself), and `php artisan config:check --fail-on-prod` validates the
+  runtime config (APP_KEY, APP_DEBUG, CORS, Paystack, demo mode, database)
+  as a deploy gate — wired into `deploy_docker.sh`. Tests: `ConfigCheckTest` (2).
 
 ### Changed
 - Local backend port standardised on Laravel default `8000` (loopback,
