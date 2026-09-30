@@ -53,6 +53,8 @@ central Laravel API.
 - **Bootstrap admins**: run `php artisan admin:create <username> --pin <strong-pin> --super`
   (add `--super` for SUPER_ADMIN). Promoted accounts log in from the app with
   their username + PIN.
+- **Onboard real vendors**: `php artisan vendor:create "Store Name" --pin <strong-pin> --campus "..." --location "..."`.
+  Creates the vendor login + stall profile (avoids demo data).
 - **Audit trail**: Admin → **Audit logs** lists who did what (logins,
   order mutations, refunds, admin actions). Check it daily.
 - **Wallets**: adjust balance only for legitimate corrections — every change

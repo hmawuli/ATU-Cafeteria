@@ -99,6 +99,12 @@ load: ## Load test (default: /api/health, 20 concurrent, 200 requests)
 contract: ## Verify every frontend API call has a matching backend route
 	scripts/check_api_contract.sh
 
+deploy: ## One-command Docker Compose deploy on a Docker host (sets APP_ENV)
+	scripts/deploy_docker.sh
+
+release-build: ## Build release APK with env-provided API + Firebase defines
+	scripts/build_release_apk.sh
+
 # Flutter SDK dart (sibling of the resolved flutter binary).
 FLUTTER_DART := $(dir $(FLUTTER))dart
 

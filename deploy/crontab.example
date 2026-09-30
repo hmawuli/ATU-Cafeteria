@@ -1,0 +1,8 @@
+# Example crontab lines for the ATU Cafeteria server (Ubuntu).
+# Install with: sudo crontab -l > /tmp/cron; cat deploy/crontab.example >> /tmp/cron; sudo crontab /tmp/cron
+
+# Laravel scheduler (project root must be the deploy path).
+* * * * * cd /var/www/atu-cafeteria/backend && php artisan schedule:run >> /dev/null 2>&1
+
+# Daily database backup at 02:15 (Docker Compose stack).
+15 2 * * * cd /var/www/atu-cafeteria && scripts/db_backup.sh backups/atu_cafeteria_$(date +\%F).sql.gz >> /var/log/atu-backup.log 2>&1

@@ -22,6 +22,7 @@ class Vendor extends Model
         'location_within_campus',
         'contact_email',
         'operational_hours',
+        'campus',
     ];
 
     protected $casts = [

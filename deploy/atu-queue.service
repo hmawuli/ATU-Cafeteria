@@ -1,0 +1,17 @@
+# systemd unit for the Laravel queue worker on a bare metal (non-Docker) host.
+# Save to /etc/systemd/system/atu-queue.service, then:
+#   sudo systemctl daemon-reload
+#   sudo systemctl enable --now atu-queue
+[Unit]
+Description=ATU Cafeteria queue worker
+After=network.target
+
+[Service]
+User=www-data
+Group=www-data
+WorkingDirectory=/var/www/atu-cafeteria/backend
+ExecStart=/usr/bin/php artisan queue:work --sleep=3 --tries=3 --max-time=3600
+Restart=always
+
+[Install]
+WantedBy=multi-user.target

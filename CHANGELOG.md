@@ -122,6 +122,13 @@ and this project follows the versioning policy described in
   so the hottest endpoint stops hitting the database on every request; added
   indexes for `order_items` (order/menu), `inventory_movements`
   (vendor+created) and `payments` (customer). Tests: `CatalogueCacheTest` (2).
+- **Operational automation**: `bash scripts/deploy_docker.sh` runs the full
+  deployed sequence (build → up → healthcheck → migrate → smoke →
+  security gate → backup); `php artisan vendor:create` onboards real vendor
+  accounts with strong PINs (+ `VendorBootstrapTest`, 4); `make release-build`
+  builds the release APK from validated `API_BASE_URL` + `ATU_FIREBASE_*`
+  env; `deploy/` includes the queue systemd unit and scheduler/backup cron
+  templates. `vendor.campus` is now fillable (multi-campus provisioning).
 
 ### Changed
 - Local backend port standardised on Laravel default `8000` (loopback,
