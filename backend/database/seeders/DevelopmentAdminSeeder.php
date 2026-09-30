@@ -18,8 +18,8 @@ class DevelopmentAdminSeeder extends Seeder
      */
     public function run(): void
     {
-        if (app()->environment('production')) {
-            throw new RuntimeException('Development admin seeder must never run in production.');
+        if (app()->environment(['production', 'staging'])) {
+            throw new RuntimeException('Development seeders must never run in production or staging.');
         }
 
         $accounts = [

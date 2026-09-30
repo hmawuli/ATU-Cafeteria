@@ -14,8 +14,8 @@ class MenuCategoryAndVendorSeeder extends Seeder
      */
     public function run(): void
     {
-        if (app()->environment('production')) {
-            throw new RuntimeException('Development seeders must never run in production.');
+        if (app()->environment(['production', 'staging'])) {
+            throw new RuntimeException('Development seeders must never run in production or staging.');
         }
 
         // 1. Seed Menu Categories

@@ -129,6 +129,10 @@ and this project follows the versioning policy described in
   builds the release APK from validated `API_BASE_URL` + `ATU_FIREBASE_*`
   env; `deploy/` includes the queue systemd unit and scheduler/backup cron
   templates. `vendor.campus` is now fillable (multi-campus provisioning).
+- **Staging environment + handover**: dev seeders and `scripts/dev_seed.sh`
+  now also refuse `APP_ENV=staging`; `docs/DEPLOYMENT_CHECKLIST.md` documents
+  the local/staging/production matrix; `docs/HANDOVER.md` is the one-page
+  system state, owners and pre-launch checklist.
 
 ### Changed
 - Local backend port standardised on Laravel default `8000` (loopback,

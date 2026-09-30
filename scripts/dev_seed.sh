@@ -12,7 +12,8 @@ set -euo pipefail
 cd "$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)/backend"
 
 if [ "${APP_ENV:-}" = "production" ] \
-  || [ "${APP_ENV:-}" = "prod" ]; then
+  || [ "${APP_ENV:-}" = "prod" ] \
+  || [ "${APP_ENV:-}" = "staging" ]; then
   echo "✗ Refusing to seed development data with APP_ENV=${APP_ENV}." >&2
   exit 1
 fi

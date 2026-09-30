@@ -6,7 +6,19 @@ every release.
 
 **Companions:** `docs/STAFF_QUICKSTART.md` (how venue staff and admins run it),
 `docs/UAT_CHECKLIST.md` (manual QA), `docs/PERFORMANCE_BUDGET.md` (baselines),
-`RELEASING.md` (versioning).
+`RELEASING.md` (versioning), `docs/HANDOVER.md` (state of the system & owners).
+
+## Environments
+
+| Env | `APP_ENV` | Dev seeders | Demo payments | Admin defaults |
+|---|---|---|---|---|
+| Local | `local` | Run (`make seed-dev`) | Allowed (`PAYSTACK_DEMO_MODE=true`) | Weak-pin dev accounts exist |
+| Staging | `staging` | **Blocked** | **Blocked** (`false`) | Strong PIN + 2FA via `admin:create --enable-2fa` |
+| Production | `production` | **Blocked** | **Blocked** (`false`, real secret) | Strong PIN + 2FA required |
+
+Staging is a safe rehearsal of Production: same seeders/guards, no demo money,
+but on a test server. Promote promotion only through a scenario proven in
+staging.
 
 ## A. Environment (only you can provide)
 
