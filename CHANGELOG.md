@@ -133,6 +133,9 @@ and this project follows the versioning policy described in
   now also refuse `APP_ENV=staging`; `docs/DEPLOYMENT_CHECKLIST.md` documents
   the local/staging/production matrix; `docs/HANDOVER.md` is the one-page
   system state, owners and pre-launch checklist.
+- **No-Docker deploy**: `make deploy-local` stands the backend up directly
+  (ensure DB → migrate → guard-seeded → serve → smoke) on hosts without a
+  Docker daemon — verified live on this machine.
 
 ### Changed
 - Local backend port standardised on Laravel default `8000` (loopback,

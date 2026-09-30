@@ -39,6 +39,13 @@ export APP_ENV=production
 bash scripts/deploy_docker.sh             # build → up → healthcheck → migrate → smoke → security:audit → backup
 ```
 
+### No Docker host? Stand it up directly
+```bash
+make deploy-local                        # ensure db → migrate → seed (local) → serve → smoke
+```
+`deploy-local` is the non-container equivalent used on this development
+machine — the same code, served by PHP-FPM/artisan on `0.0.0.0:8000`.
+
 ### VPS (manual)
 Follow `docs/DEPLOY_VPS.md` end-to-end (Nginx + PHP-FPM + PostgreSQL, TLS,
 queue worker, scheduler cron, `pg_dump` backups), then `make smoke`.

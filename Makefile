@@ -102,6 +102,9 @@ contract: ## Verify every frontend API call has a matching backend route
 deploy: ## One-command Docker Compose deploy on a Docker host (sets APP_ENV)
 	scripts/deploy_docker.sh
 
+deploy-local: ## Stand up the backend without Docker (migrate + seed + serve + smoke)
+	scripts/deploy_local.sh
+
 release-build: ## Build release APK with env-provided API + Firebase defines
 	scripts/build_release_apk.sh
 
