@@ -1545,6 +1545,7 @@ class CafeteriaProvider extends ChangeNotifier {
     required String email,
     required String purpose,
   }) async {
+    _paystackInitError = null;
     try {
       final decoded = await _api.request(
         'POST',
@@ -1562,12 +1563,21 @@ class CafeteriaProvider extends ChangeNotifier {
       if (decoded is Map && decoded['success'] == true) {
         return Map<String, dynamic>.from(decoded['data'] as Map);
       }
-      debugPrint("Initialize Paystack error response: $decoded");
+      _paystackInitError = 'The server could not initialize a top-up.';
+    } on ApiException catch (e) {
+      _paystackInitError = e.message;
     } catch (e) {
+      _paystackInitError = 'Could not reach the cafeteria server.';
       debugPrint("Exception initializing Paystack payment: $e");
     }
     return null;
   }
+
+  /// Human-readable reason the last [initializePaystackPayment] failed, so the
+  /// UI can tell the student exactly what to fix instead of a generic message.
+  String? _paystackInitError;
+
+  String? get paystackInitError => _paystackInitError;
 
   Future<bool> verifyPaystackPayment({
     required String reference,

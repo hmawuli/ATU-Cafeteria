@@ -1621,7 +1621,7 @@ class _RestaurantCustomerHomeScreenState
                       if (payment == null) {
                         setDialogState(() {
                           isLoading = false;
-                          errorMsg =
+                          errorMsg = provider.paystackInitError ??
                               'Unable to start wallet top-up. Please check the cafeteria server and try again.';
                         });
                         return;
