@@ -41,6 +41,14 @@ import 'package:atu_cafeteria/core/config/server_config.dart';
 import 'package:atu_cafeteria/core/network/backend_discovery.dart';
 import 'package:atu_cafeteria/services/crash_reporting.dart';
 import 'package:atu_cafeteria/domain/models/models.dart';
+import 'package:atu_cafeteria/presentation/screens/not_found_screen.dart';
+
+/// Fallback for any navigation that misses a registered page — never a blank/
+/// error screen, always a friendly way home.
+Route<dynamic> appUnknownRoute(RouteSettings settings) => MaterialPageRoute(
+      builder: (context) => const NotFoundScreen(),
+      settings: settings,
+    );
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -78,6 +86,7 @@ class ATUCafeteriaApp extends StatelessWidget {
         darkTheme: AppTheme.dark(),
         themeMode: ThemeMode.system,
         home: const SplashScreen(),
+        onUnknownRoute: appUnknownRoute,
         routes: {
           '/home': (_) => const PublicHomeScreen(),
           '/login': (_) => const LoginScreen(),
