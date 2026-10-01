@@ -38,12 +38,19 @@ import 'package:atu_cafeteria/presentation/screens/reference_admin_screen.dart';
 import 'package:atu_cafeteria/presentation/screens/notifications_screen.dart';
 import 'package:atu_cafeteria/presentation/screens/splash_screen.dart';
 import 'package:atu_cafeteria/core/config/server_config.dart';
+import 'package:atu_cafeteria/core/network/backend_discovery.dart';
 import 'package:atu_cafeteria/services/crash_reporting.dart';
 import 'package:atu_cafeteria/domain/models/models.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await ServerConfig.init();
+  // Debug-only: auto-point at the first reachable backend so wallet top-up /
+  // all pages work on USB, emulator or Wi-Fi without manual URL changes.
+  final backend = await BackendDiscovery().resolve();
+  if (backend != null) {
+    ServerConfig.setMemoryOverride(backend);
+  }
   await CrashReporting.init();
   runApp(const ATUCafeteriaApp());
 }

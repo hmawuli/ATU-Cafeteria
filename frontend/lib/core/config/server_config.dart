@@ -78,4 +78,12 @@ class ServerConfig {
       // Best-effort persistence; in-memory override still applies this run.
     }
   }
+
+  /// Override the base URL **in memory only** (used by debug backend
+  /// discovery). Never persisted, so release builds always enforce HTTPS on
+  /// the real configured URL.
+  static void setMemoryOverride(String url) {
+    final value = url.trim();
+    _manual = value.isEmpty ? null : value;
+  }
 }
