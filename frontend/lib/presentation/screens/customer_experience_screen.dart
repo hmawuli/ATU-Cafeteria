@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:atu_cafeteria/core/network/api_client.dart';
 import 'package:provider/provider.dart';
 import 'package:atu_cafeteria/domain/models/models.dart';
+import 'package:atu_cafeteria/domain/models/wallet_ledger_entry.dart';
 import 'package:atu_cafeteria/presentation/providers/cafeteria_provider.dart';
 import 'package:atu_cafeteria/presentation/providers/cart_provider.dart';
 
@@ -1497,9 +1498,68 @@ class _RestaurantCustomerHomeScreenState
               textAlign: TextAlign.center,
               style: TextStyle(color: muted, fontSize: 11),
             ),
+            const SizedBox(height: 18),
+            _walletActivityList(provider),
           ],
         ),
       ),
+    );
+  }
+
+  Widget _walletActivityList(CafeteriaProvider provider) {
+    const debitRed = Color(0xFFB3261E);
+    final raw = provider.wallet.transactions;
+    if (raw.isEmpty) {
+      return const Text(
+        'No wallet transactions yet.',
+        style: TextStyle(color: muted, fontSize: 12),
+      );
+    }
+
+    final entries = raw
+        .take(8)
+        .map((m) => WalletLedgerEntry.fromJson(Map<String, dynamic>.from(m)))
+        .toList();
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        const Text(
+          'Recent activity',
+          style: TextStyle(color: navy, fontWeight: FontWeight.w800),
+        ),
+        const SizedBox(height: 8),
+        ...entries.map((e) => Padding(
+              padding: const EdgeInsets.symmetric(vertical: 5),
+              child: Row(
+                children: [
+                  Icon(
+                    e.isCredit
+                        ? Icons.add_circle_outline
+                        : Icons.remove_circle_outline,
+                    size: 18,
+                    color: e.isCredit ? blue : debitRed,
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      e.reference == null ? e.label : '${e.label} · ${e.reference}',
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(color: muted, fontSize: 12),
+                    ),
+                  ),
+                  Text(
+                    e.signedAmount,
+                    style: TextStyle(
+                      fontWeight: FontWeight.w800,
+                      color: e.isCredit ? blue : debitRed,
+                      fontSize: 13,
+                    ),
+                  ),
+                ],
+              ),
+            )),
+      ],
     );
   }
 

@@ -212,5 +212,7 @@ Route::middleware(['auth:sanctum', InactivityTimeout::class])->group(function ()
     Route::middleware('role:STUDENT')->group(function () {
         Route::get('/wallet', [WalletController::class, 'index']);
         Route::post('/wallet/top-up', [WalletController::class, 'topUp']);
+        Route::get('/wallet/reconcile', [WalletController::class, 'reconcile']);
+        Route::get('/wallet/statement', [WalletController::class, 'statement']);
     });
 });

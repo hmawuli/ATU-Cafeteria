@@ -147,8 +147,19 @@ and this project follows the versioning policy described in
   server itself), and `php artisan config:check --fail-on-prod` validates the
   runtime config (APP_KEY, APP_DEBUG, CORS, Paystack, demo mode, database)
   as a deploy gate — wired into `deploy_docker.sh`. Tests: `ConfigCheckTest` (2).
+- **Industrial wallet**: ledger integrity via `GET /api/wallet/reconcile`
+  (stored balance vs. signed ledger sum, drift flagged) and date-bounded
+  statements via `GET /api/wallet/statement` (JSON, or printable PDF with
+  `?pdf=1` via `WalletStatementPdfWriter`); the customer home wallet card now
+  renders recent activity from the ledger. Tests: `WalletLedgerTest` (4),
+  `wallet_ledger_entry_test` (3). Backend 91, frontend 59.
 - **Finishing trust + architecture**: audit logs are now append-only (delete
   requires an explicit maintenance flag — `AuditLogAppendOnlyTest`); the
+  idempotency cache TTL is env-configurable (`IDEMPOTENCY_TTL_SECONDS`, 24h
+  default, bounded to 2xx responses); checkout under-funding uses shared
+  `core/money.dart` helpers (tested); and the third provider slice was
+  extracted — `CatalogueState` now owns catalogue + vendor menu data
+  (`CatalogueStateTest`). Frontend tests 53, backend 87.
   idempotency cache TTL is env-configurable (`IDEMPOTENCY_TTL_SECONDS`, 24h
   default, bounded to 2xx responses); checkout under-funding uses shared
   `core/money.dart` helpers (tested); and the third provider slice was

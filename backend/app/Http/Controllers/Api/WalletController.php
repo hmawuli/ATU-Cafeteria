@@ -6,7 +6,10 @@ use App\Http\Controllers\Controller;
 use App\Models\AuditLog;
 use App\Models\User;
 use App\Models\WalletTransaction;
+use App\Services\WalletStatementPdfWriter;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Http\Response;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Str;
@@ -74,6 +77,83 @@ class WalletController extends Controller
             ->get();
 
         return response()->json(['success' => true, 'transactions' => $transactions]);
+    }
+
+    /**
+     * Industrial ledger integrity check: the stored balance must reconcile with
+     * the sum of the SUCCESS transaction ledger. Reports any drift so finance
+     * can act before students/staff see inconsistency.
+     */
+    public function reconcile(Request $request): JsonResponse
+    {
+        $user = $request->user();
+        if (! $user) {
+            return response()->json(['success' => false, 'message' => 'Unauthorized.'], 401);
+        }
+
+        $ledger = (float) DB::table('wallet_transactions')
+            ->where('user_id', $user->id)
+            ->where('status', 'SUCCESS')
+            ->sum('amount');
+
+        $stored = round((float) $user->balance, 2);
+        $computed = round($ledger, 2);
+        $delta = round($stored - $computed, 2);
+
+        return response()->json([
+            'success' => true,
+            'data' => [
+                'stored_balance' => $stored,
+                'ledger_balance' => $computed,
+                'delta' => $delta,
+                'consistent' => abs($delta) < 0.01,
+                'generated_at' => now()->toIso8601String(),
+            ],
+        ]);
+    }
+
+    /**
+     * Industrial wallet statement: a date-bounded JSON ledger or a printable
+     * PDF when ?pdf=1.
+     */
+    public function statement(Request $request): JsonResponse|Response
+    {
+        $user = $request->user();
+        if (! $user) {
+            return response()->json(['success' => false, 'message' => 'Unauthorized.'], 401);
+        }
+
+        $from = $request->filled('from')
+            ? now()->parse($request->string('from'))->startOfDay()
+            : now()->subDays(90)->startOfDay();
+        $to = $request->filled('to')
+            ? now()->parse($request->string('to'))->endOfDay()
+            : now()->endOfDay();
+
+        $transactions = WalletTransaction::where('user_id', $user->id)
+            ->whereBetween('created_at', [$from, $to])
+            ->orderByDesc('created_at')
+            ->limit(500)
+            ->get();
+
+        if ((bool) $request->boolean('pdf')) {
+            $pdf = (new WalletStatementPdfWriter)->generate($user, $transactions, $from, $to);
+
+            return response($pdf, 200, [
+                'Content-Type' => 'application/pdf',
+                'Content-Disposition' => "inline; filename=\"wallet-statement-{$user->id}.pdf\"",
+            ]);
+        }
+
+        return response()->json([
+            'success' => true,
+            'data' => [
+                'from' => $from->toDateString(),
+                'to' => $to->toDateString(),
+                'balance' => (float) $user->balance,
+                'transactions' => $transactions,
+            ],
+        ]);
     }
 
     /**
