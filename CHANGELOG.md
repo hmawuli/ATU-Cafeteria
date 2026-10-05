@@ -66,6 +66,13 @@ and this project follows the versioning policy described in
   `docs/PERFORMANCE_BUDGET.md`; `docs/MOBILE_POLISH.md` (accessibility audit
   checklist + offline order-queueing design).
 
+### Fixed
+- **`CACHE_STORE` was ignored**: `config/cache.php` read only `CACHE_DRIVER`, so
+  the value in the `.env` templates, `phpunit.xml` (`array`) and the Vercel
+  guide never took effect. Tests therefore shared a file cache and leaked
+  idempotency responses between runs (`CustomerDataRightsTest` flakiness); the
+  config now honours `CACHE_STORE` with `CACHE_DRIVER` as a fallback.
+
 ### Changed
 - **One typed API layer in Flutter**: `CafeteriaProvider` now takes an
   `ApiClient`; auth/account, `/me`, catalogue, vendor-menu, order-read and
