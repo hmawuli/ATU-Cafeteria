@@ -44,6 +44,7 @@ ATU-Cafeteria/
 |---|---|
 | Payment gateway setup (wallet + Paystack, demo↔live) | `docs/PAYMENTS_SETUP.md` |
 | Student data rights (export & erasure) | `docs/DATA_RIGHTS.md` |
+| UI design system & token rules | `docs/DESIGN_SYSTEM.md` |
 | One-page system state & owners (handover) | `docs/HANDOVER.md` |
 | Industrial-standard readiness matrix | `docs/INDUSTRIAL_READINESS.md` |
 | Stand-out features (open-now board, QR menus, scheduling, badges, streaks, receipts) | `docs/STANDOUT_FEATURES.md` |

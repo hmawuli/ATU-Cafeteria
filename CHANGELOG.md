@@ -165,6 +165,10 @@ and this project follows the versioning policy described in
   `DELETE /api/customer/account` (refuses a non-empty wallet, revokes
   sessions/devices, erases PII, keeps financial history, audited).
   Tests: `CustomerDataRightsTest` (4). Backend 99+ tests.
+- **Design system standard**: `docs/DESIGN_SYSTEM.md` (tokens, component reuse,
+  dark-mode and accessibility rules) plus a **ratchet test**
+  (`design_token_budget_test.dart`) that fails if hardcoded presentation
+  colours grow beyond the current budget, so the UI cannot drift further.
 - **Finishing trust + architecture**: audit logs are now append-only (delete
   requires an explicit maintenance flag — `AuditLogAppendOnlyTest`); the
   idempotency cache TTL is env-configurable (`IDEMPOTENCY_TTL_SECONDS`, 24h
