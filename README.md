@@ -54,6 +54,7 @@ ATU-Cafeteria/
 | API conventions (envelope, errors, idempotency, rate limits) | `docs/API_STANDARDS.md` |
 | Interactive API docs (served live) | `/api/docs` on the running backend |
 | Deploy to a Linux VPS (Nginx + PHP-FPM + PostgreSQL) | `docs/DEPLOY_VPS.md` |
+| Deploy the API to Vercel as a container function | `docs/DEPLOY_VERCEL.md` |
 | Containerised deployment (incl. queue worker + scheduler) | `docker-compose.yml` + `make docker-up` |
 | Logging, health checks, monitoring, crash reporting | `docs/OBSERVABILITY.md` |
 | Performance baselines & budgets | `docs/PERFORMANCE_BUDGET.md` |

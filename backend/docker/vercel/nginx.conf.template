@@ -1,0 +1,49 @@
+# ATU Cafeteria API — self-contained Nginx config for the Vercel container
+# function. Nginx and PHP-FPM run in the same image; __PORT__ is substituted at
+# container start with Vercel's PORT (default 80).
+
+user nginx;
+worker_processes auto;
+error_log /dev/stderr warn;
+pid /tmp/atu-nginx.pid;
+
+events {
+    worker_connections 1024;
+}
+
+http {
+    include /etc/nginx/mime.types;
+    default_type application/octet-stream;
+
+    access_log /dev/stdout;
+    sendfile on;
+    client_max_body_size 20M;
+
+    server {
+        listen __PORT__;
+        server_name _;
+
+        root /var/www/html/public;
+        index index.php;
+        charset utf-8;
+
+        location / {
+            try_files $uri $uri/ /index.php?$query_string;
+        }
+
+        location = /favicon.ico { access_log off; log_not_found off; }
+        location = /robots.txt { access_log off; log_not_found off; }
+
+        error_page 404 /index.php;
+
+        location ~ \.php$ {
+            fastcgi_pass 127.0.0.1:9000;
+            fastcgi_index index.php;
+            fastcgi_param SCRIPT_FILENAME $realpath_root$fastcgi_script_name;
+            include fastcgi_params;
+        }
+
+        location ~ /\.(?!well-known).* { deny all; }
+        location ~ /\.ht { deny all; }
+    }
+}

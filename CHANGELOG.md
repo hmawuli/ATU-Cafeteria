@@ -15,6 +15,12 @@ and this project follows the versioning policy described in
 > `backups/` and `dist/` are gitignored.
 
 ### Added
+- **Vercel container deployment** for the Laravel API (`Dockerfile.vercel` +
+  `backend/docker/vercel/`): Nginx and PHP-FPM run in a single image that
+  listens on Vercel's `$PORT`. `bootstrap/app.php` redirects Laravel's writable
+  storage to `/tmp` and trusts the platform proxy via `LARAVEL_STORAGE_PATH` /
+  `TRUSTED_PROXIES`. See `docs/DEPLOY_VERCEL.md` (queue worker, scheduler and
+  backups are documented as off-platform responsibilities).
 - **Primary database switched to PostgreSQL** (local, Docker and VPS
   deployment). SQLite remains only for automated tests (`phpunit.xml`) and
   the Flutter offline cache. Driver-specific JSON lookups were replaced with

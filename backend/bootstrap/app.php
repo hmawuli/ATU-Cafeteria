@@ -18,7 +18,7 @@ use Illuminate\Http\Middleware\HandleCors;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 
-return Application::configure(basePath: dirname(__DIR__))
+$app = Application::configure(basePath: dirname(__DIR__))
     ->withRouting(
         web: __DIR__.'/../routes/web.php',
         api: __DIR__.'/../routes/api.php',
@@ -31,6 +31,13 @@ return Application::configure(basePath: dirname(__DIR__))
         }
     )
     ->withMiddleware(function (Middleware $middleware) {
+        // Behind a managed proxy (Vercel), trust its X-Forwarded-* headers so
+        // the HTTPS transport guard and generated URLs see the real scheme.
+        $trustedProxies = getenv('TRUSTED_PROXIES');
+        if (is_string($trustedProxies) && $trustedProxies !== '') {
+            $middleware->trustProxies(at: $trustedProxies);
+        }
+
         $middleware->validateCsrfTokens(except: ['api/*']);
         $middleware->api(append: [
             'throttle:api', EnsureSecureTransport::class,
@@ -56,3 +63,35 @@ return Application::configure(basePath: dirname(__DIR__))
             }
         });
     })->create();
+
+// ---------------------------------------------------------------------------
+// Serverless container support (Vercel).
+//
+// Vercel runs the app in an ephemeral container where only /tmp is writable.
+// When LARAVEL_STORAGE_PATH is present (a real process environment variable),
+// redirect Laravel's writable storage there so compiled views, caches and logs
+// keep working. getenv() is used deliberately: bootstrap/app.php runs before the
+// .env file is loaded, but platform-provided environment variables are already
+// available. Both options are no-ops when unset (local dev, CI, VPS).
+// ---------------------------------------------------------------------------
+$serverlessStorage = getenv('LARAVEL_STORAGE_PATH');
+if (is_string($serverlessStorage) && $serverlessStorage !== '') {
+    foreach ([
+        $serverlessStorage,
+        $serverlessStorage.'/app',
+        $serverlessStorage.'/framework',
+        $serverlessStorage.'/framework/cache',
+        $serverlessStorage.'/framework/cache/data',
+        $serverlessStorage.'/framework/sessions',
+        $serverlessStorage.'/framework/views',
+        $serverlessStorage.'/logs',
+    ] as $dir) {
+        if (! is_dir($dir)) {
+            @mkdir($dir, 0775, true);
+        }
+    }
+
+    $app->useStoragePath($serverlessStorage);
+}
+
+return $app;

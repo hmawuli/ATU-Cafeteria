@@ -1,0 +1,69 @@
+# syntax=docker/dockerfile:1
+#
+# Vercel container function for the ATU Cafeteria Laravel API.
+#
+# Vercel automatically detects this file at the repository root, builds the
+# image, and routes all HTTP traffic to it on $PORT (default 80). Because a
+# Vercel function is a single HTTP server, Nginx and PHP-FPM are combined here
+# instead of running as separate services (as docker-compose.yml does).
+#
+# See docs/DEPLOY_VERCEL.md for the required environment variables and the
+# known limitations (queue worker, scheduler and backups live off-platform).
+
+# ---------------------------------------------------------------------------
+# Stage 1 — vendor: production Composer dependencies.
+# ---------------------------------------------------------------------------
+FROM composer:2 AS vendor
+
+WORKDIR /app
+
+COPY backend/composer.json backend/composer.lock ./
+
+RUN composer install \
+    --no-dev \
+    --no-interaction \
+    --prefer-dist \
+    --no-scripts \
+    --no-progress \
+    --optimize-autoloader
+
+# ---------------------------------------------------------------------------
+# Stage 2 — runtime: Nginx + PHP-FPM serving the API on one port.
+# ---------------------------------------------------------------------------
+FROM php:8.2-fpm-alpine AS runtime
+
+WORKDIR /var/www/html
+
+# PostgreSQL extensions required by the production database, plus Nginx.
+RUN set -eux; \
+    apk add --no-cache --virtual .build-deps $PHPIZE_DEPS; \
+    docker-php-ext-install pdo_pgsql pgsql bcmath; \
+    apk del .build-deps; \
+    apk add --no-cache nginx
+
+# Production-tuned PHP settings for an immutable image.
+RUN { \
+        echo 'opcache.enable=1'; \
+        echo 'opcache.memory_consumption=128'; \
+        echo 'opcache.interned_strings_buffer=16'; \
+        echo 'opcache.max_accelerated_files=10000'; \
+        echo 'opcache.validate_timestamps=0'; \
+        echo 'expose_php=0'; \
+    } > /usr/local/etc/php/conf.d/zz-atu.ini
+
+# Vendor from the build stage, then the application source.
+COPY --from=vendor /app/vendor ./vendor
+COPY backend/ .
+
+# Build the package manifest into the image so the read-only filesystem needs no
+# bootstrap/cache write at runtime.
+RUN php artisan package:discover --ansi \
+    && chown -R www-data:www-data storage bootstrap/cache
+
+COPY backend/docker/vercel/nginx.conf.template /etc/nginx/atu-nginx.conf.template
+COPY backend/docker/vercel/start.sh /usr/local/bin/atu-start
+RUN chmod +x /usr/local/bin/atu-start
+
+EXPOSE 80
+
+CMD ["atu-start"]

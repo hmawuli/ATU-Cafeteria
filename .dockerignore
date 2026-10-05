@@ -1,0 +1,43 @@
+# Build context exclusions for the root-level Vercel container image
+# (Dockerfile.vercel). Vercel uses the repository root as the build context.
+
+.git
+.gitignore
+.github
+.vscode
+.idea
+**/node_modules
+
+# The Flutter client is not part of the backend image.
+frontend
+
+# Root-only tooling and docs.
+build
+dist
+docs
+scripts
+tool
+
+# Backend build artifacts and secrets (composer dependencies are installed in
+# the image, never copied from the working tree).
+backend/.env
+backend/.env.*
+!backend/.env.example
+backend/vendor
+backend/node_modules
+backend/storage/framework/cache/data/*
+backend/storage/framework/sessions/*
+backend/storage/framework/views/*
+backend/storage/logs/*
+backend/public/storage
+backend/tests
+backend/database/*.sqlite
+backend/database/*.sqlite-*
+backend/*.result.cache
+backend/.swagger-codegen
+
+# Keep the container definition itself out of the image.
+Dockerfile
+Dockerfile.vercel
+Containerfile.vercel
+.dockerignore
