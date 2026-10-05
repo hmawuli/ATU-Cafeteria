@@ -193,8 +193,8 @@ class _SlideCard extends StatelessWidget {
             begin: Alignment.centerLeft,
             end: Alignment.centerRight,
             colors: [
-              Color(0xEB052B63),
-              Color(0x8C052B63),
+              AppTheme.blue700A,
+              AppTheme.blue700,
               Colors.transparent,
             ],
           ),

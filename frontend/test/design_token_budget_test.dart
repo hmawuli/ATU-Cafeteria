@@ -11,7 +11,7 @@ import 'package:flutter_test/flutter_test.dart';
 /// new colour to a token instead of raising the number.
 void main() {
   test('hardcoded presentation colours stay within the token budget', () {
-    const budget = 82;
+    const budget = 0;
 
     final directory = Directory('lib/presentation');
     expect(directory.existsSync(), isTrue,

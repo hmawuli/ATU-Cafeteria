@@ -3,6 +3,7 @@ import 'package:atu_cafeteria/domain/models/models.dart';
 import 'package:atu_cafeteria/presentation/providers/cafeteria_provider.dart';
 import 'package:atu_cafeteria/presentation/providers/cart_provider.dart';
 import 'package:provider/provider.dart';
+import 'package:atu_cafeteria/core/theme/app_theme.dart';
 
 /// Customer-facing restaurant menu.
 ///
@@ -22,11 +23,11 @@ class CustomerVendorMenuScreen extends StatefulWidget {
 }
 
 class _CustomerVendorMenuScreenState extends State<CustomerVendorMenuScreen> {
-  static const navy = Color(0xFF073B82);
-  static const blue = Color(0xFF0D55B5);
-  static const yellow = Color(0xFFFFC400);
-  static const page = Color(0xFFF5F8FC);
-  static const muted = Color(0xFF61738A);
+  static const navy = AppTheme.blue700C;
+  static const blue = AppTheme.blue600A;
+  static const yellow = AppTheme.accent;
+  static const page = AppTheme.grey50;
+  static const muted = AppTheme.blue500B;
 
   String _query = '';
   String _category = 'All';
@@ -430,7 +431,7 @@ class _CustomerVendorMenuScreenState extends State<CustomerVendorMenuScreen> {
         vertical: 5,
       ),
       decoration: BoxDecoration(
-        color: open ? const Color(0xFF20B95A) : const Color(0xFFE8EEF5),
+        color: open ? AppTheme.success : AppTheme.blue100C,
         borderRadius: BorderRadius.circular(20),
       ),
       child: Text(

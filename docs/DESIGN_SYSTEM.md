@@ -34,21 +34,22 @@ defined centrally in the shared `TextTheme`.
 5. **Resilience.** Layouts must not overflow at large text scale
    (`MediaQuery.textScaler`); prefer `Expanded`/`Flexible`/`Wrap`.
 
-## Current audit (ratcheted)
+## Enforcement (ratcheted to zero)
 
-- Token usages in `presentation/`: **161** · hardcoded colour literals: **82**
-  (across 10 files).
-- Worst offenders: `customer_experience_screen.dart` (23),
-  `vendor_dashboard.dart` (18), `reference_design.dart` (10).
-- Guard: `test/design_token_budget_test.dart` fails if the literal count
-  exceeds the budget, so the drift cannot grow. The budget should be lowered
-  as screens are migrated to tokens.
+- **Every** colour in `presentation/` now references an `AppTheme` token — the
+  budget test (`test/design_token_budget_test.dart`) enforces **0** hardcoded
+  `Color(0x…)` literals, so the UI cannot drift back.
+- The migration mapped all 49 distinct legacy shades to tokens **preserving
+  their exact values** (no visual change): existing tokens were reused, and 44
+  shades were added to the extended palette in `app_theme.dart` with
+  family/weight names (e.g. `blue600`, `grey900`, `red700A`).
+- New UI must use `AppTheme.*` (or `Theme.of(context)`) — never a literal.
 
-## Migration backlog (lower the budget as you go)
+## Still to verify on a device
 
-1. `customer_experience_screen.dart` — the customer home (flagship).
-2. `vendor_dashboard.dart` — legacy vendor screen.
-3. `reference_design.dart` / `professional_widgets.dart` — shared styling.
-
-Verify visually on a device in **both** light and dark mode after migrating,
-then reduce the `budget` in `design_token_budget_test.dart`.
+- **Dark mode:** the palette is now centralised, but confirm each screen looks
+  right in dark theme on a phone (the app follows the system setting).
+- **Text scale & contrast:** check large font scaling for overflow and AA
+  contrast in both themes.
+- Prefer theme-driven colours over the legacy token aliases when touching a
+  screen, so its appearance adapts to light/dark automatically.

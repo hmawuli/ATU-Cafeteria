@@ -1122,10 +1122,10 @@ class _ReferenceAdminScreenState extends State<ReferenceAdminScreen> {
               final severity = (alert['severity']?.toString() ?? 'LOW')
                   .toUpperCase();
               final severityColor = severity == 'HIGH'
-                  ? const Color(0xFFD32F2F)
+                  ? AppTheme.red400
                   : severity == 'MEDIUM'
-                      ? const Color(0xFFF57C00)
-                      : const Color(0xFF388E3C);
+                      ? AppTheme.orange500
+                      : AppTheme.green600C;
               final user = alert['user'] is Map
                   ? (alert['user']['fullName'] ??
                       alert['user']['username'] ??

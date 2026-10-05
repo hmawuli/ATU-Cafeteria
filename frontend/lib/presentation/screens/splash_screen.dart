@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 
 import '../widgets/auth_gate.dart';
+import 'package:atu_cafeteria/core/theme/app_theme.dart';
 
 /// ATU Cafeteria launch screen using the official ATU splash artwork.
 class SplashScreen extends StatefulWidget {
@@ -53,7 +54,7 @@ class _SplashScreenState extends State<SplashScreen>
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFF062B66),
+      backgroundColor: AppTheme.blue700B,
       body: FadeTransition(
         opacity: _fade,
         child: SizedBox.expand(

@@ -352,4 +352,53 @@ class AppTheme {
   }
 
   const AppTheme._();
+
+  // -------------------------------------------------------------------
+  // Extended palette — exact legacy values migrated into tokens so the
+  // presentation layer uses AppTheme everywhere without visual change.
+  // -------------------------------------------------------------------
+  static const Color grey900 = Color(0x12000000);
+  static const Color blue700 = Color(0x8C052B63);
+  static const Color blue700A = Color(0xEB052B63);
+  static const Color blue700B = Color(0xFF062B66);
+  static const Color blue700C = Color(0xFF073B82);
+  static const Color blue600 = Color(0xFF0A4C9C);
+  static const Color blue800 = Color(0xFF0B1F3A);
+  static const Color blue600A = Color(0xFF0D55B5);
+  static const Color blue700D = Color(0xFF123B5D);
+  static const Color blue500 = Color(0xFF1565C0);
+  static const Color green600 = Color(0xFF178A49);
+  static const Color green600A = Color(0xFF20A45A);
+  static const Color indigo600 = Color(0xFF283593);
+  static const Color green600B = Color(0xFF2E7D32);
+  static const Color green600C = Color(0xFF388E3C);
+  static const Color blue400 = Color(0xFF4B8DE0);
+  static const Color blue500A = Color(0xFF4F6783);
+  static const Color blue500B = Color(0xFF61738A);
+  static const Color blue500C = Color(0xFF65788D);
+  static const Color blue300 = Color(0xFF8CA0B7);
+  static const Color orange600 = Color(0xFF9A6A00);
+  static const Color blue200 = Color(0xFF9FB7D3);
+  static const Color red500 = Color(0xFFB3261E);
+  static const Color blue200A = Color(0xFFB8C9DC);
+  static const Color blue200B = Color(0xFFB8CDE3);
+  static const Color red500A = Color(0xFFC62828);
+  static const Color red400 = Color(0xFFD32F2F);
+  static const Color blue100 = Color(0xFFD5E0ED);
+  static const Color blue100A = Color(0xFFD6E1EF);
+  static const Color blue100B = Color(0xFFD8E3F0);
+  static const Color orange400 = Color(0xFFE5A93C);
+  static const Color orange400A = Color(0xFFE67E22);
+  static const Color blue50 = Color(0xFFE7F4FF);
+  static const Color orange400B = Color(0xFFE8751A);
+  static const Color blue100C = Color(0xFFE8EEF5);
+  static const Color blue100D = Color(0xFFE8EEF6);
+  static const Color green100 = Color(0xFFE8F8EE);
+  static const Color blue50A = Color(0xFFF0F4F8);
+  static const Color orange500 = Color(0xFFF57C00);
+  static const Color grey50 = Color(0xFFF5F8FC);
+  static const Color red200 = Color(0xFFFF7777);
+  static const Color orange500A = Color(0xFFFFA000);
+  static const Color red50 = Color(0xFFFFE9E9);
+  static const Color amber100 = Color(0xFFFFF6D6);
 }

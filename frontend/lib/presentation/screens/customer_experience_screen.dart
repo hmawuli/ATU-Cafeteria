@@ -5,6 +5,7 @@ import 'package:atu_cafeteria/domain/models/models.dart';
 import 'package:atu_cafeteria/domain/models/wallet_ledger_entry.dart';
 import 'package:atu_cafeteria/presentation/providers/cafeteria_provider.dart';
 import 'package:atu_cafeteria/presentation/providers/cart_provider.dart';
+import 'package:atu_cafeteria/core/theme/app_theme.dart';
 
 /// Mobile-first customer experience for the ATU Cafeteria application.
 class RestaurantCustomerHomeScreen extends StatefulWidget {
@@ -17,11 +18,11 @@ class RestaurantCustomerHomeScreen extends StatefulWidget {
 
 class _RestaurantCustomerHomeScreenState
     extends State<RestaurantCustomerHomeScreen> {
-  static const navy = Color(0xFF073B82);
-  static const blue = Color(0xFF0D55B5);
-  static const yellow = Color(0xFFFFC400);
-  static const page = Color(0xFFF5F8FC);
-  static const muted = Color(0xFF61738A);
+  static const navy = AppTheme.blue700C;
+  static const blue = AppTheme.blue600A;
+  static const yellow = AppTheme.accent;
+  static const page = AppTheme.grey50;
+  static const muted = AppTheme.blue500B;
 
   int _tab = 0;
   String _query = '';
@@ -183,7 +184,7 @@ class _RestaurantCustomerHomeScreenState
     return NavigationBarTheme(
       data: NavigationBarThemeData(
         backgroundColor: navy,
-        indicatorColor: const Color(0xFF4B8DE0),
+        indicatorColor: AppTheme.blue400,
         labelTextStyle: WidgetStateProperty.resolveWith(
           (states) => TextStyle(
             color: Colors.white,
@@ -681,11 +682,11 @@ class _RestaurantCustomerHomeScreenState
         contentPadding: const EdgeInsets.symmetric(vertical: 15),
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(14),
-          borderSide: const BorderSide(color: Color(0xFFD6E1EF)),
+          borderSide: const BorderSide(color: AppTheme.blue100A),
         ),
         enabledBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(14),
-          borderSide: const BorderSide(color: Color(0xFFD6E1EF)),
+          borderSide: const BorderSide(color: AppTheme.blue100A),
         ),
       ),
     );
@@ -848,7 +849,7 @@ class _RestaurantCustomerHomeScreenState
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 5),
       decoration: BoxDecoration(
-        color: open ? const Color(0xFF20B95A) : const Color(0xFFE8EEF5),
+        color: open ? AppTheme.success : AppTheme.blue100C,
         borderRadius: BorderRadius.circular(20),
       ),
       child: Text(
@@ -892,7 +893,7 @@ class _RestaurantCustomerHomeScreenState
                 decoration: BoxDecoration(
                   color: Colors.white,
                   borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: const Color(0xFFD8E3F0)),
+                  border: Border.all(color: AppTheme.blue100B),
                 ),
                 child: Column(
                   mainAxisAlignment: MainAxisAlignment.center,
@@ -988,7 +989,7 @@ class _RestaurantCustomerHomeScreenState
     return Container(
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: const Color(0xFFEAF2FC),
+        color: AppTheme.primaryLight,
         borderRadius: BorderRadius.circular(14),
       ),
       child: const Row(
@@ -1138,9 +1139,9 @@ class _RestaurantCustomerHomeScreenState
   Widget _orderCard(Order order) {
     final status = order.displayStatus;
     final color = status == 'Delivered'
-        ? const Color(0xFF178A49)
+        ? AppTheme.green600
         : status == 'Preparing'
-            ? const Color(0xFFE39A00)
+            ? AppTheme.warning
             : blue;
 
     return Padding(
@@ -1263,13 +1264,13 @@ class _RestaurantCustomerHomeScreenState
   Color _statusColor(String status) {
     switch (status.toUpperCase()) {
       case 'ACTIVE':
-        return const Color(0xFF20A45A);
+        return AppTheme.green600A;
       case 'SUSPENDED':
-        return const Color(0xFFE67E22);
+        return AppTheme.orange400A;
       case 'DISABLED':
-        return const Color(0xFFD64545);
+        return AppTheme.danger;
       default:
-        return const Color(0xFF20A45A);
+        return AppTheme.green600A;
     }
   }
 
@@ -1334,7 +1335,7 @@ class _RestaurantCustomerHomeScreenState
                         ? (i == active ? yellow : navy)
                         : Colors.white,
                     border: Border.all(
-                      color: i <= active ? navy : const Color(0xFF9FB7D3),
+                      color: i <= active ? navy : AppTheme.blue200,
                       width: 2,
                     ),
                   ),
@@ -1368,7 +1369,7 @@ class _RestaurantCustomerHomeScreenState
             Expanded(
               child: Container(
                 height: 2,
-                color: i < active ? navy : const Color(0xFFB8C9DC),
+                color: i < active ? navy : AppTheme.blue200A,
               ),
             ),
         ],
@@ -1507,7 +1508,7 @@ class _RestaurantCustomerHomeScreenState
   }
 
   Widget _walletActivityList(CafeteriaProvider provider) {
-    const debitRed = Color(0xFFB3261E);
+    const debitRed = AppTheme.red500;
     final raw = provider.wallet.transactions;
     if (raw.isEmpty) {
       return const Text(
@@ -1821,7 +1822,7 @@ class _RestaurantCustomerHomeScreenState
   Widget _foodImage(String url) {
     if (url.trim().isEmpty) {
       return Container(
-        color: const Color(0xFFE8EEF6),
+        color: AppTheme.blue100D,
         child: const Icon(Icons.restaurant_rounded, color: navy, size: 38),
       );
     }
@@ -1829,7 +1830,7 @@ class _RestaurantCustomerHomeScreenState
       url,
       fit: BoxFit.cover,
       errorBuilder: (_, __, ___) => Container(
-        color: const Color(0xFFE8EEF6),
+        color: AppTheme.blue100D,
         child: const Icon(Icons.restaurant_rounded, color: navy, size: 38),
       ),
     );
@@ -1840,7 +1841,7 @@ class _RestaurantCustomerHomeScreenState
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: const Color(0xFFD8E3F0)),
+        border: Border.all(color: AppTheme.blue100B),
       ),
       child: child,
     );

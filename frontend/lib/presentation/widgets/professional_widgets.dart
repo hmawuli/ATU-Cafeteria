@@ -301,7 +301,7 @@ class OrderStatusTimeline extends StatelessWidget {
                               thickness: 2,
                               color: a >= i
                                   ? AppTheme.primary
-                                  : const Color(0xFFD5E0ED))),
+                                  : AppTheme.blue100)),
                     Container(
                         width: 28,
                         height: 28,
@@ -313,7 +313,7 @@ class OrderStatusTimeline extends StatelessWidget {
                             border: Border.all(
                                 color: a >= i
                                     ? AppTheme.primary
-                                    : const Color(0xFFB8CDE3),
+                                    : AppTheme.blue200B,
                                 width: 2)),
                         child: Icon(
                             a >= i
@@ -322,14 +322,14 @@ class OrderStatusTimeline extends StatelessWidget {
                             size: a >= i ? 16 : 11,
                             color: a >= i
                                 ? (i == a ? AppTheme.primaryDark : Colors.white)
-                                : const Color(0xFF8CA0B7))),
+                                : AppTheme.blue300)),
                     if (i < stages.length - 1)
                       Expanded(
                           child: Divider(
                               thickness: 2,
                               color: a > i
                                   ? AppTheme.primary
-                                  : const Color(0xFFD5E0ED)))
+                                  : AppTheme.blue100))
                   ]),
                   const SizedBox(height: 5),
                   Text(stages[i],

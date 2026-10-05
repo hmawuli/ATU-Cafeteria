@@ -111,22 +111,22 @@ class StatusPill extends StatelessWidget {
   Widget build(BuildContext context) {
     final s = text.toUpperCase();
     final Color bg = s.contains('READY')
-        ? const Color(0xFFE8F8EE)
+        ? AppTheme.green100
         : s.contains('PREPAR')
-            ? const Color(0xFFFFF6D6)
+            ? AppTheme.amber100
             : s.contains('COMPLE') || s.contains('DELIVER')
-                ? const Color(0xFFE7F4FF)
+                ? AppTheme.blue50
                 : s.contains('CANCEL') || s.contains('DECLIN')
-                    ? const Color(0xFFFFE9E9)
-                    : const Color(0xFFF0F4F8);
+                    ? AppTheme.red50
+                    : AppTheme.blue50A;
     final Color fg = s.contains('READY')
         ? AppTheme.success
         : s.contains('PREPAR')
-            ? const Color(0xFF9A6A00)
+            ? AppTheme.orange600
             : s.contains('COMPLE') || s.contains('DELIVER')
                 ? AppTheme.primary
                 : s.contains('CANCEL') || s.contains('DECLIN')
-                    ? const Color(0xFFC62828)
+                    ? AppTheme.red500A
                     : AppTheme.textMuted;
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
@@ -310,11 +310,11 @@ class Sidebar extends StatelessWidget {
               child: const Padding(
                   padding: EdgeInsets.all(18),
                   child: Row(children: [
-                    Icon(Icons.logout, color: Color(0xFFFF7777), size: 19),
+                    Icon(Icons.logout, color: AppTheme.red200, size: 19),
                     SizedBox(width: 12),
                     Text('Logout',
                         style: TextStyle(
-                            color: Color(0xFFFF7777),
+                            color: AppTheme.red200,
                             fontWeight: FontWeight.w800)),
                   ]))),
           const Padding(
@@ -402,7 +402,7 @@ class StepTrack extends StatelessWidget {
                             border: Border.all(
                                 color: i <= active
                                     ? AppTheme.primary
-                                    : const Color(0xFFB8CDE3),
+                                    : AppTheme.blue200B,
                                 width: 2)),
                         child: i < active
                             ? const Icon(Icons.check,

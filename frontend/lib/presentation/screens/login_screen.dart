@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../core/config/server_config.dart';
 import '../providers/cafeteria_provider.dart';
+import 'package:atu_cafeteria/core/theme/app_theme.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -145,7 +146,7 @@ class _LoginScreenState extends State<LoginScreen> {
           gradient: LinearGradient(
             begin: Alignment.topCenter,
             end: Alignment.bottomCenter,
-            colors: [Color(0xFF063B82), Color(0xFF0A4C9C), Color(0xFF052B63)],
+            colors: [AppTheme.primary, AppTheme.blue600, AppTheme.primaryDark],
           ),
         ),
         child: SafeArea(
@@ -168,20 +169,20 @@ class _LoginScreenState extends State<LoginScreen> {
                             width: 82,
                             height: 82,
                             decoration: BoxDecoration(
-                              color: const Color(0xFFFFC400),
+                              color: AppTheme.accent,
                               borderRadius: BorderRadius.circular(22),
                             ),
                             child: const Icon(
                               Icons.restaurant_menu_rounded,
                               size: 46,
-                              color: Color(0xFF063B82),
+                              color: AppTheme.primary,
                             ),
                           ),
                           const SizedBox(height: 16),
                           const Text(
                             'ATU CAFETERIA',
                             style: TextStyle(
-                              color: Color(0xFF063B82),
+                              color: AppTheme.primary,
                               fontSize: 27,
                               fontWeight: FontWeight.w900,
                             ),
@@ -190,7 +191,7 @@ class _LoginScreenState extends State<LoginScreen> {
                           const Text(
                             'SMART FOOD ORDERING PLATFORM',
                             style: TextStyle(
-                              color: Color(0xFF4F6783),
+                              color: AppTheme.blue500A,
                               fontSize: 11,
                               fontWeight: FontWeight.w800,
                               letterSpacing: 1.2,
@@ -201,7 +202,7 @@ class _LoginScreenState extends State<LoginScreen> {
                             'Secure access for customers, vendors and administrators.',
                             textAlign: TextAlign.center,
                             style: TextStyle(
-                              color: Color(0xFF65788D),
+                              color: AppTheme.blue500C,
                               fontSize: 13,
                             ),
                           ),
@@ -299,7 +300,7 @@ class _LoginScreenState extends State<LoginScreen> {
                             mainAxisAlignment: MainAxisAlignment.center,
                             children: [
                               Icon(Icons.verified_user_outlined,
-                                  size: 15, color: Color(0xFF20B95A)),
+                                  size: 15, color: AppTheme.success),
                               SizedBox(width: 6),
                               Text('Secure customer access',
                                   style: TextStyle(fontSize: 11)),

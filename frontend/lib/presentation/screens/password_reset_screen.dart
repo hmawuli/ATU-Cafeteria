@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../providers/cafeteria_provider.dart';
+import 'package:atu_cafeteria/core/theme/app_theme.dart';
 
 class PasswordResetScreen extends StatefulWidget {
   const PasswordResetScreen({super.key});
@@ -94,11 +95,11 @@ class _PasswordResetScreenState extends State<PasswordResetScreen> {
                     Container(
                       padding: const EdgeInsets.all(18),
                       decoration: BoxDecoration(
-                        color: const Color(0xFFE8751A).withValues(alpha: .12),
+                        color: AppTheme.orange400B.withValues(alpha: .12),
                         shape: BoxShape.circle,
                       ),
                       child: const Icon(Icons.lock_reset_rounded,
-                          size: 52, color: Color(0xFFE8751A)),
+                          size: 52, color: AppTheme.orange400B),
                     ),
                     const SizedBox(height: 16),
                     const Text('Reset your PIN',

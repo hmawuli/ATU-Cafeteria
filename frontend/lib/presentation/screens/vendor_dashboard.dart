@@ -4,6 +4,7 @@ import 'package:intl/intl.dart';
 import 'package:atu_cafeteria/domain/models/models.dart';
 import 'package:atu_cafeteria/presentation/providers/cafeteria_provider.dart';
 import 'package:atu_cafeteria/presentation/widgets/recharts_line_chart.dart';
+import 'package:atu_cafeteria/core/theme/app_theme.dart';
 
 class VendorDashboardScreen extends StatefulWidget {
   const VendorDashboardScreen({super.key});
@@ -773,16 +774,16 @@ class _VendorDashboardScreenState extends State<VendorDashboardScreen> {
         switch (order.status) {
           case 'Order Placed':
           case 'PENDING':
-            stateColor = const Color(0xFF2E7D32);
+            stateColor = AppTheme.green600B;
             break;
           case 'Preparing':
           case 'PREPARING':
-            stateColor = const Color(0xFF1565C0);
+            stateColor = AppTheme.blue500;
             break;
           case 'Out for Delivery':
           case 'OUT_FOR_DELIVERY':
           case 'READY':
-            stateColor = const Color(0xFFE8751A);
+            stateColor = AppTheme.orange400B;
             break;
           default:
             stateColor = Colors.blueGrey;
@@ -869,7 +870,7 @@ class _VendorDashboardScreenState extends State<VendorDashboardScreen> {
                     onPressed: () => provider.updateOrderStatus(
                         order.id!, "Out for Delivery"),
                     style: ElevatedButton.styleFrom(
-                        backgroundColor: const Color(0xFFE8751A),
+                        backgroundColor: AppTheme.orange400B,
                         foregroundColor: Colors.white),
                     child: const Text("DISPATCH / OUT FOR DELIVERY"),
                   )
@@ -1047,7 +1048,7 @@ class _VendorDashboardScreenState extends State<VendorDashboardScreen> {
 
           Card(
             color:
-                hasRemote ? const Color(0xFF123B5D) : const Color(0xFF0B1F3A),
+                hasRemote ? AppTheme.blue700D : AppTheme.blue800,
             shape:
                 RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
             child: Padding(
@@ -1121,7 +1122,7 @@ class _VendorDashboardScreenState extends State<VendorDashboardScreen> {
                   value: "$totalOrders",
                   subtitle: "Processed",
                   icon: Icons.shopping_bag_outlined,
-                  color: const Color(0xFF1565C0),
+                  color: AppTheme.blue500,
                 ),
               ),
               const SizedBox(width: 12),
@@ -1132,7 +1133,7 @@ class _VendorDashboardScreenState extends State<VendorDashboardScreen> {
                   value: "${avgPrepMinutes.toStringAsFixed(1)} min",
                   subtitle: "Per Meal Ticket",
                   icon: Icons.timer_outlined,
-                  color: const Color(0xFFE8751A),
+                  color: AppTheme.orange400B,
                 ),
               ),
             ],
@@ -1147,7 +1148,7 @@ class _VendorDashboardScreenState extends State<VendorDashboardScreen> {
                   value: "${successRate.toStringAsFixed(1)}%",
                   subtitle: "Success Handshake",
                   icon: Icons.check_circle_outline,
-                  color: const Color(0xFF2E7D32),
+                  color: AppTheme.green600B,
                 ),
               ),
               const SizedBox(width: 12),
@@ -1158,7 +1159,7 @@ class _VendorDashboardScreenState extends State<VendorDashboardScreen> {
                   value: "${overallAvg.toStringAsFixed(1)} ★",
                   subtitle: "Compliance Score",
                   icon: Icons.star_outline_rounded,
-                  color: const Color(0xFFFFA000),
+                  color: AppTheme.orange500A,
                 ),
               ),
             ],
@@ -1186,7 +1187,7 @@ class _VendorDashboardScreenState extends State<VendorDashboardScreen> {
                           fontWeight: FontWeight.bold,
                           fontSize: 13,
                           letterSpacing: 0.8,
-                          color: Color(0xFF283593))),
+                          color: AppTheme.indigo600)),
                   const Divider(height: 16),
                   const SizedBox(height: 8),
                   _denseRatingBar("Culinary Preparation Quality", avgQuality),
@@ -1214,7 +1215,7 @@ class _VendorDashboardScreenState extends State<VendorDashboardScreen> {
                         fontWeight: FontWeight.bold,
                         fontSize: 13,
                         letterSpacing: 0.8,
-                        color: Color(0xFF283593)),
+                        color: AppTheme.indigo600),
                   ),
                   const Divider(height: 16),
                   const SizedBox(height: 8),
@@ -1227,13 +1228,13 @@ class _VendorDashboardScreenState extends State<VendorDashboardScreen> {
                           CircleAvatar(
                             radius: 14,
                             backgroundColor:
-                                const Color(0xFF1565C0).withValues(alpha: 0.12),
+                                AppTheme.blue500.withValues(alpha: 0.12),
                             child: Text(
                               "${index + 1}",
                               style: const TextStyle(
                                   fontSize: 11,
                                   fontWeight: FontWeight.bold,
-                                  color: Color(0xFF1565C0)),
+                                  color: AppTheme.blue500),
                             ),
                           ),
                           const SizedBox(width: 12),
@@ -1438,7 +1439,7 @@ class _VendorDashboardScreenState extends State<VendorDashboardScreen> {
             shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(8),
                 side: const BorderSide(color: Colors.blueGrey)),
-            leading: const Icon(Icons.import_export, color: Color(0xFF1565C0)),
+            leading: const Icon(Icons.import_export, color: AppTheme.blue500),
             title: const Text("Export Restaurant Reports",
                 style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold)),
             subtitle: const Text(
@@ -1446,7 +1447,7 @@ class _VendorDashboardScreenState extends State<VendorDashboardScreen> {
                 style: TextStyle(fontSize: 11)),
             trailing: IconButton(
               icon:
-                  const Icon(Icons.arrow_circle_down, color: Color(0xFF1565C0)),
+                  const Icon(Icons.arrow_circle_down, color: AppTheme.blue500),
               onPressed: () {
                 ScaffoldMessenger.of(context).showSnackBar(
                   const SnackBar(
@@ -1507,7 +1508,7 @@ class _VendorDashboardScreenState extends State<VendorDashboardScreen> {
                         ? "Verification Match! Custody transfer complete."
                         : "Invalid PIN code. Access denied."),
                     backgroundColor:
-                        success ? const Color(0xFF2E7D32) : Colors.red,
+                        success ? AppTheme.green600B : Colors.red,
                   ),
                 );
               },
@@ -1630,7 +1631,7 @@ class _VendorDashboardScreenState extends State<VendorDashboardScreen> {
                   style: const TextStyle(
                       fontSize: 11,
                       fontWeight: FontWeight.bold,
-                      color: Color(0xFF283593))),
+                      color: AppTheme.indigo600)),
             ],
           ),
           const SizedBox(height: 4),
@@ -1639,7 +1640,7 @@ class _VendorDashboardScreenState extends State<VendorDashboardScreen> {
             child: LinearProgressIndicator(
               value: rating / 5.0,
               minHeight: 6,
-              color: const Color(0xFFE5A93C),
+              color: AppTheme.orange400,
               backgroundColor: Colors.blueGrey[200],
             ),
           )

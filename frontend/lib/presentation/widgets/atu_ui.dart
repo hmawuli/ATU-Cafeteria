@@ -14,7 +14,7 @@ class AtuUi {
         border: Border.all(color: AppTheme.border),
         boxShadow: const [
           BoxShadow(
-              color: Color(0x12000000), blurRadius: 8, offset: Offset(0, 2)),
+              color: AppTheme.grey900, blurRadius: 8, offset: Offset(0, 2)),
         ],
       );
 

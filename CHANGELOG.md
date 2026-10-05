@@ -169,6 +169,11 @@ and this project follows the versioning policy described in
   dark-mode and accessibility rules) plus a **ratchet test**
   (`design_token_budget_test.dart`) that fails if hardcoded presentation
   colours grow beyond the current budget, so the UI cannot drift further.
+- **UI token migration complete**: all 49 distinct legacy colour literals
+  across the presentation layer were replaced with `AppTheme` tokens —
+  exact values preserved (no visual change), 44 shades added to the extended
+  palette — and the budget ratchet is now **0**. `flutter analyze` clean,
+  60 frontend tests.
 - **Finishing trust + architecture**: audit logs are now append-only (delete
   requires an explicit maintenance flag — `AuditLogAppendOnlyTest`); the
   idempotency cache TTL is env-configurable (`IDEMPOTENCY_TTL_SECONDS`, 24h
