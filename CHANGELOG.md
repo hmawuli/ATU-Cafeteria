@@ -153,6 +153,13 @@ and this project follows the versioning policy described in
   `?pdf=1` via `WalletStatementPdfWriter`); the customer home wallet card now
   renders recent activity from the ledger. Tests: `WalletLedgerTest` (4),
   `wallet_ledger_entry_test` (3). Backend 91, frontend 59.
+- **Paystack production hardening**: fixed the HMAC webhook being blocked by
+  the legacy auth guard (Paystack transfer/refund/charge events now reach the
+  controller); `charge.*` events are acknowledged safely (stops Paystack
+  retries, never double-credits — the verify flow remains authoritative); and
+  `php artisan paystack:status [--ping]` reports the payment config and can
+  prove the secret against the live API. Tests: `PaystackWebhookTest` (3).
+  Backend 94 tests (SQLite + PostgreSQL).
 - **Finishing trust + architecture**: audit logs are now append-only (delete
   requires an explicit maintenance flag — `AuditLogAppendOnlyTest`); the
   idempotency cache TTL is env-configurable (`IDEMPOTENCY_TTL_SECONDS`, 24h

@@ -219,6 +219,26 @@ class PaystackPaymentController extends Controller
         }
 
         $event = (string) $request->input('event', '');
+
+        // Charge events: the authoritative wallet credit happens in the verify
+        // endpoint, so this only acknowledges the charge and marks the payment
+        // as seen — no balance mutation, no double-credit risk, and Paystack
+        // stops retrying an unhandled webhook.
+        if (str_starts_with($event, 'charge.')) {
+            $reference = trim((string) $request->input('data.reference', ''));
+            if ($reference !== '') {
+                $payment = Payment::where('reference', $reference)->first();
+                if ($payment && $payment->status === 'INITIATED') {
+                    $payment->update([
+                        'status' => 'PENDING',
+                        'gateway_response' => $request->input('data'),
+                    ]);
+                }
+            }
+
+            return response()->json(['success' => true, 'message' => 'Charge webhook acknowledged.']);
+        }
+
         if (str_starts_with($event, 'transfer.')) {
             return DB::transaction(function () use ($request, $event) {
                 $reference = trim((string) $request->input('data.reference', ''));

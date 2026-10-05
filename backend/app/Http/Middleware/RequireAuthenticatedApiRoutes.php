@@ -49,6 +49,12 @@ class RequireAuthenticatedApiRoutes
     {
         $path = trim($request->path(), '/');
 
+        // Paystack webhooks are authenticated by the HMAC signature inside the
+        // controller, never by a bearer token — keep that endpoint public.
+        if (str_starts_with($path, 'api/paystack/webhook')) {
+            return false;
+        }
+
         return str_starts_with($path, 'api/wallet/')
             || str_starts_with($path, 'api/notifications')
             || str_starts_with($path, 'api/chats/')
