@@ -1716,20 +1716,26 @@ class _RestaurantCustomerHomeScreenState
     Map<String, dynamic> payment,
     double amount,
   ) {
+    final isDemo = payment['is_simulated'] == true;
     var isVerifying = false;
-    String message =
-        'Confirm the payment after completing the Paystack checkout.';
+    String message = isDemo
+        ? 'Demo mode is active — tap Verify Payment to simulate a successful top-up (no real charge).'
+        : 'Confirm the payment after completing the Paystack checkout.';
 
     showDialog<void>(
       context: context,
       barrierDismissible: false,
       builder: (dialogContext) => StatefulBuilder(
         builder: (context, setState) => AlertDialog(
-          title: const Row(
+          title: Row(
             children: [
-              Icon(Icons.verified_user_rounded, color: blue),
-              SizedBox(width: 10),
-              Expanded(child: Text('Confirm Wallet Top-Up')),
+              const Icon(Icons.verified_user_rounded, color: blue),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Text(isDemo
+                    ? 'Confirm Top-Up (Demo)'
+                    : 'Confirm Wallet Top-Up'),
+              ),
             ],
           ),
           content: Column(
@@ -1745,9 +1751,11 @@ class _RestaurantCustomerHomeScreenState
                 ),
               ),
               const SizedBox(height: 10),
-              const Text(
-                'Complete the payment in the Paystack checkout, then tap Verify Payment.',
-                style: TextStyle(color: muted, fontSize: 12),
+              Text(
+                isDemo
+                    ? 'No Paystack account is needed while demo mode is on. Tap Verify Payment to credit your wallet with simulated funds.'
+                    : 'Complete the payment in the Paystack checkout, then tap Verify Payment.',
+                style: const TextStyle(color: muted, fontSize: 12),
               ),
               const SizedBox(height: 10),
               Text(
