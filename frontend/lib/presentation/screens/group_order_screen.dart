@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:atu_cafeteria/core/network/api_client.dart';
 import 'package:atu_cafeteria/presentation/providers/cafeteria_provider.dart';
+import 'package:atu_cafeteria/services/crash_reporting.dart';
 
 class GroupOrderScreen extends StatefulWidget {
   const GroupOrderScreen({super.key});
@@ -116,7 +117,9 @@ class _GroupOrderScreenState extends State<GroupOrderScreen> {
       if (raw is List && mounted) {
         setState(() => _menu = List<dynamic>.from(raw));
       }
-    } catch (_) {}
+    } catch (e, s) {
+      CrashReporting.recordNonFatal(e, s, reason: 'group_order:load_menu');
+    }
   }
 
   Future<void> _addItem(Map<String, dynamic> item) async {

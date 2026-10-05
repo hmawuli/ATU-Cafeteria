@@ -10,6 +10,7 @@ import 'package:atu_cafeteria/generated/atu_api.dart';
 import 'package:atu_cafeteria/core/config/server_config.dart';
 import 'package:atu_cafeteria/core/network/api_client.dart';
 import 'package:atu_cafeteria/core/storage/secure_session_store.dart';
+import 'package:atu_cafeteria/services/crash_reporting.dart';
 import 'package:atu_cafeteria/services/pending_order_queue.dart';
 import 'package:atu_cafeteria/services/push_notification_service.dart';
 import 'catalogue_state.dart';
@@ -991,7 +992,9 @@ class CafeteriaProvider extends ChangeNotifier {
     await PushNotificationService.revokeRegisteredDevice();
     try {
       if (_authToken != null) await _authRequest('POST', 'logout', {});
-    } catch (_) {}
+    } catch (e, s) {
+      CrashReporting.recordNonFatal(e, s, reason: 'logout:server');
+    }
     _authToken = null;
     _currentUser = null;
     _requiresTwoFactor = false;
@@ -1160,7 +1163,9 @@ class CafeteriaProvider extends ChangeNotifier {
           client.close(force: true);
         }
       }
-    } catch (_) {}
+    } catch (e, s) {
+      CrashReporting.recordNonFatal(e, s, reason: 'logout:legacy-server');
+    }
 
     if (oldUser?.id != null) {
       try {
@@ -1169,7 +1174,9 @@ class CafeteriaProvider extends ChangeNotifier {
             action: 'USER_LOGOUT',
             details: 'User logged out securely.',
             timestamp: DateTime.now().millisecondsSinceEpoch));
-      } catch (_) {}
+      } catch (e, s) {
+        CrashReporting.recordNonFatal(e, s, reason: 'logout:audit-log');
+      }
     }
 
     _readyPollingTimer?.cancel();

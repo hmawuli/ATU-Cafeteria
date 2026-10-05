@@ -68,4 +68,29 @@ class CrashReporting {
       debugPrint('CrashReporting: failed to initialise: $e\n$s');
     }
   }
+
+  /// Record a non-fatal error that was handled (e.g. a best-effort network
+  /// call that is allowed to fail) so it still surfaces in the console instead
+  /// of being silently discarded. Never throws, even when unconfigured.
+  static Future<void> recordNonFatal(
+    Object error,
+    StackTrace stack, {
+    String? reason,
+  }) async {
+    if (!isConfigured) {
+      debugPrint('CrashReporting: non-fatal${reason == null ? '' : ' ($reason)'}: $error');
+      return;
+    }
+
+    try {
+      await FirebaseCrashlytics.instance.recordError(
+        error,
+        stack,
+        reason: reason,
+        fatal: false,
+      );
+    } catch (_) {
+      // Telemetry must never break the app.
+    }
+  }
 }

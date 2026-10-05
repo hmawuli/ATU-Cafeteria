@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../core/network/api_client.dart';
 import '../../core/theme/app_theme.dart';
+import '../../services/crash_reporting.dart';
 import '../widgets/reference_design.dart';
 
 class VendorPayoutAccountScreen extends StatefulWidget {
@@ -93,7 +94,9 @@ class _VendorPayoutAccountScreenState extends State<VendorPayoutAccountScreen> {
           ? response['channels'].whereType<Map>().map(Map<String, dynamic>.from).toList()
           : <Map<String, dynamic>>[];
       if (mounted) setState(() => _channels = channels);
-    } catch (_) {}
+    } catch (e, s) {
+      CrashReporting.recordNonFatal(e, s, reason: 'vendor:payout-banks');
+    }
   }
 
   Future<void> _save() async {

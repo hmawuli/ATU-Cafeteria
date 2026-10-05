@@ -37,7 +37,7 @@ class User extends Authenticatable
      * The email address may live either in the `username` column or inside
      * the JSON `profile_info` payload (legacy accounts). Relying on raw JSON
      * functions (JSON_EXTRACT / json_extract) is driver-specific, so the
-     * check is kept portable across SQLite, MySQL and PostgreSQL.
+     * check is kept portable across SQLite and PostgreSQL.
      */
     public static function emailTaken(string $email): bool
     {

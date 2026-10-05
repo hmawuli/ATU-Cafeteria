@@ -11,8 +11,8 @@ truth. One wallet, audited payments, real-time order flow, offline resilience.
 
 ## Current status (verified)
 
-- **Backend:** 83 feature/unit tests on **SQLite and PostgreSQL**, Pint clean.
-- **Frontend:** 49 tests, `flutter analyze` clean, contract check green.
+- **Backend:** 103 feature/unit tests on **SQLite and PostgreSQL**, Pint clean.
+- **Frontend:** 60 tests, `flutter analyze` clean, contract check green.
 - **E2E:** a single HTTP journey test (register → login → order → vendor →
   pickup) passes on both databases.
 - **Deploy path:** `scripts/deploy_docker.sh` (one command) + `docs/DEPLOY_VPS.md`.

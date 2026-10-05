@@ -8,7 +8,7 @@ hardware/accounts.
 | # | Dimension | Status | Evidence |
 |---|---|---|---|
 | 1 | Build & release pipeline | ✅ Green | CI builds backend (2 DBs) + frontend + **release APK/AAB**; `make release-build`; signed-release workflow |
-| 2 | Automated testing | ✅ Green | Backend **87 tests × SQLite & PostgreSQL**; frontend **53 tests**; HTTP **E2E journey**; load/smoke tooling |
+| 2 | Automated testing | ✅ Green | Backend **103 tests × SQLite & PostgreSQL**; frontend **60 tests**; HTTP **E2E journey**; load/smoke tooling |
 | 3 | Code quality | ✅ Green | Pint (242 files), `flutter analyze` 0 issues, contract gate, generated typed API client |
 | 4 | Contract-first API | ✅ Green | Committed OpenAPI (`docs/openapi.json`), `make api-gen`, envelope/pagination/idempotency standards |
 | 5 | Database & performance | ✅ Green | PostgreSQL primary; hot-path indexes; catalogue caching + invalidation; `PERFORMANCE_BUDGET.md` |

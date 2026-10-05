@@ -41,7 +41,7 @@ class DailyRevenueController extends Controller
         }
 
         // Group by Date and aggregate totals
-        // Support SQLite/MySQL/PostgreSQL dates natively
+        // Support SQLite (tests) and PostgreSQL (production) dates natively
         $driver = DB::connection()->getDriverName();
         if ($driver === 'sqlite') {
             $dateExpr = "strftime('%Y-%m-%d', datetime(created_at, 'localtime'))";

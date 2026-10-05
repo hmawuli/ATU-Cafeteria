@@ -69,7 +69,7 @@ check: ## Full project health check (runs the CI-style gate locally)
 docker-build: ## Build the backend Docker image
 	docker compose build
 
-docker-up: ## Stand up the full stack (Laravel + MySQL + Nginx) in Docker
+docker-up: ## Stand up the full stack (Laravel + PostgreSQL + Nginx) in Docker
 	docker compose up -d --build
 
 docker-down: ## Stop the Docker stack (volumes persist unless you pass -v)

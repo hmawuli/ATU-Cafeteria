@@ -17,8 +17,8 @@ and this project follows the versioning policy described in
 ### Added
 - **Primary database switched to PostgreSQL** (local, Docker and VPS
   deployment). SQLite remains only for automated tests (`phpunit.xml`) and
-  the Flutter offline cache. MySQL-specific JSON lookups were replaced with
-  a DB-portable duplicate-email check, and `audit_logs.user_id` became
+  the Flutter offline cache. Driver-specific JSON lookups were replaced with
+  a portable duplicate-email check, and `audit_logs.user_id` became
   nullable so pre-auth order audits no longer violate Postgres constraints.
 - Docker self-hosting stack for the backend API (`backend/Dockerfile`,
   `docker-compose.yml`) with PostgreSQL, Nginx and health checks.

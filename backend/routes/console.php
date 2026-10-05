@@ -126,29 +126,6 @@ Artisan::command('database:backup', function () {
             }
             break;
 
-        case 'mysql':
-            $fileName .= '.sql';
-            $filePath = "{$backupDir}/{$fileName}";
-
-            $host = $config['host'] ?? '127.0.0.1';
-            $port = $config['port'] ?? '3306';
-            $db = $config['database'] ?? 'laravel';
-            $user = $config['username'] ?? 'root';
-            $password = $config['password'] ?? '';
-
-            $cmd = "mysqldump -h {$host} -P {$port} -u {$user} -p".escapeshellarg($password).' '.escapeshellarg($db).' > '.escapeshellarg($filePath);
-
-            $this->info('Running mysqldump command...');
-            exec($cmd, $output, $resultCode);
-
-            if ($resultCode !== 0) {
-                $this->error("mysqldump failed with exit code: {$resultCode}");
-                Log::error("Database backup failed for mysql. Exit code: {$resultCode}");
-
-                return 1;
-            }
-            break;
-
         default:
             $this->error("Unsupported database driver: {$connection}");
 

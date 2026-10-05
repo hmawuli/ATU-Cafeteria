@@ -74,7 +74,7 @@ jobs:
   backend-postgres:
     # PostgreSQL is the primary database (local, Docker and VPS). SQLite in
     # the `backend` job covers migrations; this job proves the whole suite on
-    # the production database driver so MySQL-specific SQL cannot regress.
+    # the production database driver so driver-specific SQL cannot regress.
     timeout-minutes: 25
     runs-on: ubuntu-24.04
     services:

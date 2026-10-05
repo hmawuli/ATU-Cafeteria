@@ -38,7 +38,7 @@ Flutter is the customer/staff client. Laravel is the business-logic API and syst
 
 ## Required before go-live
 
-1. Configure a supported production database (MySQL or PostgreSQL).
+1. Configure the production PostgreSQL database (the only supported primary database).
 2. Configure real mail delivery and test password reset/email verification.
 3. Configure Firebase Cloud Messaging credentials and register real device tokens.
 4. Configure Paystack production credentials and complete webhook verification.
