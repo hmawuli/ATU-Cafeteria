@@ -61,6 +61,7 @@ RUN php artisan package:discover --ansi \
     && chown -R www-data:www-data storage bootstrap/cache
 
 COPY backend/docker/vercel/nginx.conf.template /etc/nginx/atu-nginx.conf.template
+COPY backend/docker/vercel/php-fpm.conf /usr/local/etc/php-fpm.d/zz-atu.conf
 COPY backend/docker/vercel/start.sh /usr/local/bin/atu-start
 RUN chmod +x /usr/local/bin/atu-start
 

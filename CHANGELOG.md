@@ -21,6 +21,9 @@ and this project follows the versioning policy described in
   storage to `/tmp` and trusts the platform proxy via `LARAVEL_STORAGE_PATH` /
   `TRUSTED_PROXIES`. See `docs/DEPLOY_VERCEL.md` (queue worker, scheduler and
   backups are documented as off-platform responsibilities).
+- **Shared `cache` / `cache_locks` tables** so rate limiting and order/payment
+  idempotency work across workers and instances (required on serverless, where
+  the per-process array cache is unsafe).
 - **Primary database switched to PostgreSQL** (local, Docker and VPS
   deployment). SQLite remains only for automated tests (`phpunit.xml`) and
   the Flutter offline cache. Driver-specific JSON lookups were replaced with

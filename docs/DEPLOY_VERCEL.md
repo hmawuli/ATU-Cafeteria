@@ -18,8 +18,9 @@ Flutter app ──HTTPS──▶ Vercel container function (Nginx + PHP-FPM + La
                              └──▶ Managed PostgreSQL (Neon / Supabase / …)
 ```
 
-- The container filesystem is ephemeral, so Laravel writes its storage to
-  `/tmp` (`LARAVEL_STORAGE_PATH`). Nothing there survives a cold start.
+- The container filesystem is ephemeral, so Laravel writes its runtime storage
+  to `/tmp` (`LARAVEL_STORAGE_PATH`). Nothing there survives a cold start, which
+  is why the shared cache lives in PostgreSQL rather than on disk.
 - `TRUSTED_PROXIES=*` makes Laravel read Vercel's `X-Forwarded-Proto` so the
   `EnsureSecureTransport` middleware sees HTTPS and `APP_URL` links are correct.
 
@@ -84,7 +85,7 @@ and Preview if you want preview deploys to work):
 | `DB_USERNAME` | Neon user |
 | `DB_PASSWORD` | Neon password |
 | `DB_SSLMODE` | `require` |
-| `CACHE_STORE` | `array` |
+| `CACHE_STORE` | `database` (shared cache — see the warning below) |
 | `SESSION_DRIVER` | `array` |
 | `QUEUE_CONNECTION` | `sync` |
 | `FILESYSTEM_DISK` | `local` |
@@ -99,6 +100,16 @@ and Preview if you want preview deploys to work):
 
 Do **not** set `MIGRATE_ON_START` on a normal deploy — run migrations once,
 manually (next step), so multiple cold starts cannot race each other.
+
+> **Cache must be shared (`CACHE_STORE=database`), not `array` or `file`.**
+> Authentication rate limiting (`throttle:auth`), payment throttling
+> (`throttle:payments`) and the idempotency middleware for orders and payments
+> all use `Cache::get` / `Cache::lock`. Those must be visible to every worker
+> and every instance; an `array` store is per-process and would let concurrent
+> requests double-charge or bypass login throttling. The `cache` and
+> `cache_locks` tables are created by the migration in step 5. A managed Redis
+> (e.g. Upstash) works too if you add `predis/predis`; the database store needs
+> no extra dependency.
 
 ## 5. Run migrations (once, from your machine)
 
@@ -133,6 +144,27 @@ curl -fsS https://atu-cafeteria-backend.vercel.app/api/catalog/food-items
 ```
 
 Both should return JSON with `"status":"UP"` / a catalogue payload.
+
+## Will it hold up?
+
+For a single-campus workload (hundreds to a few thousand students), the API
+itself handles fine: each instance runs up to 10 PHP-FPM workers and Vercel adds
+instances as traffic grows. Keep an eye on these when you scale:
+
+- **Shared-state correctness** — the reason `CACHE_STORE` must be `database`
+  (or Redis). Without it, rate limiting and idempotency break. This is the one
+  thing that is not "just performance".
+- **Cold starts** — an idle instance is reclaimed after ~5 minutes; the next
+  request pays Nginx + PHP-FPM + Laravel + (Neon) startup. A periodic health
+  ping keeps one instance warm if the latency matters.
+- **Database connections** — every instance opens a small pool. Use Neon's
+  pooled (`-pooler`) host when concurrency rises. If you ever see
+  *"prepared statement already exists"*, use Neon's direct host or disable
+  server-side prepares.
+- **Request duration** — the container function is capped at `maxDuration`
+  (default 300s). Heavy exports or report endpoints must finish inside it.
+- **Region** — pick the Vercel region closest to your users (Europe is nearest
+  to Accra; `iad1` adds ~100ms+ round-trips).
 
 ## Limitations and what runs where
 
