@@ -20,8 +20,9 @@ hardware/accounts.
 | 11 | Governance & docs | ✅ Green | SECURITY/CONTRIBUTING/RELEASING/CHANGELOG, PR + issue templates, CODEOWNERS, hooks, 30+ runbooks |
 | 12 | Environments | ✅ Green | `local` / `staging` / `production` matrix; staging blocks dev seeders + demo payments |
 | 13 | Release hygiene | ✅ Aligned | App `1.2.0+3`, OpenAPI `1.2.0`, CHANGELOG-kept, tagging workflow documented |
-| 14 | Legal/privacy | ⚠️ Decision | Privacy/ToS **templates** exist; final policy + retention enforcement = institutional decision |
-| 15 | Live deployment | ⏳ Operations | Needs a Docker host (or use `make deploy-local`), Firebase/Paystack/Play values, device UAT — one command each |
+| 14 | Data rights (access & erasure) | ✅ Green | `GET /api/customer/account/data-export` + anonymising `DELETE /api/customer/account` (`CustomerDataRightsTest`) |
+| 15 | Legal/privacy policy wording | ⚠️ Decision | Privacy/ToS **templates** exist; final policy + retention sign-off is institutional |
+| 16 | Live deployment | ⏳ Operations | Needs a Docker host (or use `make deploy-local`), Firebase/Paystack/Play values, device UAT — one command each |
 
 ## To flip the four ⚠️/⏳ to ✅
 

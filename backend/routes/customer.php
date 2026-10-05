@@ -86,6 +86,8 @@ $customerRoutes = function () {
             ->middleware('idempotency:required');
         Route::get('/support/tickets/{ticket}', [CustomerSupportController::class, 'show']);
 
+        // Data rights: portable export, then erasure (anonymising personal data).
+        Route::get('/account/data-export', [CustomerAccountController::class, 'export']);
         Route::delete('/account', [CustomerAccountController::class, 'destroy'])
             ->middleware('idempotency:required');
     });

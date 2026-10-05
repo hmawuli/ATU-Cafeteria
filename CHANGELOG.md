@@ -160,6 +160,11 @@ and this project follows the versioning policy described in
   `php artisan paystack:status [--ping]` reports the payment config and can
   prove the secret against the live API. Tests: `PaystackWebhookTest` (3).
   Backend 94 tests (SQLite + PostgreSQL).
+- **Student data rights**: `GET /api/customer/account/data-export` (portable
+  profile/orders/ledger/devices/addresses bundle) and an anonymising
+  `DELETE /api/customer/account` (refuses a non-empty wallet, revokes
+  sessions/devices, erases PII, keeps financial history, audited).
+  Tests: `CustomerDataRightsTest` (4). Backend 99+ tests.
 - **Finishing trust + architecture**: audit logs are now append-only (delete
   requires an explicit maintenance flag — `AuditLogAppendOnlyTest`); the
   idempotency cache TTL is env-configurable (`IDEMPOTENCY_TTL_SECONDS`, 24h
