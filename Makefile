@@ -14,7 +14,7 @@ FLUTTER ?= $(shell scripts/flutter.sh)
 
 .DEFAULT_GOAL := help
 
-.PHONY: help setup hooks backend-deps frontend-deps migrate seed-dev serve connect analyze lint test format check
+.PHONY: help setup hooks backend-deps frontend-deps migrate seed-dev serve connect analyze lint test format check deploy-web
 
 help: ## Show this help
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "  \033[36m%-14s\033[0m %s\n", $$1, $$2}'
@@ -104,6 +104,11 @@ deploy: ## One-command Docker Compose deploy on a Docker host (sets APP_ENV)
 
 deploy-local: ## Stand up the backend without Docker (migrate + seed + serve + smoke)
 	scripts/deploy_local.sh
+
+API_BASE_URL ?= https://atu-cafeteria-backend.vercel.app
+
+deploy-web: ## Build the Flutter web client and deploy it to Vercel (static)
+	API_BASE_URL="$(API_BASE_URL)" scripts/deploy_frontend_vercel.sh
 
 release-build: ## Build release APK with env-provided API + Firebase defines
 	scripts/build_release_apk.sh

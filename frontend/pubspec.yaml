@@ -20,6 +20,7 @@ dependencies:
   firebase_core: ^4.15.0
   firebase_messaging: ^16.7.0
   firebase_crashlytics: ^5.4.0
+  sqflite_common_ffi_web: ^1.0.2
 
 # Keep the Flutter client lean on low-memory development machines.
 # Removed heavy/unused UI packages. The client uses native Flutter widgets and SQLite.

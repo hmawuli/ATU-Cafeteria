@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:sqflite/sqflite.dart';
 import 'package:path/path.dart';
 import 'package:atu_cafeteria/domain/models/models.dart';
@@ -16,8 +17,9 @@ class DbHelper {
   }
 
   Future<Database> _initDB(String filePath) async {
-    final dbPath = await getDatabasesPath();
-    final path = join(dbPath, filePath);
+    // On web the WASM factory keys the database by name inside IndexedDB;
+    // Android and iOS use the platform database directory.
+    final path = kIsWeb ? filePath : join(await getDatabasesPath(), filePath);
 
     return await openDatabase(
       path,

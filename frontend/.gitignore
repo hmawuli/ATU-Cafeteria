@@ -32,6 +32,8 @@ migrate_working_dir/
 .pub/
 /build/
 /coverage/
+# Vercel project linkage for CLI deploys
+/.vercel/
 
 # Symbolication related
 app.*.symbols

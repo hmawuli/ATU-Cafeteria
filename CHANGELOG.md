@@ -21,6 +21,11 @@ and this project follows the versioning policy described in
   storage to `/tmp` and trusts the platform proxy via `LARAVEL_STORAGE_PATH` /
   `TRUSTED_PROXIES`. See `docs/DEPLOY_VERCEL.md` (queue worker, scheduler and
   backups are documented as off-platform responsibilities).
+- **Flutter web client deploy on Vercel** (static hosting):
+  `docs/DEPLOY_VERCEL_WEB.md`, `scripts/deploy_frontend_vercel.sh`,
+  `make deploy-web`, and an opt-in `.github/workflows/deploy-web.yml`. The
+  bundle is built locally and uploaded, since Vercel's build image has no
+  Flutter SDK.
 - **Shared `cache` / `cache_locks` tables** so rate limiting and order/payment
   idempotency work across workers and instances (required on serverless, where
   the per-process array cache is unsafe).
@@ -82,6 +87,12 @@ and this project follows the versioning policy described in
 - **Typed client finished**: login/2FA and Paystack initialize/verify now run
   through `ApiClient` (`rawRequest` keeps status/header semantics for auth);
   SSE order-tracking streaming remains the documented exception.
+- **Flutter client is web-safe**: the local cache uses
+  `sqflite_common_ffi_web` (SQLite WASM + IndexedDB) under `kIsWeb`; the
+  remaining raw `dart:io HttpClient` calls (purchased vendors, reviews, vendor
+  metrics, feedback) moved to the typed `ApiClient`; the SSE tracking stream
+  falls back to the in-app simulator on web (browsers cannot open a raw
+  HTTP stream). Android/iOS behaviour is unchanged.
 - **Branding**: generated Android launcher icons + brand asset; README banner
   and badges; `docs/DEPLOYMENT_CHECKLIST.md` (A–F rollout/release plan).
 - **Real-world UX**: queued orders are now surfaced — `pendingOrderCount` state

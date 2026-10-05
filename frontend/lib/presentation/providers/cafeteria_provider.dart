@@ -214,18 +214,11 @@ class CafeteriaProvider extends ChangeNotifier {
     }
 
     try {
-      final url = Uri.parse("$_laravelBaseUrl/api/customer/purchased-vendors");
-      final client = HttpClient();
-      client.connectionTimeout = const Duration(seconds: 4);
-      final request = await client.getUrl(url);
-      request.headers.add("Accept", "application/json");
-      request.headers.add("Authorization", "Bearer $_authToken");
-      final response = await request.close();
-
-      if (response.statusCode != 200) return;
-
-      final body = await response.transform(utf8.decoder).join();
-      final decoded = json.decode(body);
+      final decoded = await _api.request(
+        'GET',
+        'customer/purchased-vendors',
+        token: _authToken,
+      );
       final raw = decoded is Map ? decoded['vendors'] : decoded;
       if (raw is List) {
         _purchasedVendors =
@@ -248,39 +241,28 @@ class CafeteriaProvider extends ChangeNotifier {
     }
 
     try {
-      final url = Uri.parse("$_laravelBaseUrl/api/reviews");
-      final client = HttpClient();
-      client.connectionTimeout = const Duration(seconds: 6);
-      final request = await client.postUrl(url);
-      request.headers.add("Accept", "application/json");
-      request.headers.add("Content-Type", "application/json");
-      request.headers.add("Authorization", "Bearer $_authToken");
-      request.add(utf8.encode(jsonEncode({
-        'order_id': orderId,
-        'vendor_rating': vendorRating,
-        if (vendorComment != null && vendorComment.trim().isNotEmpty)
-          'vendor_comment': vendorComment.trim(),
-        if (foodRating != null) 'food_rating': foodRating,
-        if (foodComment != null && foodComment.trim().isNotEmpty)
-          'food_comment': foodComment.trim(),
-      })));
-      final response = await request.close();
-      final body = await response.transform(utf8.decoder).join();
+      await _api.request(
+        'POST',
+        'reviews',
+        token: _authToken,
+        body: {
+          'order_id': orderId,
+          'vendor_rating': vendorRating,
+          if (vendorComment != null && vendorComment.trim().isNotEmpty)
+            'vendor_comment': vendorComment.trim(),
+          if (foodRating != null) 'food_rating': foodRating,
+          if (foodComment != null && foodComment.trim().isNotEmpty)
+            'food_comment': foodComment.trim(),
+        },
+      );
 
-      Map<String, dynamic>? decoded;
-      if (body.isNotEmpty) {
-        final raw = json.decode(body);
-        if (raw is Map) decoded = Map<String, dynamic>.from(raw);
-      }
-
-      if (response.statusCode == 201) {
-        await fetchPurchasedVendors();
-        notifyListeners();
-        return null;
-      }
-
-      return decoded?['message']?.toString() ??
-          'We could not submit your review. Please try again.';
+      await fetchPurchasedVendors();
+      notifyListeners();
+      return null;
+    } on ApiException catch (e) {
+      return e.message.trim().isNotEmpty
+          ? e.message
+          : 'We could not submit your review. Please try again.';
     } catch (e) {
       debugPrint('Vendor review failed: $e');
       return 'Unable to submit the review. Please check your connection and try again.';
@@ -1150,18 +1132,7 @@ class CafeteriaProvider extends ChangeNotifier {
 
     try {
       if (oldToken != null && oldToken.isNotEmpty) {
-        final url = Uri.parse('$_laravelBaseUrl/api/logout');
-        final client = HttpClient()
-          ..connectionTimeout = const Duration(seconds: 4);
-        try {
-          final request = await client.postUrl(url);
-          request.headers
-            ..set(HttpHeaders.acceptHeader, 'application/json')
-            ..set(HttpHeaders.authorizationHeader, 'Bearer $oldToken');
-          await request.close();
-        } finally {
-          client.close(force: true);
-        }
+        await _api.request('POST', 'logout', token: oldToken);
       }
     } catch (e, s) {
       CrashReporting.recordNonFatal(e, s, reason: 'logout:legacy-server');
@@ -1484,59 +1455,45 @@ class CafeteriaProvider extends ChangeNotifier {
 
     try {
       // 1. Fetch performance metrics from Laravel API
-      final metricsUrl =
-          Uri.parse("$_laravelBaseUrl/api/vendor/performance-metrics");
-      final client = HttpClient();
-      client.connectionTimeout = const Duration(seconds: 4);
-      final request = await client.getUrl(metricsUrl);
-      request.headers.set(HttpHeaders.acceptHeader, 'application/json');
-      request.headers.set(HttpHeaders.authorizationHeader, 'Bearer $token');
-      final response = await request.close();
-
-      if (response.statusCode == 200) {
-        final body = await response.transform(utf8.decoder).join();
-        final decoded = json.decode(body);
-        if (decoded['success'] == true && decoded['performance'] != null) {
-          final perfList = decoded['performance'] as List;
-          final vendorMetrics = perfList.firstWhere(
-            (item) => item['vendor_id'] == vendorId,
-            orElse: () => null,
-          );
-          if (vendorMetrics != null) {
-            _remoteVendorMetrics = Map<String, dynamic>.from(vendorMetrics);
-          }
+      final decoded = await _api.request(
+        'GET',
+        'vendor/performance-metrics',
+        token: token,
+      );
+      if (decoded is Map &&
+          decoded['success'] == true &&
+          decoded['performance'] != null) {
+        final perfList = decoded['performance'] as List;
+        final vendorMetrics = perfList.firstWhere(
+          (item) => item['vendor_id'] == vendorId,
+          orElse: () => null,
+        );
+        if (vendorMetrics != null) {
+          _remoteVendorMetrics = Map<String, dynamic>.from(vendorMetrics);
         }
       }
 
       // 2. Fetch Recharts timeline analytics from Laravel API
-      final rechartsUrl = Uri.parse(
-          "$_laravelBaseUrl/api/vendor/recharts-sales?vendor_id=$vendorId");
-      final rRequest = await client.getUrl(rechartsUrl);
-      rRequest.headers.set(HttpHeaders.acceptHeader, 'application/json');
-      rRequest.headers.set(HttpHeaders.authorizationHeader, 'Bearer $token');
-      final rResponse = await rRequest.close();
-      if (rResponse.statusCode == 200) {
-        final rBody = await rResponse.transform(utf8.decoder).join();
-        final rDecoded = json.decode(rBody);
-        if (rDecoded['success'] == true &&
-            rDecoded['data'] != null &&
-            rDecoded['data']['by_date'] != null) {
-          _remoteRechartsData = rDecoded['data']['by_date'] as List;
-        }
+      final rDecoded = await _api.request(
+        'GET',
+        'vendor/recharts-sales?vendor_id=$vendorId',
+        token: token,
+      );
+      if (rDecoded is Map &&
+          rDecoded['success'] == true &&
+          rDecoded['data'] != null &&
+          rDecoded['data']['by_date'] != null) {
+        _remoteRechartsData = rDecoded['data']['by_date'] as List;
       }
 
       // 3. Fetch today's / daily revenue for the vendor
-      final dailyUrl = Uri.parse("$_laravelBaseUrl/api/vendor/daily-revenue");
-      final dRequest = await client.getUrl(dailyUrl);
-      dRequest.headers.set(HttpHeaders.acceptHeader, 'application/json');
-      dRequest.headers.set(HttpHeaders.authorizationHeader, 'Bearer $token');
-      final dResponse = await dRequest.close();
-      if (dResponse.statusCode == 200) {
-        final dBody = await dResponse.transform(utf8.decoder).join();
-        final dDecoded = json.decode(dBody);
-        if (dDecoded['data'] is List) {
-          _remoteDailyRevenue = List<dynamic>.from(dDecoded['data']);
-        }
+      final dDecoded = await _api.request(
+        'GET',
+        'vendor/daily-revenue',
+        token: token,
+      );
+      if (dDecoded is Map && dDecoded['data'] is List) {
+        _remoteDailyRevenue = List<dynamic>.from(dDecoded['data']);
       }
     } catch (e) {
       debugPrint("Error fetching remote performance metrics from Laravel: $e");
@@ -1622,6 +1579,13 @@ class CafeteriaProvider extends ChangeNotifier {
   }
 
   void _startRealTimeTrackingSimulation(int orderId) {
+    // Browsers cannot open a raw dart:io HTTP stream; use the local simulator
+    // on web instead of hitting UnsupportedError.
+    if (kIsWeb) {
+      _runOfflineFallbackSimulation(orderId);
+      return;
+    }
+
     final sseUrl =
         Uri.parse("$_laravelBaseUrl/api/orders/$orderId/tracking?stream=1");
 
@@ -1720,42 +1684,36 @@ class CafeteriaProvider extends ChangeNotifier {
     // Sync feedback with Laravel API if authenticated
     if (_authToken != null) {
       try {
-        final url = Uri.parse("$_laravelBaseUrl/api/feedback");
-        final client = HttpClient();
-        client.connectionTimeout = const Duration(seconds: 4);
-        final request = await client.postUrl(url);
-        request.headers.add("Content-Type", "application/json");
-        request.headers.add("Authorization", "Bearer $_authToken");
-        request.add(utf8.encode(json.encode({
-          'order_id': orderId,
-          'vendor_id': vendorId,
-          'customer_id': _currentUser!.id,
-          'food_quality': quality,
-          'cleanliness': cleanliness,
-          'speed': speed,
-          'value': value,
-          'comment': comment,
-        })));
-        final response = await request.close();
-        if (response.statusCode == 201) {
-          final body = await response.transform(utf8.decoder).join();
-          final decoded = json.decode(body);
-          if (decoded != null && decoded['id'] != null) {
-            // Update local SQLite db with the server-generated feedback ID
-            final remoteFb = Feedback(
-              id: decoded['id'],
-              orderId: orderId,
-              vendorId: vendorId,
-              customerId: _currentUser!.id!,
-              ratingFoodQuality: quality,
-              ratingCleanliness: cleanliness,
-              ratingServiceSpeed: speed,
-              ratingPriceValue: value,
-              comment: comment,
-              timestamp: feedback.timestamp,
-            );
-            await _db.insertFeedback(remoteFb);
-          }
+        final decoded = await _api.request(
+          'POST',
+          'feedback',
+          token: _authToken,
+          body: {
+            'order_id': orderId,
+            'vendor_id': vendorId,
+            'customer_id': _currentUser!.id,
+            'food_quality': quality,
+            'cleanliness': cleanliness,
+            'speed': speed,
+            'value': value,
+            'comment': comment,
+          },
+        );
+        if (decoded is Map && decoded['id'] != null) {
+          // Update local SQLite db with the server-generated feedback ID
+          final remoteFb = Feedback(
+            id: decoded['id'],
+            orderId: orderId,
+            vendorId: vendorId,
+            customerId: _currentUser!.id!,
+            ratingFoodQuality: quality,
+            ratingCleanliness: cleanliness,
+            ratingServiceSpeed: speed,
+            ratingPriceValue: value,
+            comment: comment,
+            timestamp: feedback.timestamp,
+          );
+          await _db.insertFeedback(remoteFb);
         }
       } catch (e) {
         debugPrint(
@@ -2067,16 +2025,10 @@ class CafeteriaProvider extends ChangeNotifier {
 
   Future<void> fetchAndCacheFeedback() async {
     try {
-      final url = Uri.parse("$_laravelBaseUrl/api/feedback");
-      final client = HttpClient();
-      client.connectionTimeout = const Duration(seconds: 4);
-      final request = await client.getUrl(url);
-      request.headers.add("Authorization", "Bearer $_authToken");
-      final response = await request.close();
-      if (response.statusCode == 200) {
-        final body = await response.transform(utf8.decoder).join();
-        final List decoded = json.decode(body);
-        for (var item in decoded) {
+      final decoded = await _api.request('GET', 'feedback', token: _authToken);
+      if (decoded is List) {
+        for (final item in decoded) {
+          if (item is! Map) continue;
           final fb = Feedback(
             id: item['id'],
             orderId: item['order_id'],

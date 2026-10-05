@@ -48,6 +48,11 @@ make check      # full CI-style health gate
   `flutter analyze` when Dart files are staged.
 - `pre-push` — runs the full `scripts/check_project.sh` gate.
 
+Because that gate takes a few minutes, `make setup` also enables SSH keepalives
+(`core.sshCommand` with `ServerAliveInterval`) for SSH remotes. Without it the
+connection git opens before the hook can be dropped while tests run, and git
+fails with `SIGPIPE` (exit 141) right after the hook reports success.
+
 Temporarily bypass with `git commit --no-verify` / `git push --no-verify`.
 
 ## Quality gates (must be green before pushing)

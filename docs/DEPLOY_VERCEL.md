@@ -9,6 +9,9 @@ PHP-FPM run together inside that one image.
 > request-scoped workloads. The queue worker, scheduler and database backups
 > that `docker-compose.yml` provides do **not** run on Vercel. See
 > [Limitations](#limitations-and-what-runs-where) before choosing this path.
+>
+> Hosting the **Flutter web client** on Vercel (as static files) is covered
+> separately in [`DEPLOY_VERCEL_WEB.md`](DEPLOY_VERCEL_WEB.md).
 
 ## Architecture on Vercel
 

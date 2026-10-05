@@ -1,5 +1,8 @@
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:sqflite/sqflite.dart';
+import 'package:sqflite_common_ffi_web/sqflite_ffi_web.dart';
 import 'package:atu_cafeteria/core/theme/app_theme.dart';
 import 'package:atu_cafeteria/presentation/providers/cafeteria_provider.dart';
 import 'package:atu_cafeteria/presentation/providers/admin_state_provider.dart';
@@ -52,6 +55,14 @@ Route<dynamic> appUnknownRoute(RouteSettings settings) => MaterialPageRoute(
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+
+  // Browsers have no native SQLite. Use the IndexedDB-backed WASM factory so
+  // the offline cache still works on Flutter web. The no-op stub is resolved
+  // on Android/iOS, so this is a web-only branch. See docs/DEPLOY_VERCEL_WEB.md.
+  if (kIsWeb) {
+    databaseFactory = databaseFactoryFfiWeb;
+  }
+
   await ServerConfig.init();
   // Debug-only: auto-point at the first reachable backend so wallet top-up /
   // all pages work on USB, emulator or Wi-Fi without manual URL changes.

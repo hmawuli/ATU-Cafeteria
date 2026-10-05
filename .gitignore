@@ -2,6 +2,7 @@
 frontend/.dart_tool/
 frontend/.packages
 frontend/build/
+frontend/.vercel/
 frontend/.flutter-plugins
 frontend/.flutter-plugins-dependencies
 frontend/.pub-cache/

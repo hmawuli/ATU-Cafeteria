@@ -1,0 +1,80 @@
+name: Deploy Flutter web to Vercel
+
+# Builds the Flutter web client and publishes the static bundle to Vercel.
+# Vercel's build image has no Flutter SDK, so the build happens here and the
+# finished `build/web` directory is uploaded with the Vercel CLI.
+#
+# Setup (once):
+#   - Repo secret  VERCEL_TOKEN  = a scoped Vercel token
+#   - Repo variable API_BASE_URL = https://atu-cafeteria-backend.vercel.app   (backend ORIGIN; the client appends /api/...)
+#
+# If VERCEL_TOKEN is not configured the deploy steps are skipped, so this
+# workflow is safe to merge before the project is linked.
+#
+# See docs/DEPLOY_VERCEL_WEB.md.
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'frontend/**'
+      - 'scripts/deploy_frontend_vercel.sh'
+      - '.github/workflows/deploy-web.yml'
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-web-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  deploy-web:
+    timeout-minutes: 30
+    runs-on: ubuntu-24.04
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Check Vercel credentials
+        id: check
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+        run: |
+          if [ -n "${VERCEL_TOKEN:-}" ]; then
+            echo "ok=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "ok=false" >> "$GITHUB_OUTPUT"
+            echo "VERCEL_TOKEN is not set — skipping deployment." >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+      - name: Setup Flutter
+        if: steps.check.outputs.ok == 'true'
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.35.4'
+          channel: stable
+          cache: true
+
+      - name: Install dependencies
+        if: steps.check.outputs.ok == 'true'
+        run: flutter pub get
+
+      - name: Build web
+        if: steps.check.outputs.ok == 'true'
+        env:
+          API_BASE_URL: ${{ vars.API_BASE_URL || 'https://atu-cafeteria-backend.vercel.app' }}
+        run: |
+          flutter build web --release --dart-define=API_BASE_URL="${API_BASE_URL}"
+
+      - name: Deploy to Vercel
+        if: steps.check.outputs.ok == 'true'
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+        run: npx --yes vercel@latest deploy build/web --prod --yes --token="$VERCEL_TOKEN"

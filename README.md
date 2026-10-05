@@ -55,6 +55,7 @@ ATU-Cafeteria/
 | Interactive API docs (served live) | `/api/docs` on the running backend |
 | Deploy to a Linux VPS (Nginx + PHP-FPM + PostgreSQL) | `docs/DEPLOY_VPS.md` |
 | Deploy the API to Vercel as a container function | `docs/DEPLOY_VERCEL.md` |
+| Deploy the Flutter web client to Vercel (static) | `docs/DEPLOY_VERCEL_WEB.md` |
 | Containerised deployment (incl. queue worker + scheduler) | `docker-compose.yml` + `make docker-up` |
 | Logging, health checks, monitoring, crash reporting | `docs/OBSERVABILITY.md` |
 | Performance baselines & budgets | `docs/PERFORMANCE_BUDGET.md` |
