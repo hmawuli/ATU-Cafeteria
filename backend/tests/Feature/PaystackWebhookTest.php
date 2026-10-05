@@ -4,6 +4,7 @@ namespace Tests\Feature;
 
 use App\Models\Payment;
 use App\Models\User;
+use App\Models\VendorSettlement;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Testing\TestResponse;
 use Tests\TestCase;
@@ -101,5 +102,33 @@ class PaystackWebhookTest extends TestCase
 
         // Authoritative credit stays in the verify flow — webhook never mints.
         $this->assertSame(0.0, (float) $user->fresh()->balance);
+    }
+
+    public function test_transfer_success_marks_a_vendor_settlement_paid(): void
+    {
+        $vendor = User::factory()->create(['role' => 'VENDOR']);
+
+        $settlement = VendorSettlement::create([
+            'vendor_id' => $vendor->id,
+            'period_start' => now()->subMonth()->toDateString(),
+            'period_end' => now()->toDateString(),
+            'gross_sales' => 500.00,
+            'refunds' => 0,
+            'fees' => 10.00,
+            'net_amount' => 490.00,
+            'status' => 'APPROVED',
+            'payout_reference' => 'TRF-SETTLE-1',
+        ]);
+
+        $payload = json_encode([
+            'event' => 'transfer.success',
+            'data' => ['reference' => 'TRF-SETTLE-1', 'status' => 'success'],
+        ]);
+
+        $this->webhookCall($payload, hash_hmac('sha512', $payload, 'sk_test_industrial'))
+            ->assertOk()
+            ->assertJsonPath('message', 'Transfer webhook reconciled.');
+
+        $this->assertSame('PAID', $settlement->fresh()->status);
     }
 }
