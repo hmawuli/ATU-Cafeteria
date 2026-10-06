@@ -11,8 +11,17 @@
 
 # ---------------------------------------------------------------------------
 # Stage 1 — vendor: production Composer dependencies.
+#
+# Built on the SAME PHP image as the runtime so Composer's platform check and
+# generated autoloader match the target exactly.
 # ---------------------------------------------------------------------------
-FROM composer:2 AS vendor
+FROM composer:2 AS composer
+
+FROM php:8.2-fpm-alpine AS vendor
+
+RUN apk add --no-cache unzip
+
+COPY --from=composer /usr/bin/composer /usr/bin/composer
 
 WORKDIR /app
 

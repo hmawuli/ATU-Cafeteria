@@ -3,7 +3,15 @@
 # ---------------------------------------------------------------------------
 # Stage 1 — vendor: build production Composer dependencies.
 # ---------------------------------------------------------------------------
-FROM composer:2 AS vendor
+FROM composer:2 AS composer
+
+# Build vendor on the same PHP image as the runtime so the generated platform
+# check and autoloader match the target exactly.
+FROM php:8.2-fpm-alpine AS vendor
+
+RUN apk add --no-cache unzip
+
+COPY --from=composer /usr/bin/composer /usr/bin/composer
 
 WORKDIR /app
 
