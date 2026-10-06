@@ -37,7 +37,7 @@ There is no active Blade/PWA/browser frontend. `routes/api.php` is the applicati
 
 ## Local setup
 
-Requirements: PHP 8.2+, Composer and a running PostgreSQL server.
+Requirements: PHP 8.4+, Composer and a running PostgreSQL server.
 
 ```bash
 cd backend

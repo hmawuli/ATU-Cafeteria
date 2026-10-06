@@ -4,7 +4,7 @@
 
 - VS Code
 - Flutter SDK
-- PHP 8.2+
+- PHP 8.4+
 - Composer
 - A physical Android phone
 

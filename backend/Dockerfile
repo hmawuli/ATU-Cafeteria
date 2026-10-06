@@ -7,7 +7,7 @@ FROM composer:2 AS composer
 
 # Build vendor on the same PHP image as the runtime so the generated platform
 # check and autoloader match the target exactly.
-FROM php:8.2-fpm-alpine AS vendor
+FROM php:8.4-fpm-alpine AS vendor
 
 RUN apk add --no-cache unzip
 
@@ -30,7 +30,7 @@ RUN composer install \
 # ---------------------------------------------------------------------------
 # Stage 2 — runtime: PHP-FPM with the ATU Cafeteria API.
 # ---------------------------------------------------------------------------
-FROM php:8.2-fpm-alpine AS runtime
+FROM php:8.4-fpm-alpine AS runtime
 
 WORKDIR /var/www/html
 

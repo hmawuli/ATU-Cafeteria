@@ -7,7 +7,7 @@ and `docker compose up -d --build` for the containerised alternative).
 | Component | Stack |
 |---|---|
 | Web server | Nginx |
-| Application | Laravel 12 / PHP 8.2 (PHP-FPM) |
+| Application | Laravel 12 / PHP 8.4 (PHP-FPM) |
 | Database | PostgreSQL 14+ |
 | TLS | Let's Encrypt (certbot) |
 | Queue/cache | Database queue, file cache (adjust per scale) |
@@ -24,10 +24,11 @@ and `docker compose up -d --build` for the containerised alternative).
 sudo apt update && sudo apt upgrade -y
 sudo apt install -y nginx postgresql composer git curl zip unzip
 
-# PHP 8.2 (Ubuntu 24.04 ships 8.3; any of 8.2–8.3 works with this codebase)
-sudo apt install -y php8.2-fpm php8.2-cli php8.2-pgsql \
-  php8.2-mbstring php8.2-xml php8.2-bcmath php8.2-curl php8.2-sqlite3 \
-  php8.2-intl php8.2-gd
+# PHP 8.4 (Ubuntu 24.04 ships 8.3; add the Ondřej PHP PPA for 8.4)
+sudo add-apt-repository -y ppa:ondrej/php && sudo apt update
+sudo apt install -y php8.4-fpm php8.4-cli php8.4-pgsql \
+  php8.4-mbstring php8.4-xml php8.4-bcmath php8.4-curl php8.4-sqlite3 \
+  php8.4-intl php8.4-gd
 ```
 
 Verify: `php -v` and `psql --version`.

@@ -28,7 +28,7 @@ jobs:
       - name: Setup PHP
         uses: shivammathur/setup-php@v2
         with:
-          php-version: '8.2'
+          php-version: '8.4'
           extensions: mbstring, xml, ctype, iconv, json, bcmath, sqlite, pdo_sqlite
           coverage: none
           tools: composer:v2
@@ -101,7 +101,7 @@ jobs:
       - name: Setup PHP
         uses: shivammathur/setup-php@v2
         with:
-          php-version: '8.2'
+          php-version: '8.4'
           extensions: mbstring, xml, ctype, iconv, json, bcmath, pgsql, pdo_pgsql
           coverage: none
           tools: composer:v2

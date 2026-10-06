@@ -17,7 +17,7 @@ Production-oriented Flutter + Laravel implementation for Accra Technical Univers
 | State management | Provider |
 | Local cache | SQLite / sqflite |
 | Primary database | PostgreSQL |
-| Backend | Laravel 12 / PHP 8.2+ |
+| Backend | Laravel 12 / PHP 8.4+ |
 | API | REST / JSON |
 | Authentication | Laravel-issued bearer token |
 | Payments | Paystack integration |

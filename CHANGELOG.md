@@ -80,9 +80,9 @@ and this project follows the versioning policy described in
 - **Upgraded to Laravel 12** (`laravel/framework` 11.56 → 12.69). Laravel 11 is
   hit by security advisories with no 11.x fix, which failed the CI
   `composer audit` gate; 12.69 clears them. Backend suite remains green on both
-  SQLite and PostgreSQL. Composer's `platform.php` is pinned to 8.2 so the tree
-  resolves Symfony 7.x (Symfony 8 requires PHP 8.4), matching the PHP 8.2
-  runtime and CI images.
+  SQLite and PostgreSQL. **The backend now targets PHP 8.4** (Composer
+  `platform.php` 8.4.1, `php: ^8.4`), which is also what Symfony 8 requires;
+  all Docker images, CI and the VPS guide use 8.4.
 - **One typed API layer in Flutter**: `CafeteriaProvider` now takes an
   `ApiClient`; auth/account, `/me`, catalogue, vendor-menu, order-read and
   pickup flows all go through it (token passing, idempotency keys, JSON error
