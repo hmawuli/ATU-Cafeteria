@@ -592,7 +592,7 @@ HTML;
                                 'description' => 'Service healthy',
                                 'content' => [
                                     'application/json' => [
-                                        'example' => ['status' => 'healthy', 'framework' => 'Laravel 11'],
+                                        'example' => ['status' => 'healthy', 'framework' => 'Laravel 12'],
                                     ],
                                 ],
                             ],

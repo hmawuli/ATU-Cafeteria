@@ -9,7 +9,7 @@ Flutter Mobile App
        |
        | HTTPS/JSON + Bearer token
        v
-Laravel 11 REST API
+Laravel 12 REST API
        |
        v
 Database / integrations

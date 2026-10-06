@@ -1,6 +1,6 @@
 <?php
 
-namespace AppServices;
+namespace App\Services;
 
 class FcmService
 {

@@ -8,7 +8,7 @@ on constrained hardware, while still meeting production standards.
 | Path | What it is |
 |---|---|
 | `frontend/` | Flutter application (active client) |
-| `backend/` | Laravel 11 REST API |
+| `backend/` | Laravel 12 REST API |
 | `scripts/` | Setup, serving and development utilities |
 | `docs/` | Architecture, security, deployment and runbook docs |
 | `.github/workflows/` | CI/CD (tests, static analysis, release builds) |

@@ -72,8 +72,15 @@ and this project follows the versioning policy described in
   guide never took effect. Tests therefore shared a file cache and leaked
   idempotency responses between runs (`CustomerDataRightsTest` flakiness); the
   config now honours `CACHE_STORE` with `CACHE_DRIVER` as a fallback.
+- **`FcmService` could not autoload**: it declared namespace `AppServices` while
+  the order listeners import `App\Services\FcmService`, so push delivery would
+  fatal as soon as a device had a token. Corrected the namespace.
 
 ### Changed
+- **Upgraded to Laravel 12** (`laravel/framework` 11.56 → 12.69). Laravel 11 is
+  hit by security advisories with no 11.x fix, which failed the CI
+  `composer audit` gate; 12.69 clears them. Backend suite remains green on both
+  SQLite and PostgreSQL.
 - **One typed API layer in Flutter**: `CafeteriaProvider` now takes an
   `ApiClient`; auth/account, `/me`, catalogue, vendor-menu, order-read and
   pickup flows all go through it (token passing, idempotency keys, JSON error

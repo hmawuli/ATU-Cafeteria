@@ -7,7 +7,7 @@ and `docker compose up -d --build` for the containerised alternative).
 | Component | Stack |
 |---|---|
 | Web server | Nginx |
-| Application | Laravel 11 / PHP 8.2 (PHP-FPM) |
+| Application | Laravel 12 / PHP 8.2 (PHP-FPM) |
 | Database | PostgreSQL 14+ |
 | TLS | Let's Encrypt (certbot) |
 | Queue/cache | Database queue, file cache (adjust per scale) |
@@ -193,7 +193,7 @@ renewed automatically.
 
 ## 10. Verify
 
-- `https://api.example.com/health` → `{"app":"ATU Cafeteria API","status":"Healthy","framework":"Laravel 11"}`.
+- `https://api.example.com/health` → `{"app":"ATU Cafeteria API","status":"Healthy","framework":"Laravel 12"}`.
 - `https://api.example.com/api/health` → API health JSON.
 - `https://api.example.com/api/docs` → interactive OpenAPI docs.
 - Point the Flutter app at the API with

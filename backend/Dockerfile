@@ -28,9 +28,10 @@ WORKDIR /var/www/html
 
 # PHP extensions required by the application and the PostgreSQL production database.
 RUN set -eux; \
-    apk add --no-cache --virtual .build-deps $PHPIZE_DEPS; \
+    apk add --no-cache --virtual .build-deps $PHPIZE_DEPS postgresql-dev; \
     docker-php-ext-install pdo_pgsql pgsql bcmath; \
-    apk del .build-deps
+    apk del .build-deps; \
+    apk add --no-cache libpq
 
 # Production-tuned PHP settings (kept revalidation ON so bind mounts and
 # volume refreshes never serve stale bytecode).

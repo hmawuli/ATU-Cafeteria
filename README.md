@@ -17,7 +17,7 @@ Production-oriented Flutter + Laravel implementation for Accra Technical Univers
 | State management | Provider |
 | Local cache | SQLite / sqflite |
 | Primary database | PostgreSQL |
-| Backend | Laravel 11 / PHP 8.2+ |
+| Backend | Laravel 12 / PHP 8.2+ |
 | API | REST / JSON |
 | Authentication | Laravel-issued bearer token |
 | Payments | Paystack integration |
@@ -156,7 +156,7 @@ commit and the full gate on push; `make setup` installs them.
 
 ## Production standard
 
-See `docs/PRODUCTION_STANDARD.md` for security, testing, deployment and architecture standards. The active application frontend is Flutter and the backend is Laravel 11 REST API with Sanctum.
+See `docs/PRODUCTION_STANDARD.md` for security, testing, deployment and architecture standards. The active application frontend is Flutter and the backend is Laravel 12 REST API with Sanctum.
 
 Production Android releases are built through GitHub Actions using protected signing credentials. The Android App Bundle (`.aab`) is the primary artifact for Google Play distribution; the signed APK is retained for direct distribution and verification.
 

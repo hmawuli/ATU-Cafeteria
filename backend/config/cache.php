@@ -13,7 +13,7 @@ return [
     |
     */
 
-    // Laravel 11 names this CACHE_STORE; CACHE_DRIVER is kept as a fallback so
+    // Laravel 11+ names this CACHE_STORE; CACHE_DRIVER is kept as a fallback so
     // older environment files keep working. The .env templates and phpunit.xml
     // (array, for test isolation) all use CACHE_STORE.
     'default' => env('CACHE_STORE', env('CACHE_DRIVER', 'file')),

@@ -1,6 +1,6 @@
 # ATU Cafeteria — Laravel API
 
-Laravel 11 backend for the ATU Cafeteria Flutter application.
+Laravel 12 backend for the ATU Cafeteria Flutter application.
 
 ## Responsibilities
 
