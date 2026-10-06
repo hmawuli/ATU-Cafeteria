@@ -11,13 +11,17 @@ set -e
 PORT="${PORT:-80}"
 export LARAVEL_STORAGE_PATH="${LARAVEL_STORAGE_PATH:-/tmp/atu-storage}"
 
-# Recreate Laravel's writable storage tree on every cold start.
+# Recreate Laravel's writable storage tree on every cold start. The container
+# starts as root but PHP-FPM runs as www-data, so the tree must be owned by
+# www-data or Laravel cannot write its caches/logs (every request 500s).
 mkdir -p \
     "${LARAVEL_STORAGE_PATH}/app" \
     "${LARAVEL_STORAGE_PATH}/framework/cache/data" \
     "${LARAVEL_STORAGE_PATH}/framework/sessions" \
     "${LARAVEL_STORAGE_PATH}/framework/views" \
     "${LARAVEL_STORAGE_PATH}/logs"
+
+chown -R www-data:www-data "${LARAVEL_STORAGE_PATH}"
 
 # Optional: run migrations on boot. Off by default because several instances can
 # cold-start at once; prefer running migrations once from your machine.
