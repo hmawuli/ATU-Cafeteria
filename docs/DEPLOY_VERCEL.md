@@ -62,9 +62,14 @@ php artisan key:generate --show      # prints base64:…
 Use your existing import link (or **Add New → Project → Import Git Repository**):
 
 - **Framework Preset:** `Other` (Vercel auto-detects `Dockerfile.vercel`).
-- **Root Directory:** leave it as the **repository root**. Do **not** set it to
-  `backend` — the Dockerfile and build context are at the root by design.
+- **Root Directory:** either the **repository root** *or* `backend/` works — a
+  `Dockerfile.vercel` exists in both places and builds the same image. Leaving it
+  as the repository root is the default and recommended.
 - **Build & Output Settings:** leave defaults.
+
+> If the deployment log says it cannot find a Dockerfile, the Root Directory is
+> pointing somewhere other than the repository root or `backend/` — move it to
+> one of those two.
 
 ## 4. Set environment variables
 
