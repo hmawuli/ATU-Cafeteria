@@ -65,6 +65,11 @@ RUN mkdir -p \
         bootstrap/cache \
     && chown -R www-data:www-data storage bootstrap/cache
 
+# Dev-generated manifests shipped in the repo reference require-dev packages,
+# which are not installed here; regenerate them from the production autoloader.
+RUN rm -f bootstrap/cache/packages.php bootstrap/cache/services.php \
+    && php artisan package:discover --ansi
+
 COPY docker/entrypoint.sh /usr/local/bin/docker-entrypoint
 RUN chmod +x /usr/local/bin/docker-entrypoint
 

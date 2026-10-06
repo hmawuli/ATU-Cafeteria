@@ -1,0 +1,15 @@
+.git
+.github
+.idea
+.vscode
+frontend/build
+frontend/.dart_tool
+frontend/.flutter-plugins*
+docs
+scripts
+backend/vendor
+backend/tests
+backend/storage/framework/cache/data
+backend/storage/logs
+*.sqlite
+*.result.cache

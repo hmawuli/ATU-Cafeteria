@@ -75,6 +75,11 @@ and this project follows the versioning policy described in
 - **`FcmService` could not autoload**: it declared namespace `AppServices` while
   the order listeners import `App\Services\FcmService`, so push delivery would
   fatal as soon as a device had a token. Corrected the namespace.
+- **Production container builds failed at `package:discover`**: the committed
+  `bootstrap/cache/packages.php`/`services.php` were generated with
+  `require-dev` (NunoMaduro\Collision), which is absent after
+  `composer install --no-dev`; the Dockerfiles now drop the stale manifests so
+  Laravel regenerates them from the production autoloader.
 
 ### Changed
 - **Upgraded to Laravel 12** (`laravel/framework` 11.56 → 12.69). Laravel 11 is

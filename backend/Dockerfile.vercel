@@ -63,9 +63,12 @@ RUN { \
 COPY --from=vendor /app/vendor ./vendor
 COPY . .
 
-# Build the package manifest into the image so the read-only filesystem needs no
-# bootstrap/cache write at runtime.
-RUN php artisan package:discover --ansi \
+# The repository ships dev-generated package manifests (created with
+# require-dev). With --no-dev in this image those manifests reference packages
+# that do not exist; drop them so Laravel regenerates them from the production
+# autoloader.
+RUN rm -f bootstrap/cache/packages.php bootstrap/cache/services.php \
+    && php artisan package:discover --ansi \
     && chown -R www-data:www-data storage bootstrap/cache
 
 COPY docker/vercel/nginx.conf.template /etc/nginx/atu-nginx.conf.template
