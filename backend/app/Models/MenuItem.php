@@ -24,6 +24,7 @@ class MenuItem extends Model
         'initial_stock',
         'current_stock',
         'low_stock_threshold', 'sku', 'preparation_minutes', 'dietary_tags', 'allergen_info', 'is_featured',
+        'image_url',
     ];
 
     protected static function boot()

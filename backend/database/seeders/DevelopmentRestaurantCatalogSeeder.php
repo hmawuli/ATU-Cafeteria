@@ -247,6 +247,7 @@ class DevelopmentRestaurantCatalogSeeder extends Seeder
                             'dietary_tags' => $data['dietary_tags'],
                             'allergen_info' => $data['allergen_info'],
                             'is_featured' => $data['featured'],
+                            'image_url' => $data['image_url'] ?? self::imageFor($data['category']),
                         ]);
 
                         continue;
@@ -268,6 +269,7 @@ class DevelopmentRestaurantCatalogSeeder extends Seeder
                         'dietary_tags' => $data['dietary_tags'],
                         'allergen_info' => $data['allergen_info'],
                         'is_featured' => $data['featured'],
+                        'image_url' => $data['image_url'] ?? self::imageFor($data['category']),
                     ]);
 
                     InventoryMovement::create([
@@ -287,5 +289,19 @@ class DevelopmentRestaurantCatalogSeeder extends Seeder
         });
 
         $this->command?->info('Development restaurant catalog seeded successfully.');
+    }
+
+    /**
+     * Pick a stable food photo for a menu category so the app never shows a
+     * blank image when a vendor has not uploaded one.
+     */
+    private static function imageFor(string $category): string
+    {
+        return match ($category) {
+            'Breakfast' => 'https://images.unsplash.com/photo-1509440159596-0249088772ff?auto=format&fit=crop&w=700&q=80',
+            'Pastries & Snacks' => 'https://images.unsplash.com/photo-1551024506-0bccd828d307?auto=format&fit=crop&w=700&q=80',
+            'Beverages & Drinks' => 'https://images.unsplash.com/photo-1554866585-cd94860890b7?auto=format&fit=crop&w=700&q=80',
+            default => 'https://images.unsplash.com/photo-1540189549336-e6e99c3679fe?auto=format&fit=crop&w=700&q=80',
+        };
     }
 }
