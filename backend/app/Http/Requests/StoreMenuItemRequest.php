@@ -29,6 +29,7 @@ class StoreMenuItemRequest extends FormRequest
             'description' => 'nullable|string',
             'category' => 'nullable|string|max:255',
             'is_available' => 'nullable|boolean',
+            'image_url' => 'nullable|string|max:2048',
             'vendor_id' => 'nullable|integer|exists:users,id',
         ];
     }

@@ -75,6 +75,7 @@ class _VendorMenuManagementScreenState extends State<VendorMenuManagementScreen>
     final category = TextEditingController(text: '${item?['category'] ?? 'General'}');
     final stock = TextEditingController(text: item == null ? '' : '${item['current_stock'] ?? ''}');
     final threshold = TextEditingController(text: item == null ? '3' : '${item['low_stock_threshold'] ?? 3}');
+    final imageUrl = TextEditingController(text: '${item?['image_url'] ?? ''}');
     bool available = item == null ? true : item['is_available'] != false && item['is_available'] != 0;
     String? error;
 
@@ -110,6 +111,80 @@ class _VendorMenuManagementScreenState extends State<VendorMenuManagementScreen>
                     controller: threshold,
                     keyboardType: TextInputType.number,
                     decoration: const InputDecoration(labelText: 'Low-stock threshold'),
+                  ),
+                  const SizedBox(height: 14),
+                  Align(
+                    alignment: Alignment.centerLeft,
+                    child: Text('Food photo',
+                        style: TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w800,
+                            color: Theme.of(context).colorScheme.onSurface)),
+                  ),
+                  const SizedBox(height: 8),
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.center,
+                    children: [
+                      ClipRRect(
+                        borderRadius: BorderRadius.circular(12),
+                        child: SizedBox(
+                          width: 78,
+                          height: 60,
+                          child: imageUrl.text.trim().isEmpty
+                              ? Container(
+                                  color: Theme.of(context)
+                                      .colorScheme
+                                      .primaryContainer,
+                                  child: Icon(Icons.restaurant_rounded,
+                                      color: Theme.of(context)
+                                          .colorScheme
+                                          .primary,
+                                      size: 28),
+                                )
+                              : Image.network(
+                                  imageUrl.text.trim(),
+                                  fit: BoxFit.cover,
+                                  errorBuilder: (_, __, ___) => Container(
+                                    color: Theme.of(context)
+                                        .colorScheme
+                                        .primaryContainer,
+                                    child: Icon(Icons.broken_image_outlined,
+                                        color: Theme.of(context)
+                                            .colorScheme
+                                            .primary,
+                                        size: 28),
+                                  ),
+                                ),
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: TextField(
+                          controller: imageUrl,
+                          decoration: const InputDecoration(
+                            labelText: 'Image URL (optional)',
+                            hintText: 'https://…  or tap “Sample photo”',
+                            isDense: true,
+                          ),
+                          onChanged: (_) => setDialogState(() {}),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 4),
+                  Align(
+                    alignment: Alignment.centerLeft,
+                    child: TextButton.icon(
+                      onPressed: () => _showSamplePhotos(
+                        context,
+                        imageUrl,
+                        () => setDialogState(() {}),
+                      ),
+                      icon: const Icon(Icons.photo_library_outlined, size: 18),
+                      label: const Text('Choose a sample photo'),
+                      style: TextButton.styleFrom(
+                          visualDensity: VisualDensity.compact),
+                    ),
                   ),
                   const SizedBox(height: 6),
                   SwitchListTile.adaptive(
@@ -148,6 +223,7 @@ class _VendorMenuManagementScreenState extends State<VendorMenuManagementScreen>
                       'is_available': available,
                       'low_stock_threshold': parsedThreshold,
                       if (item == null && parsedStock != null) 'initial_stock': parsedStock,
+                      'image_url': imageUrl.text.trim().isEmpty ? null : imageUrl.text.trim(),
                     };
                     if (item == null) {
                       await _api.post('/vendor/menu-items', body: body, idempotencyKey: ApiClient.newIdempotencyKey());
@@ -175,6 +251,7 @@ class _VendorMenuManagementScreenState extends State<VendorMenuManagementScreen>
       category.dispose();
       stock.dispose();
       threshold.dispose();
+      imageUrl.dispose();
     }
   }
 
@@ -348,4 +425,73 @@ class _ErrorState extends StatelessWidget {
           ),
         ),
       );
+}
+
+const List<String> _sampleFoodImages = [
+  'https://images.unsplash.com/photo-1540189549336-e6e99c3679fe?auto=format&fit=crop&w=700&q=80',
+  'https://images.unsplash.com/photo-1509440159596-0249088772ff?auto=format&fit=crop&w=700&q=80',
+  'https://images.unsplash.com/photo-1551024506-0bccd828d307?auto=format&fit=crop&w=700&q=80',
+  'https://images.unsplash.com/photo-1554866585-cd94860890b7?auto=format&fit=crop&w=700&q=80',
+  'https://images.unsplash.com/photo-1567620905732-2d1ec7ab7445?auto=format&fit=crop&w=700&q=80',
+  'https://images.unsplash.com/photo-1565299624946-b28f40a0ae38?auto=format&fit=crop&w=700&q=80',
+  'https://images.unsplash.com/photo-1512621776951-a57141f2eefd?auto=format&fit=crop&w=700&q=80',
+  'https://images.unsplash.com/photo-1565958011703-44f9829ba187?auto=format&fit=crop&w=700&q=80',
+  'https://images.unsplash.com/photo-1484723091739-30a097e8f929?auto=format&fit=crop&w=700&q=80',
+  'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?auto=format&fit=crop&w=700&q=80',
+];
+
+/// Lets a vendor set a food photo by picking a curated sample image.
+Future<void> _showSamplePhotos(
+  BuildContext context,
+  TextEditingController target,
+  VoidCallback onChanged,
+) async {
+  await showDialog<void>(
+    context: context,
+    builder: (dialogContext) => AlertDialog(
+      title: const Text('Choose a photo'),
+      content: SizedBox(
+        width: 340,
+        child: GridView.count(
+          crossAxisCount: 3,
+          shrinkWrap: true,
+          mainAxisSpacing: 8,
+          crossAxisSpacing: 8,
+          children: [
+            for (final url in _sampleFoodImages)
+              InkWell(
+                onTap: () {
+                  target.text = url;
+                  onChanged();
+                  Navigator.pop(dialogContext);
+                },
+                borderRadius: BorderRadius.circular(10),
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(10),
+                  child: Image.network(
+                    url,
+                    fit: BoxFit.cover,
+                    errorBuilder: (_, __, ___) => ColoredBox(
+                      color: Theme.of(dialogContext).colorScheme.primaryContainer,
+                      child: Center(
+                        child: Icon(
+                          Icons.restaurant_rounded,
+                          color: Theme.of(dialogContext).colorScheme.primary,
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+          ],
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(dialogContext),
+          child: const Text('Cancel'),
+        ),
+      ],
+    ),
+  );
 }

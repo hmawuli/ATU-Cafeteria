@@ -137,6 +137,7 @@ class MenuItemController extends Controller
                 'description' => $request->input('description') ?? '',
                 'category' => $request->input('category'),
                 'is_available' => $request->input('is_available', true),
+                'image_url' => $request->input('image_url'),
             ]);
 
             AuditLog::create([
@@ -184,6 +185,7 @@ class MenuItemController extends Controller
             'description' => 'nullable|string',
             'category' => 'nullable|string|max:255',
             'is_available' => 'nullable|boolean',
+            'image_url' => 'nullable|string|max:2048',
         ]);
 
         if ($validator->fails()) {
@@ -203,6 +205,7 @@ class MenuItemController extends Controller
                 'description' => $request->has('description') ? $request->input('description') : $item->description,
                 'category' => $request->has('category') ? $request->input('category') : $item->category,
                 'is_available' => $request->has('is_available') ? $request->input('is_available') : $item->is_available,
+                'image_url' => $request->has('image_url') ? $request->input('image_url') : $item->image_url,
             ]);
 
             AuditLog::create([
