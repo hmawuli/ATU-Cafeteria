@@ -333,6 +333,40 @@ class CafeteriaProvider extends ChangeNotifier {
     }
   }
 
+  /// Record a walk-in kiosk sale for the signed-in vendor.
+  ///
+  /// This uses the dedicated vendor kiosk endpoint (counter sales paid by
+  /// cash/MoMo/card), which is separate from the customer cart checkout. It
+  /// returns the created order payload, including the pickup PIN, and refreshes
+  /// the catalogue so stock levels update immediately.
+  Future<Map<String, dynamic>> recordKioskSale({
+    required List<Map<String, dynamic>> items,
+    required String paymentMethod,
+    String? customerName,
+    String? customerPhone,
+  }) async {
+    final response = await _api.request(
+      'POST',
+      'vendor/kiosk/orders',
+      token: _authToken,
+      idempotencyKey: ApiClient.newIdempotencyKey(),
+      body: {
+        'items': items,
+        'payment_method': paymentMethod.toUpperCase(),
+        if ((customerName ?? '').trim().isNotEmpty)
+          'customer_name': customerName!.trim(),
+        if ((customerPhone ?? '').trim().isNotEmpty)
+          'customer_phone': customerPhone!.trim(),
+      },
+    );
+
+    await refreshAllData();
+
+    return response is Map
+        ? Map<String, dynamic>.from(response)
+        : <String, dynamic>{};
+  }
+
   Future<void> _syncRemoteVendorFoodItems() async {
     if (_authToken == null ||
         _currentUser?.id == null ||

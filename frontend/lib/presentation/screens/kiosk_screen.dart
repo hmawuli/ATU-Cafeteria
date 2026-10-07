@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import '../../core/network/api_client.dart';
 import '../../domain/models/models.dart';
 import '../providers/cafeteria_provider.dart';
 import '../providers/cart_provider.dart';
@@ -327,7 +328,7 @@ class _OrderPanel extends StatelessWidget {
             FilledButton(
               onPressed: cart.isEmpty
                   ? null
-                  : () => Navigator.pushNamed(context, '/checkout'),
+                  : () => _completeKioskOrder(context, cart),
               child: const Padding(
                 padding: EdgeInsets.symmetric(vertical: 14),
                 child: Text('PROCEED TO PAYMENT'),
@@ -338,4 +339,234 @@ class _OrderPanel extends StatelessWidget {
       ),
     );
   }
+}
+
+/// Completes the kiosk order.
+///
+/// Vendors take a counter payment (cash/MoMo/card) through the dedicated
+/// vendor kiosk endpoint and get a receipt with the pickup PIN. Non-vendors
+/// keep the normal customer checkout.
+Future<void> _completeKioskOrder(
+    BuildContext context, CartProvider cart) async {
+  final provider = context.read<CafeteriaProvider>();
+  final isVendor = provider.currentUser?.role == 'VENDOR';
+
+  if (!isVendor) {
+    Navigator.pushNamed(context, '/checkout');
+    return;
+  }
+
+  final request = await showDialog<_KioskSaleRequest>(
+    context: context,
+    builder: (_) => const _KioskPaymentDialog(),
+  );
+  if (request == null) return;
+
+  final items = <Map<String, dynamic>>[];
+  for (final line in cart.lines) {
+    final id = line.item.id;
+    if (id == null) continue;
+    items.add({'menu_item_id': id, 'quantity': line.quantity});
+  }
+
+  if (items.isEmpty) {
+    if (context.mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('There is nothing to sell.')));
+    }
+    return;
+  }
+
+  if (!context.mounted) return;
+
+  showDialog<void>(
+    context: context,
+    barrierDismissible: false,
+    builder: (_) => const Center(child: CircularProgressIndicator()),
+  );
+
+  try {
+    final response = await provider.recordKioskSale(
+      items: items,
+      paymentMethod: request.method,
+      customerName: request.name,
+      customerPhone: request.phone,
+    );
+    if (context.mounted) Navigator.of(context, rootNavigator: true).pop();
+    cart.clear();
+    if (context.mounted) {
+      await showDialog<void>(
+        context: context,
+        builder: (_) => _KioskReceiptDialog(response: response),
+      );
+    }
+  } on ApiException catch (e) {
+    if (context.mounted) Navigator.of(context, rootNavigator: true).pop();
+    if (context.mounted) {
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text(e.message)));
+    }
+  } catch (e) {
+    if (context.mounted) Navigator.of(context, rootNavigator: true).pop();
+    if (context.mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Could not record the sale: $e')));
+    }
+  }
+}
+
+class _KioskSaleRequest {
+  final String method;
+  final String? name;
+  final String? phone;
+  const _KioskSaleRequest({required this.method, this.name, this.phone});
+}
+
+class _KioskPaymentDialog extends StatefulWidget {
+  const _KioskPaymentDialog();
+
+  @override
+  State<_KioskPaymentDialog> createState() => _KioskPaymentDialogState();
+}
+
+class _KioskPaymentDialogState extends State<_KioskPaymentDialog> {
+  String _method = 'CASH';
+  final _name = TextEditingController();
+  final _phone = TextEditingController();
+
+  @override
+  void dispose() {
+    _name.dispose();
+    _phone.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: const Text('Take payment'),
+      content: SingleChildScrollView(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text('Payment method'),
+            const SizedBox(height: 8),
+            SegmentedButton<String>(
+              segments: const [
+                ButtonSegment(
+                    value: 'CASH',
+                    label: Text('Cash'),
+                    icon: Icon(Icons.payments_outlined)),
+                ButtonSegment(
+                    value: 'MOMO',
+                    label: Text('MoMo'),
+                    icon: Icon(Icons.phone_android)),
+                ButtonSegment(
+                    value: 'CARD',
+                    label: Text('Card'),
+                    icon: Icon(Icons.credit_card)),
+              ],
+              selected: {_method},
+              onSelectionChanged: (selection) =>
+                  setState(() => _method = selection.first),
+            ),
+            const SizedBox(height: 16),
+            TextField(
+              controller: _name,
+              decoration: const InputDecoration(
+                labelText: 'Customer name (optional)',
+                border: OutlineInputBorder(),
+              ),
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: _phone,
+              keyboardType: TextInputType.phone,
+              decoration: const InputDecoration(
+                labelText: 'Customer phone (optional)',
+                border: OutlineInputBorder(),
+              ),
+            ),
+          ],
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(context),
+          child: const Text('Cancel'),
+        ),
+        FilledButton(
+          onPressed: () => Navigator.pop(
+            context,
+            _KioskSaleRequest(
+                method: _method, name: _name.text, phone: _phone.text),
+          ),
+          child: const Text('Complete sale'),
+        ),
+      ],
+    );
+  }
+}
+
+class _KioskReceiptDialog extends StatelessWidget {
+  final Map<String, dynamic> response;
+  const _KioskReceiptDialog({required this.response});
+
+  @override
+  Widget build(BuildContext context) {
+    final rawOrder = response['order'];
+    final order = rawOrder is Map
+        ? Map<String, dynamic>.from(rawOrder)
+        : <String, dynamic>{};
+    final orderNumber = (order['order_number'] ?? '').toString();
+    final pin = (response['pickup_pin'] ?? order['pickup_pin'] ?? '').toString();
+    final total =
+        (order['grand_total'] ?? order['total_price'] ?? '').toString();
+    final method = (order['payment_method'] ?? '').toString();
+
+    return AlertDialog(
+      title: const Row(
+        children: [
+          Icon(Icons.check_circle, color: Colors.green),
+          SizedBox(width: 8),
+          Text('Sale recorded'),
+        ],
+      ),
+      content: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          if (orderNumber.isNotEmpty) _receiptRow('Order', orderNumber),
+          if (total.isNotEmpty) _receiptRow('Total', 'GH₵ $total'),
+          if (method.isNotEmpty) _receiptRow('Paid by', method),
+          if (pin.isNotEmpty) _receiptRow('Pickup PIN', pin),
+        ],
+      ),
+      actions: [
+        FilledButton(
+          onPressed: () => Navigator.pop(context),
+          child: const Text('Done'),
+        ),
+      ],
+    );
+  }
+
+  static Widget _receiptRow(String label, String value) => Padding(
+        padding: const EdgeInsets.symmetric(vertical: 3),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Text(label, style: const TextStyle(color: Colors.grey)),
+            const SizedBox(width: 16),
+            Flexible(
+              child: Text(
+                value,
+                textAlign: TextAlign.right,
+                style: const TextStyle(fontWeight: FontWeight.w800),
+              ),
+            ),
+          ],
+        ),
+      );
 }
