@@ -38,3 +38,6 @@ dist/
 backups/
 .vercel
 .env*
+
+# Built APKs (distributed separately, never committed)
+ATU-Cafeteria-*.apk
