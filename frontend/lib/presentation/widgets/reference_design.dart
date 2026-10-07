@@ -208,31 +208,52 @@ class MetricTile extends StatelessWidget {
       required this.value,
       required this.icon});
   @override
-  Widget build(BuildContext context) => ReferenceCard(
-        child: Row(children: [
-          Container(
-              width: 46,
-              height: 46,
-              decoration: BoxDecoration(
-                  color: AppTheme.primary.withValues(alpha: .09),
-                  shape: BoxShape.circle),
-              child: Icon(icon, color: AppTheme.primary)),
-          const SizedBox(width: 12),
-          Expanded(
+  Widget build(BuildContext context) => Container(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: AppTheme.primary.withValues(alpha: .08)),
+          boxShadow: [
+            BoxShadow(
+              color: AppTheme.textMuted.withValues(alpha: .10),
+              blurRadius: 10,
+              offset: const Offset(0, 2),
+            ),
+          ],
+        ),
+        child: Row(
+          children: [
+            Container(
+                width: 40,
+                height: 40,
+                decoration: BoxDecoration(
+                    color: AppTheme.primary.withValues(alpha: .08),
+                    borderRadius: BorderRadius.circular(11)),
+                child: Icon(icon, color: AppTheme.primary, size: 21)),
+            const SizedBox(width: 12),
+            Expanded(
               child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                Text(label,
-                    style: const TextStyle(
-                        fontSize: 12, color: AppTheme.textMuted)),
-                const SizedBox(height: 3),
-                Text(value,
-                    style: const TextStyle(
-                        fontSize: 22,
-                        color: AppTheme.textDark,
-                        fontWeight: FontWeight.w900)),
-              ])),
-        ]),
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(label,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                          fontSize: 12,
+                          color: AppTheme.textMuted,
+                          fontWeight: FontWeight.w600)),
+                  const SizedBox(height: 2),
+                  Text(value,
+                      style: const TextStyle(
+                          fontSize: 22,
+                          color: AppTheme.textDark,
+                          fontWeight: FontWeight.w800)),
+                ],
+              ),
+            ),
+          ],
+        ),
       );
 }
 
