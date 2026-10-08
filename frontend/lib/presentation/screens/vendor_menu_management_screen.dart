@@ -1,5 +1,9 @@
+import 'dart:convert';
+
 import 'package:flutter/material.dart';
+import 'package:image_picker/image_picker.dart';
 import 'package:atu_cafeteria/core/network/api_client.dart';
+import '../widgets/food_image.dart';
 
 /// Production menu-management workspace backed directly by the vendor CRUD API.
 class VendorMenuManagementScreen extends StatefulWidget {
@@ -77,6 +81,8 @@ class _VendorMenuManagementScreenState extends State<VendorMenuManagementScreen>
     final threshold = TextEditingController(text: item == null ? '3' : '${item['low_stock_threshold'] ?? 3}');
     final imageUrl = TextEditingController(text: '${item?['image_url'] ?? ''}');
     bool available = item == null ? true : item['is_available'] != false && item['is_available'] != 0;
+    String pickedImage = '';
+    bool pickingImage = false;
     String? error;
 
     try {
@@ -130,31 +136,10 @@ class _VendorMenuManagementScreenState extends State<VendorMenuManagementScreen>
                         child: SizedBox(
                           width: 78,
                           height: 60,
-                          child: imageUrl.text.trim().isEmpty
-                              ? Container(
-                                  color: Theme.of(context)
-                                      .colorScheme
-                                      .primaryContainer,
-                                  child: Icon(Icons.restaurant_rounded,
-                                      color: Theme.of(context)
-                                          .colorScheme
-                                          .primary,
-                                      size: 28),
-                                )
-                              : Image.network(
-                                  imageUrl.text.trim(),
-                                  fit: BoxFit.cover,
-                                  errorBuilder: (_, __, ___) => Container(
-                                    color: Theme.of(context)
-                                        .colorScheme
-                                        .primaryContainer,
-                                    child: Icon(Icons.broken_image_outlined,
-                                        color: Theme.of(context)
-                                            .colorScheme
-                                            .primary,
-                                        size: 28),
-                                  ),
-                                ),
+                          child: buildFoodImage(
+                              pickedImage.isNotEmpty
+                                  ? pickedImage
+                                  : imageUrl.text.trim()),
                         ),
                       ),
                       const SizedBox(width: 12),
@@ -163,28 +148,71 @@ class _VendorMenuManagementScreenState extends State<VendorMenuManagementScreen>
                           controller: imageUrl,
                           decoration: const InputDecoration(
                             labelText: 'Image URL (optional)',
-                            hintText: 'https://…  or tap “Sample photo”',
+                            hintText: 'https://…  or tap “Upload / sample”',
                             isDense: true,
                           ),
-                          onChanged: (_) => setDialogState(() {}),
+                          onChanged: (_) =>
+                              setDialogState(() => pickedImage = ''),
                         ),
                       ),
                     ],
                   ),
                   const SizedBox(height: 4),
-                  Align(
-                    alignment: Alignment.centerLeft,
-                    child: TextButton.icon(
-                      onPressed: () => _showSamplePhotos(
-                        context,
-                        imageUrl,
-                        () => setDialogState(() {}),
+                  Wrap(
+                    spacing: 4,
+                    children: [
+                      TextButton.icon(
+                        onPressed: pickingImage
+                            ? null
+                            : () async {
+                                setDialogState(() => pickingImage = true);
+                                try {
+                                  final file = await ImagePicker().pickImage(
+                                    source: ImageSource.gallery,
+                                    maxWidth: 1200,
+                                    imageQuality: 82,
+                                  );
+                                  if (file != null) {
+                                    final bytes = await file.readAsBytes();
+                                    setDialogState(() {
+                                      pickedImage =
+                                          'data:image/jpeg;base64,${base64Encode(bytes)}';
+                                      pickingImage = false;
+                                    });
+                                  } else {
+                                    setDialogState(
+                                        () => pickingImage = false);
+                                  }
+                                } catch (_) {
+                                  setDialogState(() => pickingImage = false);
+                                }
+                              },
+                        icon: pickingImage
+                            ? const SizedBox(
+                                width: 14,
+                                height: 14,
+                                child: CircularProgressIndicator(strokeWidth: 2),
+                              )
+                            : const Icon(Icons.upload_outlined, size: 18),
+                        label: Text(pickingImage
+                            ? 'Uploading…'
+                            : 'Upload from phone'),
+                        style: TextButton.styleFrom(
+                            visualDensity: VisualDensity.compact),
                       ),
-                      icon: const Icon(Icons.photo_library_outlined, size: 18),
-                      label: const Text('Choose a sample photo'),
-                      style: TextButton.styleFrom(
-                          visualDensity: VisualDensity.compact),
-                    ),
+                      TextButton.icon(
+                        onPressed: () => _showSamplePhotos(
+                          context,
+                          imageUrl,
+                          () => setDialogState(() => pickedImage = ''),
+                        ),
+                        icon: const Icon(Icons.photo_library_outlined,
+                            size: 18),
+                        label: const Text('Choose a sample photo'),
+                        style: TextButton.styleFrom(
+                            visualDensity: VisualDensity.compact),
+                      ),
+                    ],
                   ),
                   const SizedBox(height: 6),
                   SwitchListTile.adaptive(
@@ -223,7 +251,11 @@ class _VendorMenuManagementScreenState extends State<VendorMenuManagementScreen>
                       'is_available': available,
                       'low_stock_threshold': parsedThreshold,
                       if (item == null && parsedStock != null) 'initial_stock': parsedStock,
-                      'image_url': imageUrl.text.trim().isEmpty ? null : imageUrl.text.trim(),
+                      'image_url': pickedImage.isNotEmpty
+                          ? pickedImage
+                          : (imageUrl.text.trim().isEmpty
+                              ? null
+                              : imageUrl.text.trim()),
                     };
                     if (item == null) {
                       await _api.post('/vendor/menu-items', body: body, idempotencyKey: ApiClient.newIdempotencyKey());

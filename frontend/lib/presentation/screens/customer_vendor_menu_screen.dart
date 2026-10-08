@@ -3,6 +3,7 @@ import 'package:atu_cafeteria/domain/models/models.dart';
 import 'package:atu_cafeteria/presentation/providers/cafeteria_provider.dart';
 import 'package:atu_cafeteria/presentation/providers/cart_provider.dart';
 import 'package:provider/provider.dart';
+import 'package:atu_cafeteria/presentation/widgets/food_image.dart';
 import 'package:atu_cafeteria/core/theme/app_theme.dart';
 
 /// Customer-facing restaurant menu.
@@ -458,19 +459,7 @@ class _CustomerVendorMenuScreenState extends State<CustomerVendorMenuScreen> {
       );
     }
 
-    return Image.network(
-      url,
-      fit: BoxFit.cover,
-      errorBuilder: (_, __, ___) => Container(
-        color: page,
-        alignment: Alignment.center,
-        child: const Icon(
-          Icons.restaurant_rounded,
-          color: muted,
-          size: 36,
-        ),
-      ),
-    );
+    return buildFoodImage(url, fit: BoxFit.cover);
   }
 
   String _price(FoodItem food) {

@@ -185,7 +185,7 @@ class MenuItemController extends Controller
             'description' => 'nullable|string',
             'category' => 'nullable|string|max:255',
             'is_available' => 'nullable|boolean',
-            'image_url' => 'nullable|string|max:2048',
+            'image_url' => 'nullable|string|max:3000000',
         ]);
 
         if ($validator->fails()) {

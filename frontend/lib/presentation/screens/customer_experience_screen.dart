@@ -6,6 +6,7 @@ import 'package:atu_cafeteria/domain/models/wallet_ledger_entry.dart';
 import 'package:atu_cafeteria/presentation/providers/cafeteria_provider.dart';
 import 'package:atu_cafeteria/presentation/providers/cart_provider.dart';
 import 'package:atu_cafeteria/core/theme/app_theme.dart';
+import 'package:atu_cafeteria/presentation/widgets/food_image.dart';
 
 /// Mobile-first customer experience for the ATU Cafeteria application.
 class RestaurantCustomerHomeScreen extends StatefulWidget {
@@ -1826,14 +1827,7 @@ class _RestaurantCustomerHomeScreenState
         child: const Icon(Icons.restaurant_rounded, color: navy, size: 38),
       );
     }
-    return Image.network(
-      url,
-      fit: BoxFit.cover,
-      errorBuilder: (_, __, ___) => Container(
-        color: AppTheme.blue100D,
-        child: const Icon(Icons.restaurant_rounded, color: navy, size: 38),
-      ),
-    );
+    return buildFoodImage(url, fit: BoxFit.cover);
   }
 
   Widget _panel(Widget child) {

@@ -40,7 +40,7 @@ class VendorMenuItemController extends Controller
             'is_available' => 'nullable|boolean',
             'initial_stock' => 'nullable|integer|min:0|max:1000000',
             'low_stock_threshold' => 'nullable|integer|min:0|max:1000000',
-            'image_url' => 'nullable|string|max:2048',
+            'image_url' => 'nullable|string|max:3000000',
         ]);
 
         if ($validator->fails()) {
@@ -132,7 +132,7 @@ class VendorMenuItemController extends Controller
             'category' => 'nullable|string|max:255',
             'is_available' => 'nullable|boolean',
             'low_stock_threshold' => 'nullable|integer|min:0|max:1000000',
-            'image_url' => 'nullable|string|max:2048',
+            'image_url' => 'nullable|string|max:3000000',
         ]);
 
         if ($validator->fails()) {

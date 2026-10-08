@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../domain/models/models.dart';
 import '../providers/cart_provider.dart';
+import '../widgets/food_image.dart';
 
 class FoodDetailScreen extends StatelessWidget {
   final FoodItem item;
@@ -65,21 +66,7 @@ class FoodDetailScreen extends StatelessWidget {
             borderRadius: BorderRadius.circular(wide ? 28 : 0),
             child: AspectRatio(
               aspectRatio: wide ? 1.05 : 1.25,
-              child: Image.network(
-                imageUrl,
-                fit: BoxFit.cover,
-                loadingBuilder: (_, child, progress) => progress == null
-                    ? child
-                    : Container(
-                        color: scheme.primaryContainer,
-                        child: const Center(
-                            child: CircularProgressIndicator(strokeWidth: 2))),
-                errorBuilder: (_, __, ___) => Container(
-                  color: scheme.primaryContainer,
-                  child: Icon(Icons.restaurant_rounded,
-                      size: 96, color: scheme.primary),
-                ),
-              ),
+              child: buildFoodImage(imageUrl, fit: BoxFit.cover),
             ),
           );
 
