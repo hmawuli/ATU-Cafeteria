@@ -26,6 +26,7 @@ import 'package:atu_cafeteria/presentation/screens/vendor_promotions_screen.dart
 import 'package:atu_cafeteria/presentation/screens/vendor_payout_account_screen.dart';
 import 'package:atu_cafeteria/presentation/screens/vendor_order_display_screen.dart';
 import 'package:atu_cafeteria/presentation/screens/vendor_order_workflow_screen.dart';
+import 'package:atu_cafeteria/presentation/screens/vendor_workforce_screen.dart';
 import 'package:atu_cafeteria/presentation/screens/vendor_menu_management_screen.dart';
 import 'package:atu_cafeteria/presentation/screens/vendor_inventory_screen.dart';
 import 'package:atu_cafeteria/presentation/screens/kfc_ordering_screen.dart';
@@ -120,6 +121,7 @@ class ATUCafeteriaApp extends StatelessWidget {
           '/vendor-finance': (_) => const VendorFinanceScreen(),
           '/vendor-promotions': (_) => const VendorPromotionsScreen(),
           '/vendor-payout-account': (_) => const VendorPayoutAccountScreen(),
+          '/vendor-workers': (_) => const VendorWorkforceScreen(),
           '/vendor-legacy-dashboard': (_) => const VendorDashboardScreen(),
           '/admin': (_) => const ReferenceAdminScreen(),
           '/reset-password': (_) => const PasswordResetScreen(),

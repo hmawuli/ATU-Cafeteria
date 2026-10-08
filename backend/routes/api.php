@@ -31,6 +31,7 @@ use App\Http\Controllers\Api\VendorMetricsController;
 use App\Http\Controllers\Api\VendorPayoutAccountController;
 use App\Http\Controllers\Api\VendorPerformanceController;
 use App\Http\Controllers\Api\VendorPromotionController;
+use App\Http\Controllers\Api\VendorWorkerController;
 use App\Http\Controllers\Api\WalletController;
 use App\Http\Middleware\InactivityTimeout;
 use App\Listeners\SendOrderCompletedNotification;
@@ -180,6 +181,14 @@ Route::middleware(['auth:sanctum', InactivityTimeout::class])->group(function ()
         Route::put('/vendor/menu-items/{id}', [VendorMenuItemController::class, 'update']);
         Route::delete('/vendor/menu-items/{id}', [VendorMenuItemController::class, 'destroy']);
         Route::get('/vendor/menu-items', [VendorMenuItemController::class, 'index']);
+        // Vendor workforce: supervisors employ workers, schedule shifts and
+        // keep a worker-finance ledger.
+        Route::get('/vendor/workers', [VendorWorkerController::class, 'index']);
+        Route::post('/vendor/workers', [VendorWorkerController::class, 'store']);
+        Route::get('/vendor/workers/{id}/finance', [VendorWorkerController::class, 'finance']);
+        Route::post('/vendor/workers/{id}/payments', [VendorWorkerController::class, 'storePayment']);
+        Route::put('/vendor/workers/{id}', [VendorWorkerController::class, 'update']);
+        Route::delete('/vendor/workers/{id}', [VendorWorkerController::class, 'destroy']);
         Route::get('/vendor/metrics', [VendorMetricsController::class, 'index']);
         Route::get('/vendor/performance', [VendorPerformanceController::class, 'index']);
         Route::get('/vendor/performance-metrics', [VendorPerformanceController::class, 'getVendorPerformanceMetrics']);

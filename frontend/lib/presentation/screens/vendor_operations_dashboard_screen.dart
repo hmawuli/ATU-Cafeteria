@@ -302,6 +302,7 @@ class _VendorOperationsDashboardScreenState extends State<VendorOperationsDashbo
           _action('Finance', Icons.account_balance_wallet_outlined, () => _go('/vendor-finance')),
           _action('Promotions', Icons.local_offer_outlined, () => _go('/vendor-promotions')),
           _action('Payout Account', Icons.payments_outlined, () => _go('/vendor-payout-account')),
+          _action('Workforce', Icons.groups_2_outlined, () => _go('/vendor-workers')),
         ],
       );
 
