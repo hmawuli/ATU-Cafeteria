@@ -40,6 +40,7 @@ class VendorMenuItemController extends Controller
             'is_available' => 'nullable|boolean',
             'initial_stock' => 'nullable|integer|min:0|max:1000000',
             'low_stock_threshold' => 'nullable|integer|min:0|max:1000000',
+            'image_url' => 'nullable|string|max:2048',
         ]);
 
         if ($validator->fails()) {
@@ -62,6 +63,7 @@ class VendorMenuItemController extends Controller
                 'initial_stock' => $initialStock,
                 'current_stock' => $initialStock,
                 'low_stock_threshold' => $threshold,
+                'image_url' => $request->input('image_url'),
             ]);
 
             if ($initialStock !== null && $initialStock > 0) {
@@ -130,6 +132,7 @@ class VendorMenuItemController extends Controller
             'category' => 'nullable|string|max:255',
             'is_available' => 'nullable|boolean',
             'low_stock_threshold' => 'nullable|integer|min:0|max:1000000',
+            'image_url' => 'nullable|string|max:2048',
         ]);
 
         if ($validator->fails()) {
@@ -146,6 +149,7 @@ class VendorMenuItemController extends Controller
                 'category' => $request->has('category') ? ($request->input('category') ?: 'General') : $item->category,
                 'is_available' => $request->has('is_available') ? $request->input('is_available') : $item->is_available,
                 'low_stock_threshold' => $request->has('low_stock_threshold') ? $request->input('low_stock_threshold') : $item->low_stock_threshold,
+                'image_url' => $request->has('image_url') ? $request->input('image_url') : $item->image_url,
             ]);
 
             AuditLog::create([
