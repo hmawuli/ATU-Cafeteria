@@ -23,6 +23,20 @@ command -v docker >/dev/null 2>&1 || fail "docker not installed."
 docker compose version >/dev/null 2>&1 || fail "Docker Compose plugin missing (install 'docker-compose-plugin')."
 [ -f backend/.env ] || fail "backend/.env missing — cp backend/.env.example backend/.env and set secrets."
 
+# Docker Compose variable interpolation happens before `env_file` is read.
+# Export the backend values so the PostgreSQL service and Laravel agree.
+set -a
+# shellcheck disable=SC1091
+. backend/.env
+set +a
+
+required_env=(APP_KEY DB_DATABASE DB_USERNAME DB_PASSWORD PAYSTACK_SECRET_KEY CORS_ALLOWED_ORIGINS)
+for key in "${required_env[@]}"; do
+  [ -n "${!key:-}" ] || fail "${key} must be set in backend/.env."
+done
+[ "${APP_DEBUG:-false}" = "false" ] || fail "APP_DEBUG must be false for a production deploy."
+[ "${DB_PASSWORD}" != "atu_secret" ] || fail "DB_PASSWORD must not use the example value."
+
 port() { grep -E "^APP_PORT=" backend/.env | head -1 | cut -d= -f2- | tr -d ' "'; }
 APP_PORT="${APP_PORT:-$(port)}"
 BASE_URL="${1:-http://127.0.0.1:${APP_PORT:-8000}}"
@@ -53,7 +67,9 @@ log "Security gate (no admins on known dev PINs / 2FA missing)…"
 docker compose exec -T app php artisan security:audit --fail-on-critical
 
 log "Backup check…"
-scripts/db_backup.sh
+BACKUP_PATH="backups/atu_cafeteria_deploy_$(date +%F_%H%M).sql.gz"
+scripts/db_backup.sh "$BACKUP_PATH"
+scripts/verify_backup.sh "$BACKUP_PATH"
 
 echo
 echo "✅ Deployed and healthy at ${BASE_URL}"

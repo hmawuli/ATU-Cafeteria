@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:atu_cafeteria/core/export_csv.dart';
 import 'package:atu_cafeteria/core/network/api_client.dart';
 import 'package:atu_cafeteria/core/theme/app_theme.dart';
 
@@ -64,6 +65,11 @@ class _VendorWorkforceScreenState extends State<VendorWorkforceScreen> {
             onPressed: _addOrEdit,
             icon: const Icon(Icons.person_add_alt_1),
             label: const Text('Employ'),
+          ),
+          TextButton.icon(
+            onPressed: _exportCsv,
+            icon: const Icon(Icons.file_download_outlined),
+            label: const Text('Export'),
           ),
           const SizedBox(width: 8),
         ],
@@ -232,6 +238,21 @@ class _VendorWorkforceScreenState extends State<VendorWorkforceScreen> {
   double _amount(dynamic value) => value is num
       ? value.toDouble()
       : double.tryParse(value?.toString() ?? '') ?? 0;
+
+  Future<void> _exportCsv() async {
+    try {
+      final csv = await _api.requestText('vendor/workers/export.csv');
+      final path = await saveCsvFile(
+        'workers-${DateTime.now().millisecondsSinceEpoch}.csv',
+        csv,
+      );
+      _show('Workforce CSV saved to:\n$path');
+    } on ApiException catch (e) {
+      _show(e.message);
+    } catch (_) {
+      _show('Could not export the workforce.');
+    }
+  }
 
   Future<void> _addOrEdit([Map<String, dynamic>? worker]) async {
     final saved = await _editor(worker);

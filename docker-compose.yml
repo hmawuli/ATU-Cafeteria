@@ -105,15 +105,15 @@ services:
     image: postgres:16-alpine
     restart: unless-stopped
     environment:
-      POSTGRES_DB: ${DB_DATABASE:-atu_cafeteria}
-      POSTGRES_USER: ${DB_USERNAME:-atu}
-      POSTGRES_PASSWORD: ${DB_PASSWORD:-atu_secret}
+      POSTGRES_DB: ${DB_DATABASE:?Set DB_DATABASE in backend/.env}
+      POSTGRES_USER: ${DB_USERNAME:?Set DB_USERNAME in backend/.env}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:?Set DB_PASSWORD in backend/.env}
     volumes:
       - db_data:/var/lib/postgresql/data
     networks:
       - atu
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${DB_USERNAME:-atu} -d ${DB_DATABASE:-atu_cafeteria}"]
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USERNAME:?Set DB_USERNAME in backend/.env} -d ${DB_DATABASE:?Set DB_DATABASE in backend/.env}"]
       interval: 5s
       timeout: 5s
       retries: 20

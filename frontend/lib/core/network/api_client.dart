@@ -227,6 +227,46 @@ class ApiClient {
   }
 
   Future<dynamic> get(String path) => request('GET', path);
+
+  /// Fetch a raw (non-JSON) GET response body — used for CSV downloads.
+  Future<String> requestText(String path, {String? token}) async {
+    // Mirror request(): fall back to the token stored in secure storage.
+    String? storedToken;
+    try {
+      storedToken = await _storage.read(key: _tokenKey);
+    } catch (_) {
+      storedToken = null;
+    }
+    final finalToken = token ??
+        ((storedToken != null && storedToken.isNotEmpty)
+            ? storedToken
+            : this.token);
+
+    final uri = Uri.parse(
+        '${ServerConfig.baseUrl}/api/${path.replaceFirst(RegExp(r'^/'), '')}');
+
+    if (kReleaseMode && uri.scheme != 'https') {
+      throw const ApiException(
+        0,
+        'Production builds require a secure HTTPS API endpoint.',
+      );
+    }
+
+    final headers = <String, String>{
+      'Accept': 'text/csv, application/json',
+    };
+    if (finalToken != null && finalToken.isNotEmpty) {
+      headers['Authorization'] = 'Bearer $finalToken';
+    }
+
+    final response = await _send('GET', uri, headers, null);
+    if (response.statusCode < 200 || response.statusCode >= 300) {
+      throw ApiException(
+          response.statusCode, 'The download could not be generated.');
+    }
+
+    return response.body;
+  }
   Future<dynamic> post(String path,
           {Map<String, dynamic>? body, String? idempotencyKey}) =>
       request('POST', path, body: body, idempotencyKey: idempotencyKey);

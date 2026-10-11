@@ -4,6 +4,7 @@ namespace Tests\Feature;
 
 use App\Models\MenuItem;
 use App\Models\Order;
+use App\Models\OrderItem;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Laravel\Sanctum\Sanctum;
@@ -114,13 +115,28 @@ class VendorOrderConfidentialityTest extends TestCase
 
         Sanctum::actingAs($this->vendor, ['*']);
 
-        $this->get('/api/vendor/orders/export.csv')
-            ->assertOk()
+        // The confidential order must have an item so its name appears in the CSV.
+        OrderItem::create([
+            'order_id' => $this->order->id,
+            'menu_item_id' => $this->order->menu_item_id,
+            'name' => 'Confidential Waakye',
+            'name_snapshot' => 'Confidential Waakye',
+            'quantity' => 1,
+            'unit_price' => 20.00,
+            'total_price' => 20.00,
+            'line_total' => 20.00,
+        ]);
+
+        $export = $this->get('/api/vendor/orders/export.csv');
+        $export->assertOk()
             ->assertHeader('Content-Type', 'text/csv; charset=UTF-8')
-            ->assertHeader('Content-Disposition', fn ($value) => str_contains($value, 'attachment; filename="orders-'))
             ->assertSee('ATU Cafeteria — vendor orders export', false)
             ->assertSee('Confidential Waakye', false)
             ->assertDontSee('Private Jollof', false);
+        $this->assertStringContainsString(
+            'attachment; filename="orders-',
+            (string) $export->headers->get('Content-Disposition')
+        );
     }
 
     public function test_vendor_status_update_never_exposes_pickup_pin(): void
@@ -143,10 +159,10 @@ class VendorOrderConfidentialityTest extends TestCase
             'balance' => 0.00,
         ]);
 
-        Sanctum::actingAs($unrelatedStudent, ['*']);
+        $this->actingWithToken($unrelatedStudent);
 
         $this->getJson("/api/orders/{$this->order->id}/tracking")
-            ->assertForbidden();
+            ->assertNotFound();
     }
 
     public function test_vendor_pickup_completion_never_exposes_pickup_pin(): void

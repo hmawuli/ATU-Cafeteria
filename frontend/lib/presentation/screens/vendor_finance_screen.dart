@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import '../../core/export_csv.dart';
 import '../../core/network/api_client.dart';
 import '../../core/theme/app_theme.dart';
 import '../widgets/reference_design.dart';
@@ -117,6 +118,30 @@ class _VendorFinanceScreenState extends State<VendorFinanceScreen> {
     );
   }
 
+  Future<void> _exportOrders() async {
+    try {
+      final csv = await context
+          .read<ApiClient>()
+          .requestText('vendor/orders/export.csv');
+      final path = await saveCsvFile(
+          'orders-${DateTime.now().millisecondsSinceEpoch}.csv', csv);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Orders CSV saved to:\n$path')));
+      }
+    } on ApiException catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text(e.message)));
+      }
+    } catch (_) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Could not export orders.')));
+      }
+    }
+  }
+
   Widget _header() => LayoutBuilder(
         builder: (context, constraints) {
           final filters = Wrap(
@@ -137,6 +162,11 @@ class _VendorFinanceScreenState extends State<VendorFinanceScreen> {
                 tooltip: 'Refresh',
                 onPressed: _loading ? null : _load,
                 icon: const Icon(Icons.refresh),
+              ),
+              IconButton(
+                tooltip: 'Export orders (CSV)',
+                onPressed: _exportOrders,
+                icon: const Icon(Icons.file_download_outlined),
               ),
             ],
           );

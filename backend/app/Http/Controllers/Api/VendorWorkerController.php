@@ -242,6 +242,15 @@ class VendorWorkerController extends Controller
         ]], 201);
     }
 
+    private function csvResponse(string $name, string $csv)
+    {
+        return response($csv, 200, [
+            'Content-Type' => 'text/csv; charset=UTF-8',
+            'Content-Disposition' => 'attachment; filename="'.$name.'-'.now()->format('Ymd-His').'.csv"',
+            'Cache-Control' => 'no-store',
+        ]);
+    }
+
     private function requireVendor(Request $request)
     {
         $user = $request->user();

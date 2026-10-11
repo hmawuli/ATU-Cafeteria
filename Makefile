@@ -14,7 +14,7 @@ FLUTTER ?= $(shell scripts/flutter.sh)
 
 .DEFAULT_GOAL := help
 
-.PHONY: help setup hooks backend-deps frontend-deps migrate seed-dev serve connect analyze lint test format check deploy-web
+.PHONY: help setup hooks backend-deps frontend-deps migrate seed-dev serve connect analyze lint test format check security backup-verify restore-drill deploy-web
 
 help: ## Show this help
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "  \033[36m%-14s\033[0m %s\n", $$1, $$2}'
@@ -98,6 +98,19 @@ load: ## Load test (default: /api/health, 20 concurrent, 200 requests)
 
 contract: ## Verify every frontend API call has a matching backend route
 	scripts/check_api_contract.sh
+
+security: ## Audit backend dependencies and run API contract validation
+	cd backend && composer audit --no-interaction
+	scripts/check_api_contract.sh
+
+backup-verify: ## Validate BACKUP=backups/file.sql.gz without changing a database
+	@test -n "$(BACKUP)" || (echo "Set BACKUP=backups/file.sql.gz"; exit 2)
+	scripts/verify_backup.sh "$(BACKUP)"
+
+restore-drill: ## Restore BACKUP into explicit DB_RESTORE_DRILL_DATABASE only
+	@test -n "$(BACKUP)" || (echo "Set BACKUP=backups/file.sql.gz"; exit 2)
+	@test -n "$(DB_RESTORE_DRILL_DATABASE)" || (echo "Set DB_RESTORE_DRILL_DATABASE"; exit 2)
+	DB_RESTORE_DRILL_DATABASE="$(DB_RESTORE_DRILL_DATABASE)" scripts/db_restore_drill.sh "$(BACKUP)"
 
 deploy: ## One-command Docker Compose deploy on a Docker host (sets APP_ENV)
 	scripts/deploy_docker.sh

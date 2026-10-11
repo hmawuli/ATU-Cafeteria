@@ -55,8 +55,11 @@ To bound disk usage, set log rotation on the daemon (e.g.
   SELECT count(*) FROM failed_jobs WHERE failed_at > now() - interval '1 hour';
   ```
 - Watch disk, memory and PostgreSQL connection count on the host.
-- Send a daily `pg_dump` to another machine: `make db-backup` (Docker stack
-  or local). Restore drill at least monthly.
+- Send a daily `pg_dump` to encrypted off-host storage: `make db-backup`
+  (Docker stack or local). Validate each archive with
+  `make backup-verify BACKUP=backups/<file>.sql.gz`, then run a monthly restore
+  drill only against a dedicated non-production database:
+  `make restore-drill BACKUP=backups/<file>.sql.gz DB_RESTORE_DRILL_DATABASE=atu_restore_drill`.
 
 ## Flutter crash reporting
 

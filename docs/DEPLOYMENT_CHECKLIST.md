@@ -39,6 +39,10 @@ export APP_ENV=production
 bash scripts/deploy_docker.sh             # build → up → healthcheck → migrate → smoke → security:audit → backup
 ```
 
+`deploy_docker.sh` exports `backend/.env` for Docker Compose so the PostgreSQL
+container receives the same `DB_*` credentials as Laravel. It refuses empty
+secrets, `APP_DEBUG=true`, and the example database password.
+
 ### No Docker host? Stand it up directly
 ```bash
 make deploy-local                        # ensure db → migrate → seed (local) → serve → smoke
