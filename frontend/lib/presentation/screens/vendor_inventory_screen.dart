@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import 'package:atu_cafeteria/core/network/api_client.dart';
 
 /// Production inventory workspace backed by the vendor inventory APIs.
@@ -10,8 +11,8 @@ class VendorInventoryScreen extends StatefulWidget {
 }
 
 class _VendorInventoryScreenState extends State<VendorInventoryScreen> {
-  final _api = ApiClient();
   final _search = TextEditingController();
+  late final ApiClient _api;
   bool _loading = true;
   bool _adjusting = false;
   String? _error;
@@ -21,13 +22,13 @@ class _VendorInventoryScreenState extends State<VendorInventoryScreen> {
   @override
   void initState() {
     super.initState();
+    _api = context.read<ApiClient>();
     _load();
   }
 
   @override
   void dispose() {
     _search.dispose();
-    _api.close();
     super.dispose();
   }
 
@@ -47,7 +48,8 @@ class _VendorInventoryScreenState extends State<VendorInventoryScreen> {
       if (!mounted) return;
       setState(() {
         _summary = summary;
-        _items = rawItems.whereType<Map>().map(Map<String, dynamic>.from).toList();
+        _items =
+            rawItems.whereType<Map>().map(Map<String, dynamic>.from).toList();
         _loading = false;
       });
     } on ApiException catch (e) {
@@ -59,7 +61,8 @@ class _VendorInventoryScreenState extends State<VendorInventoryScreen> {
     } catch (_) {
       if (!mounted) return;
       setState(() {
-        _error = 'Unable to load inventory information. Check your connection and try again.';
+        _error =
+            'Unable to load inventory information. Check your connection and try again.';
         _loading = false;
       });
     }
@@ -102,18 +105,21 @@ class _VendorInventoryScreenState extends State<VendorInventoryScreen> {
                   const SizedBox(height: 14),
                   TextField(
                     controller: quantity,
-                    keyboardType: const TextInputType.numberWithOptions(signed: true),
+                    keyboardType:
+                        const TextInputType.numberWithOptions(signed: true),
                     decoration: const InputDecoration(
                       labelText: 'Quantity adjustment',
                       hintText: 'e.g. 10 or -2',
-                      helperText: 'Positive adds stock; negative removes stock.',
+                      helperText:
+                          'Positive adds stock; negative removes stock.',
                     ),
                   ),
                   const SizedBox(height: 10),
                   TextField(
                     controller: reason,
                     maxLength: 255,
-                    decoration: const InputDecoration(labelText: 'Reason (optional)'),
+                    decoration:
+                        const InputDecoration(labelText: 'Reason (optional)'),
                   ),
                   if (error != null) ...[
                     const SizedBox(height: 6),
@@ -121,7 +127,8 @@ class _VendorInventoryScreenState extends State<VendorInventoryScreen> {
                       alignment: Alignment.centerLeft,
                       child: Text(
                         error!,
-                        style: TextStyle(color: Theme.of(dialogContext).colorScheme.error),
+                        style: TextStyle(
+                            color: Theme.of(dialogContext).colorScheme.error),
                       ),
                     ),
                   ],
@@ -137,7 +144,8 @@ class _VendorInventoryScreenState extends State<VendorInventoryScreen> {
                 onPressed: () {
                   final value = int.tryParse(quantity.text.trim());
                   if (value == null || value == 0) {
-                    setDialogState(() => error = 'Enter a non-zero whole number.');
+                    setDialogState(
+                        () => error = 'Enter a non-zero whole number.');
                     return;
                   }
                   Navigator.pop(dialogContext, true);
@@ -181,7 +189,8 @@ class _VendorInventoryScreenState extends State<VendorInventoryScreen> {
 
   void _show(String message) {
     if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message)));
+    ScaffoldMessenger.of(context)
+        .showSnackBar(SnackBar(content: Text(message)));
   }
 
   @override
@@ -219,16 +228,30 @@ class _VendorInventoryScreenState extends State<VendorInventoryScreen> {
                           padding: const EdgeInsets.all(16),
                           child: Row(
                             children: [
-                              Expanded(child: _Metric(label: 'Total', value: '${_number('total_items')}')),
-                              Expanded(child: _Metric(label: 'Tracked', value: '${_number('tracked_items')}')),
-                              Expanded(child: _Metric(label: 'Low Stock', value: '${_number('low_stock')}')),
-                              Expanded(child: _Metric(label: 'Out', value: '${_number('out_of_stock')}')),
+                              Expanded(
+                                  child: _Metric(
+                                      label: 'Total',
+                                      value: '${_number('total_items')}')),
+                              Expanded(
+                                  child: _Metric(
+                                      label: 'Tracked',
+                                      value: '${_number('tracked_items')}')),
+                              Expanded(
+                                  child: _Metric(
+                                      label: 'Low Stock',
+                                      value: '${_number('low_stock')}')),
+                              Expanded(
+                                  child: _Metric(
+                                      label: 'Out',
+                                      value: '${_number('out_of_stock')}')),
                             ],
                           ),
                         ),
                       ),
                       const SizedBox(height: 18),
-                      const Text('Stock & Availability', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w900)),
+                      const Text('Stock & Availability',
+                          style: TextStyle(
+                              fontSize: 18, fontWeight: FontWeight.w900)),
                       const SizedBox(height: 10),
                       TextField(
                         controller: _search,
@@ -252,7 +275,9 @@ class _VendorInventoryScreenState extends State<VendorInventoryScreen> {
                         const Card(
                           child: Padding(
                             padding: EdgeInsets.all(24),
-                            child: Center(child: Text('No inventory records match your search.')),
+                            child: Center(
+                                child: Text(
+                                    'No inventory records match your search.')),
                           ),
                         )
                       else
@@ -260,12 +285,14 @@ class _VendorInventoryScreenState extends State<VendorInventoryScreen> {
                           final status = '${item['status'] ?? 'UNTRACKED'}';
                           final stock = item['stock'];
                           final threshold = item['threshold'];
-                          final available = item['available'] == true || item['available'] == 1;
+                          final available = item['available'] == true ||
+                              item['available'] == 1;
                           final tracked = stock != null;
                           return Card(
                             margin: const EdgeInsets.only(bottom: 10),
                             child: ListTile(
-                              contentPadding: const EdgeInsets.fromLTRB(14, 8, 8, 8),
+                              contentPadding:
+                                  const EdgeInsets.fromLTRB(14, 8, 8, 8),
                               leading: CircleAvatar(
                                 child: Icon(
                                   status == 'OUT_OF_STOCK'
@@ -275,7 +302,8 @@ class _VendorInventoryScreenState extends State<VendorInventoryScreen> {
                               ),
                               title: Text(
                                 '${item['name'] ?? 'Item'}',
-                                style: const TextStyle(fontWeight: FontWeight.w800),
+                                style: const TextStyle(
+                                    fontWeight: FontWeight.w800),
                               ),
                               subtitle: Text(
                                 tracked
@@ -285,12 +313,15 @@ class _VendorInventoryScreenState extends State<VendorInventoryScreen> {
                               trailing: tracked
                                   ? IconButton(
                                       tooltip: 'Adjust stock',
-                                      onPressed: _adjusting ? null : () => _adjustStock(item),
+                                      onPressed: _adjusting
+                                          ? null
+                                          : () => _adjustStock(item),
                                       icon: const Icon(Icons.tune_outlined),
                                     )
                                   : Text(
                                       available ? 'Available' : 'Unavailable',
-                                      style: Theme.of(context).textTheme.bodySmall,
+                                      style:
+                                          Theme.of(context).textTheme.bodySmall,
                                     ),
                               onTap: tracked ? () => _adjustStock(item) : null,
                             ),
@@ -316,9 +347,13 @@ class _Metric extends StatelessWidget {
   @override
   Widget build(BuildContext context) => Column(
         children: [
-          Text(value, style: const TextStyle(fontSize: 21, fontWeight: FontWeight.w900)),
+          Text(value,
+              style:
+                  const TextStyle(fontSize: 21, fontWeight: FontWeight.w900)),
           const SizedBox(height: 3),
-          Text(label, textAlign: TextAlign.center, style: Theme.of(context).textTheme.bodySmall),
+          Text(label,
+              textAlign: TextAlign.center,
+              style: Theme.of(context).textTheme.bodySmall),
         ],
       );
 }
@@ -339,7 +374,10 @@ class _ErrorState extends StatelessWidget {
               const SizedBox(height: 12),
               Text(message, textAlign: TextAlign.center),
               const SizedBox(height: 16),
-              FilledButton.icon(onPressed: onRetry, icon: const Icon(Icons.refresh), label: const Text('Retry')),
+              FilledButton.icon(
+                  onPressed: onRetry,
+                  icon: const Icon(Icons.refresh),
+                  label: const Text('Retry')),
             ],
           ),
         ),
@@ -356,7 +394,8 @@ class _MessageCard extends StatelessWidget {
         child: ListTile(
           leading: const Icon(Icons.warning_amber_rounded),
           title: Text(message),
-          trailing: IconButton(onPressed: onRetry, icon: const Icon(Icons.refresh)),
+          trailing:
+              IconButton(onPressed: onRetry, icon: const Icon(Icons.refresh)),
         ),
       );
 }

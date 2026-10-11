@@ -82,7 +82,10 @@ class ATUCafeteriaApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return MultiProvider(
       providers: [
-        Provider<ApiClient>(create: (_) => ApiClient()),
+        Provider<ApiClient>(
+          create: (_) => ApiClient(),
+          dispose: (_, client) => client.close(),
+        ),
         ChangeNotifierProvider(
           create: (ctx) => CafeteriaProvider(apiClient: ctx.read<ApiClient>()),
         ),
@@ -139,13 +142,15 @@ class ATUCafeteriaApp extends StatelessWidget {
             final vendor = ModalRoute.of(context)?.settings.arguments;
             return vendor is User
                 ? CustomerVendorMenuScreen(vendor: vendor)
-                : const Scaffold(body: Center(child: Text('Invalid restaurant.')));
+                : const Scaffold(
+                    body: Center(child: Text('Invalid restaurant.')));
           },
           '/food-detail': (context) {
             final item = ModalRoute.of(context)?.settings.arguments;
             return item is FoodItem
                 ? FoodDetailScreen(item: item)
-                : const Scaffold(body: Center(child: Text('Invalid food item.')));
+                : const Scaffold(
+                    body: Center(child: Text('Invalid food item.')));
           },
           '/order-tracking': (context) {
             final id = ModalRoute.of(context)?.settings.arguments;

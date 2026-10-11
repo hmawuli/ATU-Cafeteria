@@ -88,6 +88,41 @@ class VendorOrderConfidentialityTest extends TestCase
             ->assertJsonMissingPath('0.pickupPin');
     }
 
+    public function test_vendor_order_export_downloads_only_their_orders_as_csv(): void
+    {
+        $otherVendor = User::create([
+            'username' => 'othervendor',
+            'password' => hash('sha256', '1111'),
+            'role' => 'VENDOR',
+            'fullName' => 'Other Vendor',
+            'info' => 'Other Kitchen',
+            'balance' => 0.00,
+            'is_open' => true,
+        ]);
+
+        Order::create([
+            'customer_id' => $this->student->id,
+            'vendor_id' => $otherVendor->id,
+            'food_name' => 'Private Jollof',
+            'quantity' => 1,
+            'unit_price' => 10.00,
+            'total_price' => 10.00,
+            'order_timestamp' => time() * 1000,
+            'status' => 'ORDER_PLACED',
+            'pickup_pin' => '1111',
+        ]);
+
+        Sanctum::actingAs($this->vendor, ['*']);
+
+        $this->get('/api/vendor/orders/export.csv')
+            ->assertOk()
+            ->assertHeader('Content-Type', 'text/csv; charset=UTF-8')
+            ->assertHeader('Content-Disposition', fn ($value) => str_contains($value, 'attachment; filename="orders-'))
+            ->assertSee('ATU Cafeteria — vendor orders export', false)
+            ->assertSee('Confidential Waakye', false)
+            ->assertDontSee('Private Jollof', false);
+    }
+
     public function test_vendor_status_update_never_exposes_pickup_pin(): void
     {
         $this->actingWithToken($this->vendor);
@@ -95,6 +130,23 @@ class VendorOrderConfidentialityTest extends TestCase
         $this->putJson("/api/orders/{$this->order->id}/status", ['status' => 'PREPARING'])
             ->assertOk()
             ->assertJsonMissingPath('pickup_pin');
+    }
+
+    public function test_unrelated_user_cannot_track_another_customers_order(): void
+    {
+        $unrelatedStudent = User::create([
+            'username' => 'unrelatedstudent',
+            'password' => hash('sha256', '2222'),
+            'role' => 'STUDENT',
+            'fullName' => 'Unrelated Student',
+            'info' => 'ATU-2026-U01',
+            'balance' => 0.00,
+        ]);
+
+        Sanctum::actingAs($unrelatedStudent, ['*']);
+
+        $this->getJson("/api/orders/{$this->order->id}/tracking")
+            ->assertForbidden();
     }
 
     public function test_vendor_pickup_completion_never_exposes_pickup_pin(): void

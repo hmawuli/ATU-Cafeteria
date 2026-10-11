@@ -2,6 +2,7 @@ import 'dart:convert';
 
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:provider/provider.dart';
 import 'package:atu_cafeteria/core/network/api_client.dart';
 import '../widgets/food_image.dart';
 
@@ -10,12 +11,14 @@ class VendorMenuManagementScreen extends StatefulWidget {
   const VendorMenuManagementScreen({super.key});
 
   @override
-  State<VendorMenuManagementScreen> createState() => _VendorMenuManagementScreenState();
+  State<VendorMenuManagementScreen> createState() =>
+      _VendorMenuManagementScreenState();
 }
 
-class _VendorMenuManagementScreenState extends State<VendorMenuManagementScreen> {
-  final _api = ApiClient();
+class _VendorMenuManagementScreenState
+    extends State<VendorMenuManagementScreen> {
   final _search = TextEditingController();
+  late final ApiClient _api;
   List<Map<String, dynamic>> _items = [];
   bool _loading = true;
   String? _error;
@@ -23,13 +26,13 @@ class _VendorMenuManagementScreenState extends State<VendorMenuManagementScreen>
   @override
   void initState() {
     super.initState();
+    _api = context.read<ApiClient>();
     _load();
   }
 
   @override
   void dispose() {
     _search.dispose();
-    _api.close();
     super.dispose();
   }
 
@@ -56,7 +59,8 @@ class _VendorMenuManagementScreenState extends State<VendorMenuManagementScreen>
     } catch (_) {
       if (!mounted) return;
       setState(() {
-        _error = 'Unable to load the restaurant menu. Check your connection and try again.';
+        _error =
+            'Unable to load the restaurant menu. Check your connection and try again.';
         _loading = false;
       });
     }
@@ -73,14 +77,22 @@ class _VendorMenuManagementScreenState extends State<VendorMenuManagementScreen>
   }
 
   Future<void> _save({Map<String, dynamic>? item}) async {
-    final name = TextEditingController(text: '${item?['name'] ?? item?['food_name'] ?? ''}');
-    final price = TextEditingController(text: item == null ? '' : '${item['price'] ?? ''}');
-    final description = TextEditingController(text: '${item?['description'] ?? ''}');
-    final category = TextEditingController(text: '${item?['category'] ?? 'General'}');
-    final stock = TextEditingController(text: item == null ? '' : '${item['current_stock'] ?? ''}');
-    final threshold = TextEditingController(text: item == null ? '3' : '${item['low_stock_threshold'] ?? 3}');
+    final name = TextEditingController(
+        text: '${item?['name'] ?? item?['food_name'] ?? ''}');
+    final price = TextEditingController(
+        text: item == null ? '' : '${item['price'] ?? ''}');
+    final description =
+        TextEditingController(text: '${item?['description'] ?? ''}');
+    final category =
+        TextEditingController(text: '${item?['category'] ?? 'General'}');
+    final stock = TextEditingController(
+        text: item == null ? '' : '${item['current_stock'] ?? ''}');
+    final threshold = TextEditingController(
+        text: item == null ? '3' : '${item['low_stock_threshold'] ?? 3}');
     final imageUrl = TextEditingController(text: '${item?['image_url'] ?? ''}');
-    bool available = item == null ? true : item['is_available'] != false && item['is_available'] != 0;
+    bool available = item == null
+        ? true
+        : item['is_available'] != false && item['is_available'] != 0;
     String pickedImage = '';
     bool pickingImage = false;
     String? error;
@@ -95,28 +107,47 @@ class _VendorMenuManagementScreenState extends State<VendorMenuManagementScreen>
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  TextField(controller: name, decoration: const InputDecoration(labelText: 'Menu item name')),
+                  TextField(
+                      controller: name,
+                      decoration:
+                          const InputDecoration(labelText: 'Menu item name')),
                   const SizedBox(height: 10),
-                  TextField(controller: price, keyboardType: const TextInputType.numberWithOptions(decimal: true), decoration: const InputDecoration(labelText: 'Price (GH₵)')),
+                  TextField(
+                      controller: price,
+                      keyboardType:
+                          const TextInputType.numberWithOptions(decimal: true),
+                      decoration:
+                          const InputDecoration(labelText: 'Price (GH₵)')),
                   const SizedBox(height: 10),
-                  TextField(controller: category, decoration: const InputDecoration(labelText: 'Category')),
+                  TextField(
+                      controller: category,
+                      decoration: const InputDecoration(labelText: 'Category')),
                   const SizedBox(height: 10),
-                  TextField(controller: description, maxLines: 3, decoration: const InputDecoration(labelText: 'Description')),
+                  TextField(
+                      controller: description,
+                      maxLines: 3,
+                      decoration:
+                          const InputDecoration(labelText: 'Description')),
                   const SizedBox(height: 10),
                   TextField(
                     controller: stock,
                     keyboardType: TextInputType.number,
                     enabled: item == null,
                     decoration: InputDecoration(
-                      labelText: item == null ? 'Opening stock (optional)' : 'Current stock',
-                      helperText: item == null ? 'Leave blank to keep stock untracked.' : 'Use Inventory to adjust current stock.',
+                      labelText: item == null
+                          ? 'Opening stock (optional)'
+                          : 'Current stock',
+                      helperText: item == null
+                          ? 'Leave blank to keep stock untracked.'
+                          : 'Use Inventory to adjust current stock.',
                     ),
                   ),
                   const SizedBox(height: 10),
                   TextField(
                     controller: threshold,
                     keyboardType: TextInputType.number,
-                    decoration: const InputDecoration(labelText: 'Low-stock threshold'),
+                    decoration:
+                        const InputDecoration(labelText: 'Low-stock threshold'),
                   ),
                   const SizedBox(height: 14),
                   Align(
@@ -136,10 +167,9 @@ class _VendorMenuManagementScreenState extends State<VendorMenuManagementScreen>
                         child: SizedBox(
                           width: 78,
                           height: 60,
-                          child: buildFoodImage(
-                              pickedImage.isNotEmpty
-                                  ? pickedImage
-                                  : imageUrl.text.trim()),
+                          child: buildFoodImage(pickedImage.isNotEmpty
+                              ? pickedImage
+                              : imageUrl.text.trim()),
                         ),
                       ),
                       const SizedBox(width: 12),
@@ -180,8 +210,7 @@ class _VendorMenuManagementScreenState extends State<VendorMenuManagementScreen>
                                       pickingImage = false;
                                     });
                                   } else {
-                                    setDialogState(
-                                        () => pickingImage = false);
+                                    setDialogState(() => pickingImage = false);
                                   }
                                 } catch (_) {
                                   setDialogState(() => pickingImage = false);
@@ -191,12 +220,12 @@ class _VendorMenuManagementScreenState extends State<VendorMenuManagementScreen>
                             ? const SizedBox(
                                 width: 14,
                                 height: 14,
-                                child: CircularProgressIndicator(strokeWidth: 2),
+                                child:
+                                    CircularProgressIndicator(strokeWidth: 2),
                               )
                             : const Icon(Icons.upload_outlined, size: 18),
-                        label: Text(pickingImage
-                            ? 'Uploading…'
-                            : 'Upload from phone'),
+                        label: Text(
+                            pickingImage ? 'Uploading…' : 'Upload from phone'),
                         style: TextButton.styleFrom(
                             visualDensity: VisualDensity.compact),
                       ),
@@ -206,8 +235,8 @@ class _VendorMenuManagementScreenState extends State<VendorMenuManagementScreen>
                           imageUrl,
                           () => setDialogState(() => pickedImage = ''),
                         ),
-                        icon: const Icon(Icons.photo_library_outlined,
-                            size: 18),
+                        icon:
+                            const Icon(Icons.photo_library_outlined, size: 18),
                         label: const Text('Choose a sample photo'),
                         style: TextButton.styleFrom(
                             visualDensity: VisualDensity.compact),
@@ -219,27 +248,39 @@ class _VendorMenuManagementScreenState extends State<VendorMenuManagementScreen>
                     contentPadding: EdgeInsets.zero,
                     title: const Text('Available for ordering'),
                     value: available,
-                    onChanged: (value) => setDialogState(() => available = value),
+                    onChanged: (value) =>
+                        setDialogState(() => available = value),
                   ),
                   if (error != null)
                     Align(
                       alignment: Alignment.centerLeft,
-                      child: Text(error!, style: TextStyle(color: Theme.of(context).colorScheme.error)),
+                      child: Text(error!,
+                          style: TextStyle(
+                              color: Theme.of(context).colorScheme.error)),
                     ),
                 ],
               ),
             ),
             actions: [
-              TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Cancel')),
+              TextButton(
+                  onPressed: () => Navigator.pop(context, false),
+                  child: const Text('Cancel')),
               FilledButton(
                 onPressed: () async {
                   final parsed = double.tryParse(price.text.trim());
-                  final parsedStock = stock.text.trim().isEmpty ? null : int.tryParse(stock.text.trim());
+                  final parsedStock = stock.text.trim().isEmpty
+                      ? null
+                      : int.tryParse(stock.text.trim());
                   final parsedThreshold = int.tryParse(threshold.text.trim());
-                  if (name.text.trim().isEmpty || parsed == null || parsed < 0 ||
-                      (stock.text.trim().isNotEmpty && (parsedStock == null || parsedStock < 0)) ||
-                      parsedThreshold == null || parsedThreshold < 0) {
-                    setDialogState(() => error = 'Enter a valid name, price, stock and threshold.');
+                  if (name.text.trim().isEmpty ||
+                      parsed == null ||
+                      parsed < 0 ||
+                      (stock.text.trim().isNotEmpty &&
+                          (parsedStock == null || parsedStock < 0)) ||
+                      parsedThreshold == null ||
+                      parsedThreshold < 0) {
+                    setDialogState(() => error =
+                        'Enter a valid name, price, stock and threshold.');
                     return;
                   }
                   try {
@@ -247,10 +288,13 @@ class _VendorMenuManagementScreenState extends State<VendorMenuManagementScreen>
                       'food_name': name.text.trim(),
                       'price': parsed,
                       'description': description.text.trim(),
-                      'category': category.text.trim().isEmpty ? 'General' : category.text.trim(),
+                      'category': category.text.trim().isEmpty
+                          ? 'General'
+                          : category.text.trim(),
                       'is_available': available,
                       'low_stock_threshold': parsedThreshold,
-                      if (item == null && parsedStock != null) 'initial_stock': parsedStock,
+                      if (item == null && parsedStock != null)
+                        'initial_stock': parsedStock,
                       'image_url': pickedImage.isNotEmpty
                           ? pickedImage
                           : (imageUrl.text.trim().isEmpty
@@ -258,15 +302,19 @@ class _VendorMenuManagementScreenState extends State<VendorMenuManagementScreen>
                               : imageUrl.text.trim()),
                     };
                     if (item == null) {
-                      await _api.post('/vendor/menu-items', body: body, idempotencyKey: ApiClient.newIdempotencyKey());
+                      await _api.post('/vendor/menu-items',
+                          body: body,
+                          idempotencyKey: ApiClient.newIdempotencyKey());
                     } else {
-                      await _api.put('/vendor/menu-items/${item['id']}', body: body);
+                      await _api.put('/vendor/menu-items/${item['id']}',
+                          body: body);
                     }
                     if (context.mounted) Navigator.pop(context, true);
                   } on ApiException catch (e) {
                     setDialogState(() => error = e.message);
                   } catch (_) {
-                    setDialogState(() => error = 'The menu item could not be saved.');
+                    setDialogState(
+                        () => error = 'The menu item could not be saved.');
                   }
                 },
                 child: const Text('Save'),
@@ -310,8 +358,12 @@ class _VendorMenuManagementScreenState extends State<VendorMenuManagementScreen>
         title: const Text('Remove menu item?'),
         content: Text('Remove "$name" from your restaurant menu?'),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Cancel')),
-          FilledButton(onPressed: () => Navigator.pop(context, true), child: const Text('Remove')),
+          TextButton(
+              onPressed: () => Navigator.pop(context, false),
+              child: const Text('Cancel')),
+          FilledButton(
+              onPressed: () => Navigator.pop(context, true),
+              child: const Text('Remove')),
         ],
       ),
     );
@@ -328,18 +380,24 @@ class _VendorMenuManagementScreenState extends State<VendorMenuManagementScreen>
 
   void _show(String message) {
     if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message)));
+    ScaffoldMessenger.of(context)
+        .showSnackBar(SnackBar(content: Text(message)));
   }
 
   @override
   Widget build(BuildContext context) {
     final filtered = _filtered;
-    final available = _items.where((e) => e['is_available'] == true || e['is_available'] == 1).length;
+    final available = _items
+        .where((e) => e['is_available'] == true || e['is_available'] == 1)
+        .length;
     return Scaffold(
       appBar: AppBar(
         title: const Text('Menu Management'),
         actions: [
-          IconButton(onPressed: _load, tooltip: 'Refresh menu', icon: const Icon(Icons.refresh_outlined)),
+          IconButton(
+              onPressed: _load,
+              tooltip: 'Refresh menu',
+              icon: const Icon(Icons.refresh_outlined)),
         ],
       ),
       floatingActionButton: FloatingActionButton.extended(
@@ -362,9 +420,17 @@ class _VendorMenuManagementScreenState extends State<VendorMenuManagementScreen>
                           padding: const EdgeInsets.all(16),
                           child: Row(
                             children: [
-                              Expanded(child: _Metric(label: 'Menu Items', value: '${_items.length}')),
-                              Expanded(child: _Metric(label: 'Available', value: '$available')),
-                              Expanded(child: _Metric(label: 'Unavailable', value: '${_items.length - available}')),
+                              Expanded(
+                                  child: _Metric(
+                                      label: 'Menu Items',
+                                      value: '${_items.length}')),
+                              Expanded(
+                                  child: _Metric(
+                                      label: 'Available', value: '$available')),
+                              Expanded(
+                                  child: _Metric(
+                                      label: 'Unavailable',
+                                      value: '${_items.length - available}')),
                             ],
                           ),
                         ),
@@ -376,7 +442,14 @@ class _VendorMenuManagementScreenState extends State<VendorMenuManagementScreen>
                         decoration: InputDecoration(
                           hintText: 'Search menu items or categories',
                           prefixIcon: const Icon(Icons.search),
-                          suffixIcon: _search.text.isEmpty ? null : IconButton(onPressed: () { _search.clear(); setState(() {}); }, icon: const Icon(Icons.clear)),
+                          suffixIcon: _search.text.isEmpty
+                              ? null
+                              : IconButton(
+                                  onPressed: () {
+                                    _search.clear();
+                                    setState(() {});
+                                  },
+                                  icon: const Icon(Icons.clear)),
                           border: const OutlineInputBorder(),
                         ),
                       ),
@@ -384,31 +457,52 @@ class _VendorMenuManagementScreenState extends State<VendorMenuManagementScreen>
                       if (filtered.isEmpty)
                         const Padding(
                           padding: EdgeInsets.symmetric(vertical: 60),
-                          child: Center(child: Text('No menu items match your search.')),
+                          child: Center(
+                              child: Text('No menu items match your search.')),
                         )
                       else
                         ...filtered.map((item) {
-                          final isAvailable = item['is_available'] == true || item['is_available'] == 1;
-                          final itemName = '${item['name'] ?? item['food_name'] ?? 'Menu item'}';
+                          final isAvailable = item['is_available'] == true ||
+                              item['is_available'] == 1;
+                          final itemName =
+                              '${item['name'] ?? item['food_name'] ?? 'Menu item'}';
                           final category = '${item['category'] ?? 'General'}';
-                          final price = double.tryParse('${item['price'] ?? 0}') ?? 0;
+                          final price =
+                              double.tryParse('${item['price'] ?? 0}') ?? 0;
                           final stock = item['current_stock'];
-                          final stockText = stock == null ? 'Untracked' : 'Stock: $stock';
+                          final stockText =
+                              stock == null ? 'Untracked' : 'Stock: $stock';
                           return Card(
                             margin: const EdgeInsets.only(bottom: 10),
                             child: ListTile(
-                              contentPadding: const EdgeInsets.fromLTRB(16, 8, 8, 8),
-                              leading: CircleAvatar(child: Icon(isAvailable ? Icons.restaurant : Icons.visibility_off_outlined)),
-                              title: Text(itemName, style: const TextStyle(fontWeight: FontWeight.w800)),
-                              subtitle: Text('$category  •  GH₵ ${price.toStringAsFixed(2)}  •  $stockText\n${item['description'] ?? ''}'),
+                              contentPadding:
+                                  const EdgeInsets.fromLTRB(16, 8, 8, 8),
+                              leading: CircleAvatar(
+                                  child: Icon(isAvailable
+                                      ? Icons.restaurant
+                                      : Icons.visibility_off_outlined)),
+                              title: Text(itemName,
+                                  style: const TextStyle(
+                                      fontWeight: FontWeight.w800)),
+                              subtitle: Text(
+                                  '$category  •  GH₵ ${price.toStringAsFixed(2)}  •  $stockText\n${item['description'] ?? ''}'),
                               isThreeLine: true,
                               trailing: Wrap(
                                 spacing: 2,
                                 crossAxisAlignment: WrapCrossAlignment.center,
                                 children: [
-                                  Switch(value: isAvailable, onChanged: (value) => _toggle(item, value)),
-                                  IconButton(tooltip: 'Edit', onPressed: () => _save(item: item), icon: const Icon(Icons.edit_outlined)),
-                                  IconButton(tooltip: 'Remove', onPressed: () => _delete(item), icon: const Icon(Icons.delete_outline)),
+                                  Switch(
+                                      value: isAvailable,
+                                      onChanged: (value) =>
+                                          _toggle(item, value)),
+                                  IconButton(
+                                      tooltip: 'Edit',
+                                      onPressed: () => _save(item: item),
+                                      icon: const Icon(Icons.edit_outlined)),
+                                  IconButton(
+                                      tooltip: 'Remove',
+                                      onPressed: () => _delete(item),
+                                      icon: const Icon(Icons.delete_outline)),
                                 ],
                               ),
                             ),
@@ -429,9 +523,13 @@ class _Metric extends StatelessWidget {
   @override
   Widget build(BuildContext context) => Column(
         children: [
-          Text(value, style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w900)),
+          Text(value,
+              style:
+                  const TextStyle(fontSize: 22, fontWeight: FontWeight.w900)),
           const SizedBox(height: 3),
-          Text(label, textAlign: TextAlign.center, style: Theme.of(context).textTheme.bodySmall),
+          Text(label,
+              textAlign: TextAlign.center,
+              style: Theme.of(context).textTheme.bodySmall),
         ],
       );
 }
@@ -452,7 +550,10 @@ class _ErrorState extends StatelessWidget {
               const SizedBox(height: 12),
               Text(message, textAlign: TextAlign.center),
               const SizedBox(height: 16),
-              FilledButton.icon(onPressed: onRetry, icon: const Icon(Icons.refresh), label: const Text('Retry')),
+              FilledButton.icon(
+                  onPressed: onRetry,
+                  icon: const Icon(Icons.refresh),
+                  label: const Text('Retry')),
             ],
           ),
         ),
@@ -504,7 +605,8 @@ Future<void> _showSamplePhotos(
                     url,
                     fit: BoxFit.cover,
                     errorBuilder: (_, __, ___) => ColoredBox(
-                      color: Theme.of(dialogContext).colorScheme.primaryContainer,
+                      color:
+                          Theme.of(dialogContext).colorScheme.primaryContainer,
                       child: Center(
                         child: Icon(
                           Icons.restaurant_rounded,

@@ -13,11 +13,13 @@ class VendorOperationsDashboardScreen extends StatefulWidget {
   const VendorOperationsDashboardScreen({super.key});
 
   @override
-  State<VendorOperationsDashboardScreen> createState() => _VendorOperationsDashboardScreenState();
+  State<VendorOperationsDashboardScreen> createState() =>
+      _VendorOperationsDashboardScreenState();
 }
 
-class _VendorOperationsDashboardScreenState extends State<VendorOperationsDashboardScreen> {
-  final _api = ApiClient();
+class _VendorOperationsDashboardScreenState
+    extends State<VendorOperationsDashboardScreen> {
+  late final ApiClient _api;
   bool _loading = true;
   bool _storeOpen = true;
   String? _error;
@@ -28,13 +30,8 @@ class _VendorOperationsDashboardScreenState extends State<VendorOperationsDashbo
   @override
   void initState() {
     super.initState();
+    _api = context.read<ApiClient>();
     _load();
-  }
-
-  @override
-  void dispose() {
-    _api.close();
-    super.dispose();
   }
 
   Future<void> _load() async {
@@ -63,7 +60,8 @@ class _VendorOperationsDashboardScreenState extends State<VendorOperationsDashbo
 
       if (!mounted) return;
       setState(() {
-        _orders = rawOrders.whereType<Map>().map(Map<String, dynamic>.from).toList();
+        _orders =
+            rawOrders.whereType<Map>().map(Map<String, dynamic>.from).toList();
         _inventory = inventory;
         _finance = finance;
         _storeOpen = me['is_open'] != false && me['is_open'] != 0;
@@ -78,7 +76,8 @@ class _VendorOperationsDashboardScreenState extends State<VendorOperationsDashbo
     } catch (_) {
       if (!mounted) return;
       setState(() {
-        _error = 'Some restaurant data could not be loaded. Please refresh and try again.';
+        _error =
+            'Some restaurant data could not be loaded. Please refresh and try again.';
         _loading = false;
       });
     }
@@ -90,7 +89,8 @@ class _VendorOperationsDashboardScreenState extends State<VendorOperationsDashbo
   int _count(Iterable<Map<String, dynamic>> source, Set<String> statuses) =>
       source.where((o) => statuses.contains(_status(o))).length;
 
-  double _money(dynamic value) => value is num ? value.toDouble() : double.tryParse('$value') ?? 0;
+  double _money(dynamic value) =>
+      value is num ? value.toDouble() : double.tryParse('$value') ?? 0;
 
   String _ghs(dynamic value) => 'GH₵ ${_money(value).toStringAsFixed(2)}';
 
@@ -98,28 +98,38 @@ class _VendorOperationsDashboardScreenState extends State<VendorOperationsDashbo
     final previous = _storeOpen;
     setState(() => _storeOpen = open);
     try {
-      final response = await _api.patch('/vendor/status', body: {'is_open': open}, idempotencyKey: ApiClient.newIdempotencyKey());
+      final response = await _api.patch('/vendor/status',
+          body: {'is_open': open},
+          idempotencyKey: ApiClient.newIdempotencyKey());
       final serverValue = response is Map ? response['is_open'] : null;
-      if (mounted && serverValue is bool) setState(() => _storeOpen = serverValue);
+      if (mounted && serverValue is bool) {
+        setState(() => _storeOpen = serverValue);
+      }
       if (mounted) {
         context.read<CafeteriaProvider>().setStoreClosedState(!open);
       }
     } catch (e) {
       if (!mounted) return;
       setState(() => _storeOpen = previous);
-      final message = e is ApiException ? e.message : 'Restaurant status could not be updated.';
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message)));
+      final message = e is ApiException
+          ? e.message
+          : 'Restaurant status could not be updated.';
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text(message)));
     }
   }
 
-  void _go(String route) => Navigator.pushNamed(context, route).then((_) => _load());
+  void _go(String route) =>
+      Navigator.pushNamed(context, route).then((_) => _load());
 
   @override
   Widget build(BuildContext context) {
     final provider = context.watch<CafeteriaProvider>();
     final user = provider.currentUser;
     if (user == null) {
-      return const Scaffold(body: Center(child: Text('Access session expired. Please sign in again.')));
+      return const Scaffold(
+          body: Center(
+              child: Text('Access session expired. Please sign in again.')));
     }
 
     final newOrders = _count(_orders, {'PENDING', 'ORDER_PLACED', 'RECEIVED'});
@@ -131,7 +141,10 @@ class _VendorOperationsDashboardScreenState extends State<VendorOperationsDashbo
       appBar: AppBar(
         title: const Text('Restaurant Operations'),
         actions: [
-          IconButton(onPressed: _load, tooltip: 'Refresh', icon: const Icon(Icons.refresh)),
+          IconButton(
+              onPressed: _load,
+              tooltip: 'Refresh',
+              icon: const Icon(Icons.refresh)),
           IconButton(
             onPressed: () {
               provider.logOut();
@@ -156,7 +169,8 @@ class _VendorOperationsDashboardScreenState extends State<VendorOperationsDashbo
                   ],
                   _restaurantHeader(user.fullName),
                   const SizedBox(height: 16),
-                  _sectionTitle('Today at a glance', 'Live operational indicators'),
+                  _sectionTitle(
+                      'Today at a glance', 'Live operational indicators'),
                   const SizedBox(height: 10),
                   GridView.count(
                     crossAxisCount: 2,
@@ -166,14 +180,28 @@ class _VendorOperationsDashboardScreenState extends State<VendorOperationsDashbo
                     crossAxisSpacing: 10,
                     childAspectRatio: 1.55,
                     children: [
-                      _metric('New Orders', '$newOrders', Icons.notifications_active_outlined, () => _go('/vendor-orders')),
-                      _metric('Preparing', '$preparing', Icons.soup_kitchen_outlined, () => _go('/vendor-orders')),
-                      _metric('Ready', '$ready', Icons.shopping_bag_outlined, () => _go('/vendor-orders')),
-                      _metric('Completed', '$completed', Icons.check_circle_outline, () => _go('/vendor-orders')),
+                      _metric(
+                          'New Orders',
+                          '$newOrders',
+                          Icons.notifications_active_outlined,
+                          () => _go('/vendor-orders')),
+                      _metric(
+                          'Preparing',
+                          '$preparing',
+                          Icons.soup_kitchen_outlined,
+                          () => _go('/vendor-orders')),
+                      _metric('Ready', '$ready', Icons.shopping_bag_outlined,
+                          () => _go('/vendor-orders')),
+                      _metric(
+                          'Completed',
+                          '$completed',
+                          Icons.check_circle_outline,
+                          () => _go('/vendor-orders')),
                     ],
                   ),
                   const SizedBox(height: 18),
-                  _sectionTitle('Order pipeline', 'Current restaurant workload'),
+                  _sectionTitle(
+                      'Order pipeline', 'Current restaurant workload'),
                   const SizedBox(height: 10),
                   Card(
                     child: Padding(
@@ -190,45 +218,81 @@ class _VendorOperationsDashboardScreenState extends State<VendorOperationsDashbo
                     ),
                   ),
                   const SizedBox(height: 18),
-                  _sectionTitle('Business snapshot', 'Database-backed restaurant performance'),
+                  _sectionTitle('Business snapshot',
+                      'Database-backed restaurant performance'),
                   const SizedBox(height: 10),
                   Card(
                     child: Column(
                       children: [
-                        ListTile(leading: const Icon(Icons.payments_outlined), title: const Text('Net food sales • 30 days'), trailing: Text(_ghs(_finance['net_food_sales']), style: const TextStyle(fontWeight: FontWeight.w900))),
+                        ListTile(
+                            leading: const Icon(Icons.payments_outlined),
+                            title: const Text('Net food sales • 30 days'),
+                            trailing: Text(_ghs(_finance['net_food_sales']),
+                                style: const TextStyle(
+                                    fontWeight: FontWeight.w900))),
                         const Divider(height: 1),
-                        ListTile(leading: const Icon(Icons.receipt_long_outlined), title: const Text('Completed orders • 30 days'), trailing: Text('${_finance['completed_orders'] ?? 0}', style: const TextStyle(fontWeight: FontWeight.w900))),
+                        ListTile(
+                            leading: const Icon(Icons.receipt_long_outlined),
+                            title: const Text('Completed orders • 30 days'),
+                            trailing: Text(
+                                '${_finance['completed_orders'] ?? 0}',
+                                style: const TextStyle(
+                                    fontWeight: FontWeight.w900))),
                         const Divider(height: 1),
-                        ListTile(leading: const Icon(Icons.inventory_2_outlined), title: const Text('Low-stock items'), trailing: Text('${_inventory['low_stock'] ?? 0}', style: const TextStyle(fontWeight: FontWeight.w900))),
+                        ListTile(
+                            leading: const Icon(Icons.inventory_2_outlined),
+                            title: const Text('Low-stock items'),
+                            trailing: Text('${_inventory['low_stock'] ?? 0}',
+                                style: const TextStyle(
+                                    fontWeight: FontWeight.w900))),
                         const Divider(height: 1),
-                        ListTile(leading: const Icon(Icons.remove_shopping_cart_outlined), title: const Text('Out of stock'), trailing: Text('${_inventory['out_of_stock'] ?? 0}', style: const TextStyle(fontWeight: FontWeight.w900))),
+                        ListTile(
+                            leading:
+                                const Icon(Icons.remove_shopping_cart_outlined),
+                            title: const Text('Out of stock'),
+                            trailing: Text('${_inventory['out_of_stock'] ?? 0}',
+                                style: const TextStyle(
+                                    fontWeight: FontWeight.w900))),
                       ],
                     ),
                   ),
                   const SizedBox(height: 18),
-                  _sectionTitle('Restaurant controls', 'Manage the customer-facing operation'),
+                  _sectionTitle('Restaurant controls',
+                      'Manage the customer-facing operation'),
                   const SizedBox(height: 10),
                   Card(
                     child: SwitchListTile.adaptive(
-                      secondary: Icon(_storeOpen ? Icons.storefront : Icons.storefront_outlined),
-                      title: Text(_storeOpen ? 'Restaurant Open' : 'Restaurant Closed', style: const TextStyle(fontWeight: FontWeight.w800)),
-                      subtitle: Text(_storeOpen ? 'Customers can place new orders.' : 'New customer orders are currently paused.'),
+                      secondary: Icon(_storeOpen
+                          ? Icons.storefront
+                          : Icons.storefront_outlined),
+                      title: Text(
+                          _storeOpen ? 'Restaurant Open' : 'Restaurant Closed',
+                          style: const TextStyle(fontWeight: FontWeight.w800)),
+                      subtitle: Text(_storeOpen
+                          ? 'Customers can place new orders.'
+                          : 'New customer orders are currently paused.'),
                       value: _storeOpen,
                       onChanged: _toggleStore,
                     ),
                   ),
                   const SizedBox(height: 18),
-                  _sectionTitle('Operations', 'Open the dedicated management workspace'),
+                  _sectionTitle(
+                      'Operations', 'Open the dedicated management workspace'),
                   const SizedBox(height: 10),
                   _actionGrid(),
                   const SizedBox(height: 18),
-                  _sectionTitle('Production tools', 'Keep the kitchen and service points connected'),
+                  _sectionTitle('Production tools',
+                      'Keep the kitchen and service points connected'),
                   const SizedBox(height: 10),
                   Row(
                     children: [
-                      Expanded(child: _action('Kitchen Display', Icons.tv_outlined, () => _go('/vendor-display'))),
+                      Expanded(
+                          child: _action('Kitchen Display', Icons.tv_outlined,
+                              () => _go('/vendor-display'))),
                       const SizedBox(width: 10),
-                      Expanded(child: _action('Kiosk', Icons.point_of_sale_outlined, () => _go('/kiosk'))),
+                      Expanded(
+                          child: _action('Kiosk', Icons.point_of_sale_outlined,
+                              () => _go('/kiosk'))),
                     ],
                   ),
                 ],
@@ -242,32 +306,53 @@ class _VendorOperationsDashboardScreenState extends State<VendorOperationsDashbo
           padding: const EdgeInsets.all(18),
           child: Row(
             children: [
-              const CircleAvatar(radius: 29, child: Icon(Icons.restaurant_rounded, size: 29)),
+              const CircleAvatar(
+                  radius: 29, child: Icon(Icons.restaurant_rounded, size: 29)),
               const SizedBox(width: 14),
               Expanded(
-                child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                  Text(name, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w900)),
-                  const SizedBox(height: 4),
-                  const Text('Restaurant command centre'),
-                ]),
+                child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(name,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                              fontSize: 20, fontWeight: FontWeight.w900)),
+                      const SizedBox(height: 4),
+                      const Text('Restaurant command centre'),
+                    ]),
               ),
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                decoration: BoxDecoration(borderRadius: BorderRadius.circular(30), color: (_storeOpen ? Colors.green : Colors.red).withValues(alpha: .10)),
-                child: Text(_storeOpen ? 'OPEN' : 'CLOSED', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w900, color: _storeOpen ? Colors.green.shade700 : Colors.red.shade700)),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(30),
+                    color: (_storeOpen ? Colors.green : Colors.red)
+                        .withValues(alpha: .10)),
+                child: Text(_storeOpen ? 'OPEN' : 'CLOSED',
+                    style: TextStyle(
+                        fontSize: 11,
+                        fontWeight: FontWeight.w900,
+                        color: _storeOpen
+                            ? Colors.green.shade700
+                            : Colors.red.shade700)),
               ),
             ],
           ),
         ),
       );
 
-  Widget _sectionTitle(String title, String subtitle) => Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        Text(title, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w900)),
+  Widget _sectionTitle(String title, String subtitle) =>
+      Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Text(title,
+            style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w900)),
         const SizedBox(height: 3),
         Text(subtitle, style: Theme.of(context).textTheme.bodySmall),
       ]);
 
-  Widget _metric(String title, String value, IconData icon, VoidCallback onTap) => Card(
+  Widget _metric(
+          String title, String value, IconData icon, VoidCallback onTap) =>
+      Card(
         clipBehavior: Clip.antiAlias,
         child: InkWell(
           onTap: onTap,
@@ -276,17 +361,32 @@ class _VendorOperationsDashboardScreenState extends State<VendorOperationsDashbo
             child: Row(children: [
               CircleAvatar(child: Icon(icon, size: 19)),
               const SizedBox(width: 10),
-              Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, mainAxisAlignment: MainAxisAlignment.center, children: [
-                Text(value, style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w900)),
-                const SizedBox(height: 2),
-                Text(title, style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w700)),
-              ])),
+              Expanded(
+                  child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                    Text(value,
+                        style: const TextStyle(
+                            fontSize: 22, fontWeight: FontWeight.w900)),
+                    const SizedBox(height: 2),
+                    Text(title,
+                        style: const TextStyle(
+                            fontSize: 11, fontWeight: FontWeight.w700)),
+                  ])),
             ]),
           ),
         ),
       );
 
-  Widget _pipeline(String label, int count) => Expanded(child: Column(children: [Text('$count', style: const TextStyle(fontSize: 21, fontWeight: FontWeight.w900)), const SizedBox(height: 3), Text(label, textAlign: TextAlign.center, style: const TextStyle(fontSize: 10))]));
+  Widget _pipeline(String label, int count) => Expanded(
+          child: Column(children: [
+        Text('$count',
+            style: const TextStyle(fontSize: 21, fontWeight: FontWeight.w900)),
+        const SizedBox(height: 3),
+        Text(label,
+            textAlign: TextAlign.center, style: const TextStyle(fontSize: 10))
+      ]));
 
   Widget _actionGrid() => GridView.count(
         crossAxisCount: 2,
@@ -296,20 +396,43 @@ class _VendorOperationsDashboardScreenState extends State<VendorOperationsDashbo
         crossAxisSpacing: 10,
         childAspectRatio: 2.2,
         children: [
-          _action('Orders', Icons.receipt_long_outlined, () => _go('/vendor-orders')),
-          _action('Menu Management', Icons.restaurant_menu_outlined, () => _go('/vendor-menu')),
-          _action('Inventory', Icons.inventory_2_outlined, () => _go('/vendor-inventory')),
-          _action('Finance', Icons.account_balance_wallet_outlined, () => _go('/vendor-finance')),
-          _action('Promotions', Icons.local_offer_outlined, () => _go('/vendor-promotions')),
-          _action('Payout Account', Icons.payments_outlined, () => _go('/vendor-payout-account')),
-          _action('Workforce', Icons.groups_2_outlined, () => _go('/vendor-workers')),
+          _action('Orders', Icons.receipt_long_outlined,
+              () => _go('/vendor-orders')),
+          _action('Menu Management', Icons.restaurant_menu_outlined,
+              () => _go('/vendor-menu')),
+          _action('Inventory', Icons.inventory_2_outlined,
+              () => _go('/vendor-inventory')),
+          _action('Finance', Icons.account_balance_wallet_outlined,
+              () => _go('/vendor-finance')),
+          _action('Promotions', Icons.local_offer_outlined,
+              () => _go('/vendor-promotions')),
+          _action('Payout Account', Icons.payments_outlined,
+              () => _go('/vendor-payout-account')),
+          _action('Workforce', Icons.groups_2_outlined,
+              () => _go('/vendor-workers')),
         ],
       );
 
   Widget _action(String label, IconData icon, VoidCallback onTap) => Card(
         clipBehavior: Clip.antiAlias,
-        child: InkWell(onTap: onTap, child: Padding(padding: const EdgeInsets.symmetric(horizontal: 12), child: Row(children: [CircleAvatar(radius: 18, child: Icon(icon, size: 18)), const SizedBox(width: 10), Expanded(child: Text(label, style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 12)))]))),
+        child: InkWell(
+            onTap: onTap,
+            child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 12),
+                child: Row(children: [
+                  CircleAvatar(radius: 18, child: Icon(icon, size: 18)),
+                  const SizedBox(width: 10),
+                  Expanded(
+                      child: Text(label,
+                          style: const TextStyle(
+                              fontWeight: FontWeight.w800, fontSize: 12)))
+                ]))),
       );
 
-  Widget _messageCard(String message, IconData icon) => Card(child: ListTile(leading: Icon(icon), title: Text(message), trailing: IconButton(onPressed: _load, icon: const Icon(Icons.refresh))));
+  Widget _messageCard(String message, IconData icon) => Card(
+      child: ListTile(
+          leading: Icon(icon),
+          title: Text(message),
+          trailing:
+              IconButton(onPressed: _load, icon: const Icon(Icons.refresh))));
 }

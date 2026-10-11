@@ -170,6 +170,7 @@ Route::middleware(['auth:sanctum', InactivityTimeout::class])->group(function ()
         Route::get('/vendor/orders', [OrderController::class, 'getVendorOrders']);
 
         // Backward-compatible vendor order endpoint used by existing clients.
+        Route::get('/vendor/orders/export.csv', [OrderController::class, 'exportVendorOrdersCsv']);
         Route::get('/vendor/my-orders', [OrderController::class, 'getVendorOrders']);
         Route::get('/vendor/orders/{id}', [OrderController::class, 'getVendorOrder']);
         Route::patch('/vendor/orders/{id}/status', [OrderController::class, 'updateStatus']);
@@ -184,6 +185,7 @@ Route::middleware(['auth:sanctum', InactivityTimeout::class])->group(function ()
         // Vendor workforce: supervisors employ workers, schedule shifts and
         // keep a worker-finance ledger.
         Route::get('/vendor/workers', [VendorWorkerController::class, 'index']);
+        Route::get('/vendor/workers/export.csv', [VendorWorkerController::class, 'exportCsv']);
         Route::post('/vendor/workers', [VendorWorkerController::class, 'store']);
         Route::get('/vendor/workers/{id}/finance', [VendorWorkerController::class, 'finance']);
         Route::post('/vendor/workers/{id}/payments', [VendorWorkerController::class, 'storePayment']);

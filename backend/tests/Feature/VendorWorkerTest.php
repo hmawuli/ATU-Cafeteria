@@ -52,6 +52,14 @@ class VendorWorkerTest extends TestCase
 
         $this->getJson('/api/vendor/workers')->assertOk()->assertJsonCount(1, 'workers');
 
+        // CSV export of the workforce.
+        $this->get('/api/vendor/workers/export.csv')
+            ->assertOk()
+            ->assertHeader('Content-Type', 'text/csv; charset=UTF-8')
+            ->assertHeader('Content-Disposition', fn ($value) => str_contains($value, 'attachment; filename="workers-'))
+            ->assertSee('ATU Cafeteria — workforce export', false)
+            ->assertSee('Ama Mensah', false);
+
         $this->putJson("/api/vendor/workers/{$id}", [
             'shift_label' => 'Night',
             'shift_start' => '16:00',

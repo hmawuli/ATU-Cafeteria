@@ -27,6 +27,7 @@ use App\Notifications\NewIncomingOrderNotification;
 use App\Notifications\OrderStatusChangedNotification;
 use App\Services\PaystackRefundService;
 use App\Services\ReceiptPdfWriter;
+use App\Support\CsvExporter;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Validator;
@@ -201,6 +202,51 @@ class OrderController extends Controller
         $orders = $ordersQuery->with(['items', 'customer'])->orderBy('order_timestamp', 'desc')->get();
 
         return response()->json($orders, 200);
+    }
+
+    /**
+     * CSV of the signed-in vendor's orders (for finance/export workflows).
+     */
+    public function exportVendorOrdersCsv(Request $request)
+    {
+        $user = $request->user();
+        if (! $user || strtoupper((string) $user->role) !== 'VENDOR') {
+            return response()->json(['success' => false, 'message' => 'Vendor access required.'], 403);
+        }
+
+        $orders = Order::where('vendor_id', $user->id)
+            ->with('items')
+            ->orderByDesc('created_at')
+            ->limit(5000)
+            ->get();
+
+        $rows = $orders->map(function (Order $order) {
+            $items = $order->items
+                ->map(fn ($item) => trim((string) ($item->name ?? $item->name_snapshot ?? '')).' × '.$item->quantity)
+                ->implode('; ');
+            if ($items === '' && $order->food_name) {
+                $items = trim((string) $order->food_name).' × '.($order->quantity ?? 1);
+            }
+
+            return [
+                'order_number' => $order->order_number,
+                'status' => $order->status ?? $order->order_status ?? '',
+                'payment_method' => $order->payment_method ?? '',
+                'payment_status' => $order->payment_status ?? '',
+                'sales_channel' => $order->sales_channel ?? '',
+                'customer' => (string) ($order->customer_name ?? ''),
+                'items' => $items,
+                'total' => $order->total_price ?? $order->grand_total ?? 0,
+                'placed_at' => $order->placed_at?->toDateTimeString() ?? $order->created_at?->toDateTimeString() ?? '',
+            ];
+        })->all();
+
+        return CsvExporter::download(
+            'orders-'.now()->format('Ymd-His').'.csv',
+            ['order_number', 'status', 'payment_method', 'payment_status', 'sales_channel', 'customer', 'items', 'total', 'placed_at'],
+            $rows,
+            'ATU Cafeteria — vendor orders export'
+        );
     }
 
     /**
@@ -1756,6 +1802,22 @@ class OrderController extends Controller
             ], 404);
         }
 
+        $user = $request->user();
+        $isCustomer = in_array((int) $user->id, [
+            (int) $order->customer_id,
+            (int) $order->student_id,
+            (int) $order->user_id,
+        ], true);
+        $isVendor = (int) $user->id === (int) $order->vendor_id;
+        $isAdmin = strtoupper((string) $user->role) === 'ADMIN';
+
+        if (! $isCustomer && ! $isVendor && ! $isAdmin) {
+            return response()->json([
+                'success' => false,
+                'message' => 'You are not authorized to track this order.',
+            ], 403);
+        }
+
         // If client requests text/event-stream or sets stream parameter of 1, stream in real-time
         if ($request->header('Accept') === 'text/event-stream' || $request->input('stream') == 1) {
             return response()->stream(function () use ($id) {
@@ -1803,13 +1865,7 @@ class OrderController extends Controller
         }
 
         // Return direct single JSON snapshot
-        $user = $request->user();
-        $isOwner = in_array((int) $user->id, [
-            (int) $order->customer_id,
-            (int) $order->student_id,
-            (int) $order->user_id,
-        ], true);
-        $canViewPin = $isOwner || strtoupper($user->role ?? '') === 'ADMIN';
+        $canViewPin = $isCustomer || $isAdmin;
 
         return response()->json([
             'success' => true,

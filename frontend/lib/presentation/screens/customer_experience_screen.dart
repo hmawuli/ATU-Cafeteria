@@ -27,7 +27,7 @@ class _RestaurantCustomerHomeScreenState
 
   int _tab = 0;
   String _query = '';
-  final ApiClient _api = ApiClient();
+  late final ApiClient _api;
   List<Map<String, dynamic>> _smartPicks = const [];
   List<Map<String, dynamic>> _discoveryVendors = const [];
   List<Map<String, dynamic>> _promotions = const [];
@@ -35,6 +35,7 @@ class _RestaurantCustomerHomeScreenState
   @override
   void initState() {
     super.initState();
+    _api = context.read<ApiClient>();
     _loadDiscovery();
   }
 
@@ -69,12 +70,6 @@ class _RestaurantCustomerHomeScreenState
     } catch (_) {
       // Existing cached catalogue remains usable if discovery is unavailable.
     } finally {}
-  }
-
-  @override
-  void dispose() {
-    _api.close();
-    super.dispose();
   }
 
   @override
@@ -1545,7 +1540,9 @@ class _RestaurantCustomerHomeScreenState
                   const SizedBox(width: 8),
                   Expanded(
                     child: Text(
-                      e.reference == null ? e.label : '${e.label} · ${e.reference}',
+                      e.reference == null
+                          ? e.label
+                          : '${e.label} · ${e.reference}',
                       overflow: TextOverflow.ellipsis,
                       style: const TextStyle(color: muted, fontSize: 12),
                     ),
@@ -1734,9 +1731,8 @@ class _RestaurantCustomerHomeScreenState
               const Icon(Icons.verified_user_rounded, color: blue),
               const SizedBox(width: 10),
               Expanded(
-                child: Text(isDemo
-                    ? 'Confirm Top-Up (Demo)'
-                    : 'Confirm Wallet Top-Up'),
+                child: Text(
+                    isDemo ? 'Confirm Top-Up (Demo)' : 'Confirm Wallet Top-Up'),
               ),
             ],
           ),

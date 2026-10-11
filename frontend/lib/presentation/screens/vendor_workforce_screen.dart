@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import 'package:atu_cafeteria/core/network/api_client.dart';
 import 'package:atu_cafeteria/core/theme/app_theme.dart';
 
@@ -14,7 +15,7 @@ class VendorWorkforceScreen extends StatefulWidget {
 class _VendorWorkforceScreenState extends State<VendorWorkforceScreen> {
   static const _days = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
 
-  final _api = ApiClient();
+  late final ApiClient _api;
   List<Map<String, dynamic>> _workers = [];
   bool _loading = true;
   String? _error;
@@ -22,13 +23,8 @@ class _VendorWorkforceScreenState extends State<VendorWorkforceScreen> {
   @override
   void initState() {
     super.initState();
+    _api = context.read<ApiClient>();
     _load();
-  }
-
-  @override
-  void dispose() {
-    _api.close();
-    super.dispose();
   }
 
   Future<void> _load() async {
@@ -41,10 +37,7 @@ class _VendorWorkforceScreenState extends State<VendorWorkforceScreen> {
       final raw = data is Map ? data['workers'] : null;
       setState(() {
         _workers = raw is List
-            ? raw
-                .whereType<Map>()
-                .map(Map<String, dynamic>.from)
-                .toList()
+            ? raw.whereType<Map>().map(Map<String, dynamic>.from).toList()
             : [];
         _loading = false;
       });
@@ -103,11 +96,9 @@ class _VendorWorkforceScreenState extends State<VendorWorkforceScreen> {
                           const SizedBox(height: 12),
                           const Text('No workers yet.',
                               style: TextStyle(
-                                  fontSize: 18,
-                                  fontWeight: FontWeight.w800)),
+                                  fontSize: 18, fontWeight: FontWeight.w800)),
                           const SizedBox(height: 6),
-                          const Text(
-                              'Tap “Employ” to add your first worker.'),
+                          const Text('Tap “Employ” to add your first worker.'),
                           const SizedBox(height: 16),
                           FilledButton.icon(
                             onPressed: _addOrEdit,
@@ -122,8 +113,7 @@ class _VendorWorkforceScreenState extends State<VendorWorkforceScreen> {
                       child: ListView.builder(
                         padding: const EdgeInsets.all(14),
                         itemCount: _workers.length,
-                        itemBuilder: (context, i) =>
-                            _workerCard(_workers[i]),
+                        itemBuilder: (context, i) => _workerCard(_workers[i]),
                       ),
                     ),
     );
@@ -131,7 +121,8 @@ class _VendorWorkforceScreenState extends State<VendorWorkforceScreen> {
 
   Widget _workerCard(Map<String, dynamic> worker) {
     final active = worker['is_active'] != false;
-    final wage = worker['daily_wage'];
+    final wage = _amount(worker['daily_wage']);
+    final totalPaid = _amount(worker['total_paid']);
     return Card(
       margin: const EdgeInsets.only(bottom: 12),
       child: Padding(
@@ -170,8 +161,8 @@ class _VendorWorkforceScreenState extends State<VendorWorkforceScreen> {
                 ),
                 if (!active)
                   Container(
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 8, vertical: 4),
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                     decoration: BoxDecoration(
                       color: AppTheme.red50,
                       borderRadius: BorderRadius.circular(12),
@@ -187,7 +178,7 @@ class _VendorWorkforceScreenState extends State<VendorWorkforceScreen> {
             const SizedBox(height: 10),
             Text(_shiftSummary(worker),
                 style: const TextStyle(fontSize: 12, color: AppTheme.textDark)),
-            if (wage != null)
+            if (worker['daily_wage'] != null)
               Text('Daily wage: GH₵ ${wage.toStringAsFixed(2)}',
                   style: const TextStyle(
                       fontSize: 12,
@@ -196,9 +187,9 @@ class _VendorWorkforceScreenState extends State<VendorWorkforceScreen> {
             const Divider(height: 18),
             Row(
               children: [
-                const Expanded(
-                  child: Text('Total paid: GH₵ 0.00',
-                      style: TextStyle(
+                Expanded(
+                  child: Text('Total paid: GH₵ ${totalPaid.toStringAsFixed(2)}',
+                      style: const TextStyle(
                           fontSize: 12, color: AppTheme.textMuted)),
                 ),
                 TextButton(
@@ -221,9 +212,7 @@ class _VendorWorkforceScreenState extends State<VendorWorkforceScreen> {
   }
 
   String _shiftSummary(Map<String, dynamic> w) {
-    final days = (w['days_of_week'] as List? ?? [])
-        .whereType<int>()
-        .toList();
+    final days = (w['days_of_week'] as List? ?? []).whereType<int>().toList();
     final daysStr =
         days.isEmpty ? 'Flexible days' : days.map((d) => _days[d]).join(',');
     final start = (w['shift_start'] ?? '').toString();
@@ -231,9 +220,7 @@ class _VendorWorkforceScreenState extends State<VendorWorkforceScreen> {
     final label = (w['shift_label'] ?? '').toString();
     final time = start.isNotEmpty && end.isNotEmpty
         ? '$start – $end'
-        : (start.isNotEmpty
-            ? start
-            : (end.isNotEmpty ? end : ''));
+        : (start.isNotEmpty ? start : (end.isNotEmpty ? end : ''));
     final parts = [
       if (label.isNotEmpty) label,
       if (time.isNotEmpty) time,
@@ -241,6 +228,10 @@ class _VendorWorkforceScreenState extends State<VendorWorkforceScreen> {
     ];
     return 'Shift: ${parts.join('  •  ')}';
   }
+
+  double _amount(dynamic value) => value is num
+      ? value.toDouble()
+      : double.tryParse(value?.toString() ?? '') ?? 0;
 
   Future<void> _addOrEdit([Map<String, dynamic>? worker]) async {
     final saved = await _editor(worker);
@@ -275,23 +266,25 @@ class _VendorWorkforceScreenState extends State<VendorWorkforceScreen> {
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                TextField(controller: name,
-                    decoration:
-                        const InputDecoration(labelText: 'Full name')),
+                TextField(
+                    controller: name,
+                    decoration: const InputDecoration(labelText: 'Full name')),
                 const SizedBox(height: 10),
-                TextField(controller: staff,
+                TextField(
+                    controller: staff,
                     decoration: const InputDecoration(
                         labelText: 'Staff ID (optional)')),
                 const SizedBox(height: 10),
-                TextField(controller: phone,
+                TextField(
+                    controller: phone,
                     keyboardType: TextInputType.phone,
-                    decoration: const InputDecoration(
-                        labelText: 'Phone (optional)')),
+                    decoration:
+                        const InputDecoration(labelText: 'Phone (optional)')),
                 const SizedBox(height: 10),
                 TextField(
                     controller: wage,
-                    keyboardType: const TextInputType.numberWithOptions(
-                        decimal: true),
+                    keyboardType:
+                        const TextInputType.numberWithOptions(decimal: true),
                     decoration: const InputDecoration(
                         labelText: 'Daily wage (GH₵, optional)')),
                 const SizedBox(height: 12),
@@ -321,28 +314,31 @@ class _VendorWorkforceScreenState extends State<VendorWorkforceScreen> {
                 Row(
                   children: [
                     Expanded(
-                        child: TextField(controller: start,
+                        child: TextField(
+                            controller: start,
                             decoration: const InputDecoration(
                                 labelText: 'Shift start (HH:MM)',
                                 hintText: '08:00'))),
                     const SizedBox(width: 10),
                     Expanded(
-                        child: TextField(controller: end,
+                        child: TextField(
+                            controller: end,
                             decoration: const InputDecoration(
                                 labelText: 'Shift end (HH:MM)',
                                 hintText: '16:00'))),
                   ],
                 ),
                 const SizedBox(height: 10),
-                TextField(controller: label,
+                TextField(
+                    controller: label,
                     decoration: const InputDecoration(
                         labelText: 'Shift label (optional)',
                         hintText: 'Morning / Night')),
                 const SizedBox(height: 10),
                 TextField(
                     controller: hours,
-                    keyboardType: const TextInputType.numberWithOptions(
-                        decimal: true),
+                    keyboardType:
+                        const TextInputType.numberWithOptions(decimal: true),
                     decoration: const InputDecoration(
                         labelText: 'Weekly hours (optional)')),
                 SwitchListTile.adaptive(
@@ -375,16 +371,14 @@ class _VendorWorkforceScreenState extends State<VendorWorkforceScreen> {
                   'full_name': name.text.trim(),
                   'staff_id':
                       staff.text.trim().isEmpty ? null : staff.text.trim(),
-                  'phone':
-                      phone.text.trim().isEmpty ? null : phone.text.trim(),
+                  'phone': phone.text.trim().isEmpty ? null : phone.text.trim(),
                   'daily_wage': wage.text.trim().isEmpty
                       ? null
                       : double.tryParse(wage.text.trim()),
                   'days_of_week': days.isEmpty ? null : days,
                   'shift_start':
                       start.text.trim().isEmpty ? null : start.text.trim(),
-                  'shift_end':
-                      end.text.trim().isEmpty ? null : end.text.trim(),
+                  'shift_end': end.text.trim().isEmpty ? null : end.text.trim(),
                   'shift_label':
                       label.text.trim().isEmpty ? null : label.text.trim(),
                   'weekly_hours': hours.text.trim().isEmpty
@@ -405,8 +399,7 @@ class _VendorWorkforceScreenState extends State<VendorWorkforceScreen> {
                 } on ApiException catch (e) {
                   setDialogState(() => error = e.message);
                 } catch (_) {
-                  setDialogState(
-                      () => error = 'Could not save the worker.');
+                  setDialogState(() => error = 'Could not save the worker.');
                 }
               },
               child: Text(worker == null ? 'Employ' : 'Save'),
@@ -451,7 +444,7 @@ class _VendorWorkforceScreenState extends State<VendorWorkforceScreen> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  'Total paid: GH₵ ${(finance['total_paid'] ?? 0).toStringAsFixed(2)}'
+                  'Total paid: GH₵ ${_amount(finance['total_paid']).toStringAsFixed(2)}'
                   '  •  ${finance['payment_count'] ?? 0} payment(s)',
                   style: const TextStyle(fontWeight: FontWeight.w800),
                 ),
@@ -466,9 +459,8 @@ class _VendorWorkforceScreenState extends State<VendorWorkforceScreen> {
                         dense: true,
                         contentPadding: EdgeInsets.zero,
                         title: Text(
-                            'GH₵ ${(p['amount'] ?? 0).toStringAsFixed(2)}'),
-                        subtitle: Text(
-                            '${p['payment_date'] ?? ''}'
+                            'GH₵ ${_amount(p['amount']).toStringAsFixed(2)}'),
+                        subtitle: Text('${p['payment_date'] ?? ''}'
                             '${p['note'] != null && (p['note'] as String).isNotEmpty ? ' — ${p['note']}' : ''}'),
                       )),
               ],
@@ -510,16 +502,17 @@ class _VendorWorkforceScreenState extends State<VendorWorkforceScreen> {
           children: [
             TextField(
                 controller: amount,
-                keyboardType: const TextInputType.numberWithOptions(
-                    decimal: true),
+                keyboardType:
+                    const TextInputType.numberWithOptions(decimal: true),
+                decoration: const InputDecoration(labelText: 'Amount (GH₵)')),
+            const SizedBox(height: 10),
+            TextField(
+                controller: date,
                 decoration:
-                    const InputDecoration(labelText: 'Amount (GH₵)')),
+                    const InputDecoration(labelText: 'Date (YYYY-MM-DD)')),
             const SizedBox(height: 10),
-            TextField(controller: date,
-                decoration: const InputDecoration(
-                    labelText: 'Date (YYYY-MM-DD)')),
-            const SizedBox(height: 10),
-            TextField(controller: note,
+            TextField(
+                controller: note,
                 decoration:
                     const InputDecoration(labelText: 'Note (optional)')),
           ],
@@ -547,8 +540,7 @@ class _VendorWorkforceScreenState extends State<VendorWorkforceScreen> {
         body: {
           'amount': amt,
           'payment_date': date.text.trim(),
-          'note':
-              note.text.trim().isEmpty ? null : note.text.trim(),
+          'note': note.text.trim().isEmpty ? null : note.text.trim(),
         },
         idempotencyKey: ApiClient.newIdempotencyKey(),
       );
@@ -565,8 +557,7 @@ class _VendorWorkforceScreenState extends State<VendorWorkforceScreen> {
       context: context,
       builder: (context) => AlertDialog(
         title: Text('Remove ${worker['full_name']}?'),
-        content:
-            const Text('The worker will be removed from your workforce.'),
+        content: const Text('The worker will be removed from your workforce.'),
         actions: [
           TextButton(
               onPressed: () => Navigator.pop(context, false),

@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\AuditLog;
 use App\Models\WorkerPayment;
 use App\Models\WorkerProfile;
+use App\Support\CsvExporter;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Validator;
@@ -24,6 +25,40 @@ class VendorWorkerController extends Controller
             ->map(fn (WorkerProfile $w) => $this->serialize($w));
 
         return response()->json(['success' => true, 'workers' => $workers], 200);
+    }
+
+    /** CSV of the workforce and their wage ledger. */
+    public function exportCsv(Request $request)
+    {
+        $vendor = $this->requireVendor($request);
+
+        $workers = WorkerProfile::with('payments')
+            ->where('vendor_id', $vendor->id)
+            ->orderBy('full_name')
+            ->get();
+
+        $rows = $workers->map(fn (WorkerProfile $w) => [
+            'full_name' => $w->full_name,
+            'staff_id' => (string) ($w->staff_id ?? ''),
+            'phone' => (string) ($w->phone ?? ''),
+            'daily_wage' => $w->daily_wage ?? '',
+            'weekly_hours' => $w->weekly_hours ?? '',
+            'shift' => trim(implode(' ', array_filter([
+                (string) ($w->shift_start ?? ''),
+                (string) ($w->shift_end ?? ''),
+                (string) ($w->shift_label ?? ''),
+            ]))),
+            'total_paid' => round((float) $w->payments->sum('amount'), 2),
+            'payment_count' => $w->payments->count(),
+            'is_active' => $w->is_active ? 'yes' : 'no',
+        ])->all();
+
+        return CsvExporter::download(
+            'workers-'.now()->format('Ymd-His').'.csv',
+            ['full_name', 'staff_id', 'phone', 'daily_wage', 'weekly_hours', 'shift', 'total_paid', 'payment_count', 'is_active'],
+            $rows,
+            'ATU Cafeteria — workforce export'
+        );
     }
 
     /** Employ a new worker for the vendor (with shift schedule). */

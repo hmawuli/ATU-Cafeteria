@@ -2,7 +2,6 @@ import 'dart:convert';
 import 'dart:io';
 import 'dart:async';
 import 'package:flutter/foundation.dart';
-import 'package:http/http.dart' as http;
 import 'package:atu_cafeteria/domain/models/models.dart';
 import 'package:atu_cafeteria/data/local/db_helper.dart';
 import 'package:atu_cafeteria/data/remote/menu_response.dart';
@@ -20,14 +19,16 @@ import 'wallet_state.dart';
 class CafeteriaProvider extends ChangeNotifier {
   final DbHelper _db = DbHelper.instance;
   final ApiClient _api;
+  final bool _ownsApiClient;
   final PendingOrderQueue _orderQueue;
   Timer? _readyPollingTimer;
   final Set<int> _announcedReadyOrders = <int>{};
 
   CafeteriaProvider({ApiClient? apiClient, PendingOrderQueue? orderQueue})
       : _api = apiClient ?? ApiClient(),
-        _orderQueue =
-            orderQueue ?? PendingOrderQueue(DbPendingOrderStore(DbHelper.instance));
+        _ownsApiClient = apiClient == null,
+        _orderQueue = orderQueue ??
+            PendingOrderQueue(DbPendingOrderStore(DbHelper.instance));
 
   // Convenience for builder call sites that need the shared client.
   ApiClient get apiClient => _api;
@@ -36,8 +37,8 @@ class CafeteriaProvider extends ChangeNotifier {
   // their notifications so existing screens keep watching it unchanged.
   late final OrdersState orders = OrdersState()..addListener(notifyListeners);
   late final WalletState wallet = WalletState()..addListener(notifyListeners);
-  late final CatalogueState catalogue =
-      CatalogueState()..addListener(notifyListeners);
+  late final CatalogueState catalogue = CatalogueState()
+    ..addListener(notifyListeners);
 
   @override
   void dispose() {
@@ -45,6 +46,7 @@ class CafeteriaProvider extends ChangeNotifier {
     _readyPollingTimer = null;
     _vendorOrderPollingTimer?.cancel();
     _vendorOrderPollingTimer = null;
+    if (_ownsApiClient) _api.close();
     super.dispose();
   }
 
@@ -159,21 +161,9 @@ class CafeteriaProvider extends ChangeNotifier {
 
   Future<List<Order>> fetchAndCacheStudentOrders(int studentId) async {
     try {
-      final url = Uri.parse("$_laravelBaseUrl/api/orders/customer/$studentId");
-      final response = await http.get(
-        url,
-        headers: {
-          'Accept': 'application/json',
-          if (_authToken != null) 'Authorization': 'Bearer $_authToken',
-        },
-      ).timeout(const Duration(seconds: 8));
-
-      if (response.statusCode != 200 || response.body.isEmpty) {
-        _isOrderCacheOffline = true;
-        return [];
-      }
-
-      final decoded = jsonDecode(response.body);
+      final decoded = await _api
+          .request('GET', 'orders/customer/$studentId', token: _authToken)
+          .timeout(const Duration(seconds: 8));
       if (decoded is! List) {
         _isOrderCacheOffline = true;
         return [];
@@ -438,8 +428,7 @@ class CafeteriaProvider extends ChangeNotifier {
             : await _db.getOrdersForCustomer(_currentUser!.id!));
         await fetchPurchasedVendors();
       } else if (_currentUser!.role == 'VENDOR') {
-        orders.setVendorOrders(
-            await _db.getOrdersForVendor(_currentUser!.id!));
+        orders.setVendorOrders(await _db.getOrdersForVendor(_currentUser!.id!));
         final remoteVendorItems = catalogue.allFoodItems
             .where((item) => item.vendorId == _currentUser!.id!)
             .toList();
@@ -786,8 +775,7 @@ class CafeteriaProvider extends ChangeNotifier {
   /// Verify a student's pickup PIN server-side and complete the order
   /// (delegated to [OrdersState]). Refreshes orders so all pages update.
   Future<String> completePickup(int orderId, String pin) =>
-      orders.completePickup(_api, _authToken,
-          orderId: orderId, pin: pin);
+      orders.completePickup(_api, _authToken, orderId: orderId, pin: pin);
 
   void _syncPushDeviceIfCustomer() {
     if ((_currentUser?.role ?? '').toUpperCase() == 'STUDENT') {
@@ -845,12 +833,10 @@ class CafeteriaProvider extends ChangeNotifier {
     }
 
     try {
-      final response = await _api
-          .rawRequest('POST', 'login', body: {
-            'username': normalizedUsername,
-            'pin': pinCode,
-          })
-          .timeout(const Duration(seconds: 10));
+      final response = await _api.rawRequest('POST', 'login', body: {
+        'username': normalizedUsername,
+        'pin': pinCode,
+      }).timeout(const Duration(seconds: 10));
 
       final decoded = response.body is Map
           ? Map<String, dynamic>.from(response.body as Map)
@@ -936,12 +922,10 @@ class CafeteriaProvider extends ChangeNotifier {
     _loginError = null;
     notifyListeners();
     try {
-      final res = await _api
-          .rawRequest('POST', 'login/2fa', body: {
-            'username': username.trim(),
-            'code': code.trim(),
-          })
-          .timeout(const Duration(seconds: 10));
+      final res = await _api.rawRequest('POST', 'login/2fa', body: {
+        'username': username.trim(),
+        'code': code.trim(),
+      }).timeout(const Duration(seconds: 10));
 
       final decoded = res.body is Map
           ? Map<String, dynamic>.from(res.body as Map)
@@ -1069,47 +1053,36 @@ class CafeteriaProvider extends ChangeNotifier {
     }
 
     try {
-      final registerUrl = Uri.parse('$_laravelBaseUrl/api/customer/register');
-      final response = await http
-          .post(
-            registerUrl,
-            headers: const {
-              'Content-Type': 'application/json',
-              'Accept': 'application/json',
-            },
-            body: jsonEncode({
-              'username': normalizedUsername,
-              'pin': pinCode,
-              'pin_confirmation': pinCode,
-              'fullName': normalizedName,
-              'info': normalizedInfo,
-              'email': email?.trim().toLowerCase() ?? '',
-            }),
-          )
-          .timeout(const Duration(seconds: 10));
-
-      final decoded = response.body.isNotEmpty
-          ? Map<String, dynamic>.from(jsonDecode(response.body) as Map)
+      final response = await _api.post(
+        'customer/register',
+        body: {
+          'username': normalizedUsername,
+          'pin': pinCode,
+          'pin_confirmation': pinCode,
+          'fullName': normalizedName,
+          'info': normalizedInfo,
+          'email': email?.trim().toLowerCase() ?? '',
+        },
+      ).timeout(const Duration(seconds: 10));
+      final decoded = response is Map
+          ? Map<String, dynamic>.from(response)
           : <String, dynamic>{};
 
-      if (response.statusCode == 201 || response.statusCode == 200) {
-        final payload = decoded['user'] is Map
-            ? Map<String, dynamic>.from(decoded['user'] as Map)
-            : decoded;
-        final remoteUser = User.fromJson(payload).copyWith(
-          passwordHash: _localCacheCredentialHash(pinCode),
-        );
-        if (remoteUser.id != null) {
-          await _db.insertUser(remoteUser);
-        }
-        _registrationSuccess = true;
-        _isLoading = false;
-        notifyListeners();
-        return true;
+      final payload = decoded['user'] is Map
+          ? Map<String, dynamic>.from(decoded['user'] as Map)
+          : decoded;
+      final remoteUser = User.fromJson(payload).copyWith(
+        passwordHash: _localCacheCredentialHash(pinCode),
+      );
+      if (remoteUser.id != null) {
+        await _db.insertUser(remoteUser);
       }
-
-      _loginError = decoded['message']?.toString() ??
-          'Registration details are not valid.';
+      _registrationSuccess = true;
+      _isLoading = false;
+      notifyListeners();
+      return true;
+    } on ApiException catch (e) {
+      _loginError = e.message;
     } catch (e) {
       debugPrint('Student registration request failed: $e');
       _loginError =
@@ -1328,12 +1301,11 @@ class CafeteriaProvider extends ChangeNotifier {
 
     // Refresh user's lists specifically
     if (targetUser.role == 'STUDENT') {
-      orders.setCustomerOrders(
-          await _db.getOrdersForCustomer(targetUser.id!));
+      orders.setCustomerOrders(await _db.getOrdersForCustomer(targetUser.id!));
     } else if (targetUser.role == 'VENDOR') {
       orders.setVendorOrders(await _db.getOrdersForVendor(targetUser.id!));
-      catalogue.setVendorFoodItems(
-          await _db.getFoodItemsByVendor(targetUser.id!));
+      catalogue
+          .setVendorFoodItems(await _db.getFoodItemsByVendor(targetUser.id!));
       _vendorFeedback = await _db.getFeedbackForVendor(targetUser.id!);
     }
     notifyListeners();
@@ -1414,20 +1386,22 @@ class CafeteriaProvider extends ChangeNotifier {
     // Try to sync with Laravel backend
     int remoteOrderId = orderId;
     try {
-      final decoded = await _api.request(
-        'POST',
-        'customer/orders',
-        body: {
-          'vendor_id': foodItem.vendorId,
-          'menu_item_id': foodItem.id!,
-          'food_name': foodItem.name,
-          'quantity': quantity,
-          'unit_price': foodItem.price,
-          'total_price': requiredSum,
-        },
-        token: _authToken,
-        idempotencyKey: ApiClient.newIdempotencyKey(),
-      ).timeout(const Duration(seconds: 10));
+      final decoded = await _api
+          .request(
+            'POST',
+            'customer/orders',
+            body: {
+              'vendor_id': foodItem.vendorId,
+              'menu_item_id': foodItem.id!,
+              'food_name': foodItem.name,
+              'quantity': quantity,
+              'unit_price': foodItem.price,
+              'total_price': requiredSum,
+            },
+            token: _authToken,
+            idempotencyKey: ApiClient.newIdempotencyKey(),
+          )
+          .timeout(const Duration(seconds: 10));
 
       final orderMap = decoded is Map ? (decoded['order'] ?? decoded) : null;
       final remoteId = orderMap is Map ? orderMap['id'] : null;
@@ -1437,7 +1411,8 @@ class CafeteriaProvider extends ChangeNotifier {
             "Order synced with Laravel backend successfully. Real order ID: $remoteOrderId");
       }
     } catch (e) {
-      debugPrint("Laravel sync unavailable ($e). Queuing for offline delivery.");
+      debugPrint(
+          "Laravel sync unavailable ($e). Queuing for offline delivery.");
       try {
         await _orderQueue.enqueue(
           payload: {
@@ -1622,11 +1597,21 @@ class CafeteriaProvider extends ChangeNotifier {
 
     final sseUrl =
         Uri.parse("$_laravelBaseUrl/api/orders/$orderId/tracking?stream=1");
+    if (kReleaseMode && sseUrl.scheme != 'https') {
+      debugPrint(
+          'Skipping insecure real-time tracking endpoint in production.');
+      _runOfflineFallbackSimulation(orderId);
+      return;
+    }
 
     // Attempt real-time SSE stream connection to the Laravel backend
     HttpClient().getUrl(sseUrl).then((HttpClientRequest request) {
       request.headers.add("Accept", "text/event-stream");
       request.headers.add("X-Requested-With", "XMLHttpRequest");
+      if (_authToken != null && _authToken!.isNotEmpty) {
+        request.headers
+            .add(HttpHeaders.authorizationHeader, 'Bearer $_authToken');
+      }
       return request.close();
     }).then((HttpClientResponse response) {
       if (response.statusCode == 200) {
@@ -1786,24 +1771,13 @@ class CafeteriaProvider extends ChangeNotifier {
     }
 
     try {
-      final response = await http
+      await _api
           .patch(
-            Uri.parse('$_laravelBaseUrl/api/vendor/status'),
-            headers: {
-              'Accept': 'application/json',
-              'Content-Type': 'application/json',
-              'Authorization': 'Bearer $_authToken',
-            },
-            body: jsonEncode({'is_open': !isClosed}),
+            'vendor/status',
+            body: {'is_open': !isClosed},
+            idempotencyKey: ApiClient.newIdempotencyKey(),
           )
           .timeout(const Duration(seconds: 8));
-
-      if (response.statusCode != 200) {
-        _isStoreClosed = previous;
-        notifyListeners();
-        debugPrint('Vendor store status update failed: ${response.body}');
-        return;
-      }
 
       await refreshAllData();
     } catch (e) {
@@ -2098,9 +2072,8 @@ class CafeteriaProvider extends ChangeNotifier {
           .timeout(const Duration(seconds: 8));
 
       final wrapper = decoded is Map ? decoded['data'] : null;
-      final items = wrapper is Map
-          ? wrapper['data']
-          : (decoded is List ? decoded : null);
+      final items =
+          wrapper is Map ? wrapper['data'] : (decoded is List ? decoded : null);
       if (items is! List) return;
 
       for (final item in items) {
@@ -2110,8 +2083,7 @@ class CafeteriaProvider extends ChangeNotifier {
           userId: item['user_id'],
           action: item['action'],
           details: item['details'],
-          timestamp:
-              item['timestamp'] ?? DateTime.now().millisecondsSinceEpoch,
+          timestamp: item['timestamp'] ?? DateTime.now().millisecondsSinceEpoch,
         );
         await _db.insertAuditLog(log);
       }

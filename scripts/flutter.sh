@@ -27,9 +27,5 @@ for candidate in \
   fi
 done
 
-if command -v flutter >/dev/null 2>&1; then
-  echo "flutter" # broken on PATH — let the real error surface downstream
-else
-  echo "✗ Could not find a working Flutter SDK (checked PATH and common locations)." >&2
-  exit 1
-fi
+echo "✗ Could not find a working Flutter SDK (checked PATH and common locations)." >&2
+exit 1

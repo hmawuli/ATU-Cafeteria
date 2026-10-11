@@ -11,9 +11,12 @@ class CustomerAccountScreen extends StatelessWidget {
       context: context,
       builder: (ctx) => AlertDialog(
         title: const Text('Close customer account?'),
-        content: const Text('Your account will be closed and active sessions revoked. Order and financial history may be retained for audit and reconciliation.'),
+        content: const Text(
+            'Your account will be closed and active sessions revoked. Order and financial history may be retained for audit and reconciliation.'),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Keep account')),
+          TextButton(
+              onPressed: () => Navigator.pop(ctx, false),
+              child: const Text('Keep account')),
           FilledButton(
             onPressed: () => Navigator.pop(ctx, true),
             style: FilledButton.styleFrom(backgroundColor: Colors.redAccent),
@@ -22,17 +25,23 @@ class CustomerAccountScreen extends StatelessWidget {
         ],
       ),
     );
-    if (ok != true || !context.mounted) return;
-    final api = ApiClient();
+    if (ok != true || !context.mounted) {
+      return;
+    }
+    final api = context.read<ApiClient>();
     try {
-      await api.delete('/customer/account', idempotencyKey: ApiClient.newIdempotencyKey());
-      if (!context.mounted) return;
+      await api.delete('/customer/account',
+          idempotencyKey: ApiClient.newIdempotencyKey());
+      if (!context.mounted) {
+        return;
+      }
       context.read<CafeteriaProvider>().logOut();
       Navigator.pushNamedAndRemoveUntil(context, '/login', (_) => false);
     } catch (e) {
-      if (context.mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.toString())));
-    } finally {
-      api.close();
+      if (context.mounted) {
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text(e.toString())));
+      }
     }
   }
 
@@ -47,14 +56,18 @@ class CustomerAccountScreen extends StatelessWidget {
           Card(
             child: ListTile(
               leading: const CircleAvatar(child: Icon(Icons.person_outline)),
-              title: Text(user?.fullName ?? 'Customer', style: const TextStyle(fontWeight: FontWeight.w900)),
+              title: Text(user?.fullName ?? 'Customer',
+                  style: const TextStyle(fontWeight: FontWeight.w900)),
               subtitle: Text(user?.email ?? user?.username ?? ''),
             ),
           ),
           const SizedBox(height: 12),
-          _item(context, Icons.location_on_outlined, 'Saved addresses', 'Manage saved customer addresses', '/customer-addresses'),
-          _item(context, Icons.devices_outlined, 'Devices & sessions', 'Review and revoke registered devices', '/customer-devices'),
-          _item(context, Icons.support_agent_outlined, 'Support', 'Create and track support requests', '/customer-support'),
+          _item(context, Icons.location_on_outlined, 'Saved addresses',
+              'Manage saved customer addresses', '/customer-addresses'),
+          _item(context, Icons.devices_outlined, 'Devices & sessions',
+              'Review and revoke registered devices', '/customer-devices'),
+          _item(context, Icons.support_agent_outlined, 'Support',
+              'Create and track support requests', '/customer-support'),
           const SizedBox(height: 24),
           OutlinedButton.icon(
             onPressed: () => _close(context),
@@ -67,7 +80,8 @@ class CustomerAccountScreen extends StatelessWidget {
     );
   }
 
-  Widget _item(BuildContext context, IconData icon, String title, String subtitle, String route) {
+  Widget _item(BuildContext context, IconData icon, String title,
+      String subtitle, String route) {
     return Card(
       child: ListTile(
         leading: Icon(icon),
