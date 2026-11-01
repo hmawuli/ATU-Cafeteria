@@ -23,7 +23,7 @@ jobs:
         with:
           fetch-depth: 0
       - name: Scan for committed credentials
-        uses: gitleaks/gitleaks-action@v2
+        uses: gitleaks/gitleaks-action@v3
 
   codeql:
     name: CodeQL (PHP)
